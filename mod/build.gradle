@@ -60,6 +60,7 @@ def modMetadata = [
     loader_version    : loader_version,
     fabric_api_version: fabric_api_version,
     java_version      : java_version,
+    cca_version       : cca_version,
 ]
 
 processResources {
