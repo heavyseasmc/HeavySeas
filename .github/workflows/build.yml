@@ -13,10 +13,11 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '21'   # 与 gradle.properties 的 java_version 保持一致
       - uses: gradle/actions/setup-gradle@v4
-      - name: 规则引擎单元测试
-        run: ./gradlew :engine:test
+      # 引擎单测、两道依赖闸门、模组编译与打包 —— 与本地门禁的构建部分一致。
+      - name: 构建与单元测试
+        run: ./gradlew build
       - uses: actions/upload-artifact@v4
         if: always()
         with:
