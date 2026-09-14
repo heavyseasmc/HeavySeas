@@ -3,6 +3,9 @@ package io.github.heavyseasmc.mod.state;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Phase;
 
+import java.util.List;
+import java.util.Objects;
+
 /**
  * 客户端 HUD 看得到的全部东西 —— 一份<b>投影</b>，不是对局状态。
  *
@@ -11,7 +14,9 @@ import io.github.heavyseasmc.engine.state.Phase;
  * 写完全不同的内容。手牌与爱恨将来必须按人裁剪（否则开挂的人能读到别人的牌），
  * 所以这条通路从第一天起就按「每人一份」建，而不是先广播全量、以后再来拆。
  *
- * <p>现在只有身份与伤势，那是 M1 的 HUD 全部需要的（方案 §4.1：全场只有一套识别词，职业）。
+ * <p>手牌就走这条路：它在 {@code writeSyncPacket} 里<b>只写收件人自己那一份</b>，
+ * 别人的包里根本没有这些字节 —— 改过的客户端也读不到不存在的东西。
+ * 「发全量再让客户端藏起来」在这里是错的，理由与补给箱的 offer 同一条（决策 ⑨）。
  *
  * @param active    这个世界上有没有在进行的对局
  * @param turn      第几回合
@@ -24,12 +29,23 @@ import io.github.heavyseasmc.engine.state.Phase;
  * @param condition 清醒 / 昏迷 / 死亡
  * @param thirst    口渴标记数
  * @param yourTurn  正轮到他行动
+ * @param hand      收件人自己的手牌（物资 id，<b>可重复</b>：水有 16 张）。
+ *                  旁观者与没座位的人拿到的是空表
  */
 public record HudView(boolean active, int turn, Phase phase, int gulls,
                       boolean seated, String character, int health, int maxHealth,
-                      Condition condition, int thirst, boolean yourTurn) {
+                      Condition condition, int thirst, boolean yourTurn, List<String> hand) {
+
+    public HudView {
+        hand = List.copyOf(Objects.requireNonNull(hand, "hand"));
+    }
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
-    public static final HudView IDLE =
-            new HudView(false, 0, Phase.PROVISION, 0, false, "", 0, 0, Condition.CONSCIOUS, 0, false);
+    public static final HudView IDLE = new HudView(
+            false, 0, Phase.PROVISION, 0, false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of());
+
+    /** 在局里、有座位，而且手上有牌 —— 手牌界面开不开得起来只看这一条。 */
+    public boolean hasHand() {
+        return active && seated && !hand.isEmpty();
+    }
 }

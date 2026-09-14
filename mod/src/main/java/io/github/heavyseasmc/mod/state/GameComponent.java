@@ -16,8 +16,10 @@ import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -94,9 +96,27 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return session != null && seatOf(player.getUuid()).isPresent();
     }
 
-    /** ❗按收件人裁剪：每个人只拿到自己那一份。手牌与爱恨将来走的是同一条路。 */
+    /**
+     * 收尾哨兵。写在每一条分支的最后，读到的第一件事就是核对它。
+     *
+     * <h2>它防的是一种不会报错的坏法</h2>
+     * 写 5 个字段、读 4 个，缓冲区从此错位：后面每个字段都读到<b>上一个字段的字节</b>，
+     * 于是回合数变成天文数字、枚举下标越界、字符串长度荒唐。表现随机，
+     * 而<b>哪一条都不会指向真正的原因</b>（两边字段表不一致）。
+     *
+     * <p>加一个哨兵之后，这类错位一定在这里当场变成一句点名的报错。
+     * 这是本仓库那条老教训的同一形态：让「漏了」与「对了」在输出上分得开。
+     */
+    private static final int SYNC_END = 0x53_45_41_53;
+
+    /** ❗按收件人裁剪：每个人只拿到自己那一份。手牌走的就是这条路。 */
     @Override
     public void writeSyncPacket(RegistryByteBuf buf, ServerPlayerEntity recipient) {
+        writeView(buf, recipient);
+        buf.writeInt(SYNC_END);           // ❗必须是最后一笔，且每条分支都经过这里
+    }
+
+    private void writeView(RegistryByteBuf buf, ServerPlayerEntity recipient) {
         buf.writeBoolean(session != null);
         if (session == null) {
             return;
@@ -118,20 +138,37 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeEnumConstant(g.conditionOf(id));
         buf.writeVarInt(g.stateOf(id).thirst().count());
         buf.writeBoolean(g.nextActor().map(id::equals).orElse(false));
+        // 手牌只写这一份 —— 别人的包里没有这些字节，不是「发了再藏」。
+        List<String> hand = g.stateOf(id).hand();
+        buf.writeVarInt(hand.size());
+        for (String card : hand) {
+            buf.writeString(card);
+        }
     }
 
     @Override
     public void applySyncPacket(RegistryByteBuf buf) {
+        HudView next = readView(buf);
+        int mark = buf.readInt();
+        if (mark != SYNC_END) {
+            // ❗先核对再赋值：半截读出来的投影不许装进界面。
+            throw new IllegalStateException(
+                    "对局投影的收尾标记对不上（读到 0x%08X）—— 两端的字段表不一致，八成是改了一侧忘了改另一侧"
+                            .formatted(mark));
+        }
+        view = next;
+    }
+
+    private static HudView readView(RegistryByteBuf buf) {
         if (!buf.readBoolean()) {
-            view = HudView.IDLE;
-            return;
+            return HudView.IDLE;
         }
         int turn = buf.readVarInt();
         Phase phase = buf.readEnumConstant(Phase.class);
         int gulls = buf.readVarInt();
         if (!buf.readBoolean()) {
-            view = new HudView(true, turn, phase, gulls, false, "", 0, 0, Condition.CONSCIOUS, 0, false);
-            return;
+            return new HudView(true, turn, phase, gulls, false, "", 0, 0,
+                    Condition.CONSCIOUS, 0, false, List.of());
         }
         String character = buf.readString();
         int health = buf.readVarInt();
@@ -139,8 +176,44 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         Condition condition = buf.readEnumConstant(Condition.class);
         int thirst = buf.readVarInt();
         boolean yourTurn = buf.readBoolean();
-        view = new HudView(true, turn, phase, gulls, true, character, health, maxHealth,
-                condition, thirst, yourTurn);
+        int cards = buf.readVarInt();
+        List<String> hand = new ArrayList<>(cards);
+        for (int i = 0; i < cards; i++) {
+            hand.add(buf.readString());
+        }
+        return new HudView(true, turn, phase, gulls, true, character, health, maxHealth,
+                condition, thirst, yourTurn, List.copyOf(hand));
+    }
+
+    /**
+     * 物资阶段这一轮的运行时状态：超时时刻与当前高亮。
+     *
+     * <p>**不持久化**，也不该持久化 —— 它是一轮传递之内的东西，跨存档没有意义。
+     * 超时时刻放服务端是因为它是权威：客户端自己算超时的话，改过的客户端可以永远不超时。
+     */
+    private long provisionDeadline;
+    private int provisionHighlight;
+
+    public long provisionDeadline() {
+        return provisionDeadline;
+    }
+
+    public void setProvisionDeadline(long millis) {
+        this.provisionDeadline = millis;
+    }
+
+    /** 持有者最后一次上报的高亮下标。超时时认它（决策 ⑨：不是随机）。 */
+    public int provisionHighlight() {
+        return provisionHighlight;
+    }
+
+    public void setProvisionHighlight(int index) {
+        this.provisionHighlight = Math.max(0, index);
+    }
+
+    public void clearProvision() {
+        this.provisionDeadline = 0L;
+        this.provisionHighlight = 0;
     }
 
     public Optional<Session> session() {
@@ -166,6 +239,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     public void end() {
         this.session = null;
         this.occupants.clear();
+        clearProvision();
     }
 
     public Map<CharacterId, Occupant> occupants() {

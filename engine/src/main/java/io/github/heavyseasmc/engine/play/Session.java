@@ -82,11 +82,7 @@ public final class Session {
     }
 
     /**
-     * 物资阶段。
-     *
-     * <p>❗<b>手牌与物资尚未建模</b>，所以这里只把「抽牌数 = 存活且清醒者数」算一遍。
-     * 写成一个会返回数字的方法而不是空实现，是为了让它<b>有可能出错</b> ——
-     * 一个什么都不做的空方法，和一个坏掉的物资阶段，表现完全一样。
+     * 物资阶段该抽几张 = <b>存活且清醒者数</b>。
      *
      * @return 本阶段该抽几张
      */
@@ -96,6 +92,90 @@ public final class Session {
             throw new IllegalStateException("抽牌数不可能为负");
         }
         return draws;
+    }
+
+    // ---------------------------------------------------------------- 物资阶段
+
+    /** 这一轮传递的顺序：开始时的清醒者，船头到船尾。**中途不重算**。 */
+    private List<CharacterId> provisionChain = List.of();
+
+    /** 当前持有者看得到的牌。 */
+    private final List<String> provisionOffer = new ArrayList<>();
+
+    /** 箱子传到第几个人（下标指向 {@link #provisionChain}）。 */
+    private int provisionAt;
+
+    /**
+     * 开始一轮传递：最靠船头的清醒角色抽 N 张。
+     *
+     * <p>❗<b>顺序在开始时定死，中途不重算。</b> 传递过程中有人昏迷时，
+     * 若按「当前清醒者」重算，箱子会在半路改道 —— 而前面的人已经按旧顺序看过牌了，
+     * 信息梯度就对不上了。
+     *
+     * <p>牌堆不够 N 张时有几张抽几张；一张都没有就直接结束（规则：抽完即止，不洗回）。
+     *
+     * @return 第一位看得到的牌；空表示本阶段无事可做
+     */
+    public List<String> beginProvision() {
+        provisionChain = List.copyOf(state.consciousBySeat());
+        provisionOffer.clear();
+        provisionAt = 0;
+        if (provisionChain.isEmpty()) {
+            return List.of();
+        }
+        provisionOffer.addAll(table.drawProvisions(provisionDraws()));
+        return List.copyOf(provisionOffer);
+    }
+
+    /** 箱子在谁手上；空表示这一轮已经传完（或根本没开始）。 */
+    public Optional<CharacterId> provisionHolder() {
+        if (provisionOffer.isEmpty() || provisionAt >= provisionChain.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(provisionChain.get(provisionAt));
+    }
+
+    /** 这一轮的传递顺序（角色 id），开始时定死。**公开信息**：全船都看得见箱子怎么传。 */
+    public List<String> provisionChainIds() {
+        return provisionChain.stream().map(CharacterId::value).toList();
+    }
+
+    /** 箱子传到第几位。{@code >= 链长} 表示这一轮结束。 */
+    public int provisionIndex() {
+        return provisionAt;
+    }
+
+    /** 当前持有者看得到的牌。**只有他看得到** —— 这是规则，不是显示差异。 */
+    public List<String> provisionOffer() {
+        return List.copyOf(provisionOffer);
+    }
+
+    /**
+     * 留下一张，其余传给下一位。
+     *
+     * @param cardId 必须是当前 offer 里的一张
+     * @throws IllegalStateException     现在没有人持有箱子
+     * @throws IllegalArgumentException  这张牌不在 offer 里 —— 静默改成别的会让作弊看不出来
+     */
+    public void provisionKeep(String cardId) {
+        CharacterId holder = provisionHolder().orElseThrow(
+                () -> new IllegalStateException("%s 现在没有人持有补给箱".formatted(context)));
+        if (!provisionOffer.remove(cardId)) {
+            throw new IllegalArgumentException(
+                    "%s %s 留的 %s 不在他看得到的牌里".formatted(context, holder.value(), cardId));
+        }
+        state = state.withState(holder, state.stateOf(holder).withCard(cardId));
+        provisionAt++;
+        Invariants.requireValid(state, context, "物资留牌后");
+    }
+
+    /**
+     * 这一轮传递是否还没结束。
+     *
+     * <p>结束有两种：传完最后一位，或者牌提前发光（牌堆不够时会这样）。
+     */
+    public boolean provisionInProgress() {
+        return provisionHolder().isPresent();
     }
 
     /** 下一个该行动的人；空表示本阶段没人能再行动（**合法状态，不是死锁**）。 */

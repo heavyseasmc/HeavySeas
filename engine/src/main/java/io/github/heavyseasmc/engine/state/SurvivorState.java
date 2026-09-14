@@ -4,6 +4,8 @@ import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.thirst.ThirstSource;
 import io.github.heavyseasmc.engine.thirst.ThirstTally;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -19,18 +21,23 @@ import java.util.Objects;
  * @param damage      累计伤害。只增不减，唯一的例外是医疗箱（-1）
  * @param thirst      本回合累积的口渴来源。航海阶段结束时清空
  * @param actedThisTurn 本回合是否已经行动过。行动阶段按「最靠船头且未行动」取人
+ * @param hand        手牌（物资 id，可重复 —— 水有 16 张）。
+ *                    <b>只存 id 不存效果</b>：效果在 {@code data/provisions} 里，
+ *                    抄一份进状态就有了两个真相源
  */
 public record SurvivorState(
         CharacterId id,
         int seat,
         int damage,
         ThirstTally thirst,
-        boolean actedThisTurn
+        boolean actedThisTurn,
+        List<String> hand
 ) {
 
     public SurvivorState {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(thirst, "thirst");
+        hand = List.copyOf(Objects.requireNonNull(hand, "hand"));
         if (seat < 1) {
             throw new IllegalArgumentException("座位号从 1 起（船头），实际: " + seat);
         }
@@ -41,11 +48,11 @@ public record SurvivorState(
 
     /** 开局状态：未受伤、未渴、未行动。 */
     public static SurvivorState fresh(CharacterId id, int seat) {
-        return new SurvivorState(id, seat, 0, ThirstTally.none(), false);
+        return new SurvivorState(id, seat, 0, ThirstTally.none(), false, List.of());
     }
 
     public SurvivorState withDamage(int newDamage) {
-        return newDamage == damage ? this : new SurvivorState(id, seat, newDamage, thirst, actedThisTurn);
+        return newDamage == damage ? this : new SurvivorState(id, seat, newDamage, thirst, actedThisTurn, hand);
     }
 
     /** 受伤。{@code points} 为 0 时原样返回，省掉一次无意义的分配。 */
@@ -73,16 +80,42 @@ public record SurvivorState(
     }
 
     public SurvivorState withSeat(int newSeat) {
-        return newSeat == seat ? this : new SurvivorState(id, newSeat, damage, thirst, actedThisTurn);
+        return newSeat == seat ? this : new SurvivorState(id, newSeat, damage, thirst, actedThisTurn, hand);
     }
 
     public SurvivorState thirstFrom(ThirstSource source) {
         ThirstTally next = thirst.with(source);
-        return next == thirst ? this : new SurvivorState(id, seat, damage, next, actedThisTurn);
+        return next == thirst ? this : new SurvivorState(id, seat, damage, next, actedThisTurn, hand);
+    }
+
+    /**
+     * 拿到一张物资。
+     *
+     * <p>❗手牌**允许重复**：水有 16 张，同一个 id 拿两张是常态。
+     * 用 List 而不是 Set 正是为此 —— 用 Set 的话第二张水会被悄悄吞掉。
+     */
+    public SurvivorState withCard(String cardId) {
+        Objects.requireNonNull(cardId, "cardId");
+        List<String> next = new ArrayList<>(hand);
+        next.add(cardId);
+        return new SurvivorState(id, seat, damage, thirst, actedThisTurn, next);
+    }
+
+    /**
+     * 打出/被夺走一张。
+     *
+     * @throws IllegalArgumentException 手里没有这张 —— 静默忽略会让「牌凭空消失」查不出来
+     */
+    public SurvivorState withoutCard(String cardId) {
+        List<String> next = new ArrayList<>(hand);
+        if (!next.remove(cardId)) {
+            throw new IllegalArgumentException("%s 手里没有 %s".formatted(id, cardId));
+        }
+        return new SurvivorState(id, seat, damage, thirst, actedThisTurn, next);
     }
 
     public SurvivorState markActed() {
-        return actedThisTurn ? this : new SurvivorState(id, seat, damage, thirst, true);
+        return actedThisTurn ? this : new SurvivorState(id, seat, damage, thirst, true, hand);
     }
 
     /**
@@ -96,6 +129,6 @@ public record SurvivorState(
     public SurvivorState endOfTurn() {
         return thirst.isEmpty() && !actedThisTurn
                 ? this
-                : new SurvivorState(id, seat, damage, ThirstTally.none(), false);
+                : new SurvivorState(id, seat, damage, ThirstTally.none(), false, hand);
     }
 }

@@ -22,6 +22,11 @@ import java.util.List;
  * 全船一眼可见，零自定义渲染）。HUD 要补的只是血条说不出的三件事：
  * 第几回合、什么阶段、几只海鸥，外加「我是谁」。
  *
+ * <h2>它只说「有」，不说「是什么」</h2>
+ * 手牌这一行只给张数与开界面的键。牌面本身归手牌那一面（{@link HandScreen}）——
+ * 把牌名铺在 HUD 上，一是挤，二是<b>别人凑过来看屏幕就全知道了</b>，
+ * 而本作的手牌是隐藏信息。
+ *
  * <h2>识别词只有一套：职业</h2>
  * 方案 §4.1：HUD 与卡面用同一个词，称呼层已取消。所以这里显示的是「珠宝商」，
  * 不是名字，也不是数值 —— 数值分不开人（陪酒女与小孩两项全同）。
@@ -39,6 +44,12 @@ public final class GameHud {
         if (client.world == null || client.player == null || client.options.hudHidden) {
             return;
         }
+        if (client.currentScreen instanceof GameScreen) {
+            // 对局界面自带上带（回合 · 阶段 · 海鸥）。两份一起画，HUD 的字会从界面的底色后面透出来、
+            // 跟座位轨叠在一起（2026-09-15 真实客户端上看到的）。聊天框等别的界面开着时照常画：
+            // 谈判就在聊天里，那时正需要看「轮到谁」。
+            return;
+        }
         HudView view = GameComponents.of(client.world).hudView();
         if (!view.active()) {
             return;                          // 没有对局就什么都不画，不留一个空框
@@ -54,6 +65,12 @@ public final class GameHud {
                     conditionName(view.condition()), view.thirst()));
             if (view.yourTurn()) {
                 lines.add(Text.translatable("heavyseas.hud.your_turn").formatted(Formatting.YELLOW));
+            }
+            // ❗手上有牌却没有任何提示，等于没有手牌 —— 玩家不会去猜某个键能开一个界面。
+            //   显示的是**实际绑定的那个键**，不是写死的 H：改了键位还说 H 就是在说谎。
+            if (!view.hand().isEmpty()) {
+                lines.add(Text.translatable("heavyseas.hud.hand", view.hand().size(),
+                        HeavySeasClient.handKey().getBoundKeyLocalizedText()));
             }
         } else {
             lines.add(Text.translatable("heavyseas.hud.watching").formatted(Formatting.GRAY));

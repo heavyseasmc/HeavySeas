@@ -17,16 +17,18 @@ import java.util.Set;
  *
  * @param variant    三份数据共同自称的 id，形如 {@code heavyseas:default}
  * @param roster     角色表与预设
- * @param provisions 物资 id 全集
+ * @param provisions 物资 id 全集（航海牌的 conditional 条件靠它做白名单）
+ * @param provisionDeck 整副物资牌，按张数展开成 47 张 —— 发牌要的是这一份，不是全集
  * @param navigation 航海牌堆
  */
 public record GameData(String variant, RosterData roster, Set<String> provisions,
-                       List<NavigationCard> navigation) {
+                       List<String> provisionDeck, List<NavigationCard> navigation) {
 
     public GameData {
         Objects.requireNonNull(variant, "variant");
         Objects.requireNonNull(roster, "roster");
         provisions = Set.copyOf(provisions);
+        provisionDeck = List.copyOf(provisionDeck);
         navigation = List.copyOf(navigation);
     }
 }

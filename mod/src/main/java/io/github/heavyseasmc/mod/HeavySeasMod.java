@@ -3,8 +3,14 @@ package io.github.heavyseasmc.mod;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.command.SeasCommand;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.game.ProvisionPhase;
+import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
+import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,5 +36,16 @@ public final class HeavySeasMod implements ModInitializer {
         GameDataLoader.register();
         CommandRegistrationCallback.EVENT.register(
                 (dispatcher, registryAccess, environment) -> SeasCommand.register(dispatcher));
+
+        // 两个包都要在**两端**注册类型，否则一端发得出、另一端认不得，
+        // 表现是安静地丢包而不是报错。客户端那一半在 HeavySeasClient。
+        PayloadTypeRegistry.playS2C().register(ProvisionUpdateS2C.ID, ProvisionUpdateS2C.CODEC);
+        PayloadTypeRegistry.playC2S().register(ProvisionActionC2S.ID, ProvisionActionC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(ProvisionActionC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> ProvisionPhase.onAction(context.player(), payload)));
+
+        // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
+        ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
     }
 }

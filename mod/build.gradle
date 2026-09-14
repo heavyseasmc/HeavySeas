@@ -128,7 +128,10 @@ def checkLangKeys = tasks.register('checkLangKeys') {
         onlyZh.each { problems << "只有 zh_cn 有：${it}" }
         onlyEn.each { problems << "只有 en_us 有：${it}" }
 
-        def pattern = ~/"(heavyseas\.[A-Za-z0-9_.]+)"/
+        // 两族键：界面文案 heavyseas.*，以及键位那一族 key.categories.heavyseas / key.heavyseas.*。
+        // ❗第二族单独写一条，是因为它**不以 heavyseas 开头** —— 漏了它，
+        //   键位设置里会直接显示 `key.heavyseas.hand` 这行原文，而游戏照跑、没有任何报错。
+        def pattern = ~/"(heavyseas\.[A-Za-z0-9_.]+|key\.[A-Za-z0-9_.]*heavyseas[A-Za-z0-9_.]*)"/
         def used = [] as Set
         sources.each { f ->
             // 以 . 结尾的是拼接用的前缀（唯一一处：角色那一族），不是键本身。
@@ -141,6 +144,10 @@ def checkLangKeys = tasks.register('checkLangKeys') {
         if (used.isEmpty()) {
             // 正向对照：扫到 0 个与「全都有」输出一样。至少 /seas 的报错键该在。
             throw new GradleException('一个 lang 键都没扫到 —— 判据坏了，不是代码干净')
+        }
+        // 第二族也要各自有正向对照：只写一条 isEmpty，键位那一族整族扫不到时照样是绿的。
+        if (!used.any { it.startsWith('key.') }) {
+            throw new GradleException('键位那一族一个都没扫到 —— 正则的第二个分支坏了，不是真的没有键位')
         }
         (used - zh.keySet()).sort().each { problems << "代码用到但 lang 里没有：${it}" }
 
@@ -166,6 +173,78 @@ def checkLangKeys = tasks.register('checkLangKeys') {
 
 tasks.named('check') {
     dependsOn checkLangKeys
+}
+
+// Minecraft 不认 SVG —— GUI 里能画的只有 PNG。贴图由内部管线烘出来并**入库**：
+// 生成物入库是有意的，否则一份干净的克隆构建不出能用的 jar。
+//
+// 这道闸门查四件事，四件都是安静的失败：
+//   ① 数据里有这张牌、贴图却没烘 —— 运行时表现是一块紫黑格子，不报错；
+//   ② 贴图烘成了 0 字节或不是 PNG —— 无头浏览器那一步失败时正是这样，而它 exit 0；
+//   ③ 贴图小于 600×840 —— GUI 那一侧就得放大着画，字又糊回去
+//      （2026-09-15 真实客户端上看到的，正是 300×420 被拉大）；
+//   ④ 比例不是 5:7 —— 版面按这个比例排，不对就被拉伸，拉伸同样不报错。
+def checkCardTextures = tasks.register('checkCardTextures') {
+    group = 'verification'
+    description = '每一种物资都要有对应的 GUI 贴图：确实是张 PNG、够清楚、比例对'
+    def dataFile = rootProject.file('data/provisions/default.json')
+    // 做成任务属性而不是局部变量：红测要能把它指向一份造坏的目录，而不去改被跟踪的贴图。
+    ext.texDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/provision')
+    def minW = 600
+    def minH = 840
+    inputs.file(dataFile)
+    inputs.dir(ext.texDir).optional()
+    doLast {
+        File texDir = ext.texDir
+        def ids = (new groovy.json.JsonSlurper().parse(dataFile, 'UTF-8') as Map)
+                .cards.collect { it.id.toString() }
+        if (ids.isEmpty()) {
+            throw new GradleException('data/provisions 里一个 id 都没读到 —— 判据坏了，不是真的没有牌')
+        }
+        def problems = []
+        def sizes = [] as Set
+        ids.each { id ->
+            def f = new File(texDir, "${id}.png")
+            if (!f.isFile()) {
+                problems << "缺贴图：${id}.png"
+                return
+            }
+            if (f.length() == 0) {
+                problems << "${id}.png 是 0 字节 —— 烘制那一步失败了"
+                return
+            }
+            // PNG 头：前 4 字节是签名 89 50 4E 47；IHDR 里宽在第 16–19 字节、高在 20–23（大端）。
+            // 截图失败时留下的半截文件过不了签名这一关。
+            def head = new byte[24]
+            int got = f.withInputStream { it.read(head) }
+            if (!(got >= 4 && head[0] == (byte) 0x89 && head[1] == (byte) 0x50
+                    && head[2] == (byte) 0x4E && head[3] == (byte) 0x47)) {
+                problems << "${id}.png 不是 PNG（签名对不上）"
+                return
+            }
+            def be = { int at ->
+                ((head[at] & 0xff) << 24) | ((head[at + 1] & 0xff) << 16) | ((head[at + 2] & 0xff) << 8) | (head[at + 3] & 0xff)
+            }
+            int w = be(16)
+            int h = be(20)
+            if (w < minW || h < minH) {
+                problems << "${id}.png 只有 ${w}×${h}，低于 ${minW}×${minH} —— 烘制倍数不对，GUI 上会糊"
+            } else if (w * 7 != h * 5) {
+                problems << "${id}.png 是 ${w}×${h}，不是 5:7 —— 版面会把它拉伸"
+            }
+            sizes << "${w}×${h}".toString()
+        }
+        if (problems) {
+            throw new GradleException((['GUI 卡面贴图核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        def bytes = ids.sum { new File(texDir, "${it}.png").length() }
+        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkCardTextures
 }
 
 // ❗引擎的运行时依赖不嵌进本模组的 jar，靠 Minecraft 自带的那一份。于是必须同时成立两条：

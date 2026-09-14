@@ -38,13 +38,11 @@ import java.util.Set;
  * 这里一条规则都没有。阶段怎么推进、谁能行动、落海怎么算，全在引擎的 {@code play} 包里 ——
  * 模拟器跑几千局验的就是那一份。本类只做三件事：**问谁、调用、播报**。
  *
- * <h2>M1 的两处刻意缺席</h2>
- * <ul>
- *   <li><b>物资阶段是空转</b>：手牌与物资尚未建模，所以这一阶段只算出「该抽几张」就直接过。
- *       不装作发了牌 —— 装作发了牌，会让「物资没做」与「物资坏了」表现完全一样。</li>
- *   <li><b>没有人能喝水</b>：{@link Session.WaterChoice} 一律返回 0。没有手牌就没有水，
- *       让玩家「喝一张不存在的水」比直接说没有更坏。结果是口渴必定造成伤害，对局偏短。</li>
- * </ul>
+ * <h2>M1 还缺的那一处，说出来</h2>
+ * <b>没有人能喝水</b>：{@link Session.WaterChoice} 一律返回 0。牌现在真的进了手里，
+ * 但「喝几张」是个<b>决策</b>（水同时是谈判筹码，自动替人喝掉就把那条筹码抹了），
+ * 需要一面自己的界面与一份超时规则，都还没有。结果是口渴必定造成伤害，对局偏短。
+ * 写 0 是「这件事还没做」的老实写法，不是平衡取舍。
  */
 public final class GameFlow {
 
@@ -94,7 +92,11 @@ public final class GameFlow {
             occupants.put(shuffled.get(i), new GameComponent.Occupant(null, "dummy"));
         }
 
-        Table table = new Table(new NavigationDeck(data.navigation(), new Random(world.getRandom().nextLong())));
+        // ❗两副牌都要给。只给航海牌的话物资阶段会「牌堆已空」直接跳过 ——
+        //   而对局照样能打到终局，所以这个漏接在别处一点痕迹都没有。
+        Table table = new Table(
+                new NavigationDeck(data.navigation(), new Random(world.getRandom().nextLong())),
+                data.provisionDeck(), new Random(world.getRandom().nextLong()));
         Session session = new Session("world=" + world.getRegistryKey().getValue(), roster, table);
 
         GameComponent component = GameComponents.of(world);
@@ -111,23 +113,46 @@ public final class GameFlow {
         }
         LOGGER.info("对局开始：{} 人局 · 座位 {}", players,
                 session.state().bySeat().stream().map(CharacterId::value).toList());
-        settleIntoActionPhase(world, component);
+        enterProvision(world, component);
     }
 
     /**
-     * 物资阶段只算一遍抽牌数就过去。
+     * 进入物资阶段：补给箱从船头传起。
      *
-     * <p>❗写成一个会说话的步骤而不是悄悄跳过：**「这一阶段没做」与「这一阶段坏了」
-     * 必须在输出上分得开**，否则以后接手的人会以为物资已经实现了。
+     * <p>❗本方法**不推进阶段**。传递是异步的（要等人选牌或等超时），
+     * 推进由 {@link #afterProvision} 在传完之后做 —— 在这里推进会让整轮传递被跳过，
+     * 而表现只是「物资阶段一闪而过」，不报错。
      */
-    public static void settleIntoActionPhase(ServerWorld world, GameComponent component) {
+    public static void enterProvision(ServerWorld world, GameComponent component) {
         Session session = component.requireSession();
-        while (session.state().phase() == Phase.PROVISION && !session.state().isOver()) {
-            int draws = session.provisionDraws();
-            broadcast(world, Text.translatable("heavyseas.game.provision_stub", draws)
-                    .formatted(Formatting.DARK_GRAY));
-            session.advancePhase();
+        if (session.state().phase() != Phase.PROVISION || session.state().isOver()) {
+            announceTurn(world, component);
+            return;
         }
+        if (session.table().provisionsLeft() == 0) {
+            // 牌堆抽完即止，不洗回重用 —— 之后每回合都会走到这里。
+            broadcast(world, Text.translatable("heavyseas.game.provision_empty")
+                    .formatted(Formatting.DARK_GRAY));
+            afterProvision(world, component);
+            return;
+        }
+        // ❗先播报再发牌：全是替身时整轮传递会**同步**走完，
+        //   先 begin 的话「开始」那句会排在「结束」后面。
+        broadcast(world, Text.translatable("heavyseas.game.provision_begin",
+                session.provisionDraws()).formatted(Formatting.DARK_GRAY));
+        if (!ProvisionPhase.begin(world, component)) {
+            afterProvision(world, component);      // 一个清醒的人都没有：别把局面卡在这儿
+        }
+    }
+
+    /** 一轮传递结束之后才推进阶段。由 {@link ProvisionPhase} 回调。 */
+    public static void afterProvision(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        if (session.state().isOver()) {
+            announceOutcome(world, component);
+            return;
+        }
+        session.advancePhase();
         announceTurn(world, component);
     }
 
@@ -138,6 +163,10 @@ public final class GameFlow {
             announceOutcome(world, component);
             return;
         }
+        // ❗推投影要在分支**之前**。原先只有航海那一支推得到，于是物资→行动之后
+        //   HUD 与手牌界面停在「物资」阶段，直到有人行动才跟上 —— 不报错、不掉线，
+        //   只是看起来「这阶段怎么不变」。下面几条 return 各自补一行迟早会漏掉一条。
+        sync(world);
         if (session.state().phase() == Phase.ACTION) {
             Optional<CharacterId> actor = session.nextActor();
             if (actor.isEmpty()) {
@@ -158,7 +187,6 @@ public final class GameFlow {
                 broadcast(world, Text.translatable("heavyseas.game.top_card"));
             }
         }
-        sync(world);
     }
 
     /**
@@ -207,7 +235,7 @@ public final class GameFlow {
             return;
         }
         session.advancePhase();
-        settleIntoActionPhase(world, component);
+        enterProvision(world, component);
     }
 
     private static void announceOutcome(ServerWorld world, GameComponent component) {

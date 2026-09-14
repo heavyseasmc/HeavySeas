@@ -84,19 +84,23 @@ public final class GameDataLoader implements SimpleSynchronousResourceReloadList
     public void reload(ResourceManager manager) {
         DataDocument<RosterData> roster =
                 read(manager, "roster", RosterLoader::loadDocument);
-        DataDocument<Set<String>> provisions =
-                read(manager, "provisions", ProvisionLoader::loadDocument);
+        // 读整副（47 张，按张数展开）而不是 id 全集：全集回答「有哪些东西」，
+        // 拿它当牌堆会发出一副 18 张的牌。id 全集由它派生，只有一处解析。
+        DataDocument<List<String>> provisions =
+                read(manager, "provisions", ProvisionLoader::loadDeckDocument);
         // 航海牌点名角色与物资，必须在那两份之后读 —— 顺序是规则决定的，不是随手排的。
         DataDocument<List<NavigationCard>> navigation =
                 read(manager, "navigation", (source, reader) -> NavigationLoader.loadDocument(
-                        source, reader, roster.value().ids(), provisions.value()));
+                        source, reader, roster.value().ids(), Set.copyOf(provisions.value())));
 
         requireSameVariant(roster, provisions, navigation);
 
-        current = new GameData(roster.id(), roster.value(), provisions.value(), navigation.value());
-        LOGGER.info("数值数据已加载：变体 {} · 角色 {} 个 · 物资 {} 种 · 航海牌 {} 张",
+        current = new GameData(roster.id(), roster.value(), Set.copyOf(provisions.value()),
+                provisions.value(), navigation.value());
+        LOGGER.info("数值数据已加载：变体 {} · 角色 {} 个 · 物资 {} 种 {} 张 · 航海牌 {} 张",
                 roster.id(), roster.value().characters().size(),
-                provisions.value().size(), navigation.value().size());
+                Set.copyOf(provisions.value()).size(), provisions.value().size(),
+                navigation.value().size());
     }
 
     /**
