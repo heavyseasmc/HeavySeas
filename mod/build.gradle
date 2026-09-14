@@ -25,10 +25,20 @@ dependencies {
     include project(':engine')
 }
 
+// fabric.mod.json 里的版本约束全部从 gradle.properties 展开，JSON 里不另写一份。
+// minecraft 展开成精确版本而不是 ~x.y.z：实测 Fabric 的 ~1.21.1 会放行 1.21.2 与 1.21.11。
+def modMetadata = [
+    version           : project.version.toString(),
+    minecraft_version : minecraft_version,
+    loader_version    : loader_version,
+    fabric_api_version: fabric_api_version,
+    java_version      : java_version,
+]
+
 processResources {
-    inputs.property 'version', project.version
+    inputs.properties modMetadata
     filesMatching('fabric.mod.json') {
-        expand version: project.version
+        expand modMetadata
     }
 }
 
