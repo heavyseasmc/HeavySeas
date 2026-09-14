@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.engine.scoring;
 
+import io.github.heavyseasmc.engine.play.Invariants;
 import io.github.heavyseasmc.engine.data.RosterLoader;
 import io.github.heavyseasmc.engine.model.Ability;
 import io.github.heavyseasmc.engine.model.CharacterId;

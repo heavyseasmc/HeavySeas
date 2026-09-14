@@ -1,4 +1,4 @@
-package io.github.heavyseasmc.engine.sim;
+package io.github.heavyseasmc.engine.play;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.state.Condition;
@@ -129,21 +129,37 @@ public final class Invariants {
 
     /** 跨状态检查并在有违规时抛出。 */
     public static void requireValidTransition(GameState before, GameState after, long seed, String where) {
-        List<String> bad = checkTransition(before, after);
-        if (!bad.isEmpty()) {
-            throw new IllegalStateException(
-                    "状态转移非法（seed=%d, %s, 回合 %d → %d）：%s"
-                            .formatted(seed, where, before.turn(), after.turn(), String.join("; ", bad)));
-        }
+        requireValidTransition(before, after, "seed=%d".formatted(seed), where);
     }
 
     /** 检查并在有违规时抛出，附上全部违规与一个可复现的种子。 */
     public static void requireValid(GameState g, long seed, String where) {
+        requireValid(g, "seed=%d".formatted(seed), where);
+    }
+
+    /**
+     * 同上，但出处是一段自述的上下文而不是种子。
+     *
+     * <p>真实对局没有种子 —— 它的「怎么复现」是存档加日志。硬塞一个假种子会让报错
+     * 看上去可复现、实际复现不了，那比没有出处更坏。
+     */
+    public static void requireValidTransition(
+            GameState before, GameState after, String context, String where) {
+        List<String> bad = checkTransition(before, after);
+        if (!bad.isEmpty()) {
+            throw new IllegalStateException(
+                    "状态转移非法（%s, %s, 回合 %d → %d）：%s"
+                            .formatted(context, where, before.turn(), after.turn(), String.join("; ", bad)));
+        }
+    }
+
+    /** 同上。 */
+    public static void requireValid(GameState g, String context, String where) {
         List<String> bad = check(g);
         if (!bad.isEmpty()) {
             throw new IllegalStateException(
-                    "状态非法（seed=%d, %s, 回合 %d, 阶段 %s）：%s"
-                            .formatted(seed, where, g.turn(), g.phase(), String.join("; ", bad)));
+                    "状态非法（%s, %s, 回合 %d, 阶段 %s）：%s"
+                            .formatted(context, where, g.turn(), g.phase(), String.join("; ", bad)));
         }
     }
 }

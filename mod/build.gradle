@@ -24,11 +24,25 @@ loom {
     }
 }
 
+repositories {
+    maven {
+        name = 'Ladysnake'
+        url = 'https://maven.ladysnake.org/releases'
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     mappings "net.fabricmc:yarn:${yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    // Cardinal Components：对局状态的承载层（决策 ⑫）。JIJ 进本模组，玩家不必单独下载。
+    // base 是框架，world 是「World 级组件」那一半 —— 座位数据只能放这一级，理由见 gradle.properties。
+    modImplementation "org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}"
+    modImplementation "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
+    include "org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}"
+    include "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
 
     // 引擎不是 Fabric 模组，只是一个普通 jar：编译期直接依赖，打包时嵌进本模组的 jar。
     // ❗不嵌的话开发环境照样能跑（引擎就在类路径上），玩家那边却是 NoClassDefFoundError ——

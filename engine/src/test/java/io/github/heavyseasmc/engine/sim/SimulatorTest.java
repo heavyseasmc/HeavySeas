@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.engine.sim;
 
+import io.github.heavyseasmc.engine.play.Invariants;
 import io.github.heavyseasmc.engine.model.Ability;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Roster;
@@ -80,6 +81,48 @@ class SimulatorTest {
     @DisplayName("几千局")
     @Timeout(value = 120, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     class ManyGames {
+
+        /**
+         * 钉死八个种子的走向。
+         *
+         * <h2>它防的是什么</h2>
+         * 规则从 {@code Simulator} 的私有方法搬到了 {@link io.github.heavyseasmc.engine.play.Session}
+         * （模拟器与模组共用同一份）。那次搬迁**不该改变任何一局的走向**，当时用 900 局
+         * 逐字节对照验过 —— 但那是个一次性脚本，会话一结束就没了。
+         *
+         * <p>❗<b>一次性的对照等于没有对照。</b> 所以把它压成这张表：四局全灭、四局靠岸，
+         * 回合数与打架次数都不同，任何一处改动都会让某一行对不上，且失败信息直接点名是哪个种子。
+         *
+         * <p>规则**有意**改动时，这张表当然会红 —— 那时照新值更新它，但必须是个明确的动作。
+         */
+        @Test
+        @DisplayName("❗八个种子的走向钉死：规则搬家不得改变任何一局")
+        void pinnedSeeds() {
+            record Pinned(long seed, int turns, int alive, int fights, GameState.Outcome outcome) {
+            }
+            List<Pinned> expected = List.of(
+                    new Pinned(0L, 25, 0, 4, GameState.Outcome.ALL_DEAD),
+                    new Pinned(1L, 9, 0, 8, GameState.Outcome.ALL_DEAD),
+                    new Pinned(2L, 11, 0, 10, GameState.Outcome.ALL_DEAD),
+                    new Pinned(3L, 9, 0, 5, GameState.Outcome.ALL_DEAD),
+                    new Pinned(28L, 34, 1, 2, GameState.Outcome.LANDED),
+                    new Pinned(43L, 15, 1, 6, GameState.Outcome.LANDED),
+                    new Pinned(51L, 14, 1, 5, GameState.Outcome.LANDED),
+                    new Pinned(57L, 9, 1, 7, GameState.Outcome.LANDED));
+
+            // 正向对照：两种终局都得在表里，否则这张表只钉住了一条路。
+            assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.LANDED));
+            assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.ALL_DEAD));
+
+            Simulator sim = new Simulator(roster(), deck());
+            for (Pinned e : expected) {
+                Simulator.Result r = sim.run(e.seed());
+                assertEquals(e.outcome(), r.outcome(), "seed=" + e.seed() + " 终局变了");
+                assertEquals(e.turns(), r.turns(), "seed=" + e.seed() + " 回合数变了");
+                assertEquals(e.alive(), r.alive(), "seed=" + e.seed() + " 终局存活数变了");
+                assertEquals(e.fights(), r.fights(), "seed=" + e.seed() + " 打架次数变了");
+            }
+        }
 
         @Test
         @DisplayName("2000 局全部跑到终局，无死锁、无非法状态")
