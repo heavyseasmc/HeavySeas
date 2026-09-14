@@ -34,64 +34,98 @@ processResources {
 
 // ❗引擎的运行时依赖不嵌进本模组的 jar，靠 Minecraft 自带的那一份。于是必须同时成立两条：
 //   ① Minecraft 带了它 —— 否则玩家那边 NoClassDefFoundError，而开发环境照样能跑；
-//   ② 两边要的是同一个版本 —— 否则单测与开发环境（Gradle 取高版本）测的不是玩家那边的库。
+//   ② 两边是同一个版本 —— 否则单测与开发环境（Gradle 取高版本）测的不是玩家那边的库。
 // 两条被破坏时都不会有任何报错，所以在这里变成构建失败。
-// 判据直接取本模组运行时类路径的依赖图：引擎要的每个库，除了引擎一侧还得有别人要
-// （即 Minecraft 的库清单），并且 Gradle 没有为它做过版本仲裁。
+//
+// 判据是两份各自独立解析的清单直接比对，谁也不从对方推出来：
+//   · 引擎要什么：单独解析引擎自己的运行时依赖闭包（engineRuntimeLibraries，不混入任何别的依赖）；
+//   · MC 带什么：Loom 给出的客户端与服务端运行时库清单，取交集 —— 模组两边都得能跑。
+// ❗不要改回「在模组的类路径上，除了引擎还有别人要它，就算 MC 带了」：模组自己声明的依赖也算「别人」，
+//   引擎与模组都声明一个 MC 不带的库时，那种写法照样放行（实测复现过）。
+// ❗局部变量别与配置同名：同名时 Groovy 把下面的 `engineRuntimeScope project(':engine')`
+//   当成调用这个变量，报 Could not find method call()（实测踩过）。
+def engineScope = configurations.dependencyScope('engineRuntimeScope')
+def engineRuntimeLibraries = configurations.resolvable('engineRuntimeLibraries') {
+    extendsFrom(engineScope.get())
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.JAR))
+        attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+    }
+}
+dependencies {
+    engineRuntimeScope project(':engine')
+}
+
 def engineLibraries = tasks.register('checkEngineLibraries') {
     group = 'verification'
-    description = '引擎的运行时依赖必须由 Minecraft 自带，且版本一致'
-    def graph = configurations.named('runtimeClasspath').flatMap { it.incoming.resolutionResult.rootComponent }
+    description = '引擎的运行时依赖必须由 Minecraft 自带（客户端与服务端都带），且版本一致'
+    def required = engineRuntimeLibraries.flatMap { it.incoming.resolutionResult.rootComponent }
+    def client = configurations.named('minecraftClientRuntimeLibraries').flatMap { it.incoming.resolutionResult.rootComponent }
+    def server = configurations.named('minecraftServerRuntimeLibraries').flatMap { it.incoming.resolutionResult.rootComponent }
     doLast {
-        def resolvedChildren = { node ->
-            node.dependencies.findAll { it instanceof ResolvedDependencyResult }.collect { it.selected }
-        }
-
-        def engine = null
-        def seen = [] as Set
-        def queue = [graph.get()]
-        while (queue) {
-            def node = queue.remove(0)
-            if (!seen.add(node)) {
-                continue
-            }
-            if (node.id instanceof ProjectComponentIdentifier && node.id.projectPath == ':engine') {
-                engine = node
-            }
-            queue.addAll(resolvedChildren(node))
-        }
-        if (engine == null) {
-            // 检查对象不在图里时，下面的循环一次都不会进 —— 那就是一道只见过绿灯的闸门。
-            throw new GradleException('运行时类路径里找不到 :engine，这道检查什么也没查到')
-        }
-
-        def engineSide = [engine] as Set
-        def pending = [engine]
-        while (pending) {
-            resolvedChildren(pending.remove(0)).each {
-                if (engineSide.add(it)) {
-                    pending << it
+        // 一张解析结果里的全部模块（不含工程节点）：group:name → version。解析不了的依赖一律当场失败，不跳过。
+        def modulesOf = { String label, root ->
+            def found = [:]
+            def seen = [] as Set
+            def queue = [root]
+            while (queue) {
+                def node = queue.remove(0)
+                if (!seen.add(node)) {
+                    continue
+                }
+                if (node.id instanceof ModuleComponentIdentifier) {
+                    found[node.id.group + ':' + node.id.module] = node.id.version
+                }
+                node.dependencies.each { edge ->
+                    if (!(edge instanceof ResolvedDependencyResult)) {
+                        throw new GradleException("${label} 里有解析不了的依赖：${edge.requested.displayName}")
+                    }
+                    queue << edge.selected
                 }
             }
+            found
         }
-        def libraries = engineSide - engine
+
+        def requiredRoot = required.get()
+        def engineFound = requiredRoot.dependencies.any {
+            it instanceof ResolvedDependencyResult &&
+                    it.selected.id instanceof ProjectComponentIdentifier && it.selected.id.projectPath == ':engine'
+        }
+        if (!engineFound) {
+            // 检查对象不在图里时，下面的比对一次都不会进 —— 那就是一道只见过绿灯的闸门。
+            throw new GradleException('engineRuntimeLibraries 里解析不到 :engine，这道检查什么也没查到')
+        }
+        def needed = modulesOf('引擎的运行时依赖', requiredRoot)
+        def sides = ['客户端': modulesOf('Minecraft 客户端库清单', client.get()),
+                     '服务端': modulesOf('Minecraft 服务端库清单', server.get())]
+        sides.each { side, provided ->
+            if (provided.isEmpty()) {
+                throw new GradleException("Loom 给出的 Minecraft ${side}库清单是空的，比对没有意义")
+            }
+        }
 
         def problems = []
-        libraries.each { lib ->
-            if (lib.dependents.every { it.from in engineSide }) {
-                problems << "${lib.moduleVersion}：只有引擎要它，Minecraft 不带 —— 玩家那边会缺类"
+        needed.each { module, version ->
+            def missing = sides.findAll { side, provided -> !provided.containsKey(module) }.keySet()
+            if (missing) {
+                problems << "${module}:${version}：Minecraft 的${missing.join('与')}库清单里没有 —— 玩家那边会缺类" +
+                        '（若它只是编译期注解，在引擎里把它 exclude 掉）'
             }
-            if (lib.selectionReason.conflictResolution) {
-                problems << "${lib.moduleVersion}：各方要的版本不一致（" +
-                        lib.dependents.collect { "${it.from.id.displayName} 要 ${it.requested.displayName}" }.join('；') + '）'
+            sides.each { side, provided ->
+                if (provided.containsKey(module) && provided[module] != version) {
+                    problems << "${module}：引擎要 ${version}，Minecraft ${side}带的是 ${provided[module]}"
+                }
             }
         }
         if (problems) {
             throw new GradleException((['引擎的运行时依赖与 Minecraft 自带的库对不上：']
                     + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
-        // 打出核对了哪些库：「没有问题」与「一个库都没核对」输出一样，只有清单分得开。
-        logger.lifecycle("引擎运行时依赖核对通过：${libraries.collect { it.moduleVersion.toString() }.sort().join('、')}")
+        // 打出核对了哪些库、对照清单有多长：「没有问题」与「什么都没比」输出一样，只有这些数分得开。
+        logger.lifecycle("引擎运行时依赖核对通过：${needed.collect { k, v -> k + ':' + v }.sort().join('、')}" +
+                "（对照 Minecraft 客户端 ${sides['客户端'].size()} 个库、服务端 ${sides['服务端'].size()} 个库）")
     }
 }
 
