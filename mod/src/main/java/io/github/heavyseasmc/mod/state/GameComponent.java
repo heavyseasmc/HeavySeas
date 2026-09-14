@@ -1,17 +1,26 @@
 package io.github.heavyseasmc.mod.state;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.play.Session;
+import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.GameState;
+import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.server.network.ServerPlayerEntity;
 import org.ladysnake.cca.api.v3.component.Component;
+import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -32,7 +41,7 @@ import java.util.UUID;
  * 下次加载时对局是空的，但日志会明说「上一局没有保存」——
  * <b>让「重启丢了一局」与「本来就没开局」在输出上分得开</b>，这是本仓库反复付过学费的那一条。
  */
-public final class GameComponent implements Component {
+public final class GameComponent implements Component, AutoSyncedComponent {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -45,6 +54,94 @@ public final class GameComponent implements Component {
 
     /** 上一次存档时被打断的对局进行到第几回合；0 表示没有。仅用于提示，不用于恢复。 */
     private int interruptedTurn;
+
+    /**
+     * 开局前预定给 dummy 的角色（{@code /seas dummy add}）。
+     *
+     * <p>决策 ② 把它定为**硬性前置**而不是「强烈建议」：人数下限提到 6 之后，
+     * 开发期不可能每改一行就凑 6 个真人开 6 个客户端。这不是 AI，是测试夹具。
+     */
+    private final Set<CharacterId> pendingDummies = new LinkedHashSet<>();
+
+    public Set<CharacterId> pendingDummies() {
+        return Set.copyOf(pendingDummies);
+    }
+
+    public boolean reserveForDummy(CharacterId id) {
+        return pendingDummies.add(id);
+    }
+
+    public void clearPendingDummies() {
+        pendingDummies.clear();
+    }
+
+    /** 客户端侧的投影。服务端不读它。 */
+    private HudView view = HudView.IDLE;
+
+    /** 客户端 HUD 的数据源。服务端上它永远是 {@link HudView#IDLE}。 */
+    public HudView hudView() {
+        return view;
+    }
+
+    /**
+     * 只发给局内玩家。
+     *
+     * <p>决策 ⑫ 记着这一条「白送的好处」：它一次解决三件事 —— 防作弊、省带宽、
+     * 不会把没装模组的旁人踢下线（CCA 6.0+ 默认会踢，对我们自动消失）。
+     */
+    @Override
+    public boolean shouldSyncWith(ServerPlayerEntity player) {
+        return session != null && seatOf(player.getUuid()).isPresent();
+    }
+
+    /** ❗按收件人裁剪：每个人只拿到自己那一份。手牌与爱恨将来走的是同一条路。 */
+    @Override
+    public void writeSyncPacket(RegistryByteBuf buf, ServerPlayerEntity recipient) {
+        buf.writeBoolean(session != null);
+        if (session == null) {
+            return;
+        }
+        GameState g = session.state();
+        buf.writeVarInt(g.turn());
+        buf.writeEnumConstant(g.phase());
+        buf.writeVarInt(g.gulls());
+        Optional<CharacterId> seat = seatOf(recipient.getUuid());
+        buf.writeBoolean(seat.isPresent());
+        if (seat.isEmpty()) {
+            return;
+        }
+        CharacterId id = seat.get();
+        Survivor survivor = g.roster().get(id);
+        buf.writeString(id.value());
+        buf.writeVarInt(survivor.size() - g.stateOf(id).damage());
+        buf.writeVarInt(survivor.size());
+        buf.writeEnumConstant(g.conditionOf(id));
+        buf.writeVarInt(g.stateOf(id).thirst().count());
+        buf.writeBoolean(g.nextActor().map(id::equals).orElse(false));
+    }
+
+    @Override
+    public void applySyncPacket(RegistryByteBuf buf) {
+        if (!buf.readBoolean()) {
+            view = HudView.IDLE;
+            return;
+        }
+        int turn = buf.readVarInt();
+        Phase phase = buf.readEnumConstant(Phase.class);
+        int gulls = buf.readVarInt();
+        if (!buf.readBoolean()) {
+            view = new HudView(true, turn, phase, gulls, false, "", 0, 0, Condition.CONSCIOUS, 0, false);
+            return;
+        }
+        String character = buf.readString();
+        int health = buf.readVarInt();
+        int maxHealth = buf.readVarInt();
+        Condition condition = buf.readEnumConstant(Condition.class);
+        int thirst = buf.readVarInt();
+        boolean yourTurn = buf.readBoolean();
+        view = new HudView(true, turn, phase, gulls, true, character, health, maxHealth,
+                condition, thirst, yourTurn);
+    }
 
     public Optional<Session> session() {
         return Optional.ofNullable(session);
@@ -63,6 +160,7 @@ public final class GameComponent implements Component {
         this.occupants.clear();
         this.occupants.putAll(seats);
         this.interruptedTurn = 0;
+        this.pendingDummies.clear();
     }
 
     public void end() {

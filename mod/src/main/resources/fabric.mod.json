@@ -12,6 +12,7 @@
   },
   "entrypoints": {
     "main": ["io.github.heavyseasmc.mod.HeavySeasMod"],
+    "client": ["io.github.heavyseasmc.mod.client.HeavySeasClient"],
     "cardinal-components": ["io.github.heavyseasmc.mod.state.GameComponents"]
   },
   "depends": {

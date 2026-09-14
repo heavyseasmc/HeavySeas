@@ -33,8 +33,21 @@ public final class GameComponents implements WorldComponentInitializer {
         LOGGER.info("对局组件已注册：{}（World 级，决策 ⑫）", GAME.getId());
     }
 
-    /** 取某个世界的对局组件。 */
+    /**
+     * 取某个世界的对局组件。
+     *
+     * <p>❗走 {@code world.getComponent(KEY)} 而不是 {@code KEY.get(world)}：后者要求对象本身
+     * 就是 {@code ComponentProvider}，而 {@code World} 不是 —— 生产环境实测
+     * {@code NullPointerException: ... because "provider" is null}，**开发环境同样会**，
+     * 只是那次是起服跑一整局才撞上的。世界这一级的入口是 CCA 注入进 {@code World} 的
+     * {@code ComponentAccess} 接口（Loom 按 CCA jar 里的 {@code loom:injected_interfaces} 注入）。
+     */
     public static GameComponent of(World world) {
-        return GAME.get(world);
+        return world.getComponent(GAME);
+    }
+
+    /** 把组件推给该收到的玩家。同上，走注入进 World 的那个接口。 */
+    public static void sync(World world) {
+        world.syncComponent(GAME);
     }
 }
