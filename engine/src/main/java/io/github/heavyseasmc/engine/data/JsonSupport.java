@@ -59,7 +59,7 @@ final class JsonSupport {
         if (actual != expected) {
             throw DataFormatException.at(file, "schema_version",
                     "本引擎只读版本 %d，文件是版本 %d —— 要么升级引擎，要么在 %s 下补一条旧版本读取路径"
-                            .formatted(expected, actual, "engine/.../engine/data/"));
+                            .formatted(expected, actual, "engine/src/main/java/io/github/heavyseasmc/engine/data/"));
         }
     }
 
