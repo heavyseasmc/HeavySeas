@@ -31,7 +31,7 @@ class ScorerTest {
     private static final CharacterId SAILOR = CharacterId.of("sailor");
     private static final CharacterId KID = CharacterId.of("kid");
 
-    /** 6 人阵容。座位取 1·2·3·4·6·8——摘掉厨子(5)与医生(7)后的嵌套序列。 */
+    /** 6 人阵容。座位取 1·2·3·4·6·8——摘掉陪酒女(5)与医生(7)后的嵌套序列。 */
     private static Roster sixPersonRoster() {
         return new Roster(List.of(
                 new Survivor(JEWELER, 1, 4, 8, "base",

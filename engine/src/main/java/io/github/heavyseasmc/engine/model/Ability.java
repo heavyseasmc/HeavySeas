@@ -25,7 +25,7 @@ public sealed interface Ability {
         public enum Scope { SET_TOTAL, FACE_VALUE }
     }
 
-    /** 别人使用某些物资时一并蹭到效果（厨子）。 */
+    /** 别人使用某些物资时一并蹭到效果（陪酒女）。 */
     record ShareEffect(
             List<String> sources,
             boolean requiresConscious,
