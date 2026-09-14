@@ -11,6 +11,19 @@ base {
     archivesName = 'heavyseas'
 }
 
+loom {
+    // 客户端专用的代码（HUD、渲染）只能写在 src/client：main 里引用客户端类，专用服务端上一加载就崩，
+    // 而开发环境与单人游戏都测不出。拆开之后这件事在编译期就失败 —— 拆之前实测，main 能直接编译过那种引用。
+    splitEnvironmentSourceSets()
+
+    mods {
+        heavyseas {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     mappings "net.fabricmc:yarn:${yarn_mappings}:v2"
