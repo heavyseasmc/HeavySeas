@@ -18,7 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,8 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 加载器。
  *
  * <p>这里的数据全是<b>合成的</b>，写在测试里、放进临时目录，所以 CI 上照样跑。
- * 读真实 {@code data/} 的那部分在 {@link RealDataTest} ——
- * 航海牌在 O1 定案前不入库，那个类必须能跳过。
+ * 读真实 {@code data/} 的那部分在 {@link RealDataTest}。
  *
  * <p>❗本类里几乎每个用例都是 {@code assertThrows}。这是有意的：加载器的<b>全部价值</b>
  * 就在于把「数据坏了」变成一声当场的响，而不是几千局之后的一个怪现象。
@@ -88,14 +86,16 @@ class DataLoadingTest {
         }
 
         @Test
-        @DisplayName("必须存在的文件不在就抛；允许缺席的文件不在就是空")
+        @DisplayName("文件不在就抛，并报出解析到的绝对路径")
         void missingFile() {
             DataDir data = new DataDir(dir);
-            assertThrows(IllegalArgumentException.class, () -> data.file("navigation/default.json"));
-            assertEquals(Optional.empty(), data.optionalFile("navigation/default.json"));
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> data.file("navigation/default.json"));
+            // 路径要出现在消息里：缺文件最常见的原因是 data.dir 指错了地方，
+            // 而「指错了」与「真的没有」只有那条绝对路径分得开。
+            assertTrue(e.getMessage().contains("navigation"), e.getMessage());
 
             write("navigation/default.json", "{}");
-            assertTrue(data.optionalFile("navigation/default.json").isPresent());
             assertTrue(Files.isRegularFile(data.file("navigation/default.json")));
         }
 

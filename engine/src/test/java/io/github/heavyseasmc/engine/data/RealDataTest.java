@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>角色表与物资表<b>已落库</b>，这几条在 CI 上照跑 —— 它们同时是加载器的正向对照：
  * 合成数据全绿只证明解析器自洽，真实数据全绿才证明它读得懂导出器写出来的东西。
  *
- * <p>航海牌那一条只能本地跑，缺席时出声跳过，见 {@link LocalData}。
+ * <p>三份数据现在都已落库，所以整个类在 CI 上照跑；缺任何一份都是失败，见 {@link LocalData}。
  */
 class RealDataTest {
 
@@ -64,9 +64,9 @@ class RealDataTest {
     }
 
     @Test
-    @DisplayName("航海牌：31 张，点名全部落在角色表里（本地限定，缺数据时出声跳过）")
+    @DisplayName("航海牌：31 张，点名全部落在角色表里")
     void navigationLoads() {
-        List<NavigationCard> deck = LocalData.navigationDeckOrSkip();
+        List<NavigationCard> deck = LocalData.navigationDeck();
         assertEquals(31, deck.size());
 
         Set<CharacterId> known = RosterLoader.load(LocalData.dir().file("roster/default.json")).ids();

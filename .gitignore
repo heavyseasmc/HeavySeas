@@ -25,6 +25,3 @@ docs/
 # 本地协作配置，不入库
 CLAUDE.md
 AGENTS.md
-
-# 航海牌数据的最终版本尚在评估，定稿前不入库
-data/navigation/default.json

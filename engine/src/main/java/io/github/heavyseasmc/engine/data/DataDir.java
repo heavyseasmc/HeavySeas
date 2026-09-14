@@ -3,7 +3,6 @@ package io.github.heavyseasmc.engine.data;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * {@code data/} 目录的定址。
@@ -14,12 +13,11 @@ import java.util.Optional;
  * 「这台机器上没有」输出完全相同，而这两件事要做的处置正相反。
  * 所以本类只有一个逃生口：显式的系统属性或环境变量。
  *
- * <h2>唯一合法的「文件不在」</h2>
- * {@link #optionalFile} 只在<b>目录已经解析成功</b>时才可能返回空，
- * 即「这台机器上确实没有这个文件」。目前只有一处这样用：
- * {@code navigation/default.json} 在 O1 定案前不入库，CI 上必然缺席。
- * 依赖它的测试必须跳过而不是失败，而<b>跳过必须打印出来</b> ——
- * 实测 Gradle 只打印 SKIPPED，不打印 assume 的理由（详见那些测试里的说明）。
+ * <h2>没有「允许缺席」这一档</h2>
+ * 曾经有过一个返回 {@code Optional} 的取文件口，给的是「这台机器上确实没有这份数据」
+ * 这唯一一种合法缺席（航海牌数据当时不入库）。那份数据落库之后它再也不会被触发，
+ * 于是删掉了：<b>一条永远走不到的分支与一道只见过绿灯的闸门是同一种东西。</b>
+ * 真需要「可有可无的数据」时再加回来，并且同时加一个能让它返回空的测试。
  */
 public record DataDir(Path root) {
 
@@ -68,17 +66,6 @@ public record DataDir(Path root) {
             throw new IllegalArgumentException("数值数据文件不存在: " + path.toAbsolutePath());
         }
         return path;
-    }
-
-    /**
-     * 取一个<b>允许缺席</b>的数据文件。
-     *
-     * <p>❗只给真正允许缺席的文件用。返回空的含义是「这台机器上没有」，
-     * 不是「路径可能写错了」—— 后者由构造函数在解析目录时就抛掉了。
-     */
-    public Optional<Path> optionalFile(String relative) {
-        Path path = resolve(relative);
-        return Files.isRegularFile(path) ? Optional.of(path) : Optional.empty();
     }
 
     /**

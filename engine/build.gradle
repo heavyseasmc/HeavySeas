@@ -20,12 +20,12 @@ dependencies {
 tasks.named('test') {
     systemProperty 'heavyseas.data.dir', rootProject.file('data').absolutePath
 
-    // ❗跳过的理由只能走标准输出。2026-09-14 实测（不是推断）：
-    //   · Gradle 对 assume 失败只打印一行 SKIPPED，理由一个字都不打印；
-    //   · afterTest 监听器拿到的 TestResult 里连异常都没有，理由在那一层根本不存在。
-    // 而航海牌数据在 O1 定案前不入库，依赖它的测试必须跳过 ——
-    // 「静默跳过」与「跑过了」在日志上长得一样，那正是本仓库吃过三次的假绿。
-    // 打开它的代价是测试自己 println 的内容会进构建日志；目前只有 LocalData 在用。
+    // ❗O1 的测量台把分布表打在标准输出上，不打开这个就看不见 ——
+    // 它是「只打印不判定」的，判定写进断言就成了拿被检查对象证明自己。
+    // 打开它的代价是测试自己 println 的内容会进构建日志；目前只有那一个类在用。
+    // 顺带记一条 2026-09-14 实测（不是推断）：Gradle 对 assume 失败只打印一行 SKIPPED，
+    // 理由一个字都不打，afterTest 监听器拿到的 TestResult 里连异常都没有 ——
+    // 将来再有「允许缺席」的数据时，跳过的理由同样只能靠这个口子说出来。
     testLogging {
         showStandardStreams = true
     }

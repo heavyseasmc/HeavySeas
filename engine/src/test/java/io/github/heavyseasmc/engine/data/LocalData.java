@@ -1,33 +1,23 @@
 package io.github.heavyseasmc.engine.data;
 
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
-import org.junit.jupiter.api.Assumptions;
 
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
  * 测试里读真实 {@code data/} 的唯一入口。
  *
- * <h2>为什么跳过必须自己打印</h2>
- * {@code data/navigation/default.json} 在 O1 定案前不入库（`.gitignore` 里有它），
- * 所以 CI 上必然缺席，依赖它的测试<b>只能跳过</b>。而 2026-09-14 实测：
+ * <h2>三份数据现在都是硬要求</h2>
+ * 航海牌曾经<b>允许缺席</b>：O1 定案前它不入库，CI 上必然没有，所以依赖它的测试要跳过。
+ * O1 定案选了 A 版之后那份数据已经落库，缺席不再是合法状态 —— 于是跳过那条路被删掉了。
  *
- * <ul>
- *   <li>Gradle 只打印一行 {@code SKIPPED}，<b>不打印</b> {@code Assumptions} 的理由；</li>
- *   <li>{@code afterTest} 监听器拿到的 {@code TestResult} 里<b>一个异常都没有</b>，
- *       理由在 Gradle 这一层根本不存在；</li>
- *   <li>把 {@code testLogging.showStandardStreams} 打开之后，测试自己 {@code println}
- *       的内容才会出现在构建日志里。</li>
- * </ul>
+ * <p>❗<b>删它不是因为用不上，是因为它再也不会被触发。</b> 一条永远走不到的分支
+ * 与一道只见过绿灯的闸门是同一种东西：它给人「这里防着呢」的错觉，
+ * 而真出事时谁也不知道它是不是还能响。要么让它有机会红，要么删掉。
  *
- * 所以这里自己往标准输出写一行，{@code engine/build.gradle} 相应打开了 showStandardStreams。
- * 「静默跳过」与「跑过了」在日志上长得一样，那正是本仓库已经吃过三次的假绿。
- *
- * <p>❗<b>两条路都打印</b>：找到了也说一声，说明那份数据真的被读了。
- * 只在缺席时打印的话，「加载器其实没在扫」照样是静默的。
+ * <p>现在三份数据一律走 {@link DataDir#file}：缺任何一份都是<b>失败</b>，
+ * 报出解析到的绝对路径。CI 与本地在这件事上没有差别了。
  */
 public final class LocalData {
 
@@ -48,19 +38,8 @@ public final class LocalData {
         return ProvisionLoader.loadIds(dir().file("provisions/default.json"));
     }
 
-    /** 真实航海牌堆；文件不在就<b>出声跳过</b>，不是失败，也不是静默。 */
-    public static List<NavigationCard> navigationDeckOrSkip() {
-        DataDir data = dir();
-        Optional<Path> file = data.optionalFile(NAVIGATION);
-        if (file.isEmpty()) {
-            String path = data.root().resolve(NAVIGATION).toAbsolutePath().toString();
-            System.out.println("⚠ 跳过：本地没有 " + path);
-            System.out.println("  这是预期之内 —— 航海牌数据在 O1 定案前不入库，CI 上必然缺席。");
-            System.out.println("  本地要跑：用 docs/tools/export_datapack.py 导出后重跑。");
-            Assumptions.abort("缺 " + NAVIGATION + "（O1 定案前不入库）");
-        }
-        List<NavigationCard> deck = NavigationLoader.load(file.orElseThrow(), roster().ids(), provisionIds());
-        System.out.println("✓ 实跑：读到 " + deck.size() + " 张真实航海牌（" + file.orElseThrow() + "）");
-        return deck;
+    /** 真实航海牌堆。文件不在就是失败 —— 它已经落库，缺席只可能是配错了路径。 */
+    public static List<NavigationCard> navigationDeck() {
+        return NavigationLoader.load(dir().file(NAVIGATION), roster().ids(), provisionIds());
     }
 }

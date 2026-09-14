@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       对分布的实际影响 —— 也就是 O1 说的「静态张数 ≠ 实际落水频率」到底差多少。</li>
  * </ul>
  *
- * <p>只能本地跑：航海牌数据在 O1 定案前不入库，缺席时出声跳过。
+ * <p>O1 选定 A 版、数据落库之后，本类在 CI 上照跑。
  */
 class NavigationDeckStatsTest {
 
@@ -61,10 +61,10 @@ class NavigationDeckStatsTest {
     }
 
     @Test
-    @DisplayName("真实牌堆：落水/口渴频率对体型的分布（本地限定，只打印不判定）")
+    @DisplayName("真实牌堆：落水/口渴频率对体型的分布（只打印不判定）")
     @Timeout(value = 600, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void distribution() {
-        List<NavigationCard> deck = LocalData.navigationDeckOrSkip();
+        List<NavigationCard> deck = LocalData.navigationDeck();
         Roster roster = LocalData.roster().preset(8);
 
         List<NavigationPolicy> policies = List.of(
