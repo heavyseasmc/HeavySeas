@@ -1,0 +1,99 @@
+{
+  "_doc": [
+    "字体配置 —— 卡面文字层的唯一入口。",
+    "SVG 里不写死任何 font-family，只用 --cjk / --latin 两个 CSS 变量；",
+    "切换 profile 就是覆盖这两个变量，插画一笔都不用改。",
+    "",
+    "设计基准用 kinghwa（字面最好），随包分发用 huiwen（许可允许子集化与再分发）。",
+    "两者字面同源（同一位设计者），所以按 kinghwa 调好的版面换成 huiwen 不会跑版；",
+    "规则文本另加了 textLength，进一步消除字体度量差异。"
+  ],
+
+  "design_profile": "kinghwa",
+  "ship_profile": "huiwen",
+
+  "latin": {
+    "name": "Old Standard TT",
+    "stack": "'Old Standard TT','EB Garamond',serif",
+    "css": "https://fonts.googleapis.com/css2?family=Old+Standard+TT:wght@400;700&display=swap",
+    "license": "SIL OFL 1.1",
+    "spdx": "OFL-1.1",
+    "ship_in_jar": true
+  },
+
+  "profiles": {
+    "kinghwa": {
+      "name": "京華老宋體",
+      "designer": "特里王（王廷瑞）",
+      "stack": "'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif",
+      "font_face": {
+        "family": "KingHwa_OldSong",
+        "src": "https://cdn.jsdelivr.net/npm/@fontpkg/king-hwa-old-song@2.2.0/%E4%BA%AC%E8%8F%AF%E8%80%81%E5%AE%8B%E4%BD%93v2.002.ttf",
+        "format": "truetype"
+      },
+      "license": "作者自定义：免费商用、可随意复制传播、可嵌入软件；【禁止修改本字体文件，禁止传播修改版】",
+      "spdx": null,
+      "file_copyright_string": "Font © Copyright 2022 TerryWang. All rights reserved.",
+      "redistributable": true,
+      "modifiable": false,
+      "subsettable": false,
+      "ship_in_jar": false,
+      "full_size_mb": 36.5,
+      "role": "设计基准 / 用户自备",
+      "note": [
+        "字体文件内 name 表只有 nameID 0 'All rights reserved'，没有 nameID 13/14（授权描述与网址）。",
+        "宽松条款只存在于作者的知乎帖子，不在文件里 —— 下游拿到 jar 的人看到的是 All rights reserved。",
+        "因此本项目【不随包分发】。想要这个字面的用户，自行下载并通过资源包挂载。",
+        "不可子集化 => 用户侧是完整 36.5 MB。"
+      ]
+    },
+
+    "huiwen": {
+      "name": "汇文明朝体 GBK",
+      "designer": "特里王（王廷瑞）",
+      "stack": "'Huiwen-MinchoGBK','Noto Serif SC',serif",
+      "css": "https://fontsapi.zeoseven.com/437/main/result.css",
+      "license": "作者自定义：允许修改并以相同许可再发布、允许再分发、允许嵌入软件、允许商用；须保留字体内版权声明并附带授权原件副本",
+      "spdx": null,
+      "redistributable": true,
+      "modifiable": true,
+      "subsettable": true,
+      "ship_in_jar": true,
+      "subset_size_kb_est": 150,
+      "role": "随包分发的默认字体",
+      "note": [
+        "与 kinghwa 同一位设计者，字面同源，这是它作为默认字体的关键理由。",
+        "子集化时【不得剥除 name 表里的版权声明】（fontTools 默认保留，勿加 --no-name-IDs）。",
+        "授权正文挂在作者页面，发布前须存档一份进 NOTICE。"
+      ]
+    },
+
+    "noto": {
+      "name": "思源宋体 / Noto Serif SC",
+      "stack": "'Noto Serif SC','Source Han Serif SC',serif",
+      "css": "https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap",
+      "license": "SIL OFL 1.1",
+      "spdx": "OFL-1.1",
+      "redistributable": true,
+      "modifiable": true,
+      "subsettable": true,
+      "ship_in_jar": true,
+      "role": "终极兜底（真字重 200-900，缺字时回退）",
+      "note": ["唯一有真实多字重的一档；小字号需要 600 字重时由它承担。"]
+    }
+  },
+
+  "glyph_budget": {
+    "source": "assets/annotations/proofread/zh_cn.json",
+    "unique_non_ascii": 414,
+    "unique_cjk": 400,
+    "coverage_tested": {
+      "kinghwa": "未单独实测（完整档）",
+      "huiwen_gbk": "414/414",
+      "noto": "414/414",
+      "zhuque_fangsong": "413/414（缺全角＝）",
+      "iming": "414/414",
+      "hanamin": "414/414"
+    }
+  }
+}

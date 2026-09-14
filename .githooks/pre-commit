@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#
+# 提交前检查。启用（每个克隆只需一次）：
+#   git config core.hooksPath .githooks
+#
+set -uo pipefail
+
+check="$(git rev-parse --show-toplevel)/docs/tools/precommit.sh"
+
+if [[ -f "$check" ]]; then
+  bash "$check" || {
+    echo
+    echo "提交已中止。确需绕过时：git commit --no-verify（请三思）"
+    exit 1
+  }
+else
+  echo "提示：未找到维护者本地检查脚本，跳过本地文本检查（普通克隆里属正常）。"
+fi
+
+# docs/ 是维护者的本地目录，不应被暂存。
+staged_docs=$(git diff --cached --name-only | grep '^docs/' || true)
+if [[ -n "$staged_docs" ]]; then
+  echo "❌ docs/ 下的文件被暂存了，该目录不入库："
+  echo "$staged_docs" | sed 's/^/     /'
+  echo "   修复：git restore --staged docs/"
+  exit 1
+fi

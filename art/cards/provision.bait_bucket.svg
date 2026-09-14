@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 物资卡 · 血饵</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cPail"><path d="M104 176 L118 296 C119 302,181 302,182 296 L196 176 Z"/></clipPath>
+    <clipPath id="cRim"><ellipse cx="150" cy="176" rx="46" ry="13"/></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#E8DCC0"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#55483B"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">消耗品</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 03</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">血饵</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="art" clip-path="url(#clipArt)" transform="translate(150 197.00) scale(0.7872) translate(-150 -195.00)">
+      <g id="ground"><ellipse cx="158" cy="306" rx="60" ry="9" fill="#241E1A" opacity="0.22"/><line x1="80" y1="308" x2="220" y2="308" stroke="#8C7C67" stroke-width="1.00" opacity="0.75"/><line x1="90" y1="313" x2="210" y2="313" stroke="#8C7C67" stroke-width="0.87" opacity="0.6"/><line x1="106" y1="318" x2="194" y2="318" stroke="#8C7C67" stroke-width="0.74" opacity="0.5"/><line x1="124" y1="322" x2="176" y2="322" stroke="#8C7C67" stroke-width="0.61" opacity="0.4"/></g>
+      <path d="M104 176 L118 296 C119 302,181 302,182 296 L196 176 Z" fill="#EDE2C8"/>
+      <rect clip-path="url(#cPail)" x="156" y="170" width="46" height="140" fill="url(#h1)" opacity="1.0"/><rect clip-path="url(#cPail)" x="172" y="170" width="30" height="140" fill="url(#h2)" opacity="1.0"/><rect clip-path="url(#cPail)" x="184" y="170" width="18" height="140" fill="url(#hx)" opacity="0.8"/>
+      <path d="M110 218 C130 224,170 224,190 218" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.85"/><path d="M115 262 C133 268,167 268,185 262" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.85"/>
+      <path d="M104 176 L118 296 C119 302,181 302,182 296 L196 176 Z" fill="none" stroke="#241E1A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="150" cy="176" rx="46" ry="13" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.3"/>
+      <g clip-path="url(#cRim)"><path d="M108 178 C122 166,136 180,150 172 C164 164,178 180,192 172 L192 192 L108 192 Z" fill="#8A5A3C" opacity="0.55"/><path d="M108 178 C122 166,136 180,150 172 C164 164,178 180,192 172" fill="none" stroke="#241E1A" stroke-width="1.4"/></g>
+      <path d="M124 172 C118 160,126 150,136 154 C132 164,136 170,142 170" fill="none" stroke="#241E1A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M170 170 C178 158,188 160,186 170" fill="none" stroke="#241E1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M106 180 C118 146,182 146,194 180" fill="none" stroke="#241E1A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <g transform="translate(206 150) scale(1)" opacity="0.85"><ellipse cx="0" cy="0" rx="3.2" ry="2" fill="#241E1A"/><path d="M-1 -2 C-6 -7,-9 -3,-3 -1" fill="none" stroke="#241E1A" stroke-width="0.8"/><path d="M1 -2 C6 -7,9 -3,3 -1" fill="none" stroke="#241E1A" stroke-width="0.8"/></g>
+      <g transform="translate(96 138) scale(0.8)" opacity="0.85"><ellipse cx="0" cy="0" rx="3.2" ry="2" fill="#241E1A"/><path d="M-1 -2 C-6 -7,-9 -3,-3 -1" fill="none" stroke="#241E1A" stroke-width="0.8"/><path d="M1 -2 C6 -7,9 -3,3 -1" fill="none" stroke="#241E1A" stroke-width="0.8"/></g>
+      <g transform="translate(214 196) scale(0.7)" opacity="0.85"><ellipse cx="0" cy="0" rx="3.2" ry="2" fill="#241E1A"/><path d="M-1 -2 C-6 -7,-9 -3,-3 -1" fill="none" stroke="#241E1A" stroke-width="0.8"/><path d="M1 -2 C6 -7,9 -3,3 -1" fill="none" stroke="#241E1A" stroke-width="0.8"/></g>
+    </g>
+    <g id="rule-panel" class="lod1-hide lod2-hide">
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <text class="cjk" x="150" y="344.0" font-size="10" font-weight="500" text-anchor="middle" fill="#241E1A">落海者各受1伤，泳技与救生圈无效</text>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">RATION</text>
+      </g>
+      <text class="latin" x="26" y="392.0" font-size="13" font-weight="700" letter-spacing="1" fill="#55483B">&#215; 2</text>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="56" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">血饵</text>
+  </g>
+</svg>

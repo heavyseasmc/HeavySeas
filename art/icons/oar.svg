@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>怒海狂涛 · 图标 · oar</title>
+  <g fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="rotate(-32 32 32)">
+      <path d="M28 5 h8 v34 h-8 Z" fill="#241E1A" stroke="none"/>
+      <path d="M24 37 h16 v18 c0 3 -3 5 -8 5 c-5 0 -8 -2 -8 -5 Z" fill="#241E1A" stroke="none"/>
+      <path d="M32 9 L32 35" stroke="#EDE2C8" stroke-width="2" opacity="0.9"/>
+    </g>
+  </g>
+</svg>

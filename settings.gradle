@@ -1,0 +1,10 @@
+rootProject.name = 'heavy-seas'
+
+// M0：只有纯 Java 规则引擎。
+// 引擎「零 MC 依赖」在这里是构建层面的事实，不是靠自觉——
+// 它所在的模块根本没有 Fabric/Minecraft 的依赖可用。
+include 'engine'
+
+// M1 启用：Fabric mod 模块，依赖 engine。
+// 启用前需先确认目标 MC 版本（当前计划为 1.21.1）。
+// include 'mod'

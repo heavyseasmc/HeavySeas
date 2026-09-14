@@ -1,0 +1,33 @@
+Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+
+适用范围
+--------
+本许可适用于本仓库中的：
+
+  - 全部美术资源（角色立绘、卡面插画、图标、牌背、模型贴图）
+  - 全部音效
+  - 全部游戏内文本（牌名、规则文本、角色文案、flavor 文案、界面文字）
+
+不适用于：
+
+  - 源代码 —— 见 LICENSE（MIT）
+  - data/ 目录下的规则数值 —— 见 data/README.md
+
+摘要
+----
+你可以自由地共享与改编这些素材，包括商业用途，只要：
+
+  署名   注明出处与作者，并指明是否作了修改。
+  相同方式共享   若你改编了这些素材，必须以相同的许可发布你的版本。
+
+完整法律文本
+------------
+https://creativecommons.org/licenses/by-sa/4.0/legalcode
+中文（简体）：https://creativecommons.org/licenses/by-sa/4.0/deed.zh-hans
+
+TODO（首发前）：把完整法律文本 vendored 进本文件，不依赖外部链接可达性。
+
+来源声明
+--------
+本仓库的全部美术、音效与文本均为原创。
+音效均取自 CC0 素材库或自行录制，逐条来源见 NOTICE。

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>怒海狂涛 · 图标 · strength</title>
+  <g fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 4 L42 20 L42 40 L22 40 L22 20 Z" fill="#241E1A" stroke="none"/>
+    <rect x="15" y="40" width="34" height="7" rx="2" fill="#241E1A" stroke="none"/>
+    <rect x="26" y="47" width="12" height="14" rx="2" fill="#241E1A" stroke="none"/>
+    <path d="M32 11 L32 38" stroke="#EDE2C8" stroke-width="2.2" opacity="0.9"/>
+  </g>
+</svg>

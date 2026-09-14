@@ -1,0 +1,103 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 物资卡 · 水</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62" />
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78" />
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8" />
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8" />
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0" />
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16" />
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0" /></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5" /></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5" /></clipPath>
+    <clipPath id="cBody"><path d="M96 104 C82 150,82 254,96 300 L204 300 C218 254,218 150,204 104 Z" /></clipPath>
+    <clipPath id="cHead"><ellipse cx="150" cy="104" rx="54" ry="15" /></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#E8DCC0" />
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26" />
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22" />
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z" />
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z" />
+      </g>
+      <rect width="300" height="420" fill="url(#vig)" />
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0" />
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75" />
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5" />
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5" />
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5" />
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5" />
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#55483B" />
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">消耗品</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 01</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">水</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9" />
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6" />
+    </g>
+    <g id="art" clip-path="url(#clipArt)" transform="translate(150 197.00) scale(0.8971) translate(-150 -195.00)">
+      <g id="ground"><ellipse cx="158" cy="306" rx="72" ry="9" fill="#241E1A" opacity="0.22" /><line x1="66" y1="308" x2="234" y2="308" stroke="#8C7C67" stroke-width="1.00" opacity="0.75" /><line x1="76" y1="313" x2="224" y2="313" stroke="#8C7C67" stroke-width="0.87" opacity="0.6" /><line x1="92" y1="318" x2="208" y2="318" stroke="#8C7C67" stroke-width="0.74" opacity="0.5" /><line x1="110" y1="322" x2="190" y2="322" stroke="#8C7C67" stroke-width="0.61" opacity="0.4" /></g>
+      <path d="M96 104 C82 150,82 254,96 300 L204 300 C218 254,218 150,204 104 Z" fill="#EDE2C8" />
+      <rect clip-path="url(#cBody)" x="158" y="90" width="70" height="220" fill="url(#h1)" opacity="1.0" /><rect clip-path="url(#cBody)" x="182" y="90" width="46" height="220" fill="url(#h2)" opacity="1.0" /><rect clip-path="url(#cBody)" x="200" y="90" width="28" height="220" fill="url(#hx)" opacity="0.85" /><rect clip-path="url(#cBody)" x="80" y="284" width="150" height="26" fill="url(#h1)" opacity="0.8" />
+      <path clip-path="url(#cBody)" d="M122 102 C114 154,114 250,122 302" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.8" />
+      <path clip-path="url(#cBody)" d="M150 102 C150 154,150 250,150 302" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.8" />
+      <path clip-path="url(#cBody)" d="M178 102 C186 154,186 250,178 302" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.8" />
+      <path d="M87 140 Q150 154 213 140 L213 150 Q150 164 87 150 Z" fill="#8C7C67" />
+      <path d="M87 140 Q150 154 213 140 L213 150 Q150 164 87 150 Z" fill="url(#h2)" opacity="0.45" /><path d="M87 140 Q150 154 213 140 L213 150 Q150 164 87 150 Z" fill="none" stroke="#241E1A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M82 198 Q150 212 218 198 L218 208 Q150 222 82 208 Z" fill="#8C7C67" />
+      <path d="M82 198 Q150 212 218 198 L218 208 Q150 222 82 208 Z" fill="url(#h2)" opacity="0.45" /><path d="M82 198 Q150 212 218 198 L218 208 Q150 222 82 208 Z" fill="none" stroke="#241E1A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M88 262 Q150 276 212 262 L212 272 Q150 286 88 272 Z" fill="#8C7C67" />
+      <path d="M88 262 Q150 276 212 262 L212 272 Q150 286 88 272 Z" fill="url(#h2)" opacity="0.45" /><path d="M88 262 Q150 276 212 262 L212 272 Q150 286 88 272 Z" fill="none" stroke="#241E1A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M96 104 C82 150,82 254,96 300 L204 300 C218 254,218 150,204 104" fill="none" stroke="#241E1A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+      <ellipse cx="150" cy="104" rx="54" ry="15" fill="#EDE2C8" />
+      <rect clip-path="url(#cHead)" x="150" y="88" width="60" height="34" fill="url(#h1)" opacity="0.7" /><line clip-path="url(#cHead)" x1="128" y1="88" x2="128" y2="122" stroke="#55483B" stroke-width="0.9" opacity="0.75" /><line clip-path="url(#cHead)" x1="172" y1="88" x2="172" y2="122" stroke="#55483B" stroke-width="0.9" opacity="0.75" />
+      <ellipse cx="150" cy="104" rx="54" ry="15" fill="none" stroke="#241E1A" stroke-width="2.3" />
+      <ellipse cx="150" cy="103" rx="12" ry="4.6" fill="#A8854A" stroke="#241E1A" stroke-width="1.4" />
+      <rect x="142" y="228" width="16" height="11" rx="2" fill="#A8854A" stroke="#241E1A" stroke-width="1.4" />
+      <rect x="146" y="238" width="8" height="13" fill="#A8854A" stroke="#241E1A" stroke-width="1.4" />
+      <path d="M150 228 L150 219" fill="none" stroke="#241E1A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /><path d="M140 217 L160 217" fill="none" stroke="#241E1A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M150 256 C147 260,147 264,150 264 C153 264,153 260,150 256 Z" fill="#3D6360" opacity="0.75" />
+      <path d="M222 272 L226 296 C226.5 299,238 299,238.5 296 L242 272 Z" fill="#EDE2C8" />
+      <path d="M231 276 L234 295 C234.5 297,237 297,237.5 295 L240 276 Z" fill="url(#h2)" opacity="0.55" />
+      <path d="M222 272 L226 296 C226.5 299,238 299,238.5 296 L242 272 Z" fill="none" stroke="#241E1A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      <ellipse cx="232" cy="272" rx="10" ry="3.6" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.6" />
+      <path d="M242 276 C250 277,250 288,241 289" fill="none" stroke="#241E1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6" />
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">RATION</text>
+      </g>
+      <text class="latin" x="26" y="392.0" font-size="13" font-weight="700" letter-spacing="1" fill="#55483B">× 16</text>
+    </g>
+    </g>
+</svg>

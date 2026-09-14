@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "id": "heavyseas:default",
+  "total": 47,
+  "_comment": [
+    "id 与美术资产共用一套主键（art/cards/item.*.svg）。",
+    "显示名与规则文本走 lang 文件，本目录只有 id、数量与机制字段。",
+    "三张名画是三个独立 id 而非一个 id 带数量——它们面值不同（2/3/3），",
+    "且美术上要求三幅互不相似，玩家需要分辨。",
+    "count 合计 47，与 total 对账；改动后务必重新对账。"
+  ],
+  "cards": [
+    {
+      "id": "water",
+      "count": 16,
+      "category": "consumable",
+      "effect": {
+        "kind": "prevent_thirst",
+        "amount": 1,
+        "unit": "thirst_source",
+        "target": "any_character",
+        "may_target_others": true,
+        "resolved_during": "thirst_resolution",
+        "discard_on_use": true
+      }
+    },
+    {
+      "id": "medical_kit",
+      "count": 4,
+      "category": "consumable",
+      "effect": {
+        "kind": "heal",
+        "amount": 1,
+        "target": "any_character_including_self",
+        "costs_action": true,
+        "discard_on_use": true,
+        "no_discard_for": [
+          "doctor"
+        ]
+      }
+    },
+    {
+      "id": "bait_bucket",
+      "count": 2,
+      "category": "consumable",
+      "effect": {
+        "kind": "damage_in_water",
+        "amount": 1,
+        "stacks": false,
+        "per_overboard_phase": true,
+        "bypasses": [
+          "sailor_swim_immunity",
+          "life_preserver"
+        ]
+      }
+    },
+    {
+      "id": "ration",
+      "count": 1,
+      "category": "consumable",
+      "effect": {
+        "kind": "heal_all",
+        "amount": 1,
+        "targets": "conscious_only",
+        "requires_corpse": true,
+        "contestable": true,
+        "costs_action": true,
+        "discard_on_use": true
+      }
+    },
+    {
+      "id": "rum",
+      "count": 3,
+      "category": "equipment",
+      "effect": {
+        "kind": "buff_size",
+        "amount": 3,
+        "duration": "turn",
+        "side_effect": "thirst_at_end_of_turn",
+        "persists_in_front": true,
+        "once_per_turn": true,
+        "stacks": false
+      }
+    },
+    {
+      "id": "compass",
+      "count": 1,
+      "category": "equipment",
+      "effect": {
+        "kind": "navigator_extra_draw",
+        "amount": 1,
+        "into": "row_stack",
+        "timing": "before_navigator_chooses"
+      }
+    },
+    {
+      "id": "life_preserver",
+      "count": 1,
+      "category": "equipment",
+      "effect": {
+        "kind": "prevent_overboard_damage",
+        "transferable": true,
+        "kept_by_receiver": true,
+        "survives_overboard": true,
+        "receiver_must_be_conscious": true,
+        "must_be_given_in_advance": true
+      }
+    },
+    {
+      "id": "parasol",
+      "count": 1,
+      "category": "equipment",
+      "effect": {
+        "kind": "prevent_thirst",
+        "amount": 1,
+        "unit": "thirst_source",
+        "target": "self",
+        "persistent": true,
+        "requires_open": true,
+        "costs_action_to_open": true,
+        "lost_when_overboard": true
+      }
+    },
+    {
+      "id": "flare_gun",
+      "count": 1,
+      "category": "weapon",
+      "effect": {
+        "kind": "weapon_or_special",
+        "power": 8,
+        "exclusive_choice": true,
+        "special": {
+          "kind": "draw_and_resolve_gulls",
+          "draw": 3,
+          "resolve_only": "gulls",
+          "includes_gull_removal": true,
+          "return_to": "deck_bottom"
+        },
+        "discard_after_any_use": true
+      }
+    },
+    {
+      "id": "fish_spear",
+      "count": 1,
+      "category": "weapon",
+      "effect": {
+        "kind": "weapon",
+        "power": 4
+      }
+    },
+    {
+      "id": "knife",
+      "count": 1,
+      "category": "weapon",
+      "effect": {
+        "kind": "weapon",
+        "power": 3
+      }
+    },
+    {
+      "id": "flail",
+      "count": 1,
+      "category": "weapon",
+      "effect": {
+        "kind": "weapon",
+        "power": 2
+      }
+    },
+    {
+      "id": "oar",
+      "count": 2,
+      "category": "weapon",
+      "effect": {
+        "kind": "weapon_and_row_bonus",
+        "power": 1,
+        "row_extra_draw": 1,
+        "exclusive_choice": false,
+        "stacks": true
+      }
+    },
+    {
+      "id": "cash",
+      "count": 6,
+      "category": "treasure",
+      "effect": {
+        "kind": "score_flat",
+        "points": 1,
+        "doubled_by": "captain"
+      }
+    },
+    {
+      "id": "jewelry",
+      "count": 3,
+      "category": "treasure",
+      "effect": {
+        "kind": "score_set",
+        "table": {
+          "1": 1,
+          "2": 4,
+          "3": 8
+        },
+        "doubled_by": "jeweler",
+        "doubling_applies_to": "set_total"
+      }
+    },
+    {
+      "id": "fine_art_2",
+      "count": 1,
+      "category": "treasure",
+      "effect": {
+        "kind": "score_flat",
+        "points": 2,
+        "doubled_by": "collector"
+      }
+    },
+    {
+      "id": "fine_art_3a",
+      "count": 1,
+      "category": "treasure",
+      "effect": {
+        "kind": "score_flat",
+        "points": 3,
+        "doubled_by": "collector"
+      }
+    },
+    {
+      "id": "fine_art_3b",
+      "count": 1,
+      "category": "treasure",
+      "effect": {
+        "kind": "score_flat",
+        "points": 3,
+        "doubled_by": "collector"
+      }
+    }
+  ]
+}

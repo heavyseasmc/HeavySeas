@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 角色卡 · 珀尔</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cMed"><ellipse cx="150" cy="196" rx="98" ry="112"/></clipPath>
+    <clipPath id="cB4"><path d="M141.1 149.6 C127.1 154.6,111.2 159.6,99.2 175.6 C93.6 191.6,93.6 203.6,93.6 217.6 C94.2 245.6,95.9 275.6,96.4 356.0 L203.6 356.0 C204.1 275.6,205.8 245.6,206.4 217.6 C206.4 203.6,206.4 191.6,200.8 175.6 C188.8 159.6,172.9 154.6,158.9 149.6 Z"/></clipPath>
+    <clipPath id="cH4"><path d="M124.3 122.8 C124.3 94.2,175.7 94.2,175.7 122.8 C175.7 134.7,167.5 137.7,166.4 144.3 C163.6 153.2,155.9 155.6,150.0 155.6 C144.1 155.6,136.4 153.2,133.6 144.3 C132.5 137.7,124.3 134.7,124.3 122.8 Z"/></clipPath>
+    <clipPath id="cVel"><path d="M104.9 165.6 C124.0 197.6,176.0 197.6,195.1 165.6 L187.2 187.6 C172.0 215.6,128.0 215.6,112.8 187.6 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#EAE0C6"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#3D6360"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">珠宝商</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 01</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">珀尔</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="stat0">
+      <rect x="192.0" y="20.0" width="44" height="42" rx="2" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.2"/>
+      <line x1="192.0" y1="35.0" x2="236.0" y2="35.0" stroke="#241E1A" stroke-width="1.2"/>
+      <text class="cjk" x="214.0" y="31.0" font-size="8.5" font-weight="700" text-anchor="middle" fill="#55483B">体力</text>
+      <text class="latin" x="214.0" y="57.0" font-size="24" font-weight="700" text-anchor="middle" fill="#241E1A">4</text>
+    </g>
+    <g id="stat1">
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.2"/>
+      <line x1="240.0" y1="35.0" x2="284.0" y2="35.0" stroke="#241E1A" stroke-width="1.2"/>
+      <text class="cjk" x="262.0" y="31.0" font-size="8.5" font-weight="700" text-anchor="middle" fill="#55483B">生存</text>
+      <text class="latin" x="262.0" y="57.0" font-size="24" font-weight="700" text-anchor="middle" fill="#241E1A">8</text>
+    </g>
+    <g id="art" clip-path="url(#clipArt)" transform="translate(150 197.00) scale(0.9154) translate(-150 -195.00)">
+      <ellipse cx="150" cy="196" rx="98" ry="112" fill="#EDE2C8" opacity="0.30"/>
+      <rect clip-path="url(#cMed)" x="52" y="84" width="196" height="224" fill="url(#h1)" opacity="0.16"/>
+      <ellipse cx="150" cy="196" rx="98" ry="112" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.55"/>
+      <ellipse cx="150" cy="196" rx="93" ry="107" fill="none" stroke="#241E1A" stroke-width="0.7" opacity="0.45"/>
+      <path d="M141.1 149.6 C127.1 154.6,111.2 159.6,99.2 175.6 C93.6 191.6,93.6 203.6,93.6 217.6 C94.2 245.6,95.9 275.6,96.4 356.0 L203.6 356.0 C204.1 275.6,205.8 245.6,206.4 217.6 C206.4 203.6,206.4 191.6,200.8 175.6 C188.8 159.6,172.9 154.6,158.9 149.6 Z" fill="#EDE2C8"/>
+      <path d="M141.1 149.6 C127.1 154.6,111.2 159.6,99.2 175.6 C93.6 191.6,93.6 203.6,93.6 217.6 C94.2 245.6,95.9 275.6,96.4 356.0 L203.6 356.0 C204.1 275.6,205.8 245.6,206.4 217.6 C206.4 203.6,206.4 191.6,200.8 175.6 C188.8 159.6,172.9 154.6,158.9 149.6 Z" fill="#8C5560" opacity="0.55"/>
+      <rect clip-path="url(#cB4)" x="154" y="143.5776" width="66.4" height="222.4224" fill="url(#h1)" opacity="1.0"/><rect clip-path="url(#cB4)" x="175.38" y="143.5776" width="56.4" height="222.4224" fill="url(#h2)" opacity="0.85"/><rect clip-path="url(#cB4)" x="192.3" y="143.5776" width="56.4" height="222.4224" fill="url(#hx)" opacity="0.75"/>
+      <path d="M141.1 149.6 C127.1 154.6,111.2 159.6,99.2 175.6 C93.6 191.6,93.6 203.6,93.6 217.6 C94.2 245.6,95.9 275.6,96.4 356.0 L203.6 356.0 C204.1 275.6,205.8 245.6,206.4 217.6 C206.4 203.6,206.4 191.6,200.8 175.6 C188.8 159.6,172.9 154.6,158.9 149.6 Z" fill="none" stroke="#241E1A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path clip-path="url(#cB4)" d="M99.2 175.6 C112.6 191.6,116.6 219.6,114.6 356.0" fill="none" stroke="#241E1A" stroke-width="1.9" opacity="0.85"/>
+      <path clip-path="url(#cB4)" d="M200.8 175.6 C187.4 191.6,183.4 219.6,185.4 356.0" fill="none" stroke="#241E1A" stroke-width="1.9" opacity="0.85"/>
+      <path d="M141.1 149.6 C140.1 147.6,138.1 151.6,137.1 154.6 L162.9 154.6 C161.9 151.6,159.9 147.6,158.9 149.6 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.0"/>
+      <path d="M141.1 149.6 C146.0 160.6,154.0 160.6,158.9 149.6 L158.9 157.6 Z" fill="#241E1A" opacity="0.22"/>
+      <path d="M124.3 122.8 C124.3 94.2,175.7 94.2,175.7 122.8 C175.7 134.7,167.5 137.7,166.4 144.3 C163.6 153.2,155.9 155.6,150.0 155.6 C144.1 155.6,136.4 153.2,133.6 144.3 C132.5 137.7,124.3 134.7,124.3 122.8 Z" fill="#EDE2C8"/>
+      <rect clip-path="url(#cH4)" x="158.2176" y="96.0" width="25.68" height="65.53536" fill="url(#h1)" opacity="0.4"/>
+      <path d="M124.3 122.8 C124.3 94.2,175.7 94.2,175.7 122.8 C175.7 134.7,167.5 137.7,166.4 144.3 C163.6 153.2,155.9 155.6,150.0 155.6 C144.1 155.6,136.4 153.2,133.6 144.3 C132.5 137.7,124.3 134.7,124.3 122.8 Z" fill="none" stroke="#241E1A" stroke-width="2.4"/>
+      <path d="M135.2 119.2 Q139.7 118.7 144.2 119.2" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.9"/>
+      <path d="M164.8 119.2 Q160.3 118.7 155.8 119.2" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.9"/>
+      <path d="M134.9 124.4 Q139.7 120.8 144.5 124.4" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.95"/>
+      <circle cx="139.7" cy="125.8" r="1.7" fill="#241E1A"/>
+      <path d="M135.9 127.2 Q139.7 128.4 143.5 127.0" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.5"/>
+      <path d="M155.5 124.4 Q160.3 120.8 165.1 124.4" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.95"/>
+      <circle cx="160.3" cy="125.8" r="1.7" fill="#241E1A"/>
+      <path d="M156.5 127.2 Q160.3 128.4 164.1 127.0" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.5"/>
+      <path d="M148.4 128.2 C146.8 131.2,146.4 134.1,148.6 135.3" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.85"/>
+      <path d="M146.6 135.3 q3.0 2.2 6.0 -0.6" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.85"/>
+      <path d="M142.3 141.9 q7.7 -1.6 15.4 0" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.85"/>
+      <circle cx="132.9" cy="133.2" r="2.2" fill="none" stroke="#241E1A" stroke-width="1.4"/><path d="M132.9 135.4 L132.9 140.2" stroke="#241E1A" stroke-width="1.1"/><ellipse cx="132.9" cy="143.2" rx="2.6" ry="3.6" fill="#A8854A" stroke="#241E1A" stroke-width="1.3"/>
+      <path d="M122.3 121.0 C119.3 89.4,180.7 89.4,177.7 121.0 C164.1 104.9,135.9 104.9,122.3 121.0 Z" fill="#8C7C67" stroke="#241E1A" stroke-width="2.3"/>
+      <path d="M134.6 95.4 C132.0 80.5,168.0 80.5,165.4 95.4" fill="#8C7C67" stroke="#241E1A" stroke-width="2.2"/>
+      <path d="M141.3 94.2 C142.3 85.9,157.7 85.9,158.7 94.2" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.6"/>
+      <path d="M126.9 117.4 Q132.0 99.6 143.8 92.4" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.55"/>
+      <path d="M138.4 117.4 Q141.0 99.6 146.9 92.4" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.55"/>
+      <path d="M150.0 117.4 Q150.0 99.6 150.0 92.4" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.55"/>
+      <path d="M161.6 117.4 Q159.0 99.6 153.1 92.4" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.55"/>
+      <path d="M173.1 117.4 Q168.0 99.6 156.2 92.4" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.55"/>
+      <path d="M163.4 94.2 l9.0 -7 l3 8 Z" fill="#A8854A" stroke="#241E1A" stroke-width="1.4"/>
+      <path d="M104.9 165.6 C124.0 197.6,176.0 197.6,195.1 165.6 L187.2 187.6 C172.0 215.6,128.0 215.6,112.8 187.6 Z" fill="#8C5560" opacity="0.85"/>
+      <rect clip-path="url(#cVel)" x="154" y="161.5776" width="56.4" height="60" fill="url(#h2)" opacity="0.45"/>
+      <path d="M104.9 165.6 C124.0 197.6,176.0 197.6,195.1 165.6 L187.2 187.6 C172.0 215.6,128.0 215.6,112.8 187.6 Z" fill="none" stroke="#241E1A" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M115.0 175.6 C130.0 201.6,170.0 201.6,185.0 175.6" fill="none" stroke="#EDE2C8" stroke-width="3" opacity="0.35"/>
+      <circle cx="123.0" cy="207.6" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="127.2" cy="213.3" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="131.3" cy="218.0" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="135.5" cy="221.8" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="139.6" cy="224.6" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="143.8" cy="226.5" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="147.9" cy="227.5" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="152.1" cy="227.5" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="156.2" cy="226.5" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="160.4" cy="224.6" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="164.5" cy="221.8" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="168.7" cy="218.0" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="172.8" cy="213.3" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="177.0" cy="207.6" r="1.9" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="129.0" cy="207.6" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="132.8" cy="218.5" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="136.6" cy="227.2" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="140.5" cy="233.8" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="144.3" cy="238.1" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="148.1" cy="240.3" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="151.9" cy="240.3" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="155.7" cy="238.1" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="159.5" cy="233.8" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="163.4" cy="227.2" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="167.2" cy="218.5" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="171.0" cy="207.6" r="2.4" fill="#A8854A" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="118.0" cy="207.6" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="122.3" cy="219.5" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="126.5" cy="229.8" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="130.8" cy="238.3" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="135.1" cy="245.1" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="139.3" cy="250.2" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="143.6" cy="253.7" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="147.9" cy="255.4" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="152.1" cy="255.4" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="156.4" cy="253.7" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="160.7" cy="250.2" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="164.9" cy="245.1" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="169.2" cy="238.3" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="173.5" cy="229.8" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="177.7" cy="219.5" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <circle cx="182.0" cy="207.6" r="1.7" fill="#EDE2C8" stroke="#241E1A" stroke-width="0.9"/>
+      <ellipse cx="150" cy="258.6" rx="6" ry="7.5" fill="#A8854A" stroke="#241E1A" stroke-width="1.6"/>
+      <path d="M144.0 237.6 l6 -10 l6 10 l-6 7 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.5"/>
+    </g>
+    <g id="rule-panel" class="lod1-hide lod2-hide">
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <text class="cjk" x="150" y="344.0" font-size="10" font-weight="500" text-anchor="middle" fill="#241E1A">珠宝的分数加倍</text>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">CREW</text>
+      </g>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="56" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">珀尔</text>
+  </g>
+</svg>

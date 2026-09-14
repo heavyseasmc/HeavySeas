@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 物资卡 · 船桨</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cOarBl"><path d="M143 230.0 C136 237.0,126 243.0,124 252.0 L124 294.0 C124 302.0,132 306.0,150 306.0 C168 306.0,176 302.0,176 294.0 L176 252.0 C174 243.0,164 237.0,157 230.0 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#E4D7B8"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#3A3330"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">武器</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 13</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">船桨</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="stat-体力">
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.2"/>
+      <line x1="240.0" y1="35.0" x2="284.0" y2="35.0" stroke="#241E1A" stroke-width="1.2"/>
+      <text class="cjk" x="262.0" y="31.0" font-size="8.5" font-weight="700" text-anchor="middle" fill="#55483B">体力</text>
+      <text class="latin" x="262.0" y="57.0" font-size="24" font-weight="700" text-anchor="middle" fill="#241E1A">1</text>
+    </g>
+    <g id="art" clip-path="url(#clipArt)" transform="translate(150 197.00) scale(0.6408) translate(-150 -195.00)">
+      <g transform="rotate(-18 150 195)">
+      <path d="M143 230.0 C136 237.0,126 243.0,124 252.0 L124 294.0 C124 302.0,132 306.0,150 306.0 C168 306.0,176 302.0,176 294.0 L176 252.0 C174 243.0,164 237.0,157 230.0 Z" fill="#EDE2C8"/>
+      <rect clip-path="url(#cOarBl)" x="152" y="228" width="28" height="84" fill="url(#h1)" opacity="0.6"/><rect clip-path="url(#cOarBl)" x="162" y="228" width="16" height="84" fill="url(#h2)" opacity="0.7"/>
+      <path d="M143 230.0 C136 237.0,126 243.0,124 252.0 L124 294.0 C124 302.0,132 306.0,150 306.0 C168 306.0,176 302.0,176 294.0 L176 252.0 C174 243.0,164 237.0,157 230.0 Z" fill="none" stroke="#241E1A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M150 236.0 L150 300.0" fill="none" stroke="#55483B" stroke-width="1.2" opacity="0.5"/>
+      <rect x="142" y="58.0" width="16" height="174.0" rx="3" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.3"/>
+      <rect x="150" y="58.0" width="8" height="174.0" fill="url(#h1)" opacity="0.5"/>
+      <rect x="139" y="158" width="22" height="22" rx="2" fill="#8A5A3C" opacity="0.75" stroke="#241E1A" stroke-width="2.0"/>
+      <path d="M140 165 L160 165" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.7"/><path d="M140 173 L160 173" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.7"/>
+      <path d="M161 160 L169 160 L169 178 L161 178 Z" fill="#A8854A" stroke="#241E1A" stroke-width="1.8"/>
+      <path d="M136 62.0 C136 41.0,164 41.0,164 62.0 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.3" stroke-linejoin="round"/>
+      <path d="M140 62.0 L160 62.0" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.55"/>
+      </g>
+    </g>
+    <g id="rule-panel" class="lod1-hide lod2-hide">
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <text class="cjk" x="150" y="344.0" font-size="10" font-weight="500" text-anchor="middle" fill="#241E1A">划船时多抽1张航海卡</text>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">RATION</text>
+      </g>
+      <text class="latin" x="26" y="392.0" font-size="13" font-weight="700" letter-spacing="1" fill="#55483B">&#215; 2</text>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="56" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">船桨</text>
+  </g>
+</svg>

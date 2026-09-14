@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 物资卡 · 名画</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cArt"><path d="M76 124 L224 124 L224 284 L76 284 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#EFE4C6"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#A8854A"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">财宝</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 18</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">名画</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="stat-分数">
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.2"/>
+      <line x1="240.0" y1="35.0" x2="284.0" y2="35.0" stroke="#241E1A" stroke-width="1.2"/>
+      <text class="cjk" x="262.0" y="31.0" font-size="8.5" font-weight="700" text-anchor="middle" fill="#55483B">分数</text>
+      <text class="latin" x="262.0" y="57.0" font-size="24" font-weight="700" text-anchor="middle" fill="#241E1A">3</text>
+    </g>
+    <g id="art" clip-path="url(#clipArt)" transform="translate(150 197.00) scale(0.8605) translate(-150 -195.00)">
+      <rect x="70" y="118" width="160" height="172" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.4"/>
+      <rect x="76" y="124" width="148" height="160" fill="#A8854A" opacity="0.5"/>
+      <g clip-path="url(#cArt)"><ellipse cx="150" cy="256" rx="52" ry="12" fill="#8C7C67" opacity="0.35"/><path d="M124 256 C118 214,136 196,150 196 C164 196,182 214,176 256 Z" fill="#8A5A3C" opacity="0.45" stroke="#241E1A" stroke-width="1.5"/><ellipse cx="150" cy="196" rx="26" ry="9" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.4"/><circle cx="112" cy="246" r="15" fill="#A8402C" opacity="0.5" stroke="#241E1A" stroke-width="1.4"/><circle cx="190" cy="250" r="12" fill="#A8854A" opacity="0.6" stroke="#241E1A" stroke-width="1.4"/><path d="M150 196 L150 158 M150 166 q-12 -10 -18 2 M150 166 q12 -10 18 2" fill="none" stroke="#241E1A" stroke-width="1.4"/></g>
+      <rect x="76" y="124" width="148" height="160" fill="none" stroke="#241E1A" stroke-width="1.4"/>
+      <path d="M230 290 L206 290 C220 280,228 268,230 254 Z" fill="#E8DCC0" stroke="#241E1A" stroke-width="1.6"/>
+      <rect clip-path="url(#cArt)" x="190" y="120" width="40" height="170" fill="url(#h1)" opacity="0.35"/>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">RATION</text>
+      </g>
+      <text class="latin" x="26" y="392.0" font-size="13" font-weight="700" letter-spacing="1" fill="#55483B">&#215; 1</text>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="56" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">名画</text>
+  </g>
+</svg>

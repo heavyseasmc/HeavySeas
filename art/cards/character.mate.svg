@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 角色卡 · 巴克</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cMed"><ellipse cx="150" cy="196" rx="98" ry="112"/></clipPath>
+    <clipPath id="cB8"><path d="M138.2 148.1 C124.2 153.1,91.1 158.1,79.1 174.1 C71.2 190.1,71.2 202.1,71.2 216.1 C72.0 244.1,74.4 274.1,75.1 356.0 L224.9 356.0 C225.6 274.1,228.0 244.1,228.8 216.1 C228.8 202.1,228.8 190.1,220.9 174.1 C208.9 158.1,175.8 153.1,161.8 148.1 Z"/></clipPath>
+    <clipPath id="cH8"><path d="M120.6 116.7 C120.6 84.0,179.4 84.0,179.4 116.7 C179.4 130.3,175.8 133.7,174.3 141.2 C170.2 151.4,158.8 154.1,150.0 154.1 C141.2 154.1,129.8 151.4,125.7 141.2 C124.2 133.7,120.6 130.3,120.6 116.7 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#EAE0C6"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#3D6360"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">大副</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 04</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">巴克</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="stat0">
+      <rect x="192.0" y="20.0" width="44" height="42" rx="2" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.2"/>
+      <line x1="192.0" y1="35.0" x2="236.0" y2="35.0" stroke="#241E1A" stroke-width="1.2"/>
+      <text class="cjk" x="214.0" y="31.0" font-size="8.5" font-weight="700" text-anchor="middle" fill="#55483B">体力</text>
+      <text class="latin" x="214.0" y="57.0" font-size="24" font-weight="700" text-anchor="middle" fill="#241E1A">8</text>
+    </g>
+    <g id="stat1">
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.2"/>
+      <line x1="240.0" y1="35.0" x2="284.0" y2="35.0" stroke="#241E1A" stroke-width="1.2"/>
+      <text class="cjk" x="262.0" y="31.0" font-size="8.5" font-weight="700" text-anchor="middle" fill="#55483B">生存</text>
+      <text class="latin" x="262.0" y="57.0" font-size="24" font-weight="700" text-anchor="middle" fill="#241E1A">4</text>
+    </g>
+    <g id="art" clip-path="url(#clipArt)" transform="translate(150 197.00) scale(0.9154) translate(-150 -195.00)">
+      <ellipse cx="150" cy="196" rx="98" ry="112" fill="#EDE2C8" opacity="0.30"/>
+      <rect clip-path="url(#cMed)" x="52" y="84" width="196" height="224" fill="url(#h1)" opacity="0.16"/>
+      <ellipse cx="150" cy="196" rx="98" ry="112" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.55"/>
+      <ellipse cx="150" cy="196" rx="93" ry="107" fill="none" stroke="#241E1A" stroke-width="0.7" opacity="0.45"/>
+      <path d="M138.2 148.1 C124.2 153.1,91.1 158.1,79.1 174.1 C71.2 190.1,71.2 202.1,71.2 216.1 C72.0 244.1,74.4 274.1,75.1 356.0 L224.9 356.0 C225.6 274.1,228.0 244.1,228.8 216.1 C228.8 202.1,228.8 190.1,220.9 174.1 C208.9 158.1,175.8 153.1,161.8 148.1 Z" fill="#EDE2C8"/>
+      <path d="M138.2 148.1 C124.2 153.1,91.1 158.1,79.1 174.1 C71.2 190.1,71.2 202.1,71.2 216.1 C72.0 244.1,74.4 274.1,75.1 356.0 L224.9 356.0 C225.6 274.1,228.0 244.1,228.8 216.1 C228.8 202.1,228.8 190.1,220.9 174.1 C208.9 158.1,175.8 153.1,161.8 148.1 Z" fill="#3A3A38" opacity="0.55"/>
+      <rect clip-path="url(#cB8)" x="154" y="142.1152" width="88.8" height="223.8848" fill="url(#h1)" opacity="1.0"/><rect clip-path="url(#cB8)" x="185.46" y="142.1152" width="78.8" height="223.8848" fill="url(#h2)" opacity="0.85"/><rect clip-path="url(#cB8)" x="209.1" y="142.1152" width="78.8" height="223.8848" fill="url(#hx)" opacity="0.75"/>
+      <path d="M138.2 148.1 C124.2 153.1,91.1 158.1,79.1 174.1 C71.2 190.1,71.2 202.1,71.2 216.1 C72.0 244.1,74.4 274.1,75.1 356.0 L224.9 356.0 C225.6 274.1,228.0 244.1,228.8 216.1 C228.8 202.1,228.8 190.1,220.9 174.1 C208.9 158.1,175.8 153.1,161.8 148.1 Z" fill="none" stroke="#241E1A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path clip-path="url(#cB8)" d="M79.1 174.1 C90.2 190.1,94.2 218.1,92.2 356.0" fill="none" stroke="#241E1A" stroke-width="1.9" opacity="0.85"/>
+      <path clip-path="url(#cB8)" d="M220.9 174.1 C209.8 190.1,205.8 218.1,207.8 356.0" fill="none" stroke="#241E1A" stroke-width="1.9" opacity="0.85"/>
+      <path d="M138.2 148.1 C137.2 146.1,135.2 150.1,134.2 153.1 L165.8 153.1 C164.8 150.1,162.8 146.1,161.8 148.1 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.0"/>
+      <path d="M138.2 148.1 C146.0 159.1,154.0 159.1,161.8 148.1 L161.8 156.1 Z" fill="#241E1A" opacity="0.22"/>
+      <path d="M120.6 116.7 C120.6 84.0,179.4 84.0,179.4 116.7 C179.4 130.3,175.8 133.7,174.3 141.2 C170.2 151.4,158.8 154.1,150.0 154.1 C141.2 154.1,129.8 151.4,125.7 141.2 C124.2 133.7,120.6 130.3,120.6 116.7 Z" fill="#EDE2C8"/>
+      <rect clip-path="url(#cH8)" x="159.3952" y="86.0" width="29.36" height="74.92671999999999" fill="url(#h1)" opacity="0.4"/>
+      <path d="M120.6 116.7 C120.6 84.0,179.4 84.0,179.4 116.7 C179.4 130.3,175.8 133.7,174.3 141.2 C170.2 151.4,158.8 154.1,150.0 154.1 C141.2 154.1,129.8 151.4,125.7 141.2 C124.2 133.7,120.6 130.3,120.6 116.7 Z" fill="none" stroke="#241E1A" stroke-width="2.4"/>
+      <path d="M133.8 113.4 Q138.3 107.5 142.8 113.4" fill="none" stroke="#241E1A" stroke-width="2.4" opacity="0.9"/>
+      <path d="M166.2 113.4 Q161.7 107.5 157.2 113.4" fill="none" stroke="#241E1A" stroke-width="2.4" opacity="0.9"/>
+      <path d="M133.5 118.6 Q138.3 115.0 143.1 118.6" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.95"/>
+      <circle cx="138.3" cy="120.0" r="1.7" fill="#241E1A"/>
+      <path d="M134.5 121.4 Q138.3 122.6 142.1 121.2" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.5"/>
+      <path d="M156.9 118.6 Q161.7 115.0 166.5 118.6" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.95"/>
+      <circle cx="161.7" cy="120.0" r="1.7" fill="#241E1A"/>
+      <path d="M157.9 121.4 Q161.7 122.6 165.5 121.2" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.5"/>
+      <path d="M148.4 122.4 C146.8 126.2,146.4 129.6,148.6 131.0" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.85"/>
+      <path d="M146.6 131.0 q3.0 2.2 6.0 -0.6" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.85"/>
+      <path d="M141.2 138.4 q8.8 -1.6 17.6 0" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.85"/>
+      <path clip-path="url(#cH8)" d="M124.2 132.4 L175.8 132.4 L175.8 156.1 L124.2 156.1 Z" fill="url(#hx)" opacity="0.34"/>
+      <path d="M120.6 112.6 C118.6 78.0,181.4 78.0,179.4 112.6 C164.7 95.5,135.3 95.5,120.6 112.6 Z" fill="#8C7C67" stroke="#241E1A" stroke-width="2.2"/>
+      <path d="M128.9 109.8 C126.9 99.6,130.9 92.8,128.9 86.0" fill="none" stroke="#241E1A" stroke-width="0.9" opacity="0.55"/>
+      <path d="M139.4 109.8 C137.4 99.6,141.4 92.8,139.4 86.0" fill="none" stroke="#241E1A" stroke-width="0.9" opacity="0.55"/>
+      <path d="M150.0 109.8 C148.0 99.6,152.0 92.8,150.0 86.0" fill="none" stroke="#241E1A" stroke-width="0.9" opacity="0.55"/>
+      <path d="M160.6 109.8 C158.6 99.6,162.6 92.8,160.6 86.0" fill="none" stroke="#241E1A" stroke-width="0.9" opacity="0.55"/>
+      <path d="M171.1 109.8 C169.1 99.6,173.1 92.8,171.1 86.0" fill="none" stroke="#241E1A" stroke-width="0.9" opacity="0.55"/>
+      <path clip-path="url(#cB8)" d="M116.0 158.1 C120.0 186.1,180.0 186.1,184.0 158.1 L190.0 356 L110.0 356 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.8"/>
+      <path clip-path="url(#cB8)" d="M130 164.1 L135 356" stroke="#8C7C67" stroke-width="9" fill="none" opacity="0.75"/>
+      <path clip-path="url(#cB8)" d="M130 164.1 L135 356" stroke="#241E1A" stroke-width="1.2" fill="none" opacity="0.6"/>
+      <path clip-path="url(#cB8)" d="M170 164.1 L165 356" stroke="#8C7C67" stroke-width="9" fill="none" opacity="0.75"/>
+      <path clip-path="url(#cB8)" d="M170 164.1 L165 356" stroke="#241E1A" stroke-width="1.2" fill="none" opacity="0.6"/>
+      <path clip-path="url(#cB8)" d="M97.2 248.1 L69.2 244.1 L69.2 262.1 L97.2 266.1 Z" fill="#8C7C67" stroke="#241E1A" stroke-width="1.8"/>
+      <path d="M95.2 256.1 L71.2 253.1" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.6"/>
+      <path clip-path="url(#cB8)" d="M96.2 266.1 C98.2 292.1,95.2 322.1,97.2 356" fill="none" stroke="#241E1A" stroke-width="1.8" opacity="0.85"/>
+      <path clip-path="url(#cB8)" d="M202.8 248.1 L230.8 244.1 L230.8 262.1 L202.8 266.1 Z" fill="#8C7C67" stroke="#241E1A" stroke-width="1.8"/>
+      <path d="M204.8 256.1 L228.8 253.1" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.6"/>
+      <path clip-path="url(#cB8)" d="M203.8 266.1 C201.8 292.1,204.8 322.1,202.8 356" fill="none" stroke="#241E1A" stroke-width="1.8" opacity="0.85"/>
+    </g>
+    <g id="rule-panel" class="lod1-hide lod2-hide">
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <text class="cjk" x="150" y="344.0" font-size="10" font-weight="500" text-anchor="middle" fill="#241E1A">没有技能。他不需要</text>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">CREW</text>
+      </g>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="56" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">巴克</text>
+  </g>
+</svg>

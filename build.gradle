@@ -1,0 +1,32 @@
+subprojects {
+    apply plugin: 'java'
+
+    group = rootProject.property('group')
+    version = rootProject.property('version')
+
+    java {
+        toolchain {
+            // Minecraft 1.21.x 要求 Java 21；引擎虽不依赖 MC，也对齐同一工具链，
+            // 避免 M1 把 engine 接进 mod 时出现字节码版本不匹配。
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+        withSourcesJar()
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 21
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+            exceptionFormat 'full'
+        }
+    }
+}

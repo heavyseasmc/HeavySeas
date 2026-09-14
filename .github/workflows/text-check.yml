@@ -1,0 +1,46 @@
+name: text-check
+
+# 检查模式存放在仓库 Secret `TEXT_CHECK_PATTERN` 里，不写进本文件。
+#
+# 设置：仓库 Settings → Secrets and variables → Actions → New repository secret
+#   Name:  TEXT_CHECK_PATTERN
+#   Value: 用 | 分隔的扩展正则（按大小写不敏感匹配），由维护者提供
+#
+# 局限：来自 fork 的 PR 拿不到 Secret，检查步骤会跳过。fork PR 本来就需要人工评审，
+# 且合并进 main 时的 push 事件会再检查一次。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 文本检查
+        env:
+          PATTERN: ${{ secrets.TEXT_CHECK_PATTERN }}
+        run: |
+          if [ -z "$PATTERN" ]; then
+            echo "::warning::未配置 TEXT_CHECK_PATTERN，跳过检查（fork PR 属正常）"
+            exit 0
+          fi
+          if grep -rIinE --exclude-dir=.git --exclude-dir=build --exclude-dir=.gradle \
+                        --exclude-dir=run --exclude-dir=docs "$PATTERN" . ; then
+            echo "::error::文本检查未通过，见上方行号"
+            exit 1
+          fi
+          echo "✅ 文本检查通过"
+
+      - name: 校验 docs/ 未被跟踪
+        run: |
+          tracked=$(git ls-files docs/ || true)
+          if [ -n "$tracked" ]; then
+            echo "::error::docs/ 下有文件被跟踪，该目录不入库："
+            echo "$tracked"
+            exit 1
+          fi
+          echo "✅ docs/ 未被跟踪"

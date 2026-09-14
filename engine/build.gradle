@@ -1,0 +1,22 @@
+// 纯 Java 规则引擎。
+//
+// ❗此模块**不得**引入任何 Minecraft / Fabric / Loom 依赖。
+// 理由：本作不做 AI 玩家，因此没有任何自动化对局验证手段，
+// 单元测试是唯一的自动化防线；而只有把引擎与 MC 运行时彻底切开，
+// 才能在毫秒级跑几千局随机对局。
+//
+// 允许的依赖只有两类：JDK 标准库，以及纯数据解析（Gson）。
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.11.0'
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// 数值数据不打进 jar，由调用方（M1 的 mod 模块 / 测试）显式指定路径载入，
+// 以保持 data/ 目录的权属边界清晰（见 data/README.md）。
+tasks.named('test') {
+    systemProperty 'heavyseas.data.dir', rootProject.file('data').absolutePath
+}

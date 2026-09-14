@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Minecraft 运行目录（M1 起）
+run/
+runs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 维护者的本地文档与工具目录，不入库
+docs/
+
+# 本地协作配置，不入库
+CLAUDE.md
+AGENTS.md
+
+# 航海牌数据的最终版本尚在评估，定稿前不入库
+data/navigation/default.json
