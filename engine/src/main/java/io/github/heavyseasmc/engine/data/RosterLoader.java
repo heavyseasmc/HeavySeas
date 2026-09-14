@@ -1,0 +1,181 @@
+package io.github.heavyseasmc.engine.data;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import io.github.heavyseasmc.engine.model.Ability;
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.model.TreasureKind;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * 读 {@code data/roster/default.json}。
+ *
+ * <p>角色的技能是 sealed 接口 {@link Ability}，这里是它唯一的入口。
+ * 认不出的 {@code kind} 直接抛 —— 退回 {@code None()} 会让「技能没实现」与「这人本来就没技能」
+ * 变成同一个结果，而大副恰好真的没技能，于是没有任何办法发现漏了。
+ */
+public final class RosterLoader {
+
+    /** 本加载器读的 schema 版本。数据文件的 {@code schema_version} 必须等于它。 */
+    public static final int SCHEMA_VERSION = 1;
+
+    private static final Set<String> READ_KEYS = Set.of("schema_version", "characters", "presets");
+
+    /**
+     * ❗<b>白名单放行、但引擎并不读</b>的顶层字段。列出来是为了让它成为一个<b>决定</b>而不是疏漏。
+     *
+     * <ul>
+     *   <li>{@code id}：数据包标识，M1 的资源加载才用得上。</li>
+     *   <li>{@code treasure_scoring}：那张表（珠宝 1/4/8、现金面值、美术品 2/3/3）现在
+     *       <b>写死在 {@code scoring} 包里</b>，于是同一份数值有两个真相源。不是本次改动引入的，
+     *       但沉默放行会让这种漂移永远没人发现。</li>
+     * </ul>
+     */
+    private static final Set<String> PRESENT_BUT_NOT_CONSUMED = Set.of("id", "treasure_scoring");
+
+    private static final Set<String> TOP_KEYS =
+            java.util.stream.Stream.concat(READ_KEYS.stream(), PRESENT_BUT_NOT_CONSUMED.stream())
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+
+    private static final Set<String> CHARACTER_KEYS =
+            Set.of("id", "seat", "size", "survival", "expansion", "ability");
+
+    private RosterLoader() {
+    }
+
+    public static RosterData load(Path file) {
+        JsonObject root = JsonSupport.readObject(file);
+        JsonSupport.requireSchemaVersion(file, root, SCHEMA_VERSION);
+        JsonSupport.onlyKeys(file, "顶层", root, TOP_KEYS);
+
+        List<Survivor> characters = new ArrayList<>();
+        var array = JsonSupport.array(file, "顶层", root, "characters");
+        for (int i = 0; i < array.size(); i++) {
+            characters.add(character(file, "characters[%d]".formatted(i),
+                    JsonSupport.asObject(file, "characters[%d]".formatted(i), array.get(i))));
+        }
+        if (characters.isEmpty()) {
+            throw DataFormatException.at(file, "characters", "一个角色都没有");
+        }
+
+        Map<Integer, List<CharacterId>> presets = new LinkedHashMap<>();
+        JsonObject presetsJson = JsonSupport.object(file, "顶层", root, "presets");
+        for (String key : presetsJson.keySet()) {
+            int players;
+            try {
+                players = Integer.parseInt(key);
+            } catch (NumberFormatException e) {
+                throw DataFormatException.at(file, "presets", "键应当是人数，实际是 " + key);
+            }
+            List<CharacterId> ids = new ArrayList<>();
+            JsonSupport.strings(file, "presets", presetsJson, key)
+                    .forEach(id -> ids.add(CharacterId.of(id)));
+            presets.put(players, List.copyOf(ids));
+        }
+
+        try {
+            return new RosterData(List.copyOf(characters), presets);
+        } catch (IllegalArgumentException e) {
+            // 角色表与预设之间的一致性由 RosterData 把关；它不知道自己是从哪个文件来的，
+            // 这里补上文件名，否则报错人得自己猜是哪份数据。
+            throw DataFormatException.at(file, "characters/presets", e.getMessage());
+        }
+    }
+
+    private static Survivor character(Path file, String where, JsonObject json) {
+        JsonSupport.onlyKeys(file, where, json, CHARACTER_KEYS);
+        try {
+            return new Survivor(
+                    CharacterId.of(JsonSupport.string(file, where, json, "id")),
+                    JsonSupport.integer(file, where, json, "seat"),
+                    JsonSupport.integer(file, where, json, "size"),
+                    JsonSupport.integer(file, where, json, "survival"),
+                    JsonSupport.string(file, where, json, "expansion"),
+                    ability(file, where + ".ability",
+                            JsonSupport.object(file, where, json, "ability")));
+        } catch (IllegalArgumentException e) {
+            throw DataFormatException.at(file, where, e.getMessage());
+        }
+    }
+
+    private static Ability ability(Path file, String where, JsonObject json) {
+        String kind = JsonSupport.string(file, where, json, "kind");
+        return switch (kind) {
+            case "none" -> {
+                JsonSupport.onlyKeys(file, where, json, Set.of("kind"));
+                yield new Ability.None();
+            }
+            case "score_multiplier" -> {
+                JsonSupport.onlyKeys(file, where, json, Set.of("kind", "target", "factor", "applies_to"));
+                String appliesTo = JsonSupport.string(file, where, json, "applies_to");
+                yield new Ability.ScoreMultiplier(
+                        treasureKind(file, where, JsonSupport.string(file, where, json, "target")),
+                        JsonSupport.integer(file, where, json, "factor"),
+                        switch (appliesTo) {
+                            case "set_total" -> Ability.ScoreMultiplier.Scope.SET_TOTAL;
+                            case "face_value" -> Ability.ScoreMultiplier.Scope.FACE_VALUE;
+                            default -> throw DataFormatException.at(file, where + ".applies_to",
+                                    "只认 set_total / face_value，实际是 " + appliesTo);
+                        });
+            }
+            case "share_effect" -> {
+                JsonSupport.onlyKeys(file, where, json,
+                        Set.of("kind", "sources", "requires_conscious", "resolves_last_in_thirst", "stacking"));
+                yield new Ability.ShareEffect(
+                        JsonSupport.strings(file, where, json, "sources"),
+                        JsonSupport.bool(file, where, json, "requires_conscious"),
+                        JsonSupport.bool(file, where, json, "resolves_last_in_thirst"),
+                        flags(file, where + ".stacking", JsonSupport.object(file, where, json, "stacking")));
+            }
+            case "overboard_immune" -> {
+                JsonSupport.onlyKeys(file, where, json,
+                        Set.of("kind", "requires_conscious", "not_protected_from"));
+                yield new Ability.OverboardImmune(
+                        JsonSupport.bool(file, where, json, "requires_conscious"),
+                        JsonSupport.strings(file, where, json, "not_protected_from"));
+            }
+            case "no_discard" -> {
+                JsonSupport.onlyKeys(file, where, json, Set.of(
+                        "kind", "target", "still_costs_action", "stays_in_front", "cannot_return_to_hand"));
+                yield new Ability.NoDiscard(
+                        JsonSupport.string(file, where, json, "target"),
+                        JsonSupport.bool(file, where, json, "still_costs_action"),
+                        JsonSupport.bool(file, where, json, "stays_in_front"),
+                        JsonSupport.bool(file, where, json, "cannot_return_to_hand"));
+            }
+            case "steal_uncontested" -> {
+                JsonSupport.onlyKeys(file, where, json,
+                        Set.of("kind", "zone", "triggers_fight", "no_flash_reveal"));
+                yield new Ability.StealUncontested(
+                        JsonSupport.string(file, where, json, "zone"),
+                        JsonSupport.bool(file, where, json, "triggers_fight"),
+                        JsonSupport.bool(file, where, json, "no_flash_reveal"));
+            }
+            default -> throw DataFormatException.at(file, where + ".kind",
+                    "引擎不认识的技能 " + kind + " —— 新技能要先在 Ability 里加一种，不能退回「无技能」");
+        };
+    }
+
+    private static TreasureKind treasureKind(Path file, String where, String id) {
+        try {
+            return TreasureKind.fromId(id);
+        } catch (IllegalArgumentException e) {
+            throw DataFormatException.at(file, where + ".target", e.getMessage());
+        }
+    }
+
+    private static Map<String, Boolean> flags(Path file, String where, JsonObject json) {
+        Map<String, Boolean> out = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : json.entrySet()) {
+            out.put(entry.getKey(), JsonSupport.bool(file, where, json, entry.getKey()));
+        }
+        return Map.copyOf(out);
+    }
+}
