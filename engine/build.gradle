@@ -8,7 +8,10 @@
 // 允许的依赖只有两类：JDK 标准库，以及纯数据解析（Gson）。
 
 dependencies {
-    implementation 'com.google.code.gson:gson:2.11.0'
+    // ❗Gson 的版本对齐 Minecraft 1.21.1 自带的那一份（2.10.1），不是随手挑的。
+    //   玩家机器上引擎用的是 MC 类路径上的 Gson，模组不另带；两边版本不一致时，
+    //   单测与开发环境（Gradle 取高版本）跑的就不是玩家那边的 Gson。
+    implementation 'com.google.code.gson:gson:2.10.1'
 
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
