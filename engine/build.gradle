@@ -5,7 +5,7 @@
 // 单元测试是唯一的自动化防线；而只有把引擎与 MC 运行时彻底切开，
 // 才能在毫秒级跑几千局随机对局。
 //
-// 允许的依赖只有两类：JDK 标准库，以及纯数据解析（Gson）。
+// 允许的依赖只有两类：JDK 标准库，以及纯数据解析（Gson）—— 由下面的依赖白名单机械地拦。
 
 dependencies {
     // ❗Gson 的版本对齐 Minecraft 1.21.1 自带的那一份（2.10.1），不是随手挑的。
@@ -16,6 +16,61 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// ❗依赖白名单：engine 的四条类路径上，每一个 jar 都必须来自下表列出的 group。
+//
+// M0 时「零 MC 依赖」是构建层面的天然事实：整个构建里根本没有 Fabric / Minecraft。
+// M1 起同一个构建里有了 Loom，这条就只剩「没人往这里加」一道自觉，所以改成机器拦。
+// 用白名单不用黑名单：MC 那边的 group 不止一个（com.mojang、net.minecraft、net.fabricmc，
+// 外加它们各自带进来的库），黑名单只拦得住想到的那几个。
+// 本地文件依赖与其他工程（包括 :mod）一律不在表里 —— 依赖方向只能是 mod → engine。
+//
+// 要给引擎加依赖，先改这张表：让「引擎多了一个依赖」成为一个看得见的决定，而不是顺手。
+def allowedGroups = [
+    main: ['com.google.code.gson'],
+    test: ['com.google.code.gson', 'org.junit.jupiter', 'org.junit.platform', 'org.opentest4j', 'org.apiguardian'],
+]
+def allowlist = [
+    compileClasspath    : allowedGroups.main,
+    runtimeClasspath    : allowedGroups.main,
+    testCompileClasspath: allowedGroups.test,
+    testRuntimeClasspath: allowedGroups.test,
+]
+
+def dependencyAllowlist = tasks.register('checkDependencyAllowlist') {
+    group = 'verification'
+    description = 'engine 的类路径上只允许白名单里的依赖（拦 Minecraft / Fabric / 本地文件 / 其他工程）'
+    def resolved = allowlist.collectEntries { name, groups ->
+        [(name): configurations.named(name).flatMap { it.incoming.artifacts.resolvedArtifacts }]
+    }
+    doLast {
+        def violations = []
+        def counts = []
+        resolved.each { name, artifacts ->
+            def jars = artifacts.get()
+            counts << "${name} ${jars.size()}"
+            jars.each { artifact ->
+                def component = artifact.id.componentIdentifier
+                if (!(component instanceof ModuleComponentIdentifier)) {
+                    violations << "${name}: ${component.displayName}（不是来自仓库的模块）"
+                } else if (!allowlist[name].contains(component.group)) {
+                    violations << "${name}: ${component.displayName}"
+                }
+            }
+        }
+        if (violations) {
+            throw new GradleException(
+                    (['engine 的类路径上出现了白名单以外的依赖（白名单在 engine/build.gradle）：']
+                            + violations.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        // 打出每条类路径扫了几个 jar：「0 违规」与「什么都没扫到」输出一模一样，只有数量分得开。
+        logger.lifecycle("依赖白名单通过：${counts.join(' · ')}")
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn dependencyAllowlist
 }
 
 // 数值数据不打进 jar，由调用方（M1 的 mod 模块 / 测试）显式指定路径载入，
