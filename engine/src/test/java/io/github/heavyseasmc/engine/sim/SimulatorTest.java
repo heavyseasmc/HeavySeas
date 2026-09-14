@@ -229,4 +229,147 @@ class SimulatorTest {
             }
         }
     }
+
+    /**
+     * 点名统计 —— O1 要的那条分布曲线的原料。
+     *
+     * <p>这里全部用<b>单人阵容</b>做精确断言：一个人时打不起来、也换不了座位，
+     * 唯一的伤害来源就是落海，于是次数是可以一个一个数出来的。
+     * 多人局里随机战斗会插进来，那时只能断言不等式 —— 那种断言对「分母漏加了」不敏感。
+     */
+    @Nested
+    @DisplayName("点名统计")
+    @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    class ExposureStats {
+
+        private Roster solo(CharacterId id, int size) {
+            return new Roster(List.of(new Survivor(id, 1, size, 12 - size, "base", new Ability.None())));
+        }
+
+        private List<NavigationCard> oneCard(int gull, Selector overboard, Selector thirst) {
+            return List.of(new NavigationCard("fixed", gull, overboard, thirst, false, false));
+        }
+
+        @Test
+        @DisplayName("分母只数活着的回合：体型 3 的角色在第 4 次落海时死，分母就停在 4")
+        void deadStopAccruing() {
+            // 每回合必落海、不点口渴、没有海鸥。伤害 3 = 昏迷，4 = 死亡。
+            Simulator sim = new Simulator(solo(KID, 3), oneCard(0, new Selector.Everyone(), new Selector.Nobody()));
+            Simulator.Result r = sim.run(0);
+
+            assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
+            Exposure kid = r.exposure().get(KID);
+            assertEquals(4, kid.overboardTurns(), "第 4 次落海把他打死，之后不该再有机会数");
+            assertEquals(4, kid.overboards(), "每一回合都被点到，命中数应当等于机会数");
+
+            // ❗口渴的分母比落海少一次：第 4 回合他死在落海那一步，口渴结算根本没轮到。
+            //   两个分母分开数，正是为了让这种「死在半途」不被算成「口渴过但没被点」。
+            assertEquals(3, kid.thirstTurns());
+            assertEquals(0, kid.thirsts());
+        }
+
+        @Test
+        @DisplayName("❗死了就不再计入分母，而这只有在「他死了、局还没完」时才看得出来")
+        void deadStopAccruingWhileTheGameGoesOn() {
+            // 单人局里死亡就是终局，分母停不停都一样 —— 那种局面证明不了任何事。
+            // 两人局才分得开：小孩第 4 次落海时死，大副还要再挨 5 次。
+            Roster pair = new Roster(List.of(
+                    new Survivor(KID, 1, 3, 9, "base", new Ability.None()),
+                    new Survivor(MATE, 2, 8, 4, "base", new Ability.None())));
+            Simulator sim = new Simulator(pair, oneCard(0, new Selector.Everyone(), new Selector.Nobody()));
+
+            int clean = 0;
+            for (long seed = 0; seed < 500; seed++) {
+                Simulator.Result r = sim.run(seed);
+                if (r.fights() > 0) {
+                    continue;               // 打过架就有额外伤害，次数数不准，换个种子
+                }
+                clean++;
+                assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
+                assertEquals(9, r.turns(), "seed=" + seed);
+                assertEquals(4, r.exposure().get(KID).overboardTurns(),
+                        "seed=" + seed + " 小孩死后还在涨分母");
+                assertEquals(9, r.exposure().get(MATE).overboardTurns(), "seed=" + seed);
+            }
+            assertTrue(clean > 0, "500 局里没有一局是零战斗，这条断言其实一次都没执行");
+        }
+
+        @Test
+        @DisplayName("❗水手落水不受伤，但那仍然是落水 —— 统计数的是下水，不是受伤")
+        void immunityDoesNotHideTheSplash() {
+            Roster solo = new Roster(List.of(new Survivor(SAILOR, 1, 6, 6, "base",
+                    new Ability.OverboardImmune(true, List.of("bait_bucket")))));
+            // 每张牌一只海鸥：第 4 只出现时当场结束，那一回合的落海不再结算。
+            Simulator sim = new Simulator(solo, oneCard(1, new Selector.Everyone(), new Selector.Nobody()));
+            Simulator.Result r = sim.run(0);
+
+            assertEquals(GameState.Outcome.LANDED, r.outcome());
+            Exposure sailor = r.exposure().get(SAILOR);
+            assertEquals(3, sailor.overboardTurns(), "第 4 回合海鸥先结束了一局，那一次不该计入");
+            assertEquals(3, sailor.overboards(), "免伤不等于没下水");
+            assertEquals(1.0, sailor.overboardRate().orElseThrow());
+        }
+
+        @Test
+        @DisplayName("没点到的人分母照样在涨 —— 否则「没被点到」与「没上过场」分不开")
+        void unnamedStillAccrueChances() {
+            Simulator sim = new Simulator(solo(KID, 3), oneCard(1, new Selector.Nobody(), new Selector.Everyone()));
+            Simulator.Result r = sim.run(0);
+
+            Exposure kid = r.exposure().get(KID);
+            assertEquals(0, kid.overboards());
+            assertTrue(kid.overboardTurns() > 0, "一次落海结算都没执行过？那这份统计什么也没测");
+            assertEquals(0.0, kid.overboardRate().orElseThrow());
+            assertEquals(kid.thirstTurns(), kid.thirsts(), "口渴点的是所有人，命中应当等于机会");
+        }
+
+        @Test
+        @DisplayName("多人局：点名只落在名单里的人身上，别人一次都不该有")
+        void onlyNamedAreHit() {
+            Simulator sim = new Simulator(roster(),
+                    oneCard(1, new Selector.Only(Set.of(MATE)), new Selector.Only(Set.of(KID))));
+            Simulator.Result r = sim.run(7);
+
+            for (CharacterId id : List.of(JEWELER, HOSTESS, SAILOR)) {
+                Exposure e = r.exposure().get(id);
+                assertEquals(0, e.overboards(), id + " 不在落海名单里却被点到了");
+                assertEquals(0, e.thirsts(), id + " 不在口渴名单里却被点到了");
+                assertTrue(e.overboardTurns() > 0, id + " 的机会数是 0，统计没在数他");
+            }
+            assertTrue(r.exposure().get(MATE).overboards() > 0, "名单上的人一次都没被点到");
+            assertTrue(r.exposure().get(KID).thirsts() > 0, "名单上的人一次都没口渴");
+        }
+
+        @Test
+        @DisplayName("几千局汇总：每个角色都有机会数，且命中不多于机会")
+        void aggregateOverManyGames() {
+            Simulator sim = new Simulator(roster(), deck());
+            Map<CharacterId, Exposure> total = new HashMap<>();
+            for (long seed = 0; seed < 2000; seed++) {
+                sim.run(seed).exposure().forEach((id, e) ->
+                        total.merge(id, e, Exposure::plus));       // plus 里的守卫会拦下「命中多于机会」
+            }
+            assertEquals(roster().size(), total.size(), "有角色从头到尾没进过统计: " + total.keySet());
+            total.forEach((id, e) -> {
+                assertTrue(e.overboardTurns() > 0, id + " 一次落海结算都没赶上");
+                assertTrue(e.overboardRate().orElseThrow() > 0, id + " 两千局里一次都没落过水");
+            });
+        }
+
+        @Test
+        @DisplayName("没有观测时频率是空，不是 0 —— 0 会把「没上过场」说成「运气极好」")
+        void noObservationIsEmptyNotZero() {
+            assertTrue(Exposure.NONE.overboardRate().isEmpty());
+            assertTrue(Exposure.NONE.thirstRate().isEmpty());
+            assertEquals(0.0, new Exposure(0, 5, 0, 5).overboardRate().orElseThrow());
+        }
+
+        @Test
+        @DisplayName("命中多于机会直接拒绝构造 —— 那是分母漏加了，算出来的频率会很像有信号")
+        void hitsCannotExceedChances() {
+            assertThrows(IllegalArgumentException.class, () -> new Exposure(3, 2, 0, 0));
+            assertThrows(IllegalArgumentException.class, () -> new Exposure(0, 0, 1, 0));
+            assertThrows(IllegalArgumentException.class, () -> new Exposure(-1, 0, 0, 0));
+        }
+    }
 }

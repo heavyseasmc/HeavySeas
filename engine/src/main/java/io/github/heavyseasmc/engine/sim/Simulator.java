@@ -11,8 +11,10 @@ import io.github.heavyseasmc.engine.thirst.ThirstResolver;
 import io.github.heavyseasmc.engine.thirst.ThirstSource;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
@@ -65,6 +67,7 @@ public final class Simulator {
         Invariants.requireValid(g, seed, "开局");
 
         int fights = 0;
+        ExposureTally exposure = new ExposureTally();
         while (!g.isOver()) {
             if (g.turn() > TURN_LIMIT) {
                 throw new IllegalStateException(
@@ -79,7 +82,7 @@ public final class Simulator {
                     g = r.state();
                     fights += r.fights();
                 }
-                case NAVIGATION -> g = navigate(g, rng, seed);
+                case NAVIGATION -> g = navigate(g, rng, seed, exposure);
             }
             Invariants.requireValidTransition(before, g, seed, "阶段 " + before.phase());
             if (g.isOver()) {
@@ -88,7 +91,8 @@ public final class Simulator {
             g = g.advancePhase();
             Invariants.requireValid(g, seed, "阶段推进后");
         }
-        return new Result(seed, g.turn(), g.outcome().orElseThrow(), aliveCount(g), fights);
+        return new Result(seed, g.turn(), g.outcome().orElseThrow(), aliveCount(g), fights,
+                exposure.toMap());
     }
 
     /**
@@ -195,7 +199,7 @@ public final class Simulator {
     }
 
     /** 航海阶段：抽一张牌，按 海鸥 → 落海 → 口渴 结算。 */
-    private GameState navigate(GameState g, Random rng, long seed) {
+    private GameState navigate(GameState g, Random rng, long seed, ExposureTally exposure) {
         NavigationCard card = deck.get(rng.nextInt(deck.size()));
 
         // a) 海鸥。凑够 4 只就地结束，该牌的落海与口渴一律不再结算。
@@ -208,7 +212,17 @@ public final class Simulator {
         // b) 落海。候选含尸体 —— 死者被冲下去会彻底退出游戏。
         Set<CharacterId> overboardCandidates = new LinkedHashSet<>(next.bySeat());
         Selector.ConditionResolver noConditions = (c, who) -> false;
+        // 分母：这一步真正执行时还活着的人。先记分母再点名，两者必须同一个时刻取，
+        // 否则「落水少」与「早就死了」会算成同一件事。
+        for (CharacterId id : overboardCandidates) {
+            if (next.conditionOf(id) != Condition.DEAD) {
+                exposure.overboardChance(id);
+            }
+        }
         for (CharacterId id : card.overboard().select(overboardCandidates, noConditions)) {
+            if (next.conditionOf(id) != Condition.DEAD) {
+                exposure.overboard(id);          // 数的是下水，不是受伤：水手落水不受伤
+            }
             boolean immune = isOverboardImmune(next, id);
             if (!immune) {
                 next = next.withState(id, next.stateOf(id).hurt(1));
@@ -226,7 +240,9 @@ public final class Simulator {
                 thirstCandidates.add(id);
             }
         }
+        thirstCandidates.forEach(exposure::thirstChance);
         for (CharacterId id : card.thirst().select(thirstCandidates, noConditions)) {
+            exposure.thirst(id);                 // 只数牌面点名，划船与战斗的口渴不在内
             next = next.withState(id, next.stateOf(id).thirstFrom(ThirstSource.NAMED));
         }
 
@@ -281,12 +297,58 @@ public final class Simulator {
     /**
      * 一局的结果。
      *
-     * @param seed    种子，失败时靠它复现
-     * @param turns   走了几回合
-     * @param outcome 终局原因
-     * @param alive   终局时还活着几个人
-     * @param fights  打了几架
+     * @param seed     种子，失败时靠它复现
+     * @param turns    走了几回合
+     * @param outcome  终局原因
+     * @param alive    终局时还活着几个人
+     * @param fights   打了几架
+     * @param exposure 每个角色被航海牌点到的次数与机会数，O1 的分布曲线由它汇总而来。
+     *                 ❗<b>只含真的被结算过的回合</b>：海鸥当场结束一局时那张牌不结算落海，
+     *                 所以那一回合两边都不计
      */
-    public record Result(long seed, int turns, GameState.Outcome outcome, int alive, int fights) {
+    public record Result(long seed, int turns, GameState.Outcome outcome, int alive, int fights,
+                         Map<CharacterId, Exposure> exposure) {
+
+        public Result {
+            exposure = Map.copyOf(Objects.requireNonNull(exposure, "exposure"));
+        }
+    }
+
+    /**
+     * 累计点名次数与机会数。
+     *
+     * <p>可变，且只在一局之内活着 —— {@link Result} 拿到的是它的不可变快照。
+     * 做成可变是因为它要被航海阶段每一步更新，而 {@link GameState} 的不可变性
+     * 是为了「状态推进可回放」，与统计计数不是一回事，混在一起会让每次计数都复制一遍全局状态。
+     */
+    private static final class ExposureTally {
+
+        private final Map<CharacterId, int[]> counts = new LinkedHashMap<>();
+
+        private int[] of(CharacterId id) {
+            return counts.computeIfAbsent(id, key -> new int[4]);
+        }
+
+        void overboardChance(CharacterId id) {
+            of(id)[1]++;
+        }
+
+        void overboard(CharacterId id) {
+            of(id)[0]++;
+        }
+
+        void thirstChance(CharacterId id) {
+            of(id)[3]++;
+        }
+
+        void thirst(CharacterId id) {
+            of(id)[2]++;
+        }
+
+        Map<CharacterId, Exposure> toMap() {
+            Map<CharacterId, Exposure> out = new LinkedHashMap<>();
+            counts.forEach((id, c) -> out.put(id, new Exposure(c[0], c[1], c[2], c[3])));
+            return Map.copyOf(out);
+        }
     }
 }
