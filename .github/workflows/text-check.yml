@@ -23,10 +23,21 @@ jobs:
       - name: 文本检查
         env:
           PATTERN: ${{ secrets.TEXT_CHECK_PATTERN }}
+          # 取成环境变量而不是在 run: 里内插 ${{ }}：那样 ci-local.sh 取出的 run 块
+          # 会带着没展开的 ${{ }} 跑，本地根本测不了这两个分支。
+          EVENT: ${{ github.event_name }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
         run: |
           if [ -z "$PATTERN" ]; then
-            echo "::warning::未配置 TEXT_CHECK_PATTERN，跳过检查（fork PR 属正常）"
-            exit 0
+            # 「拿不到 Secret」只在 fork PR 上是正常的。2026-09-14 仓库转入组织后
+            # Secret 没跟过来，于是 main 上每一次都走了这个分支、结论栏照样 success ——
+            # 一道自己关掉的闸门。所以除 fork PR 外，拿不到 Secret 一律判失败。
+            if [ "$EVENT" = "pull_request" ] && [ "$IS_FORK" = "true" ]; then
+              echo "::warning::fork PR 拿不到 Secret，跳过检查（合并进 main 时的 push 会再查一次）"
+              exit 0
+            fi
+            echo "::error::未配置 TEXT_CHECK_PATTERN，而这不是 fork PR（event=$EVENT）—— 这道闸门等于是关的"
+            exit 1
           fi
           # 模式连它自己的文本都匹配不上，说明模式无效：写坏了，或者永远不可能命中。
           # 不先拦下，下面的扫描会「一个都没命中」而打印通过 —— 与「真的干净」输出一模一样。
