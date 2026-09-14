@@ -8,6 +8,7 @@ import io.github.heavyseasmc.engine.model.TreasureKind;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 终局计分。
@@ -36,21 +37,28 @@ import java.util.Map;
  *
  * <p>共用一个谓词的话，两种口径<b>只在有人落水死亡时才分叉</b> —— 那种低频分叉能一路
  * 活到发布之后。
+ *
+ * <h2>分值不写在这里</h2>
+ * 财宝的分值与珠宝的套组表由调用方以 {@link TreasureScoring} 交进来，数据来自 {@code data/roster}。
+ * 本类只管「怎么组合」，不管「值多少」—— 否则同一份数值又会有代码与数据两个真相源。
  */
 public final class Scorer {
 
     private Scorer() {
     }
 
-    public static Map<CharacterId, ScoreSheet> scoreAll(Roster roster, Map<CharacterId, FinalState> states) {
+    public static Map<CharacterId, ScoreSheet> scoreAll(
+            Roster roster, Map<CharacterId, FinalState> states, TreasureScoring scoring) {
         Map<CharacterId, ScoreSheet> out = new LinkedHashMap<>();
         for (Survivor s : roster.survivors()) {
-            out.put(s.id(), score(roster, states, s.id()));
+            out.put(s.id(), score(roster, states, s.id(), scoring));
         }
         return out;
     }
 
-    public static ScoreSheet score(Roster roster, Map<CharacterId, FinalState> states, CharacterId who) {
+    public static ScoreSheet score(
+            Roster roster, Map<CharacterId, FinalState> states, CharacterId who, TreasureScoring scoring) {
+        Objects.requireNonNull(scoring, "scoring");
         Survivor self = roster.get(who);
         FinalState st = require(states, who);
 
@@ -60,7 +68,7 @@ public final class Scorer {
         int selfSurvival = (st.alive() && !misanthrope) ? self.survival() : 0;
 
         // ② 自己在艇上（不论生死）→ 财宝分。落水死亡被移出者，财宝随之退出游戏。
-        int treasure = st.onBoat() ? treasureScore(self, st.treasures()) : 0;
+        int treasure = st.onBoat() ? treasureScore(self, st.treasures(), scoring) : 0;
 
         // ③ 所爱者存活 → 其生存分。爱=自己时此项照付，自恋者的 ×2 由此涌现。
         int loved = require(states, st.love()).alive() ? roster.get(st.love()).survival() : 0;
@@ -97,25 +105,20 @@ public final class Scorer {
         return sum;
     }
 
-    private static int treasureScore(Survivor self, Treasures t) {
-        int cash = t.cash() * multiplier(self, TreasureKind.CASH);
+    private static int treasureScore(Survivor self, Treasures t, TreasureScoring scoring) {
+        int cash = t.cash() * scoring.cashFaceValue() * multiplier(self, TreasureKind.CASH);
+
+        if (t.fineArtFaceValue() > scoring.fineArtFaceValueTotal()) {
+            throw new IllegalArgumentException("美术品面值合计 %d 超过了全部美术品的面值之和 %d"
+                    .formatted(t.fineArtFaceValue(), scoring.fineArtFaceValueTotal()));
+        }
         int fineArt = t.fineArtFaceValue() * multiplier(self, TreasureKind.FINE_ART);
 
         // 珠宝是套组计分，且加倍作用于<b>套组总分</b>而非单张面值：
-        // 先查表再翻倍，3 张 = 8 × 2 = 16。
-        int jewelry = jewelrySetTotal(t.jewelry()) * multiplier(self, TreasureKind.JEWELRY);
+        // 先查表再翻倍，标准表下 3 张 = 8 × 2 = 16。
+        int jewelry = scoring.jewelrySetTotal(t.jewelry()) * multiplier(self, TreasureKind.JEWELRY);
 
         return cash + fineArt + jewelry;
-    }
-
-    private static int jewelrySetTotal(int count) {
-        return switch (count) {
-            case 0 -> 0;
-            case 1 -> 1;
-            case 2 -> 4;
-            case 3 -> 8;
-            default -> throw new IllegalArgumentException("珠宝全局只有 3 张，实际: " + count);
-        };
     }
 
     private static int multiplier(Survivor self, TreasureKind kind) {

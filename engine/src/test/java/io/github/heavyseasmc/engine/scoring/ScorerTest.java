@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.engine.scoring;
 
+import io.github.heavyseasmc.engine.data.RosterLoader;
 import io.github.heavyseasmc.engine.model.Ability;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Roster;
@@ -9,18 +10,21 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.io.StringReader;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 计分单测。
  *
  * <p>夹具的覆盖面刻意做满：
- * 四个特殊身份、珠宝三档、遗产，以及「憎恨看事件、厌世看状态」那对关键用例。
+ * 四个特殊身份、珠宝三档、遗产，以及「憎恨看事件、厌世看状态」那对关键用例；
+ * 另有一组证明计分表来自数据、引擎里没有第二份。
  */
 class ScorerTest {
 
@@ -30,6 +34,15 @@ class ScorerTest {
     private static final CharacterId MATE = CharacterId.of("mate");
     private static final CharacterId SAILOR = CharacterId.of("sailor");
     private static final CharacterId KID = CharacterId.of("kid");
+
+    /**
+     * 标准计分表：现金每张 1 分、美术品 2 / 3 / 3、珠宝套组 1 / 4 / 8。
+     *
+     * <p>❗这是<b>测试夹具</b>，不是第二个真相源：引擎运行时只读 {@code data/roster} 里那一份，
+     * 写在这里是为了让下面每个期望值都能对着规则算清楚。数据那份与规则是否一致，由 {@code RealDataTest} 核对。
+     */
+    private static final TreasureScoring STANDARD =
+            new TreasureScoring(1, List.of(2, 3, 3), List.of(1, 4, 8));
 
     /** 6 人阵容。座位取 1·2·3·4·6·8——摘掉陪酒女(5)与医生(7)后的嵌套序列。 */
     private static Roster sixPersonRoster() {
@@ -79,7 +92,7 @@ class ScorerTest {
     }
 
     private static ScoreSheet scoreOf(CharacterId who) {
-        return Scorer.score(sixPersonRoster(), fixture(), who);
+        return Scorer.score(sixPersonRoster(), fixture(), who, STANDARD);
     }
 
     @Nested
@@ -195,7 +208,7 @@ class ScorerTest {
             FinalState old = m.get(who);
             m.put(who, new FinalState(old.alive(), old.onBoat(),
                     Treasures.jewelry(jewelry), old.love(), old.hate()));
-            return Scorer.score(sixPersonRoster(), m, who).treasure();
+            return Scorer.score(sixPersonRoster(), m, who, STANDARD).treasure();
         }
 
         @Test
@@ -217,9 +230,77 @@ class ScorerTest {
         }
 
         @Test
-        @DisplayName("超过 3 张就是数据错了，要当场炸")
+        @DisplayName("超过珠宝的全局张数就是终局状态错了，要当场炸")
         void overflow() {
-            assertThrows(IllegalArgumentException.class, () -> Treasures.jewelry(4));
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> treasureFor(4, CAPTAIN));
+            assertTrue(e.getMessage().contains("3 张"), e.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("计分表来自数据，引擎里没有第二份")
+    class DataDrivenTables {
+
+        @Test
+        @DisplayName("❗换一张珠宝套组表，分数跟着变")
+        void jewelryTableDrivesScore() {
+            TreasureScoring steeper = new TreasureScoring(1, List.of(2, 3, 3), List.of(1, 5, 9));
+            assertEquals(16, Scorer.score(sixPersonRoster(), fixture(), JEWELER, STANDARD).treasure());
+            assertEquals(18, Scorer.score(sixPersonRoster(), fixture(), JEWELER, steeper).treasure(),
+                    "珠宝商 3 张珠宝：新表 9 分，加倍 18");
+        }
+
+        @Test
+        @DisplayName("现金分值也从表里取")
+        void cashValueDrivesScore() {
+            TreasureScoring richer = new TreasureScoring(3, List.of(2, 3, 3), List.of(1, 4, 8));
+            assertEquals(12, Scorer.score(sixPersonRoster(), fixture(), CAPTAIN, richer).treasure(),
+                    "船长 2 张现金 × 每张 3 分 × 加倍");
+        }
+
+        @Test
+        @DisplayName("❗端到端：数据里的珠宝表改成 1/5/9，读进来算出的分就跟着变")
+        void editedDataChangesScore() {
+            String roster = """
+                    {
+                      "schema_version": 1,
+                      "characters": [
+                        {"id": "jeweler", "seat": 1, "size": 4, "survival": 8, "expansion": "base",
+                         "ability": {"kind": "none"}}
+                      ],
+                      "presets": {"1": ["jeweler"]},
+                      "treasure_scoring": {
+                        "cash": {"kind": "face_value", "value": 1},
+                        "fine_art": {"kind": "face_value", "values": [2, 3, 3]},
+                        "jewelry": {"kind": "set_total", "table": {"1": 1, "2": 5, "3": 9}}
+                      }
+                    }""";
+            TreasureScoring edited =
+                    RosterLoader.load("test:roster/edited", new StringReader(roster)).treasureScoring();
+            assertEquals(18, Scorer.score(sixPersonRoster(), fixture(), JEWELER, edited).treasure());
+        }
+
+        @Test
+        @DisplayName("美术品面值合计超过全部美术品之和，是终局状态错了，当场炸")
+        void fineArtOverTotalRejected() {
+            Map<CharacterId, FinalState> m = fixture();
+            FinalState old = m.get(COLLECTOR);
+            m.put(COLLECTOR, new FinalState(old.alive(), old.onBoat(),
+                    Treasures.fineArt(9), old.love(), old.hate()));
+            assertThrows(IllegalArgumentException.class,
+                    () -> Scorer.score(sixPersonRoster(), m, COLLECTOR, STANDARD));
+        }
+
+        @Test
+        @DisplayName("计分表本身：空表或负数当场拒绝")
+        void malformedTableRejected() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new TreasureScoring(1, List.of(2, 3, 3), List.of()));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new TreasureScoring(-1, List.of(2, 3, 3), List.of(1, 4, 8)));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new TreasureScoring(1, List.of(2, -3, 3), List.of(1, 4, 8)));
         }
     }
 
@@ -247,7 +328,7 @@ class ScorerTest {
     @Test
     @DisplayName("全员计分：六个人一次算完")
     void scoreAll() {
-        Map<CharacterId, ScoreSheet> all = Scorer.scoreAll(sixPersonRoster(), fixture());
+        Map<CharacterId, ScoreSheet> all = Scorer.scoreAll(sixPersonRoster(), fixture(), STANDARD);
         assertEquals(6, all.size());
         assertEquals(35, all.get(JEWELER).total());
         assertEquals(24, all.get(COLLECTOR).total());

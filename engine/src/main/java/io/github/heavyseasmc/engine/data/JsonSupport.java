@@ -177,6 +177,21 @@ final class JsonSupport {
         return List.copyOf(out);
     }
 
+    /** 整数数组。每个元素都要是整数，小数与非数字一律抛。 */
+    static List<Integer> integers(String source, String where, JsonObject parent, String key) {
+        JsonArray array = array(source, where, parent, key);
+        List<Integer> out = new java.util.ArrayList<>(array.size());
+        for (int i = 0; i < array.size(); i++) {
+            JsonElement item = array.get(i);
+            if (!isPrimitive(item, JsonPrimitive::isNumber) || item.getAsDouble() != Math.rint(item.getAsDouble())) {
+                throw DataFormatException.at(source, "%s.%s[%d]".formatted(where, key, i),
+                        "应当是整数，实际是 " + kindOf(item));
+            }
+            out.add(item.getAsInt());
+        }
+        return List.copyOf(out);
+    }
+
     static JsonObject asObject(String source, String where, JsonElement element) {
         if (!element.isJsonObject()) {
             throw DataFormatException.at(source, where, "应当是对象，实际是 " + kindOf(element));

@@ -6,6 +6,7 @@ import io.github.heavyseasmc.engine.model.Ability;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.model.TreasureKind;
+import io.github.heavyseasmc.engine.scoring.TreasureScoring;
 
 import java.io.Reader;
 import java.nio.file.Path;
@@ -27,19 +28,20 @@ public final class RosterLoader {
     /** 本加载器读的 schema 版本。数据文件的 {@code schema_version} 必须等于它。 */
     public static final int SCHEMA_VERSION = 1;
 
-    private static final Set<String> READ_KEYS = Set.of("schema_version", "characters", "presets");
+    private static final Set<String> READ_KEYS =
+            Set.of("schema_version", "characters", "presets", "treasure_scoring");
 
     /**
      * ❗<b>白名单放行、但引擎并不读</b>的顶层字段。列出来是为了让它成为一个<b>决定</b>而不是疏漏。
      *
      * <ul>
      *   <li>{@code id}：数据包标识，M1 的资源加载才用得上。</li>
-     *   <li>{@code treasure_scoring}：那张表（珠宝 1/4/8、现金面值、美术品 2/3/3）现在
-     *       <b>写死在 {@code scoring} 包里</b>，于是同一份数值有两个真相源。不是本次改动引入的，
-     *       但沉默放行会让这种漂移永远没人发现。</li>
      * </ul>
+     *
+     * <p>{@code treasure_scoring} 曾经也在这里：那张表同时写死在计分代码里，数据那份改了不生效。
+     * 现在引擎只读数据这一份，见 {@link TreasureScoring}。
      */
-    private static final Set<String> PRESENT_BUT_NOT_CONSUMED = Set.of("id", "treasure_scoring");
+    private static final Set<String> PRESENT_BUT_NOT_CONSUMED = Set.of("id");
 
     private static final Set<String> TOP_KEYS =
             java.util.stream.Stream.concat(READ_KEYS.stream(), PRESENT_BUT_NOT_CONSUMED.stream())
@@ -92,8 +94,11 @@ public final class RosterLoader {
             presets.put(players, List.copyOf(ids));
         }
 
+        TreasureScoring treasureScoring = treasureScoring(source, "treasure_scoring",
+                JsonSupport.object(source, "顶层", root, "treasure_scoring"));
+
         try {
-            return new RosterData(List.copyOf(characters), presets);
+            return new RosterData(List.copyOf(characters), presets, treasureScoring);
         } catch (IllegalArgumentException e) {
             // 角色表与预设之间的一致性由 RosterData 把关；它不知道自己是从哪个文件来的，
             // 这里补上文件名，否则报错人得自己猜是哪份数据。
@@ -189,5 +194,53 @@ public final class RosterLoader {
             out.put(entry.getKey(), JsonSupport.bool(source, where, json, entry.getKey()));
         }
         return Map.copyOf(out);
+    }
+
+    /**
+     * 财宝计分表。三类各只认一种计分方式：现金与美术品按面值（{@code face_value}），珠宝按套组（{@code set_total}）。
+     * 写成别的 {@code kind} 直接抛 —— 换计分方式是规则变了，要先改引擎，不能让数据悄悄换口径。
+     */
+    private static TreasureScoring treasureScoring(String source, String where, JsonObject json) {
+        JsonSupport.onlyKeys(source, where, json, Set.of("cash", "fine_art", "jewelry"));
+        JsonObject cash = scoringEntry(source, where, json, "cash", "face_value", "value");
+        JsonObject fineArt = scoringEntry(source, where, json, "fine_art", "face_value", "values");
+        JsonObject jewelry = scoringEntry(source, where, json, "jewelry", "set_total", "table");
+        try {
+            return new TreasureScoring(
+                    JsonSupport.integer(source, where + ".cash", cash, "value"),
+                    JsonSupport.integers(source, where + ".fine_art", fineArt, "values"),
+                    setTotals(source, where + ".jewelry.table",
+                            JsonSupport.object(source, where + ".jewelry", jewelry, "table")));
+        } catch (IllegalArgumentException e) {
+            throw DataFormatException.at(source, where, e.getMessage());
+        }
+    }
+
+    /** 一类财宝的计分对象：{@code kind} 必须恰好是 {@code expected}，字段必须恰好是 kind 加 {@code valueKey}。 */
+    private static JsonObject scoringEntry(String source, String where, JsonObject parent, String key,
+                                           String expected, String valueKey) {
+        JsonObject json = JsonSupport.object(source, where, parent, key);
+        String at = where + "." + key;
+        JsonSupport.onlyKeys(source, at, json, Set.of("kind", valueKey));
+        String kind = JsonSupport.string(source, at, json, "kind");
+        if (!kind.equals(expected)) {
+            throw DataFormatException.at(source, at + ".kind",
+                    "只认 %s，实际是 %s —— 换计分方式是规则变了，要先改引擎".formatted(expected, kind));
+        }
+        return json;
+    }
+
+    /**
+     * 珠宝套组表：键必须恰好是 {@code "1"} 到 {@code "N"}。
+     *
+     * <p>按 1..N（N = 键的个数）逐个取：缺档、或混进 {@code "0"}、{@code "four"} 这种键，
+     * 必然有一个取不到而当场抛 —— 不需要另写一条「键是否连续」的检查。
+     */
+    private static List<Integer> setTotals(String source, String where, JsonObject table) {
+        List<Integer> totals = new ArrayList<>(table.size());
+        for (int count = 1; count <= table.size(); count++) {
+            totals.add(JsonSupport.integer(source, where, table, String.valueOf(count)));
+        }
+        return totals;
     }
 }

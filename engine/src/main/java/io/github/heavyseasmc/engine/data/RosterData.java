@@ -3,6 +3,7 @@ package io.github.heavyseasmc.engine.data;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.scoring.TreasureScoring;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -13,15 +14,17 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * {@code data/roster} 读出来的东西：全部角色，加上按人数分的预设阵容。
+ * {@code data/roster} 读出来的东西：全部角色、按人数分的预设阵容，以及财宝计分表。
  *
  * <p>它<b>不是</b> {@link Roster}。{@code Roster} 是「这一局上场的这几个人」，
  * 而本记录是「这份数据里有哪些人、几人局各上谁」。一局只用得到其中一套预设，
  * 合成一个类型会让「全部角色」被当成阵容传进游戏 —— 那是 8 人局与 6 人局的差别。
  */
-public record RosterData(List<Survivor> characters, Map<Integer, List<CharacterId>> presets) {
+public record RosterData(List<Survivor> characters, Map<Integer, List<CharacterId>> presets,
+                         TreasureScoring treasureScoring) {
 
     public RosterData {
+        Objects.requireNonNull(treasureScoring, "treasureScoring");
         characters = List.copyOf(Objects.requireNonNull(characters, "characters"));
         if (characters.isEmpty()) {
             throw new IllegalArgumentException("角色表不能为空");

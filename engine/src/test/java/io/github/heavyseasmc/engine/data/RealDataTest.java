@@ -5,6 +5,7 @@ import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.scoring.TreasureScoring;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +58,12 @@ class RealDataTest {
         assertEquals(8, eightPlayers.size());
         assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8),
                 eightPlayers.survivors().stream().map(Survivor::seat).toList());
+
+        // 财宝计分表只在数据里有一份，这里把它与规则对一遍：现金每张 1 分、美术品 2/3/3、珠宝套组 1/4/8。
+        TreasureScoring scoring = data.treasureScoring();
+        assertEquals(1, scoring.cashFaceValue());
+        assertEquals(List.of(2, 3, 3), scoring.fineArtFaceValues());
+        assertEquals(List.of(1, 4, 8), scoring.jewelrySetTotals());
     }
 
     @Test

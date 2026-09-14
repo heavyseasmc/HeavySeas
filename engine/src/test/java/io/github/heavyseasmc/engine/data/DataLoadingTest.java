@@ -7,6 +7,7 @@ import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.model.TreasureKind;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.scoring.TreasureScoring;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -131,6 +132,11 @@ class DataLoadingTest {
                      "ability": {"kind": "overboard_immune", "requires_conscious": true,
                                  "not_protected_from": ["bait_bucket"]}}
                   ],
+                  "treasure_scoring": {
+                    "cash": {"kind": "face_value", "value": 1},
+                    "fine_art": {"kind": "face_value", "values": [2, 3, 3]},
+                    "jewelry": {"kind": "set_total", "table": {"1": 1, "2": 4, "3": 8}}
+                  },
                   "presets": {"2": ["jeweler", "mate"], "3": ["jeweler", "mate", "sailor"]}
                 }""";
 
@@ -213,12 +219,38 @@ class DataLoadingTest {
         }
 
         @Test
-        @DisplayName("对照：白名单确实放行「已知但不读」的 treasure_scoring，只拦真正陌生的字段")
-        void knownButUnreadKeyPasses() {
-            String withScoring = THREE_CHARACTERS.replace("\"presets\":",
-                    "\"treasure_scoring\": {\"cash\": {\"kind\": \"face_value\", \"value\": 1}}, \"presets\":");
-            assertEquals(3, RosterLoader.load(write("scoring.json", withScoring)).characters().size());
+        @DisplayName("财宝计分表读得出来 —— 引擎里不再另写一份 1/4/8")
+        void treasureScoringLoads() {
+            TreasureScoring scoring = RosterLoader.load(write("roster.json", THREE_CHARACTERS)).treasureScoring();
+            assertEquals(1, scoring.cashFaceValue());
+            assertEquals(List.of(2, 3, 3), scoring.fineArtFaceValues());
+            assertEquals(List.of(1, 4, 8), scoring.jewelrySetTotals());
+        }
 
+        @Test
+        @DisplayName("珠宝表缺档、计分方式写成别的 kind、计分表里多一个字段、干脆没有计分表，四样都抛")
+        void brokenTreasureScoringRejected() {
+            String gap = THREE_CHARACTERS.replace("{\"1\": 1, \"2\": 4, \"3\": 8}", "{\"1\": 1, \"3\": 8}");
+            assertTrue(assertThrows(DataFormatException.class,
+                    () -> RosterLoader.load(write("gap.json", gap))).getMessage().contains("jewelry.table"));
+
+            String otherKind = THREE_CHARACTERS.replace("\"kind\": \"set_total\"", "\"kind\": \"face_value\"");
+            assertTrue(assertThrows(DataFormatException.class,
+                    () -> RosterLoader.load(write("kind.json", otherKind))).getMessage().contains("只认 set_total"));
+
+            String extraField = THREE_CHARACTERS.replace("\"value\": 1}", "\"value\": 1, \"bonus\": 2}");
+            assertTrue(assertThrows(DataFormatException.class,
+                    () -> RosterLoader.load(write("extra.json", extraField))).getMessage().contains("bonus"));
+
+            // 下划线开头的键是注释：改名之后，计分表对引擎来说就是没有。
+            String missing = THREE_CHARACTERS.replace("\"treasure_scoring\": {", "\"_treasure_scoring\": {");
+            assertTrue(assertThrows(DataFormatException.class,
+                    () -> RosterLoader.load(write("missing.json", missing))).getMessage().contains("缺字段 treasure_scoring"));
+        }
+
+        @Test
+        @DisplayName("对照：顶层陌生字段照样拦 —— 「放行而不读」的只剩 id 一个")
+        void unknownTopLevelKeyRejected() {
             String withJunk = THREE_CHARACTERS.replace("\"presets\":", "\"hate_table\": {}, \"presets\":");
             assertTrue(assertThrows(DataFormatException.class,
                     () -> RosterLoader.load(write("junk.json", withJunk))).getMessage().contains("hate_table"));
