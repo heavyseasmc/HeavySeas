@@ -1,0 +1,100 @@
+// Fabric 模组（目标 Minecraft 1.21.1）。
+//
+// ❗依赖方向只能是 mod → engine。engine 那一侧由它自己的依赖白名单机械地拦；
+//   这里要守的是另一半：玩家机器上，引擎的类由谁提供。
+
+plugins {
+    id 'fabric-loom'
+}
+
+base {
+    archivesName = 'heavyseas'
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings "net.fabricmc:yarn:${yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    // 引擎不是 Fabric 模组，只是一个普通 jar：编译期直接依赖，打包时嵌进本模组的 jar。
+    // ❗不嵌的话开发环境照样能跑（引擎就在类路径上），玩家那边却是 NoClassDefFoundError ——
+    //   所以「runServer 起得来」证明不了这一行写对了，只有生产环境启动才证明得了。
+    // 引擎的 Gson 不嵌：生产环境里用的是 Minecraft 自带的那一份，版本对齐见 engine/build.gradle。
+    implementation project(':engine')
+    include project(':engine')
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand version: project.version
+    }
+}
+
+// ❗引擎的运行时依赖不嵌进本模组的 jar，靠 Minecraft 自带的那一份。于是必须同时成立两条：
+//   ① Minecraft 带了它 —— 否则玩家那边 NoClassDefFoundError，而开发环境照样能跑；
+//   ② 两边要的是同一个版本 —— 否则单测与开发环境（Gradle 取高版本）测的不是玩家那边的库。
+// 两条被破坏时都不会有任何报错，所以在这里变成构建失败。
+// 判据直接取本模组运行时类路径的依赖图：引擎要的每个库，除了引擎一侧还得有别人要
+// （即 Minecraft 的库清单），并且 Gradle 没有为它做过版本仲裁。
+def engineLibraries = tasks.register('checkEngineLibraries') {
+    group = 'verification'
+    description = '引擎的运行时依赖必须由 Minecraft 自带，且版本一致'
+    def graph = configurations.named('runtimeClasspath').flatMap { it.incoming.resolutionResult.rootComponent }
+    doLast {
+        def resolvedChildren = { node ->
+            node.dependencies.findAll { it instanceof ResolvedDependencyResult }.collect { it.selected }
+        }
+
+        def engine = null
+        def seen = [] as Set
+        def queue = [graph.get()]
+        while (queue) {
+            def node = queue.remove(0)
+            if (!seen.add(node)) {
+                continue
+            }
+            if (node.id instanceof ProjectComponentIdentifier && node.id.projectPath == ':engine') {
+                engine = node
+            }
+            queue.addAll(resolvedChildren(node))
+        }
+        if (engine == null) {
+            // 检查对象不在图里时，下面的循环一次都不会进 —— 那就是一道只见过绿灯的闸门。
+            throw new GradleException('运行时类路径里找不到 :engine，这道检查什么也没查到')
+        }
+
+        def engineSide = [engine] as Set
+        def pending = [engine]
+        while (pending) {
+            resolvedChildren(pending.remove(0)).each {
+                if (engineSide.add(it)) {
+                    pending << it
+                }
+            }
+        }
+        def libraries = engineSide - engine
+
+        def problems = []
+        libraries.each { lib ->
+            if (lib.dependents.every { it.from in engineSide }) {
+                problems << "${lib.moduleVersion}：只有引擎要它，Minecraft 不带 —— 玩家那边会缺类"
+            }
+            if (lib.selectionReason.conflictResolution) {
+                problems << "${lib.moduleVersion}：各方要的版本不一致（" +
+                        lib.dependents.collect { "${it.from.id.displayName} 要 ${it.requested.displayName}" }.join('；') + '）'
+            }
+        }
+        if (problems) {
+            throw new GradleException((['引擎的运行时依赖与 Minecraft 自带的库对不上：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        // 打出核对了哪些库：「没有问题」与「一个库都没核对」输出一样，只有清单分得开。
+        logger.lifecycle("引擎运行时依赖核对通过：${libraries.collect { it.moduleVersion.toString() }.sort().join('、')}")
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn engineLibraries
+}

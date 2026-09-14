@@ -27,12 +27,19 @@ Minecraft / Fabric 的 6–8 人谈判游戏。一局 40–60 分钟。
 
 ## 状态
 
-开发中。当前进度：**M0 —— 纯 Java 规则引擎与单元测试**。
+开发中。当前进度：**M1 —— Fabric 模组骨架**（目标 Minecraft 1.21.1）。
 
-规则引擎（`engine/`）不依赖 Minecraft，可独立构建与测试：
+规则引擎（`engine/`）不依赖 Minecraft，单测不需要启动游戏：
 
 ```bash
 ./gradlew :engine:test
+```
+
+模组（`mod/`）：
+
+```bash
+./gradlew :mod:build        # 产物在 mod/build/libs/
+./gradlew :mod:runServer    # 开发环境起服；首次需先在 mod/run/eula.txt 写入 eula=true
 ```
 
 ## 仓库结构

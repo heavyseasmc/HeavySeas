@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "heavyseas",
+  "version": "${version}",
+  "name": "Heavy Seas",
+  "description": "6–8 人谈判游戏。",
+  "authors": ["Heavy Seas contributors"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.heavyseasmc.mod.HeavySeasMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
