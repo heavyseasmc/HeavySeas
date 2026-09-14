@@ -2,6 +2,7 @@ package io.github.heavyseasmc.engine.data;
 
 import com.google.gson.JsonObject;
 
+import java.io.Reader;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -26,31 +27,42 @@ public final class ProvisionLoader {
     private ProvisionLoader() {
     }
 
+    /** 从文件读：测试与工具走这条路。文件由本方法打开并关闭。 */
     public static Set<String> loadIds(Path file) {
-        JsonObject root = JsonSupport.readObject(file);
-        JsonSupport.requireSchemaVersion(file, root, SCHEMA_VERSION);
+        return JsonSupport.fromFile(file, reader -> loadIds(file.toString(), reader));
+    }
+
+    /**
+     * 从字符流读：数据包里的资源没有文件路径，只有一个标识和一条流。
+     *
+     * @param source 出错时报给人看的来源（文件路径或资源标识），不能为空
+     * @param reader 由调用方打开、调用方关闭
+     */
+    public static Set<String> loadIds(String source, Reader reader) {
+        JsonObject root = JsonSupport.readObject(source, reader);
+        JsonSupport.requireSchemaVersion(source, root, SCHEMA_VERSION);
 
         Set<String> ids = new LinkedHashSet<>();
         int printed = 0;
-        var cards = JsonSupport.array(file, "顶层", root, "cards");
+        var cards = JsonSupport.array(source, "顶层", root, "cards");
         for (int i = 0; i < cards.size(); i++) {
             String where = "cards[%d]".formatted(i);
-            JsonObject card = JsonSupport.asObject(file, where, cards.get(i));
-            String id = JsonSupport.string(file, where, card, "id");
+            JsonObject card = JsonSupport.asObject(source, where, cards.get(i));
+            String id = JsonSupport.string(source, where, card, "id");
             if (!ids.add(id)) {
-                throw DataFormatException.at(file, where, "物资 id 重复: " + id);
+                throw DataFormatException.at(source, where, "物资 id 重复: " + id);
             }
-            printed += JsonSupport.integer(file, where, card, "count");
+            printed += JsonSupport.integer(source, where, card, "count");
         }
         if (ids.isEmpty()) {
-            throw DataFormatException.at(file, "cards", "一张物资牌都没有");
+            throw DataFormatException.at(source, "cards", "一张物资牌都没有");
         }
 
         // 与文件自己写的张数对账。这一条同时是<b>正向对照</b>：
         // 它只有在真的把每张牌都读了一遍之后才可能通过，所以「加载器其实没在扫」会当场露馅。
-        int declared = JsonSupport.integer(file, "顶层", root, "total");
+        int declared = JsonSupport.integer(source, "顶层", root, "total");
         if (declared != printed) {
-            throw DataFormatException.at(file, "total",
+            throw DataFormatException.at(source, "total",
                     "写着 %d 张，按 count 数出来是 %d 张".formatted(declared, printed));
         }
         return Set.copyOf(ids);

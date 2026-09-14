@@ -5,6 +5,7 @@ import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.Selector;
 
+import java.io.Reader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -54,6 +55,17 @@ public final class NavigationLoader {
      */
     public static List<NavigationCard> load(
             Path file, Set<CharacterId> knownCharacters, Set<String> knownProvisions) {
+        return JsonSupport.fromFile(file, reader -> load(file.toString(), reader, knownCharacters, knownProvisions));
+    }
+
+    /**
+     * 从字符流读：数据包里的资源没有文件路径，只有一个标识和一条流。其余约定同上。
+     *
+     * @param source 出错时报给人看的来源（文件路径或资源标识），不能为空
+     * @param reader 由调用方打开、调用方关闭
+     */
+    public static List<NavigationCard> load(
+            String source, Reader reader, Set<CharacterId> knownCharacters, Set<String> knownProvisions) {
         Objects.requireNonNull(knownCharacters, "knownCharacters");
         Objects.requireNonNull(knownProvisions, "knownProvisions");
         if (knownCharacters.isEmpty()) {
@@ -62,117 +74,117 @@ public final class NavigationLoader {
             throw new IllegalArgumentException("角色 id 全集为空，点名校验会失去意义");
         }
 
-        JsonObject root = JsonSupport.readObject(file);
-        JsonSupport.requireSchemaVersion(file, root, SCHEMA_VERSION);
-        JsonSupport.onlyKeys(file, "顶层", root, TOP_KEYS);
+        JsonObject root = JsonSupport.readObject(source, reader);
+        JsonSupport.requireSchemaVersion(source, root, SCHEMA_VERSION);
+        JsonSupport.onlyKeys(source, "顶层", root, TOP_KEYS);
 
         List<NavigationCard> cards = new ArrayList<>();
         Set<String> seenIds = new LinkedHashSet<>();
-        var array = JsonSupport.array(file, "顶层", root, "cards");
+        var array = JsonSupport.array(source, "顶层", root, "cards");
         for (int i = 0; i < array.size(); i++) {
             String where = "cards[%d]".formatted(i);
-            JsonObject json = JsonSupport.asObject(file, where, array.get(i));
-            JsonSupport.onlyKeys(file, where, json, CARD_KEYS);
-            String id = JsonSupport.string(file, where, json, "id");
+            JsonObject json = JsonSupport.asObject(source, where, array.get(i));
+            JsonSupport.onlyKeys(source, where, json, CARD_KEYS);
+            String id = JsonSupport.string(source, where, json, "id");
             if (!seenIds.add(id)) {
-                throw DataFormatException.at(file, where, "牌 id 重复: " + id);
+                throw DataFormatException.at(source, where, "牌 id 重复: " + id);
             }
             try {
                 cards.add(new NavigationCard(
                         id,
-                        JsonSupport.integer(file, where, json, "gull"),
-                        selector(file, where + ".overboard",
-                                JsonSupport.object(file, where, json, "overboard"),
+                        JsonSupport.integer(source, where, json, "gull"),
+                        selector(source, where + ".overboard",
+                                JsonSupport.object(source, where, json, "overboard"),
                                 knownCharacters, knownProvisions),
-                        selector(file, where + ".thirst",
-                                JsonSupport.object(file, where, json, "thirst"),
+                        selector(source, where + ".thirst",
+                                JsonSupport.object(source, where, json, "thirst"),
                                 knownCharacters, knownProvisions),
-                        JsonSupport.bool(file, where, json, "thirst_rowers"),
-                        JsonSupport.bool(file, where, json, "thirst_fighters")));
+                        JsonSupport.bool(source, where, json, "thirst_rowers"),
+                        JsonSupport.bool(source, where, json, "thirst_fighters")));
             } catch (IllegalArgumentException e) {
-                throw DataFormatException.at(file, where, e.getMessage());
+                throw DataFormatException.at(source, where, e.getMessage());
             }
         }
         if (cards.isEmpty()) {
-            throw DataFormatException.at(file, "cards", "一张航海牌都没有 —— 没有牌的牌堆永远结束不了一局");
+            throw DataFormatException.at(source, "cards", "一张航海牌都没有 —— 没有牌的牌堆永远结束不了一局");
         }
 
         // 与文件自己写的张数对账。同时是正向对照：只有真的逐张读过才可能通过。
-        int declared = JsonSupport.integer(file, "顶层", root, "total");
+        int declared = JsonSupport.integer(source, "顶层", root, "total");
         if (declared != cards.size()) {
-            throw DataFormatException.at(file, "total",
+            throw DataFormatException.at(source, "total",
                     "写着 %d 张，实际读到 %d 张".formatted(declared, cards.size()));
         }
         return List.copyOf(cards);
     }
 
-    private static Selector selector(Path file, String where, JsonObject json,
+    private static Selector selector(String source, String where, JsonObject json,
                                      Set<CharacterId> knownCharacters, Set<String> knownProvisions) {
-        JsonSupport.onlyKeys(file, where, json, SELECTOR_KEYS);
-        String mode = JsonSupport.string(file, where, json, "mode");
+        JsonSupport.onlyKeys(source, where, json, SELECTOR_KEYS);
+        String mode = JsonSupport.string(source, where, json, "mode");
         return switch (mode) {
-            case "list" -> new Selector.Only(names(file, where, json, mode, knownCharacters));
-            case "except" -> new Selector.Except(names(file, where, json, mode, knownCharacters));
+            case "list" -> new Selector.Only(names(source, where, json, mode, knownCharacters));
+            case "except" -> new Selector.Except(names(source, where, json, mode, knownCharacters));
             case "all" -> {
-                requireAbsent(file, where, json, mode, "characters", "condition");
+                requireAbsent(source, where, json, mode, "characters", "condition");
                 yield new Selector.Everyone();
             }
             case "none" -> {
-                requireAbsent(file, where, json, mode, "characters", "condition");
+                requireAbsent(source, where, json, mode, "characters", "condition");
                 yield new Selector.Nobody();
             }
             case "conditional" -> {
-                requireAbsent(file, where, json, mode, "characters");
+                requireAbsent(source, where, json, mode, "characters");
                 yield new Selector.Conditional(
-                        condition(file, where, JsonSupport.string(file, where, json, "condition"), knownProvisions));
+                        condition(source, where, JsonSupport.string(source, where, json, "condition"), knownProvisions));
             }
-            default -> throw DataFormatException.at(file, where + ".mode",
+            default -> throw DataFormatException.at(source, where + ".mode",
                     "引擎不认识的点名模式 " + mode + "（只认 list / except / all / none / conditional）");
         };
     }
 
-    private static Set<CharacterId> names(Path file, String where, JsonObject json,
+    private static Set<CharacterId> names(String source, String where, JsonObject json,
                                           String mode, Set<CharacterId> knownCharacters) {
-        requireAbsent(file, where, json, mode, "condition");
-        List<String> raw = JsonSupport.strings(file, where, json, "characters");
+        requireAbsent(source, where, json, mode, "condition");
+        List<String> raw = JsonSupport.strings(source, where, json, "characters");
         if (raw.isEmpty()) {
             // 空名单必须由 none 表示。留着空的 list 会让「这张牌不点人」与
             // 「这张牌的名单导丢了」看起来一模一样 —— 见 Selector.Nobody 的说明。
-            throw DataFormatException.at(file, where + ".characters",
+            throw DataFormatException.at(source, where + ".characters",
                     "名单是空的 —— 「一个人也不点」要写成 mode=none");
         }
         Set<CharacterId> out = new LinkedHashSet<>();
         for (String id : raw) {
             CharacterId character = CharacterId.of(id);
             if (!knownCharacters.contains(character)) {
-                throw DataFormatException.at(file, where + ".characters",
+                throw DataFormatException.at(source, where + ".characters",
                         "点了角色表里没有的 %s（角色表里有 %s）"
                                 .formatted(id, knownCharacters.stream().map(CharacterId::value).sorted().toList()));
             }
             if (!out.add(character)) {
-                throw DataFormatException.at(file, where + ".characters", id + " 在同一份名单里出现了两次");
+                throw DataFormatException.at(source, where + ".characters", id + " 在同一份名单里出现了两次");
             }
         }
         return Set.copyOf(out);
     }
 
-    private static String condition(Path file, String where, String raw, Set<String> knownProvisions) {
+    private static String condition(String source, String where, String raw, Set<String> knownProvisions) {
         if (!raw.startsWith(CONDITION_PREFIX)) {
-            throw DataFormatException.at(file, where + ".condition",
+            throw DataFormatException.at(source, where + ".condition",
                     "只认 %s<物资 id> 这一种条件，实际是 %s".formatted(CONDITION_PREFIX, raw));
         }
         String provision = raw.substring(CONDITION_PREFIX.length());
         if (!knownProvisions.contains(provision)) {
-            throw DataFormatException.at(file, where + ".condition",
+            throw DataFormatException.at(source, where + ".condition",
                     "条件指向物资表里没有的 %s".formatted(provision));
         }
         return raw;
     }
 
-    private static void requireAbsent(Path file, String where, JsonObject json, String mode, String... keys) {
+    private static void requireAbsent(String source, String where, JsonObject json, String mode, String... keys) {
         for (String key : keys) {
             if (json.has(key)) {
-                throw DataFormatException.at(file, where,
+                throw DataFormatException.at(source, where,
                         "%s 模式不该带 %s 字段 —— 带了说明导出器与引擎对这张牌的理解不一致"
                                 .formatted(mode, key));
             }

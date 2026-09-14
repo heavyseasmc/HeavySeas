@@ -8,6 +8,11 @@ import io.github.heavyseasmc.engine.navigation.Selector;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -94,5 +99,14 @@ class RealDataTest {
                 "有角色从头到尾没被任何一张牌点过，落水/口渴分布会缺一条腿: " + named);
         assertTrue(withGull > 0, "没有任何一张牌带海鸥，那样一局永远结束不了");
         assertEquals(1, conditional, "带条件的牌张数变了 —— 条件是唯一不受 id 白名单保护的字段");
+    }
+
+    @Test
+    @DisplayName("真实数据从字符流读与从文件读一致 —— 数据包走的是字符流")
+    void realDataThroughReader() throws IOException {
+        Path file = LocalData.dir().file("roster/default.json");
+        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            assertEquals(RosterLoader.load(file), RosterLoader.load("heavyseas:roster/default", reader));
+        }
     }
 }

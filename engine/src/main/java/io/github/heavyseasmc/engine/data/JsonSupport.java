@@ -2,6 +2,7 @@ package io.github.heavyseasmc.engine.data;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonIOException;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
@@ -14,7 +15,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * JSON 取值的公共部分。<b>每个取值口都要么给出值、要么抛</b>，没有第三种出口。
@@ -28,23 +31,48 @@ import java.util.Set;
  * {@link #onlyKeys} 对没列出的键直接抛；只排除已知的坏键是拦不住的。它抓的是「导出器写了、引擎没读」——
  * 这种漂移在 M5 加天候字段时几乎一定会发生一次，而沉默版本的表现是数值悄悄不生效。
  * 下划线开头的键是注释（{@code _comment}），一律放行。
+ *
+ * <h2>来源是一个名字，不是一个文件</h2>
+ * 数据包里的资源没有文件路径，只有一个标识和一条字符流。所以每个取值口收的是 {@code source}
+ * —— 出错时报给人看的来源名 —— 而不是 {@link Path}。从文件读只是来源之一，见 {@link #fromFile}。
  */
 final class JsonSupport {
 
     private JsonSupport() {
     }
 
-    static JsonObject readObject(Path file) {
+    /** 打开文件交给 {@code read}，读完关闭。文件打不开也算数据错误，并报出路径。 */
+    static <T> T fromFile(Path file, Function<Reader, T> read) {
+        Objects.requireNonNull(file, "file");
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-            JsonElement root = JsonParser.parseReader(reader);
-            if (!root.isJsonObject()) {
-                throw DataFormatException.at(file, "顶层", "应当是一个 JSON 对象，实际是 " + kindOf(root));
-            }
-            return root.getAsJsonObject();
+            return read.apply(reader);
         } catch (IOException e) {
             throw new DataFormatException("读不了数值数据文件: " + file, e);
+        }
+    }
+
+    /**
+     * 读出顶层对象。{@code reader} 由调用方关闭。
+     *
+     * <p>❗读流出错与 JSON 写坏了是两回事，要改的地方完全不同。Gson 把读流时的 {@link IOException}
+     * 包成 {@link JsonIOException}，而它是 {@link JsonParseException} 的子类 —— 不先单独接住，
+     * 「流读到一半断了」就会被报成「不是合法 JSON」。
+     */
+    static JsonObject readObject(String source, Reader reader) {
+        if (source == null || source.isBlank()) {
+            throw new IllegalArgumentException("来源名不能为空：数据出错时，它是唯一能说明「是哪份数据」的东西");
+        }
+        Objects.requireNonNull(reader, "reader");
+        try {
+            JsonElement root = JsonParser.parseReader(reader);
+            if (!root.isJsonObject()) {
+                throw DataFormatException.at(source, "顶层", "应当是一个 JSON 对象，实际是 " + kindOf(root));
+            }
+            return root.getAsJsonObject();
+        } catch (JsonIOException e) {
+            throw new DataFormatException("读不了数值数据: " + source, e.getCause() != null ? e.getCause() : e);
         } catch (JsonParseException e) {
-            throw new DataFormatException("数值数据文件不是合法 JSON: " + file, e);
+            throw new DataFormatException("数值数据不是合法 JSON: " + source, e);
         }
     }
 
@@ -54,17 +82,17 @@ final class JsonSupport {
      * <p>版本不符<b>不是警告而是失败</b>：`data/README.md` 的约定是「改动字段含义必须递增」，
      * 所以对不上就意味着引擎与数据对字段含义的理解不同，继续读出来的每个数都可能是错的。
      */
-    static void requireSchemaVersion(Path file, JsonObject root, int expected) {
-        int actual = integer(file, "顶层", root, "schema_version");
+    static void requireSchemaVersion(String source, JsonObject root, int expected) {
+        int actual = integer(source, "顶层", root, "schema_version");
         if (actual != expected) {
-            throw DataFormatException.at(file, "schema_version",
+            throw DataFormatException.at(source, "schema_version",
                     "本引擎只读版本 %d，文件是版本 %d —— 要么升级引擎，要么在 %s 下补一条旧版本读取路径"
                             .formatted(expected, actual, "engine/src/main/java/io/github/heavyseasmc/engine/data/"));
         }
     }
 
     /** 键白名单。下划线开头的键（注释）一律放行。 */
-    static void onlyKeys(Path file, String where, JsonObject object, Set<String> allowed) {
+    static void onlyKeys(String source, String where, JsonObject object, Set<String> allowed) {
         Set<String> unknown = new LinkedHashSet<>();
         for (String key : object.keySet()) {
             if (!key.startsWith("_") && !allowed.contains(key)) {
@@ -72,76 +100,76 @@ final class JsonSupport {
             }
         }
         if (!unknown.isEmpty()) {
-            throw DataFormatException.at(file, where,
+            throw DataFormatException.at(source, where,
                     "有引擎不认识的字段 %s —— 先决定是读它还是丢它，再改白名单（允许的是 %s）"
                             .formatted(unknown, allowed.stream().sorted().toList()));
         }
     }
 
-    static JsonElement required(Path file, String where, JsonObject object, String key) {
+    static JsonElement required(String source, String where, JsonObject object, String key) {
         JsonElement value = object.get(key);
         if (value == null || value.isJsonNull()) {
-            throw DataFormatException.at(file, where, "缺字段 " + key);
+            throw DataFormatException.at(source, where, "缺字段 " + key);
         }
         return value;
     }
 
-    static String string(Path file, String where, JsonObject object, String key) {
-        JsonElement value = required(file, where, object, key);
+    static String string(String source, String where, JsonObject object, String key) {
+        JsonElement value = required(source, where, object, key);
         if (!isPrimitive(value, JsonPrimitive::isString)) {
-            throw DataFormatException.at(file, where + "." + key, "应当是字符串，实际是 " + kindOf(value));
+            throw DataFormatException.at(source, where + "." + key, "应当是字符串，实际是 " + kindOf(value));
         }
         String text = value.getAsString();
         if (text.isBlank()) {
-            throw DataFormatException.at(file, where + "." + key, "不能是空字符串");
+            throw DataFormatException.at(source, where + "." + key, "不能是空字符串");
         }
         return text;
     }
 
-    static int integer(Path file, String where, JsonObject object, String key) {
-        JsonElement value = required(file, where, object, key);
+    static int integer(String source, String where, JsonObject object, String key) {
+        JsonElement value = required(source, where, object, key);
         if (!isPrimitive(value, JsonPrimitive::isNumber)) {
-            throw DataFormatException.at(file, where + "." + key, "应当是整数，实际是 " + kindOf(value));
+            throw DataFormatException.at(source, where + "." + key, "应当是整数，实际是 " + kindOf(value));
         }
         double raw = value.getAsDouble();
         if (raw != Math.rint(raw)) {
-            throw DataFormatException.at(file, where + "." + key, "应当是整数，实际是 " + raw);
+            throw DataFormatException.at(source, where + "." + key, "应当是整数，实际是 " + raw);
         }
         return value.getAsInt();
     }
 
-    static boolean bool(Path file, String where, JsonObject object, String key) {
-        JsonElement value = required(file, where, object, key);
+    static boolean bool(String source, String where, JsonObject object, String key) {
+        JsonElement value = required(source, where, object, key);
         if (!isPrimitive(value, JsonPrimitive::isBoolean)) {
-            throw DataFormatException.at(file, where + "." + key, "应当是 true/false，实际是 " + kindOf(value));
+            throw DataFormatException.at(source, where + "." + key, "应当是 true/false，实际是 " + kindOf(value));
         }
         return value.getAsBoolean();
     }
 
-    static JsonObject object(Path file, String where, JsonObject parent, String key) {
-        JsonElement value = required(file, where, parent, key);
+    static JsonObject object(String source, String where, JsonObject parent, String key) {
+        JsonElement value = required(source, where, parent, key);
         if (!value.isJsonObject()) {
-            throw DataFormatException.at(file, where + "." + key, "应当是对象，实际是 " + kindOf(value));
+            throw DataFormatException.at(source, where + "." + key, "应当是对象，实际是 " + kindOf(value));
         }
         return value.getAsJsonObject();
     }
 
-    static JsonArray array(Path file, String where, JsonObject parent, String key) {
-        JsonElement value = required(file, where, parent, key);
+    static JsonArray array(String source, String where, JsonObject parent, String key) {
+        JsonElement value = required(source, where, parent, key);
         if (!value.isJsonArray()) {
-            throw DataFormatException.at(file, where + "." + key, "应当是数组，实际是 " + kindOf(value));
+            throw DataFormatException.at(source, where + "." + key, "应当是数组，实际是 " + kindOf(value));
         }
         return value.getAsJsonArray();
     }
 
     /** 字符串数组。允许为空数组 —— 「不保护任何东西」是合法的技能描述。 */
-    static List<String> strings(Path file, String where, JsonObject parent, String key) {
-        JsonArray array = array(file, where, parent, key);
+    static List<String> strings(String source, String where, JsonObject parent, String key) {
+        JsonArray array = array(source, where, parent, key);
         List<String> out = new java.util.ArrayList<>(array.size());
         for (int i = 0; i < array.size(); i++) {
             JsonElement item = array.get(i);
             if (!isPrimitive(item, JsonPrimitive::isString) || item.getAsString().isBlank()) {
-                throw DataFormatException.at(file, "%s.%s[%d]".formatted(where, key, i),
+                throw DataFormatException.at(source, "%s.%s[%d]".formatted(where, key, i),
                         "应当是非空字符串，实际是 " + kindOf(item));
             }
             out.add(item.getAsString());
@@ -149,9 +177,9 @@ final class JsonSupport {
         return List.copyOf(out);
     }
 
-    static JsonObject asObject(Path file, String where, JsonElement element) {
+    static JsonObject asObject(String source, String where, JsonElement element) {
         if (!element.isJsonObject()) {
-            throw DataFormatException.at(file, where, "应当是对象，实际是 " + kindOf(element));
+            throw DataFormatException.at(source, where, "应当是对象，实际是 " + kindOf(element));
         }
         return element.getAsJsonObject();
     }

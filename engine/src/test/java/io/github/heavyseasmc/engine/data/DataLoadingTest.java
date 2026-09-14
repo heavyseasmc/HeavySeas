@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -436,6 +438,65 @@ class DataLoadingTest {
             DataFormatException e = assertThrows(DataFormatException.class,
                     () -> load("broken.json", "[1, 2, 3]"));
             assertTrue(e.getMessage().contains("broken.json"), e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------ 字符流入口
+
+    @Nested
+    @DisplayName("从字符流读（数据包里的资源没有文件路径）")
+    class ReaderEntry {
+
+        @Test
+        @DisplayName("同一份数据，从字符流读与从文件读，结果一模一样")
+        void readerMatchesFile() {
+            assertEquals(RosterLoader.load(write("roster.json", RosterFile.THREE_CHARACTERS)),
+                    RosterLoader.load("heavyseas:roster/test", new StringReader(RosterFile.THREE_CHARACTERS)));
+            assertEquals(ProvisionLoader.loadIds(write("provisions.json", ProvisionFile.THREE_PROVISIONS)),
+                    ProvisionLoader.loadIds("heavyseas:provisions/test",
+                            new StringReader(ProvisionFile.THREE_PROVISIONS)));
+            assertEquals(
+                    NavigationLoader.load(write("nav.json", NavigationFile.FIVE_CARDS),
+                            NavigationFile.CHARACTERS, NavigationFile.PROVISIONS),
+                    NavigationLoader.load("heavyseas:navigation/test", new StringReader(NavigationFile.FIVE_CARDS),
+                            NavigationFile.CHARACTERS, NavigationFile.PROVISIONS));
+        }
+
+        @Test
+        @DisplayName("出错时报调用方给的来源名 —— 数据包里出错，人要知道是哪个资源")
+        void errorsNameTheSource() {
+            String broken = RosterFile.THREE_CHARACTERS.replace("none", "teleport");
+            DataFormatException e = assertThrows(DataFormatException.class,
+                    () -> RosterLoader.load("heavyseas:roster/broken", new StringReader(broken)));
+            assertTrue(e.getMessage().contains("heavyseas:roster/broken"), e.getMessage());
+            assertTrue(e.getMessage().contains("characters[1]"), e.getMessage());
+        }
+
+        @Test
+        @DisplayName("❗流读到一半坏了，要报成「读不了」而不是「不是合法 JSON」—— 两者要改的地方完全不同")
+        void readFailureIsNotReportedAsBadJson() {
+            Reader failing = new Reader() {
+                @Override
+                public int read(char[] buffer, int offset, int length) throws IOException {
+                    throw new IOException("读到一半断了");
+                }
+
+                @Override
+                public void close() {
+                }
+            };
+            DataFormatException e = assertThrows(DataFormatException.class,
+                    () -> ProvisionLoader.loadIds("heavyseas:provisions/flaky", failing));
+            assertTrue(e.getMessage().contains("读不了"), e.getMessage());
+            assertTrue(e.getMessage().contains("heavyseas:provisions/flaky"), e.getMessage());
+            assertInstanceOf(IOException.class, e.getCause());
+        }
+
+        @Test
+        @DisplayName("来源名为空就拒绝 —— 数据出错时，它是唯一能说明「是哪份数据」的东西")
+        void blankSourceRejected() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> RosterLoader.load(" ", new StringReader(RosterFile.THREE_CHARACTERS)));
         }
     }
 }
