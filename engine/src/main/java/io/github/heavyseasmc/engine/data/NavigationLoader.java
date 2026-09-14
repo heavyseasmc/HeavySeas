@@ -66,6 +66,14 @@ public final class NavigationLoader {
      */
     public static List<NavigationCard> load(
             String source, Reader reader, Set<CharacterId> knownCharacters, Set<String> knownProvisions) {
+        return loadDocument(source, reader, knownCharacters, knownProvisions).value();
+    }
+
+    /**
+     * 同上，但把文件自称的 {@code id} 一起带出来，供调用方做跨文件核对。见 {@link DataDocument}。
+     */
+    public static DataDocument<List<NavigationCard>> loadDocument(
+            String source, Reader reader, Set<CharacterId> knownCharacters, Set<String> knownProvisions) {
         Objects.requireNonNull(knownCharacters, "knownCharacters");
         Objects.requireNonNull(knownProvisions, "knownProvisions");
         if (knownCharacters.isEmpty()) {
@@ -115,7 +123,7 @@ public final class NavigationLoader {
             throw DataFormatException.at(source, "total",
                     "写着 %d 张，实际读到 %d 张".formatted(declared, cards.size()));
         }
-        return List.copyOf(cards);
+        return new DataDocument<>(JsonSupport.string(source, "顶层", root, "id"), List.copyOf(cards));
     }
 
     private static Selector selector(String source, String where, JsonObject json,

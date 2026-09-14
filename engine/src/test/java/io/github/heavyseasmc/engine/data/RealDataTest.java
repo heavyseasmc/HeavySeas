@@ -116,4 +116,26 @@ class RealDataTest {
             assertEquals(RosterLoader.load(file), RosterLoader.load("heavyseas:roster/default", reader));
         }
     }
+
+    @Test
+    @DisplayName("❗三份数据自称同一个 id —— 单看每一份都合法，只有比对才发现换了半套")
+    void allThreeDeclareTheSameVariant() throws IOException {
+        DataDir dir = LocalData.dir();
+        String roster;
+        String provisions;
+        String navigation;
+        try (Reader r = Files.newBufferedReader(dir.file("roster/default.json"), StandardCharsets.UTF_8)) {
+            roster = RosterLoader.loadDocument("heavyseas:roster/default", r).id();
+        }
+        try (Reader r = Files.newBufferedReader(dir.file("provisions/default.json"), StandardCharsets.UTF_8)) {
+            provisions = ProvisionLoader.loadDocument("heavyseas:provisions/default", r).id();
+        }
+        try (Reader r = Files.newBufferedReader(dir.file(LocalData.NAVIGATION), StandardCharsets.UTF_8)) {
+            navigation = NavigationLoader.loadDocument("heavyseas:navigation/default", r,
+                    LocalData.roster().ids(), LocalData.provisionIds()).id();
+        }
+        assertEquals("heavyseas:default", roster, "角色表自称的变体");
+        assertEquals(roster, provisions, "物资表与角色表不是同一个变体");
+        assertEquals(roster, navigation, "航海牌与角色表不是同一个变体");
+    }
 }

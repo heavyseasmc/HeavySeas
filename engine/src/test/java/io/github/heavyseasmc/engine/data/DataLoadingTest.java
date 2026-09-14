@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -529,6 +530,41 @@ class DataLoadingTest {
         void blankSourceRejected() {
             assertThrows(IllegalArgumentException.class,
                     () -> RosterLoader.load(" ", new StringReader(RosterFile.THREE_CHARACTERS)));
+        }
+    }
+
+    @Nested
+    @DisplayName("文件自称的 id")
+    class DocumentIdentity {
+
+        @Test
+        @DisplayName("加载器把 id 原样带出来 —— 跨文件核对唯一的依据")
+        void exposesDeclaredId() {
+            assertEquals("heavyseas:test",
+                    RosterLoader.loadDocument("heavyseas:roster/test",
+                            new StringReader(RosterFile.THREE_CHARACTERS)).id());
+        }
+
+        @Test
+        @DisplayName("❗缺 id 就抛：缺席若能读过，跨文件核对只能一律放行，那道检查就等于没有")
+        void missingIdRejected() {
+            String withoutId = RosterFile.THREE_CHARACTERS
+                    .replace("  \"id\": \"heavyseas:test\",\n", "");
+            // 先证明确实删掉了 —— 否则「删失败」与「删了还能读过」在这条用例里长得一样。
+            assertFalse(withoutId.contains("heavyseas:test"), "顶层 id 没被删掉，这条用例什么也没测");
+
+            DataFormatException e = assertThrows(DataFormatException.class,
+                    () -> RosterLoader.loadDocument("heavyseas:roster/no-id", new StringReader(withoutId)));
+            assertTrue(e.getMessage().contains("id"), e.getMessage());
+        }
+
+        @Test
+        @DisplayName("两个便捷重载读出来的内容与 loadDocument 一致")
+        void plainLoadMatchesDocument() {
+            assertEquals(RosterLoader.load("heavyseas:roster/test",
+                            new StringReader(RosterFile.THREE_CHARACTERS)),
+                    RosterLoader.loadDocument("heavyseas:roster/test",
+                            new StringReader(RosterFile.THREE_CHARACTERS)).value());
         }
     }
 }

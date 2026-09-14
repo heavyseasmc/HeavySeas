@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.mod;
 
 import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.mod.data.GameDataLoader;
 import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,5 +25,6 @@ public final class HeavySeasMod implements ModInitializer {
     @Override
     public void onInitialize() {
         LOGGER.info("规则引擎已接入：一回合 {} 个阶段", Phase.values().length);
+        GameDataLoader.register();
     }
 }

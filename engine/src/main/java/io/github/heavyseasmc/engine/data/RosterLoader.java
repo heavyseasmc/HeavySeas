@@ -28,24 +28,19 @@ public final class RosterLoader {
     /** 本加载器读的 schema 版本。数据文件的 {@code schema_version} 必须等于它。 */
     public static final int SCHEMA_VERSION = 1;
 
-    private static final Set<String> READ_KEYS =
-            Set.of("schema_version", "characters", "presets", "treasure_scoring");
-
     /**
-     * ❗<b>白名单放行、但引擎并不读</b>的顶层字段。列出来是为了让它成为一个<b>决定</b>而不是疏漏。
+     * 顶层字段白名单。**每一条都有人读**。
      *
-     * <ul>
-     *   <li>{@code id}：数据包标识，M1 的资源加载才用得上。</li>
-     * </ul>
+     * <p>这里曾经分成两半，另一半叫「白名单放行、但引擎并不读」，为的是让「没读」成为一个
+     * 决定而不是疏漏。两条先后搬了出去：{@code treasure_scoring} 因为那张表同时写死在计分
+     * 代码里（见 {@link TreasureScoring}），{@code id} 因为 {@link #loadDocument} 开始把它
+     * 带给调用方做跨文件核对（见 {@link DataDocument}）。
      *
-     * <p>{@code treasure_scoring} 曾经也在这里：那张表同时写死在计分代码里，数据那份改了不生效。
-     * 现在引擎只读数据这一份，见 {@link TreasureScoring}。
+     * <p>剩下空集之后就把那一半删了：**一个永远为空的集合与一条永远走不到的分支是同一种东西**。
+     * 下次真出现「读不了但要放行」的字段时再把它加回来，并同时加一个会因它变红的测试。
      */
-    private static final Set<String> PRESENT_BUT_NOT_CONSUMED = Set.of("id");
-
     private static final Set<String> TOP_KEYS =
-            java.util.stream.Stream.concat(READ_KEYS.stream(), PRESENT_BUT_NOT_CONSUMED.stream())
-                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            Set.of("schema_version", "id", "characters", "presets", "treasure_scoring");
 
     private static final Set<String> CHARACTER_KEYS =
             Set.of("id", "seat", "size", "survival", "expansion", "ability");
@@ -65,6 +60,15 @@ public final class RosterLoader {
      * @param reader 由调用方打开、调用方关闭
      */
     public static RosterData load(String source, Reader reader) {
+        return loadDocument(source, reader).value();
+    }
+
+    /**
+     * 同上，但把文件自称的 {@code id} 一起带出来。
+     *
+     * <p>调用方拿它做跨文件检查：三份数值必须来自同一个变体。见 {@link DataDocument}。
+     */
+    public static DataDocument<RosterData> loadDocument(String source, Reader reader) {
         JsonObject root = JsonSupport.readObject(source, reader);
         JsonSupport.requireSchemaVersion(source, root, SCHEMA_VERSION);
         JsonSupport.onlyKeys(source, "顶层", root, TOP_KEYS);
@@ -98,7 +102,8 @@ public final class RosterLoader {
                 JsonSupport.object(source, "顶层", root, "treasure_scoring"));
 
         try {
-            return new RosterData(List.copyOf(characters), presets, treasureScoring);
+            return new DataDocument<>(JsonSupport.string(source, "顶层", root, "id"),
+                    new RosterData(List.copyOf(characters), presets, treasureScoring));
         } catch (IllegalArgumentException e) {
             // 角色表与预设之间的一致性由 RosterData 把关；它不知道自己是从哪个文件来的，
             // 这里补上文件名，否则报错人得自己猜是哪份数据。

@@ -265,6 +265,7 @@ class ScorerTest {
             String roster = """
                     {
                       "schema_version": 1,
+                      "id": "test:edited",
                       "characters": [
                         {"id": "jeweler", "seat": 1, "size": 4, "survival": 8, "expansion": "base",
                          "ability": {"kind": "none"}}

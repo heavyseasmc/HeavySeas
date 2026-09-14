@@ -39,6 +39,13 @@ public final class ProvisionLoader {
      * @param reader 由调用方打开、调用方关闭
      */
     public static Set<String> loadIds(String source, Reader reader) {
+        return loadDocument(source, reader).value();
+    }
+
+    /**
+     * 同上，但把文件自称的 {@code id} 一起带出来，供调用方做跨文件核对。见 {@link DataDocument}。
+     */
+    public static DataDocument<Set<String>> loadDocument(String source, Reader reader) {
         JsonObject root = JsonSupport.readObject(source, reader);
         JsonSupport.requireSchemaVersion(source, root, SCHEMA_VERSION);
 
@@ -65,6 +72,6 @@ public final class ProvisionLoader {
             throw DataFormatException.at(source, "total",
                     "写着 %d 张，按 count 数出来是 %d 张".formatted(declared, printed));
         }
-        return Set.copyOf(ids);
+        return new DataDocument<>(JsonSupport.string(source, "顶层", root, "id"), Set.copyOf(ids));
     }
 }

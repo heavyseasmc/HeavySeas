@@ -53,6 +53,39 @@ processResources {
     filesMatching('fabric.mod.json') {
         expand modMetadata
     }
+
+    // 数值数据以内置数据包的形式进 jar：仓库根的 data/ → jar 里的 data/heavyseas/。
+    // ❗**不在模组资源里放第二份拷贝。** 引擎单测读的是仓库根那一份，模组读的是 jar 里那一份；
+    //   两份各自维护必然漂移（证伪表里那两份 textguard 就是这么分岔的），所以这里只做搬运。
+    // data/README.md 是权属声明，不是数值，不进 jar。
+    from(rootProject.file('data')) {
+        into 'data/heavyseas'
+        include '**/*.json'
+    }
+}
+
+// 上面那条 from 是「复制了几个文件」，复制 0 个与复制成功输出完全一样。
+// 三份数值缺任何一份，模组在运行时才炸；这里让它在构建期就炸。
+def checkBundledData = tasks.register('checkBundledData') {
+    group = 'verification'
+    description = '三份数值数据必须都进了 jar 的内置数据包'
+    def expected = ['roster', 'provisions', 'navigation'].collect { "data/heavyseas/${it}/default.json" }
+    // ❗destinationDir 是 File 不是 Provider，用 flatMap 会在执行期炸「cannot be cast to Provider」。
+    def resourceDir = tasks.named('processResources').map { it.destinationDir }
+    inputs.files(tasks.named('processResources'))
+    doLast {
+        def root = resourceDir.get()
+        def missing = expected.findAll { !new File(root, it).isFile() }
+        if (missing) {
+            throw new GradleException((['内置数据包缺文件（仓库根 data/ 没搬进来）：']
+                    + missing.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("内置数据包核对通过：${expected.join('、')}")
+    }
+}
+
+tasks.named('classes') {
+    dependsOn checkBundledData
 }
 
 // ❗引擎的运行时依赖不嵌进本模组的 jar，靠 Minecraft 自带的那一份。于是必须同时成立两条：
