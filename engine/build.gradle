@@ -22,8 +22,8 @@ dependencies {
 //
 // M0 时「零 MC 依赖」是构建层面的天然事实：整个构建里根本没有 Fabric / Minecraft。
 // M1 起同一个构建里有了 Loom，这条就只剩「没人往这里加」一道自觉，所以改成机器拦。
-// 用白名单不用黑名单：MC 那边的 group 不止一个（com.mojang、net.minecraft、net.fabricmc，
-// 外加它们各自带进来的库），黑名单只拦得住想到的那几个。
+// 用白名单，不用排除法：MC 那边的 group 不止一个（com.mojang、net.minecraft、net.fabricmc，
+// 外加它们各自带进来的库），排除法只拦得住想到的那几个。
 // 本地文件依赖与其他工程（包括 :mod）一律不在表里 —— 依赖方向只能是 mod → engine。
 //
 // 要给引擎加依赖，先改这张表：让「引擎多了一个依赖」成为一个看得见的决定，而不是顺手。
