@@ -3,6 +3,7 @@ package io.github.heavyseasmc.engine.sim;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.navigation.NavigationDeck;
 import io.github.heavyseasmc.engine.navigation.Selector;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Fight;
@@ -45,15 +46,29 @@ public final class Simulator {
     /** 单局回合数上限。超过即判定为疑似死锁 —— 正常对局远到不了这个数。 */
     public static final int TURN_LIMIT = 500;
 
+    /** 划船一次看几张牌。规则：抽 2 张，对每一张分别决定留下还是塞回底部。 */
+    public static final int CARDS_DRAWN_WHEN_ROWING = 2;
+
     private final Roster roster;
     private final List<NavigationCard> deck;
+    private final NavigationPolicy policy;
 
+    /** 默认用对照组策略（留不留、挑哪张全看运气）。 */
     public Simulator(Roster roster, List<NavigationCard> deck) {
+        this(roster, deck, NavigationPolicy.INDIFFERENT);
+    }
+
+    public Simulator(Roster roster, List<NavigationCard> deck, NavigationPolicy policy) {
         this.roster = Objects.requireNonNull(roster, "roster");
         this.deck = List.copyOf(Objects.requireNonNull(deck, "deck"));
+        this.policy = Objects.requireNonNull(policy, "policy");
         if (this.deck.isEmpty()) {
             throw new IllegalArgumentException("航海牌堆不能为空 —— 没有牌就永远结束不了");
         }
+    }
+
+    public NavigationPolicy policy() {
+        return policy;
     }
 
     /**
@@ -62,12 +77,13 @@ public final class Simulator {
      * @throws IllegalStateException 出现非法状态，或超过回合上限（疑似死锁）
      */
     public Result run(long seed) {
+        // 一条随机流：洗牌与全部决策共用它，同一个种子才能完整复现一局。
         Random rng = new Random(seed);
+        Table table = new Table(seed, rng, new NavigationDeck(deck, rng));
         GameState g = GameState.start(roster);
         Invariants.requireValid(g, seed, "开局");
 
         int fights = 0;
-        ExposureTally exposure = new ExposureTally();
         while (!g.isOver()) {
             if (g.turn() > TURN_LIMIT) {
                 throw new IllegalStateException(
@@ -78,11 +94,11 @@ public final class Simulator {
             switch (g.phase()) {
                 case PROVISION -> g = provision(g);
                 case ACTION -> {
-                    ActionResult r = action(g, rng, seed);
+                    ActionResult r = action(g, table);
                     g = r.state();
                     fights += r.fights();
                 }
-                case NAVIGATION -> g = navigate(g, rng, seed, exposure);
+                case NAVIGATION -> g = navigate(g, table);
             }
             Invariants.requireValidTransition(before, g, seed, "阶段 " + before.phase());
             if (g.isOver()) {
@@ -92,7 +108,39 @@ public final class Simulator {
             Invariants.requireValid(g, seed, "阶段推进后");
         }
         return new Result(seed, g.turn(), g.outcome().orElseThrow(), aliveCount(g), fights,
-                exposure.toMap());
+                table.exposure.toMap());
+    }
+
+    /**
+     * 一局之内的桌面：牌堆、划船堆、随机流、统计。
+     *
+     * <p>与 {@link GameState} 分开放，因为两者的性质不同：{@code GameState} 不可变、可回放，
+     * 而这些是「桌上还剩什么」，每一步都在变。把牌堆塞进不可变状态就要每抽一张复制一副牌。
+     */
+    private final class Table {
+
+        private final long seed;
+        private final Random rng;
+        private final NavigationDeck pile;
+        /** 划船堆。面朝下，只有舵手看得到全部；结算完清空。 */
+        private final List<NavigationCard> rowStack = new ArrayList<>();
+        private final ExposureTally exposure = new ExposureTally();
+
+        Table(long seed, Random rng, NavigationDeck pile) {
+            this.seed = seed;
+            this.rng = rng;
+            this.pile = pile;
+        }
+
+        /** 牌只在两个地方：牌堆里或划船堆里。少一张的表现是某些名单再也不出现。 */
+        void requireNoCardLost(String where) {
+            int accounted = pile.size() + rowStack.size();
+            if (accounted != pile.total()) {
+                throw new IllegalStateException(
+                        "seed=%d %s：牌对不上，牌堆 %d + 划船堆 %d ≠ 共 %d 张"
+                                .formatted(seed, where, pile.size(), rowStack.size(), pile.total()));
+            }
+        }
     }
 
     /**
@@ -112,7 +160,8 @@ public final class Simulator {
     }
 
     /** 行动阶段：按「最靠船头且未行动」取人，每人随机做一件事。 */
-    private ActionResult action(GameState g, Random rng, long seed) {
+    private ActionResult action(GameState g, Table table) {
+        Random rng = table.rng;
         int fights = 0;
         int guard = 0;
         while (true) {
@@ -122,12 +171,12 @@ public final class Simulator {
             }
             if (++guard > roster.size() * 4) {
                 throw new IllegalStateException(
-                        "seed=%d 行动阶段推不动：nextActor 一直返回同一个人，标记没写回".formatted(seed));
+                        "seed=%d 行动阶段推不动：nextActor 一直返回同一个人，标记没写回".formatted(table.seed));
             }
             CharacterId actor = next.get();
             switch (rng.nextInt(4)) {
                 case 0 -> { }                                        // 什么都不做
-                case 1 -> g = g.withState(actor, g.stateOf(actor).thirstFrom(ThirstSource.ROWED));
+                case 1 -> g = row(g, actor, table);
                 case 2 -> g = swapSeats(g, actor, rng);
                 default -> {
                     GameState after = maybeFight(g, actor, rng);
@@ -138,9 +187,32 @@ public final class Simulator {
                 }
             }
             g = g.withState(actor, g.stateOf(actor).markActed());
-            Invariants.requireValid(g, seed, "行动后");
+            Invariants.requireValid(g, table.seed, "行动后");
         }
         return new ActionResult(g, fights);
+    }
+
+    /**
+     * 划船：抽 2 张看过，<b>对每一张分别</b>决定放进划船堆还是塞回牌堆底部，然后领一个划船标记。
+     *
+     * <p>❗「看过再决定」是本作信息结构的核心：划船堆面朝下，划船者只知道自己放了什么，
+     * 舵手知道全部，其他人只看得到有几个人划了船。舵手因此能从别人挑剩的里面再挑一次 ——
+     * 落水/口渴的实际分布被这两道挑选<b>连挑两次</b>，与牌面上印的张数分布不是一回事。
+     *
+     * <p>牌堆不够 2 张时有几张抽几张。真实对局里牌堆空不了（牌都在划船堆里、本回合就放回），
+     * 但合成牌堆可能只有 1 张，那时「抽 2 张」就只能抽到 1 张。
+     */
+    private GameState row(GameState g, CharacterId rower, Table table) {
+        for (int i = 0; i < CARDS_DRAWN_WHEN_ROWING && !table.pile.isEmpty(); i++) {
+            NavigationCard card = table.pile.draw();
+            if (policy.keepWhenRowing(card, g, rower, table.rng)) {
+                table.rowStack.add(card);
+            } else {
+                table.pile.bottom(card);
+            }
+        }
+        table.requireNoCardLost("划船后");
+        return g.withState(rower, g.stateOf(rower).thirstFrom(ThirstSource.ROWED));
     }
 
     /** 换座位：与任意角色交换，不限相邻。昏迷与死亡者不能拒绝。 */
@@ -198,9 +270,12 @@ public final class Simulator {
         return next;
     }
 
-    /** 航海阶段：抽一张牌，按 海鸥 → 落海 → 口渴 结算。 */
-    private GameState navigate(GameState g, Random rng, long seed, ExposureTally exposure) {
-        NavigationCard card = deck.get(rng.nextInt(deck.size()));
+    /** 航海阶段：舵手从划船堆里挑一张（没人划船就翻顶牌），按 海鸥 → 落海 → 口渴 结算。 */
+    private GameState navigate(GameState g, Table table) {
+        Random rng = table.rng;
+        long seed = table.seed;
+        ExposureTally exposure = table.exposure;
+        NavigationCard card = chooseCard(g, table);
 
         // a) 海鸥。凑够 4 只就地结束，该牌的落海与口渴一律不再结算。
         GameState next = g.withGulls(card.gull());
@@ -269,6 +344,40 @@ public final class Simulator {
         }
         Invariants.requireValid(next, seed, "口渴结算后");
         return next;
+    }
+
+    /**
+     * 这一回合执行哪张牌。
+     *
+     * <p>三种情况，规则只写了前两种：
+     * <ol>
+     *   <li>划船堆非空且有清醒的舵手 → 他看过全部，挑 1 张；</li>
+     *   <li>划船堆为空 → 翻牌堆顶牌；</li>
+     *   <li>❗<b>划船堆非空但全员昏迷</b> → 规则没写。本模拟器<b>翻顶牌</b>：
+     *       没有清醒的人，就没有人能查看划船堆。这是我们的裁定，不是规则；
+     *       它只在「有人划了船、之后全员昏迷」时才会走到。</li>
+     * </ol>
+     *
+     * <p>挑中的牌与没挑中的牌一律立刻回到牌堆底部 —— 结算过程中没有人会再抽牌，
+     * 所以提前放回不改变任何结果，却让「牌不会凭空消失」在每个出口都成立。
+     */
+    private NavigationCard chooseCard(GameState g, Table table) {
+        NavigationCard chosen;
+        var helmsman = g.helmsman();
+        if (table.rowStack.isEmpty() || helmsman.isEmpty()) {
+            chosen = table.pile.draw();
+        } else {
+            chosen = policy.pick(List.copyOf(table.rowStack), g, helmsman.get(), table.rng);
+            if (!table.rowStack.remove(chosen)) {
+                throw new IllegalStateException(
+                        "seed=%d 舵手挑了一张不在划船堆里的牌: %s".formatted(table.seed, chosen.id()));
+            }
+        }
+        table.rowStack.forEach(table.pile::bottom);
+        table.rowStack.clear();
+        table.pile.bottom(chosen);
+        table.requireNoCardLost("挑牌后");
+        return chosen;
     }
 
     private static io.github.heavyseasmc.engine.thirst.ThirstTally withoutSource(

@@ -29,27 +29,27 @@ import java.util.Set;
  * <p>❗<b>两条路都打印</b>：找到了也说一声，说明那份数据真的被读了。
  * 只在缺席时打印的话，「加载器其实没在扫」照样是静默的。
  */
-final class LocalData {
+public final class LocalData {
 
-    static final String NAVIGATION = "navigation/default.json";
+    public static final String NAVIGATION = "navigation/default.json";
 
     private LocalData() {
     }
 
-    static DataDir dir() {
+    public static DataDir dir() {
         return DataDir.fromEnvironment();
     }
 
-    static RosterData roster() {
+    public static RosterData roster() {
         return RosterLoader.load(dir().file("roster/default.json"));
     }
 
-    static Set<String> provisionIds() {
+    public static Set<String> provisionIds() {
         return ProvisionLoader.loadIds(dir().file("provisions/default.json"));
     }
 
     /** 真实航海牌堆；文件不在就<b>出声跳过</b>，不是失败，也不是静默。 */
-    static List<NavigationCard> navigationDeckOrSkip() {
+    public static List<NavigationCard> navigationDeckOrSkip() {
         DataDir data = dir();
         Optional<Path> file = data.optionalFile(NAVIGATION);
         if (file.isEmpty()) {

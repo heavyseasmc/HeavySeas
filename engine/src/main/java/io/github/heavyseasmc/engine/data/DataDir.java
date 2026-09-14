@@ -84,7 +84,7 @@ public record DataDir(Path root) {
     /**
      * 相对路径拼接。
      *
-     * <p>❗挡住绝对路径与 {@code ..}：{@link Path#resolve} 遇到绝对路径会<b>原样返回它</b>，
+     * <p>❗拒绝绝对路径与 {@code ..}：{@link Path#resolve} 遇到绝对路径会<b>原样返回它</b>，
      * 于是「相对 data/ 的路径」被悄悄换成了别处的文件，且没有任何报错。
      */
     private Path resolve(String relative) {

@@ -8,6 +8,7 @@ import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.Selector;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
+import io.github.heavyseasmc.engine.thirst.ThirstSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -226,6 +227,98 @@ class SimulatorTest {
             Simulator sim = new Simulator(solo, deck());
             for (long seed = 0; seed < 200; seed++) {
                 sim.run(seed);
+            }
+        }
+    }
+
+    /**
+     * 划船 → 划船堆 → 舵手挑牌。
+     *
+     * <p>❗这一层是 O1 的关键：牌面上印着谁落水是一回事，<b>实际执行了哪张牌</b>是另一回事。
+     * 中间隔着两道挑选 —— 划船者决定留哪张，舵手再从留下的里面挑一张。
+     */
+    @Nested
+    @DisplayName("划船与挑牌")
+    @Timeout(value = 120, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    class RowingAndPicking {
+
+        private final NavigationCard harmless = new NavigationCard(
+                "harmless", 1, new Selector.Nobody(), new Selector.Nobody(), false, false);
+        private final NavigationCard soaking = new NavigationCard(
+                "soaking", 1, new Selector.Everyone(), new Selector.Nobody(), false, false);
+
+        private Roster solo() {
+            return new Roster(List.of(new Survivor(KID, 1, 3, 9, "base", new Ability.None())));
+        }
+
+        private double overboardRate(NavigationPolicy policy, int games) {
+            Simulator sim = new Simulator(solo(), List.of(harmless, soaking), policy);
+            Exposure total = Exposure.NONE;
+            for (long seed = 0; seed < games; seed++) {
+                total = total.plus(sim.run(seed).exposure().get(KID));
+            }
+            return total.overboardRate().orElseThrow();
+        }
+
+        @Test
+        @DisplayName("❗舵手会挑牌，所以实际落水频率不等于牌面张数比")
+        void pickingBendsTheDistribution() {
+            // 两张牌，一张淋人一张不淋，牌面张数比恒为 50%。
+            double indifferent = overboardRate(NavigationPolicy.INDIFFERENT, 3000);
+            double selfish = overboardRate(NavigationPolicy.SELF_INTERESTED, 3000);
+
+            assertTrue(indifferent > 0.35 && indifferent < 0.65,
+                    "无所谓的舵手应当落在张数比附近，实际 " + indifferent);
+            assertTrue(selfish < indifferent - 0.05,
+                    "自保的舵手没能把淋人的牌挑掉：自保 %.3f vs 无所谓 %.3f".formatted(selfish, indifferent));
+        }
+
+        @Test
+        @DisplayName("自保策略的取向写在分数里：淋自己的扣分，海鸥加分")
+        void selfInterestScores() {
+            NavigationPolicy.SelfInterested policy =
+                    (NavigationPolicy.SelfInterested) NavigationPolicy.SELF_INTERESTED;
+            GameState g = GameState.start(solo());
+
+            assertTrue(policy.score(soaking, g, KID) < policy.score(harmless, g, KID),
+                    "淋自己的牌不该比不淋的更想要");
+            NavigationCard noGull = new NavigationCard(
+                    "no_gull", 0, new Selector.Nobody(), new Selector.Nobody(), false, false);
+            assertTrue(policy.score(harmless, g, KID) > policy.score(noGull, g, KID),
+                    "海鸥推进靠岸，活着的人应当更想要它");
+        }
+
+        @Test
+        @DisplayName("划船的人自己背划船标记，所以带船桨图示的牌对他更糟")
+        void rowerDislikesOarCards() {
+            NavigationPolicy.SelfInterested policy =
+                    (NavigationPolicy.SelfInterested) NavigationPolicy.SELF_INTERESTED;
+            NavigationCard oars = new NavigationCard(
+                    "oars", 0, new Selector.Nobody(), new Selector.Nobody(), true, false);
+            GameState fresh = GameState.start(solo());
+            GameState rowed = fresh.withState(KID, fresh.stateOf(KID).thirstFrom(ThirstSource.ROWED));
+
+            assertEquals(0, policy.score(oars, fresh, KID), "没划船的人不该被船桨图示影响");
+            assertTrue(policy.score(oars, rowed, KID) < 0, "划过船的人该躲开带船桨图示的牌");
+        }
+
+        @Test
+        @DisplayName("牌一张都不会丢：几千局里牌堆 + 划船堆始终等于整副牌")
+        void noCardIsLost() {
+            // 守恒由 Simulator 内部每回合核对，丢牌会当场抛。这里负责把它跑够多次：
+            // 8 个人、31 张牌规模的划船量，才可能让「放回」漏掉一条路径。
+            Simulator sim = new Simulator(roster(), deck(), NavigationPolicy.SELF_INTERESTED);
+            for (long seed = 0; seed < 2000; seed++) {
+                sim.run(seed);
+            }
+        }
+
+        @Test
+        @DisplayName("换了策略，同一个种子仍然可复现")
+        void stillReproducible() {
+            Simulator sim = new Simulator(roster(), deck(), NavigationPolicy.SELF_INTERESTED);
+            for (long seed : new long[]{0, 1, 42, -7}) {
+                assertEquals(sim.run(seed), sim.run(seed), "seed=" + seed + " 不可复现");
             }
         }
     }
