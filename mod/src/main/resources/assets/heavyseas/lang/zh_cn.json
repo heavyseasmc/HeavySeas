@@ -50,7 +50,7 @@
   "heavyseas.command.pick_needed": "舵手要挑一张：%s",
   "heavyseas.command.not_in_row_stack": "划船堆里没有这张牌：%s",
   "heavyseas.hud.you": "你是 %s · 体力 %s/%s · %s · 口渴标记 %s",
-  "heavyseas.hud.your_turn": "轮到你行动（/seas pass | row | swap | fight）",
+  "heavyseas.hud.your_turn": "轮到你行动 · 按 %s 选一件事",
   "heavyseas.hud.watching": "旁观中",
   "heavyseas.game.provision_begin": "物资阶段：补给箱从船头传起，每人留 1 张（共 %s 位）",
   "heavyseas.game.provision_empty": "物资牌堆已空 —— 抽完即止，本阶段跳过。",
@@ -78,6 +78,17 @@
   "heavyseas.hand.title": "手牌",
   "heavyseas.hand.empty": "补给箱还没传到你手上。",
   "heavyseas.hand.vitals": "体力 %s/%s · %s · 口渴 %s",
+  "heavyseas.action.title": "行动",
+  "heavyseas.action.row": "划船",
+  "heavyseas.action.swap": "换座位",
+  "heavyseas.action.steal": "抢夺",
+  "heavyseas.action.use": "用物资",
+  "heavyseas.action.pass": "什么也不做",
+  "heavyseas.action.row_hint": "抽 2 张航海牌 —— 这一版两张都留进划船堆",
+  "heavyseas.action.pass_hint": "这一回合不行动",
+  "heavyseas.action.needs_target": "要回到世界里看着那个人右键 —— 这一版还没有",
+  "heavyseas.action.use_hint": "打出物资 —— 这一版还没有",
   "key.categories.heavyseas": "怒海狂涛",
-  "key.heavyseas.hand": "查看手牌"
+  "key.heavyseas.hand": "查看手牌",
+  "key.heavyseas.act": "行动"
 }

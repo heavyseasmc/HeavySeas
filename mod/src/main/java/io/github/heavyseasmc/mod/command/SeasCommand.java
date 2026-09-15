@@ -13,6 +13,7 @@ import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
@@ -194,13 +195,8 @@ public final class SeasCommand {
     private static int row(CommandContext<ServerCommandSource> context, boolean keepFirst, boolean keepSecond) {
         return act(context, (world, component, actor) -> {
             Session session = component.requireSession();
-            boolean[] wanted = {keepFirst, keepSecond};
-            int[] seen = {0};
-            // 决策以参数一次给全：指令是同步的，没法抽一张、等玩家想想、再抽第二张。
-            List<NavigationCard> drawn = session.row(actor, (card, state, rower) -> {
-                int i = seen[0]++;
-                return i < wanted.length && wanted[i];
-            });
+            // 与行动一面共用同一段 —— 「逐张去留」两处各写一份的话，迟早各说各话。
+            List<NavigationCard> drawn = ActionPhase.rowKeeping(session, actor, keepFirst, keepSecond);
             context.getSource().sendFeedback(
                     () -> Text.translatable("heavyseas.command.rowed", GameFlow.characterName(actor), drawn.size()),
                     true);

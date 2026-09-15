@@ -42,6 +42,24 @@ public final class HeavySeasClient implements ClientModInitializer {
         return handKey;
     }
 
+    /**
+     * 打开行动一面（决策 ⑦）。默认 G；显示与关界面同样走绑定的那个键，理由同 {@link #handKey}。
+     */
+    private static KeyBinding actKey;
+
+    /**
+     * 轮到你了、但行动一面还没弹出来。
+     *
+     * <p>轮到你的那一刻可能正开着别的界面（补给箱的「顿」还没播完、聊天打到一半）。那时不抢，
+     * 记一笔，等它关了再弹 —— 只弹这一次：Esc 收起行动一面之后，它不会再自己冒出来。
+     */
+    private static boolean actionPending;
+    private static boolean wasMyTurn;
+
+    public static KeyBinding actKey() {
+        return actKey;
+    }
+
     @Override
     public void onInitializeClient() {
         HudRenderCallback.EVENT.register(GameHud::render);
@@ -50,6 +68,10 @@ public final class HeavySeasClient implements ClientModInitializer {
                 "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_H,
                 "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollHandKey);
+        actKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.act", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G,
+                "key.categories.heavyseas"));
+        ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollActionTurn);
 
         // 进服就把卡面载好：补给箱第一次打开时现场载，「发」的动画会在那一帧卡掉一截。
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
@@ -84,6 +106,34 @@ public final class HeavySeasClient implements ClientModInitializer {
         }
         if (GameComponents.of(client.world).hudView().hasHand()) {
             client.setScreen(new HandScreen());
+        }
+    }
+
+    /**
+     * 轮到你行动：刚轮到时弹一次，之后按键再开。
+     *
+     * <p>❗只在「刚轮到」时弹，不是「轮到期间一直弹」：这一面不计时，玩家把它收起来是为了
+     * 回到世界里谈判 —— 每 tick 都弹的话，Esc 就收不起来了。
+     */
+    private static void pollActionTurn(MinecraftClient client) {
+        boolean pressed = false;
+        while (actKey.wasPressed()) {
+            pressed = true;
+        }
+        boolean mine = client.world != null
+                && GameComponents.of(client.world).hudView().myTurnToAct();
+        if (!mine) {
+            wasMyTurn = false;
+            actionPending = false;
+            return;
+        }
+        if (!wasMyTurn) {
+            actionPending = true;
+        }
+        wasMyTurn = true;
+        if (client.currentScreen == null && (actionPending || pressed)) {
+            actionPending = false;
+            client.setScreen(new ActionScreen());
         }
     }
 

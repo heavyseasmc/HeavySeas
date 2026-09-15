@@ -22,30 +22,40 @@ import java.util.Objects;
  * @param turn      第几回合
  * @param phase     当前阶段
  * @param gulls     已有几只海鸥
+ * @param seats     座位顺序（角色 id，船头到船尾）· 公开
+ * @param actor     行动阶段正轮到谁（角色 id）；不在行动阶段、或已经没人能动时是空串 · 公开
  * @param seated    收件人自己在不在局里（旁观者只看得到上面那几项）
  * @param character 收件人的角色 id
  * @param health    体力（体型 − 伤害）
  * @param maxHealth 体型
  * @param condition 清醒 / 昏迷 / 死亡
  * @param thirst    口渴标记数
- * @param yourTurn  正轮到他行动
+ * @param yourTurn  行动阶段正轮到他 —— ❗只在行动阶段为真（见 GameComponent 的 writeView）
  * @param hand      收件人自己的手牌（物资 id，<b>可重复</b>：水有 16 张）。
  *                  旁观者与没座位的人拿到的是空表
  */
 public record HudView(boolean active, int turn, Phase phase, int gulls,
+                      List<String> seats, String actor,
                       boolean seated, String character, int health, int maxHealth,
                       Condition condition, int thirst, boolean yourTurn, List<String> hand) {
 
     public HudView {
+        seats = List.copyOf(Objects.requireNonNull(seats, "seats"));
+        actor = Objects.requireNonNull(actor, "actor");
         hand = List.copyOf(Objects.requireNonNull(hand, "hand"));
     }
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
-            false, 0, Phase.PROVISION, 0, false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of());
+            false, 0, Phase.PROVISION, 0, List.of(), "", false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of());
 
     /** 在局里、有座位，而且手上有牌 —— 手牌界面开不开得起来只看这一条。 */
     public boolean hasHand() {
         return active && seated && !hand.isEmpty();
+    }
+
+    /** 该我在行动一面上选一件事了：在局里、有座位、行动阶段、正轮到我。 */
+    public boolean myTurnToAct() {
+        return active && seated && phase == Phase.ACTION && yourTurn;
     }
 }

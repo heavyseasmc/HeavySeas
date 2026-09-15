@@ -1,5 +1,9 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.GameState;
+import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -77,5 +81,66 @@ public abstract class GameScreen extends Screen {
     protected int sharpCardHeight() {
         double scale = client == null ? 1.0 : client.getWindow().getScaleFactor();
         return (int) Math.floor(SHARP_CARD_PX_H / Math.max(1.0, scale));
+    }
+
+    /**
+     * 上带：回合 · 阶段 · 海鸥。全船都知道的东西 —— 每一面都要、而且必须长得一样，所以放在这里。
+     */
+    protected void drawPublicBand(DrawContext context, HudView view, int y) {
+        context.drawCenteredTextWithShadow(textRenderer,
+                Text.translatable("heavyseas.status.header", view.turn(), phaseName(view.phase()),
+                        view.gulls(), GameState.GULLS_TO_LAND),
+                width / 2, y, GuiLanguage.MUTED);
+        // 海鸥画成格子而不是数字：够不够 4 只是一眼的事，不该让人去读。
+        int pip = 7;
+        int gap = 4;
+        int span = GameState.GULLS_TO_LAND * pip + (GameState.GULLS_TO_LAND - 1) * gap;
+        int x = (width - span) / 2;
+        for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
+            int left = x + i * (pip + gap);
+            context.fill(left, y + 12, left + pip, y + 12 + pip,
+                    i < view.gulls() ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
+        }
+    }
+
+    /**
+     * 身份行：你是谁、还剩多少。
+     *
+     * <p>两段颜色不同（身份是金，体力可能是朱砂），所以分两次画；
+     * 位置按 {@code textRenderer} 量出来的宽度排，不写死偏移量 ——
+     * 译名长度各语言不同，写死的那一版只在中文下看着是居中的。
+     */
+    protected void drawIdentity(DrawContext context, HudView view, int y) {
+        Text who = Text.translatable("heavyseas.character." + view.character());
+        Text vitals = Text.translatable("heavyseas.hand.vitals", view.health(), view.maxHealth(),
+                conditionName(view.condition()), view.thirst());
+        Text sep = Text.literal(" · ");
+        int wWho = textRenderer.getWidth(who);
+        int wSep = textRenderer.getWidth(sep);
+        int x = (width - (wWho + wSep + textRenderer.getWidth(vitals))) / 2;
+        context.drawTextWithShadow(textRenderer, who, x, y, GuiLanguage.GOLD);
+        context.drawTextWithShadow(textRenderer, sep, x + wWho, y, GuiLanguage.DIM);
+        // 体力见底或者已经昏迷才用朱砂 —— 它只给紧迫与伤害，
+        // 当强调色用的话，真紧迫那一刻就喊不动了。
+        context.drawTextWithShadow(textRenderer, vitals, x + wWho + wSep, y,
+                view.health() <= 1 || view.condition() != Condition.CONSCIOUS
+                        ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
+    }
+
+    // 下面两个用 switch 而不是拼字符串：拼出来的 lang 键静态扫不到，漏了也不报错。
+    protected static Text conditionName(Condition condition) {
+        return Text.translatable(switch (condition) {
+            case CONSCIOUS -> "heavyseas.condition.conscious";
+            case UNCONSCIOUS -> "heavyseas.condition.unconscious";
+            case DEAD -> "heavyseas.condition.dead";
+        });
+    }
+
+    protected static Text phaseName(Phase phase) {
+        return Text.translatable(switch (phase) {
+            case PROVISION -> "heavyseas.phase.provision";
+            case ACTION -> "heavyseas.phase.action";
+            case NAVIGATION -> "heavyseas.phase.navigation";
+        });
     }
 }

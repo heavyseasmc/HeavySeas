@@ -9,16 +9,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'   # 与 gradle.properties 的 java_version 保持一致
-      - uses: gradle/actions/setup-gradle@v4
+      # 停在 v5：v6 起缓存部分拆成了专有组件，升级即接受另一份使用条款；v5 仍是 MIT，已跑在 Node 24 上。
+      - uses: gradle/actions/setup-gradle@v5
       # 引擎单测、两道依赖闸门、模组编译与打包 —— 与本地门禁的构建部分一致。
       - name: 构建与单元测试
         run: ./gradlew build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: engine-test-report

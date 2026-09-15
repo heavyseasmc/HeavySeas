@@ -53,8 +53,12 @@ public final class GuiLanguage {
      * <p>不铺这一层的话，界面坐在一片灰蓝的 Minecraft 世界上，而牌面是暖纸色的 ——
      * 两个世界。铺上之后 GUI 与牌面才是同一个世界，这是 ADR-0018 §7.3 那句
      * 「GUI 与牌面必须是同一个世界」的落地处。
+     *
+     * <p>❗透明度是用户 2026-09-15 从实测四档里定的 {@code 0xE4}。原先的 {@code 0xB8} 下，
+     * 界面尺寸一大，Minecraft 自带的聊天就从这层后面透出来、字字可读 —— 而界面刚弹出时
+     * 正是开局播报刷屏的时候。{@code 0xE4} 只剩淡影。底色在卡面之下，加深它不影响卡面。
      */
-    public static final int BACKDROP = 0xB80B120F;
+    public static final int BACKDROP = 0xE40B120F;
 
     // ---------------------------------------------------------------- 卡面
 

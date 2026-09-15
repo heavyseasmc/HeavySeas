@@ -58,6 +58,16 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     private int interruptedTurn;
 
     /**
+     * 刚结束的那一局里坐着的真人。结束那一帧只推给他们。
+     *
+     * <p>❗{@link #shouldSyncWith} 原先只认「有对局且有座位」—— 于是 {@code end()} 之后那一次 sync
+     * 一个人都发不到，客户端一直挂着最后一帧：2026-09-15 实拍，{@code /seas end} 之后行动一面照样开着、
+     * HUD 照样说「轮到你行动」；下一局一开，行动一面的「刚轮到你」也因此没弹。
+     * 不报错、不掉线，只是客户端以为那一局还在。
+     */
+    private final Set<UUID> endedFor = new LinkedHashSet<>();
+
+    /**
      * 开局前预定给 dummy 的角色（{@code /seas dummy add}）。
      *
      * <p>决策 ② 把它定为**硬性前置**而不是「强烈建议」：人数下限提到 6 之后，
@@ -93,7 +103,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      */
     @Override
     public boolean shouldSyncWith(ServerPlayerEntity player) {
-        return session != null && seatOf(player.getUuid()).isPresent();
+        if (session == null) {
+            return endedFor.contains(player.getUuid());   // 结束那一帧（「没有对局」）也得送到
+        }
+        return seatOf(player.getUuid()).isPresent();
     }
 
     /**
@@ -125,6 +138,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(g.turn());
         buf.writeEnumConstant(g.phase());
         buf.writeVarInt(g.gulls());
+        // 座位轨：谁坐哪、轮到谁。**公开信息**，每人一份照发 —— 等别人行动时全船看的就是它。
+        buf.writeVarInt(g.bySeat().size());
+        for (CharacterId s : g.bySeat()) {
+            buf.writeString(s.value());
+        }
+        buf.writeString(g.phase() == Phase.ACTION ? g.nextActor().map(CharacterId::value).orElse("") : "");
         Optional<CharacterId> seat = seatOf(recipient.getUuid());
         buf.writeBoolean(seat.isPresent());
         if (seat.isEmpty()) {
@@ -137,7 +156,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(survivor.size());
         buf.writeEnumConstant(g.conditionOf(id));
         buf.writeVarInt(g.stateOf(id).thirst().count());
-        buf.writeBoolean(g.nextActor().map(id::equals).orElse(false));
+        // ❗nextActor 只看「能行动」与「本回合还没行动过」，不看阶段 —— 行动阶段以外它照样可能指向某一位。
+        //   HUD 的「轮到你行动」与行动一面的自动弹出都认这一位，所以阶段要在这里一起判。
+        buf.writeBoolean(g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false));
         // 手牌只写这一份 —— 别人的包里没有这些字节，不是「发了再藏」。
         List<String> hand = g.stateOf(id).hand();
         buf.writeVarInt(hand.size());
@@ -166,8 +187,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         int turn = buf.readVarInt();
         Phase phase = buf.readEnumConstant(Phase.class);
         int gulls = buf.readVarInt();
+        int seatCount = buf.readVarInt();
+        List<String> seats = new ArrayList<>(seatCount);
+        for (int i = 0; i < seatCount; i++) {
+            seats.add(buf.readString());
+        }
+        String actor = buf.readString();
         if (!buf.readBoolean()) {
-            return new HudView(true, turn, phase, gulls, false, "", 0, 0,
+            return new HudView(true, turn, phase, gulls, seats, actor, false, "", 0, 0,
                     Condition.CONSCIOUS, 0, false, List.of());
         }
         String character = buf.readString();
@@ -181,7 +208,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         for (int i = 0; i < cards; i++) {
             hand.add(buf.readString());
         }
-        return new HudView(true, turn, phase, gulls, true, character, health, maxHealth,
+        return new HudView(true, turn, phase, gulls, seats, actor, true, character, health, maxHealth,
                 condition, thirst, yourTurn, List.copyOf(hand));
     }
 
@@ -234,9 +261,11 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.occupants.putAll(seats);
         this.interruptedTurn = 0;
         this.pendingDummies.clear();
+        this.endedFor.clear();
     }
 
     public void end() {
+        occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
         this.session = null;
         this.occupants.clear();
         clearProvision();

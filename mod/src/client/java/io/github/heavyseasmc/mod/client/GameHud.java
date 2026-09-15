@@ -63,8 +63,10 @@ public final class GameHud {
                     Text.translatable("heavyseas.character." + view.character()),
                     view.health(), view.maxHealth(),
                     conditionName(view.condition()), view.thirst()));
-            if (view.yourTurn()) {
-                lines.add(Text.translatable("heavyseas.hud.your_turn").formatted(Formatting.YELLOW));
+            if (view.myTurnToAct()) {
+                // 键同样显示实际绑定的那个，理由同下面手牌那一行。
+                lines.add(Text.translatable("heavyseas.hud.your_turn",
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW));
             }
             // ❗手上有牌却没有任何提示，等于没有手牌 —— 玩家不会去猜某个键能开一个界面。
             //   显示的是**实际绑定的那个键**，不是写死的 H：改了键位还说 H 就是在说谎。

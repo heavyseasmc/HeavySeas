@@ -50,7 +50,7 @@
   "heavyseas.command.pick_needed": "The helmsman must pick one: %s",
   "heavyseas.command.not_in_row_stack": "That card is not in the rowing stack: %s",
   "heavyseas.hud.you": "You are the %s · health %s/%s · %s · thirst marks %s",
-  "heavyseas.hud.your_turn": "Your turn (/seas pass | row | swap | fight)",
+  "heavyseas.hud.your_turn": "Your turn · press %s to act",
   "heavyseas.hud.watching": "Watching",
   "heavyseas.game.provision_begin": "Provision phase: the crate starts at the bow, one card each (%s aboard)",
   "heavyseas.game.provision_empty": "The provision deck is empty — drawn out for good, so this phase is skipped.",
@@ -78,6 +78,17 @@
   "heavyseas.hand.title": "Your Hand",
   "heavyseas.hand.empty": "The crate has not reached you yet.",
   "heavyseas.hand.vitals": "health %s/%s · %s · thirst marks %s",
+  "heavyseas.action.title": "Action",
+  "heavyseas.action.row": "Row",
+  "heavyseas.action.swap": "Swap seats",
+  "heavyseas.action.steal": "Steal",
+  "heavyseas.action.use": "Use a provision",
+  "heavyseas.action.pass": "Do nothing",
+  "heavyseas.action.row_hint": "Draw 2 navigation cards - for now both go on the rowing pile",
+  "heavyseas.action.pass_hint": "Take no action this turn",
+  "heavyseas.action.needs_target": "You pick the target in the world, by looking at them - not in this version",
+  "heavyseas.action.use_hint": "Playing a provision - not in this version",
   "key.categories.heavyseas": "Heavy Seas",
-  "key.heavyseas.hand": "Your hand"
+  "key.heavyseas.hand": "Your hand",
+  "key.heavyseas.act": "Act"
 }

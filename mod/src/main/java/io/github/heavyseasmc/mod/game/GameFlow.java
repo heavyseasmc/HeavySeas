@@ -330,7 +330,8 @@ public final class GameFlow {
         return joined;
     }
 
-    private static void broadcast(ServerWorld world, Text message) {
+    /** 播给全场。包内可见：{@link ActionPhase} 走界面那条路时要播同样的话。 */
+    static void broadcast(ServerWorld world, Text message) {
         MinecraftServer server = world.getServer();
         server.getPlayerManager().broadcast(message, false);
     }

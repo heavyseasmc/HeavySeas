@@ -3,7 +3,9 @@ package io.github.heavyseasmc.mod;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.command.SeasCommand;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.ProvisionPhase;
+import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
@@ -46,6 +48,11 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(ProvisionActionC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> ProvisionPhase.onAction(context.player(), payload)));
+        // 行动一面按下的那一下。这一面不计时，所以没有对应的 tick（见 ActionPhase）。
+        PayloadTypeRegistry.playC2S().register(ActionChoiceC2S.ID, ActionChoiceC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(ActionChoiceC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> ActionPhase.onChoice(context.player(), payload)));
 
         // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
         ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
