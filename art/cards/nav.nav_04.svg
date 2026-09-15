@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 航海卡 · nav_04</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cSea"><rect x="16.0" y="180.0" width="268.0" height="46.0"/></clipPath>
+    <clipPath id="cBand"><rect x="16.0" y="78.0" width="268.0" height="148.0"/></clipPath>
+    <linearGradient id="seaFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3D6360" stop-opacity="0.24"/><stop offset="70%" stop-color="#3D6360" stop-opacity="0.16"/><stop offset="100%" stop-color="#3D6360" stop-opacity="0.0"/></linearGradient>
+    <linearGradient id="seaVeil" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3D6360" stop-opacity="0.34"/><stop offset="70%" stop-color="#3D6360" stop-opacity="0.24"/><stop offset="100%" stop-color="#3D6360" stop-opacity="0.0"/></linearGradient>
+    <clipPath id="cBot"><path d="M126 138 L126 118 C126 112,174 112,174 118 L174 138 C174 156,192 168,192 196 L192 286 C192 296,184 300,172 300 L128 300 C116 300,108 296,108 286 L108 196 C108 168,126 156,126 138 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#E8DCC0"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#8A5A3C"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">航海</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 04</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">醉者落海</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="overboard" clip-path="url(#cBand)">
+    <text class="cjk lod1-hide" x="28" y="94.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">落海</text>
+      <rect x="16.0" y="180.0" width="268.0" height="46.0" fill="url(#seaFade)"/>
+      <line x1="16.0" y1="180.0" x2="284.0" y2="180.0" stroke="#241E1A" stroke-width="1.5" opacity="0.8"/>
+      <g transform="translate(150 162.0) scale(0.42) translate(-150 -206)">
+
+      <path d="M126 138 L126 118 C126 112,174 112,174 118 L174 138 C174 156,192 168,192 196 L192 286 C192 296,184 300,172 300 L128 300 C116 300,108 296,108 286 L108 196 C108 168,126 156,126 138 Z" fill="#EDE2C8"/>
+      <rect clip-path="url(#cBot)" x="156" y="110" width="44" height="200" fill="url(#h1)" opacity="1.0"/><rect clip-path="url(#cBot)" x="172" y="110" width="28" height="200" fill="url(#h2)" opacity="1.0"/><rect clip-path="url(#cBot)" x="182" y="110" width="18" height="200" fill="url(#hx)" opacity="0.85"/>
+      <path clip-path="url(#cBot)" d="M104 212 L196 212 L196 304 L104 304 Z" fill="#8A5A3C" opacity="0.30"/><path d="M104 212 L196 212" fill="none" stroke="#241E1A" stroke-width="1.4" opacity="0.8"/>
+      <path d="M126 138 L126 118 C126 112,174 112,174 118 L174 138 C174 156,192 168,192 196 L192 286 C192 296,184 300,172 300 L128 300 C116 300,108 296,108 286 L108 196 C108 168,126 156,126 138 Z" fill="none" stroke="#241E1A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="122" y="108" width="56" height="12" rx="3" fill="#A8402C" opacity="0.8" stroke="#241E1A" stroke-width="1.6"/>
+      <rect x="118" y="222" width="64" height="46" rx="2" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.5"/>
+      <path d="M124 234 L176 234" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.7"/><path d="M124 252 L176 252" fill="none" stroke="#55483B" stroke-width="0.8" opacity="0.55"/><path d="M132 259 L168 259" fill="none" stroke="#55483B" stroke-width="0.8" opacity="0.45"/>
+      <text class="latin" x="150" y="246" font-size="11" font-weight="700" text-anchor="middle" fill="#241E1A">RUM</text>
+      <path d="M206 258 L210 292 C210.5 295,224 295,224.5 292 L228 258 Z" fill="#EDE2C8"/>
+      <path d="M206 258 L210 292 C210.5 295,224 295,224.5 292 L228 258 Z" fill="none" stroke="#241E1A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="217" cy="258" rx="11" ry="4" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.6"/>
+      </g>
+      <g clip-path="url(#cSea)">
+        <rect x="16.0" y="180.0" width="268.0" height="46.0" fill="url(#seaVeil)"/>
+        <path d="M16.0 189.0 q22.0 -5.0 44.0 0 q22.0 5.0 44.0 0 q22.0 -5.0 44.0 0 q22.0 5.0 44.0 0 q22.0 -5.0 44.0 0 q22.0 5.0 44.0 0 q22.0 -5.0 44.0 0" fill="none" stroke="#241E1A" stroke-width="1.4" opacity="0.85"/>
+        <path d="M16.0 197.5 q25.5 -5.0 51.0 0 q25.5 5.0 51.0 0 q25.5 -5.0 51.0 0 q25.5 5.0 51.0 0 q25.5 -5.0 51.0 0 q25.5 5.0 51.0 0" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.71"/>
+        <path d="M16.0 206.0 q29.0 -5.0 58.0 0 q29.0 5.0 58.0 0 q29.0 -5.0 58.0 0 q29.0 5.0 58.0 0 q29.0 -5.0 58.0 0" fill="none" stroke="#241E1A" stroke-width="1.2" opacity="0.57"/>
+        <path d="M16.0 214.5 q32.5 -5.0 65.0 0 q32.5 5.0 65.0 0 q32.5 -5.0 65.0 0 q32.5 5.0 65.0 0 q32.5 -5.0 65.0 0" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.43"/>
+      </g>
+    </g>
+    <text class="cjk lod2-hide" x="150" y="246.0" font-size="16" font-weight="700" text-anchor="middle" fill="#241E1A">喝过朗姆酒的人</text>
+    <line class="lod1-hide" x1="40" y1="258.0" x2="260" y2="258.0" stroke="#241E1A" stroke-width="0.8" opacity="0.45"/>
+    <g id="thirst" class="lod2-hide">
+    <text class="cjk lod1-hide" x="28" y="274.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">口渴　除下列之外</text>
+      <g>
+        <rect x="53.0" y="282.0" width="42.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="53.0" y="282.0" width="42.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="74.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">大副</text>
+        <path d="M56.0 305.0 L92.0 285.0" stroke="#A8402C" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g>
+        <rect x="101.0" y="282.0" width="54.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="101.0" y="282.0" width="54.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="128.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">珠宝商</text>
+        <path d="M104.0 305.0 L152.0 285.0" stroke="#A8402C" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g>
+        <rect x="161.0" y="282.0" width="54.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="161.0" y="282.0" width="54.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="188.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">收藏家</text>
+        <path d="M164.0 305.0 L212.0 285.0" stroke="#A8402C" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g>
+        <rect x="221.0" y="282.0" width="26.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="221.0" y="282.0" width="26.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <g transform="translate(224.6 285.6) scale(0.2925)"><g fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(-38 32 26)"><path d="M32 6 L38 19 L38 38 L26 38 L26 19 Z" fill="#241E1A" stroke="none"/><rect x="20" y="38" width="24" height="6" rx="2" fill="#241E1A" stroke="none"/><rect x="28" y="44" width="8" height="13" rx="2" fill="#241E1A" stroke="none"/><path d="M32 12 L32 36" stroke="#EDE2C8" stroke-width="1.8" opacity="0.9"/></g><g transform="rotate(38 32 26)"><path d="M32 6 L38 19 L38 38 L26 38 L26 19 Z" fill="#241E1A" stroke="none"/><rect x="20" y="38" width="24" height="6" rx="2" fill="#241E1A" stroke="none"/><rect x="28" y="44" width="8" height="13" rx="2" fill="#241E1A" stroke="none"/><path d="M32 12 L32 36" stroke="#EDE2C8" stroke-width="1.8" opacity="0.9"/></g></g></g>
+      </g>
+    </g>
+    <g id="rule-panel" class="lod1-hide lod2-hide">
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <text class="cjk" x="150" y="344.0" font-size="9.0" font-weight="500" text-anchor="middle" fill="#241E1A">口渴：除大副、珠宝商、收藏家外所有人、打过架的人</text>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">COURSE</text>
+      </g>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="30" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">醉者落海</text>
+  </g>
+</svg>

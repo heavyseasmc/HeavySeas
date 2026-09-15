@@ -1,0 +1,189 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 航海卡 · nav_16</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cSea"><rect x="16.0" y="180.0" width="268.0" height="46.0"/></clipPath>
+    <clipPath id="cBand"><rect x="16.0" y="78.0" width="268.0" height="148.0"/></clipPath>
+    <linearGradient id="seaFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3D6360" stop-opacity="0.24"/><stop offset="70%" stop-color="#3D6360" stop-opacity="0.16"/><stop offset="100%" stop-color="#3D6360" stop-opacity="0.0"/></linearGradient>
+    <linearGradient id="seaVeil" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3D6360" stop-opacity="0.34"/><stop offset="70%" stop-color="#3D6360" stop-opacity="0.24"/><stop offset="100%" stop-color="#3D6360" stop-opacity="0.0"/></linearGradient>
+    <clipPath id="cB3"><path d="M141.8 145.4 C127.8 150.4,116.3 155.4,104.3 171.4 C99.2 187.4,99.2 199.4,99.2 213.4 C99.7 241.4,101.2 271.4,101.7 356.0 L198.3 356.0 C198.8 271.4,200.3 241.4,200.8 213.4 C200.8 199.4,200.8 187.4,195.7 171.4 C183.7 155.4,172.2 150.4,158.2 145.4 Z"/></clipPath>
+    <clipPath id="cH3"><path d="M125.2 119.8 C125.2 92.3,174.8 92.3,174.8 119.8 C174.8 131.3,169.8 134.2,168.6 140.5 C165.5 149.1,156.7 151.4,150.0 151.4 C143.3 151.4,134.5 149.1,131.4 140.5 C130.2 134.2,125.2 131.3,125.2 119.8 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#E8DCC0"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#8A5A3C"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">航海</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 16</text>
+      <text class="cjk" x="28" y="58.0" font-size="21" font-weight="700" letter-spacing="2" fill="#241E1A">陪酒女落海</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="gull">
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <g transform="translate(253.2 23.0) scale(0.34)" fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 36 q9 -12 18 0 q9 -12 18 0"/>
+        <path d="M20 30 q6 -8 12 -2" stroke-width="2.2" opacity="0.6"/>
+      </g>
+      <text class="latin" x="262.0" y="57.0" font-size="15" font-weight="700" text-anchor="middle" fill="#241E1A">+1</text>
+    </g>
+    <g id="overboard" clip-path="url(#cBand)">
+    <text class="cjk lod1-hide" x="28" y="94.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">落海</text>
+      <rect x="16.0" y="180.0" width="268.0" height="46.0" fill="url(#seaFade)"/>
+      <line x1="16.0" y1="180.0" x2="284.0" y2="180.0" stroke="#241E1A" stroke-width="1.5" opacity="0.8"/>
+      <g transform="translate(150 152.0) scale(0.4821) translate(-150 -196)">
+      <path d="M141.8 145.4 C127.8 150.4,116.3 155.4,104.3 171.4 C99.2 187.4,99.2 199.4,99.2 213.4 C99.7 241.4,101.2 271.4,101.7 356.0 L198.3 356.0 C198.8 271.4,200.3 241.4,200.8 213.4 C200.8 199.4,200.8 187.4,195.7 171.4 C183.7 155.4,172.2 150.4,158.2 145.4 Z" fill="#EDE2C8"/>
+      <path d="M141.8 145.4 C127.8 150.4,116.3 155.4,104.3 171.4 C99.2 187.4,99.2 199.4,99.2 213.4 C99.7 241.4,101.2 271.4,101.7 356.0 L198.3 356.0 C198.8 271.4,200.3 241.4,200.8 213.4 C200.8 199.4,200.8 187.4,195.7 171.4 C183.7 155.4,172.2 150.4,158.2 145.4 Z" fill="#9A7350" opacity="0.55"/>
+      <rect clip-path="url(#cB3)" x="154" y="139.4432" width="60.8" height="226.5568" fill="url(#h1)" opacity="1.0"/><rect clip-path="url(#cB3)" x="172.86" y="139.4432" width="50.8" height="226.5568" fill="url(#h2)" opacity="0.85"/><rect clip-path="url(#cB3)" x="188.1" y="139.4432" width="50.8" height="226.5568" fill="url(#hx)" opacity="0.75"/>
+      <path d="M141.8 145.4 C127.8 150.4,116.3 155.4,104.3 171.4 C99.2 187.4,99.2 199.4,99.2 213.4 C99.7 241.4,101.2 271.4,101.7 356.0 L198.3 356.0 C198.8 271.4,200.3 241.4,200.8 213.4 C200.8 199.4,200.8 187.4,195.7 171.4 C183.7 155.4,172.2 150.4,158.2 145.4 Z" fill="none" stroke="#241E1A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path clip-path="url(#cB3)" d="M104.3 171.4 C118.2 187.4,122.2 215.4,120.2 356.0" fill="none" stroke="#241E1A" stroke-width="1.9" opacity="0.85"/>
+      <path clip-path="url(#cB3)" d="M195.7 171.4 C181.8 187.4,177.8 215.4,179.8 356.0" fill="none" stroke="#241E1A" stroke-width="1.9" opacity="0.85"/>
+      <path d="M141.8 145.4 C140.8 143.4,138.8 147.4,137.8 150.4 L162.2 150.4 C161.2 147.4,159.2 143.4,158.2 145.4 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.0"/>
+      <path d="M141.8 145.4 C146.0 156.4,154.0 156.4,158.2 145.4 L158.2 153.4 Z" fill="#241E1A" opacity="0.22"/>
+      <path d="M125.2 119.8 C125.2 92.3,174.8 92.3,174.8 119.8 C174.8 131.3,169.8 134.2,168.6 140.5 C165.5 149.1,156.7 151.4,150.0 151.4 C143.3 151.4,134.5 149.1,131.4 140.5 C130.2 134.2,125.2 131.3,125.2 119.8 Z" fill="#EDE2C8"/>
+      <rect clip-path="url(#cH3)" x="157.9232" y="94.0" width="24.76" height="63.18752" fill="url(#h1)" opacity="0.4"/>
+      <path d="M125.2 119.8 C125.2 92.3,174.8 92.3,174.8 119.8 C174.8 131.3,169.8 134.2,168.6 140.5 C165.5 149.1,156.7 151.4,150.0 151.4 C143.3 151.4,134.5 149.1,131.4 140.5 C130.2 134.2,125.2 131.3,125.2 119.8 Z" fill="none" stroke="#241E1A" stroke-width="2.4"/>
+      <path d="M135.6 116.1 Q140.1 112.6 144.6 116.1" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.9"/>
+      <path d="M164.4 116.1 Q159.9 112.6 155.4 116.1" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.9"/>
+      <path d="M135.3 121.3 Q140.1 117.7 144.9 121.3" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.95"/>
+      <circle cx="140.1" cy="122.7" r="1.7" fill="#241E1A"/>
+      <path d="M136.3 124.1 Q140.1 125.3 143.9 123.9" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.5"/>
+      <path d="M155.1 121.3 Q159.9 117.7 164.7 121.3" fill="none" stroke="#241E1A" stroke-width="1.6" opacity="0.95"/>
+      <circle cx="159.9" cy="122.7" r="1.7" fill="#241E1A"/>
+      <path d="M156.1 124.1 Q159.9 125.3 163.7 123.9" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.5"/>
+      <path d="M148.4 125.1 C146.8 127.9,146.4 130.8,148.6 131.9" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.85"/>
+      <path d="M146.6 131.9 q3.0 2.2 6.0 -0.6" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.85"/>
+      <path d="M142.6 138.2 q7.4 -1.6 14.9 0" fill="none" stroke="#241E1A" stroke-width="1.5" opacity="0.85"/>
+      <path d="M124.2 117.0 C122.2 89.4,177.8 89.4,175.8 117.0 C162.9 100.3,137.1 100.3,124.2 117.0 Z" fill="#8C7C67" stroke="#241E1A" stroke-width="2.2"/>
+      <path d="M150 90.6 L150 99.7" fill="none" stroke="#55483B" stroke-width="1.2" opacity="0.7"/>
+      <path d="M126.2 110.7 C118.2 125.6,119.2 157.2,127.2 176.1 C135.2 160.1,131.2 130.2,126.2 110.7 Z" fill="#8C7C67" stroke="#241E1A" stroke-width="2.0"/>
+      <path d="M124.2 119.8 C121.2 135.4,122.2 156.6,128.2 169.3" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.55"/>
+      <path d="M173.8 110.7 C181.8 125.6,180.8 157.2,172.8 176.1 C164.8 160.1,168.8 130.2,173.8 110.7 Z" fill="#8C7C67" stroke="#241E1A" stroke-width="2.0"/>
+      <path d="M175.8 119.8 C178.8 135.4,177.8 156.6,171.8 169.3" fill="none" stroke="#55483B" stroke-width="0.9" opacity="0.55"/>
+      <path d="M135.0 149.4 C138.0 177.4,162.0 177.4,165.0 149.4 L165.0 144.4 L135.0 144.4 Z" fill="#EDE2C8"/>
+      <path d="M135.0 149.4 C138.0 177.4,162.0 177.4,165.0 149.4" fill="none" stroke="#241E1A" stroke-width="2.2"/>
+      <path d="M130.0 151.4 C135.0 183.4,165.0 183.4,170.0 151.4" fill="none" stroke="#55483B" stroke-width="1.3" opacity="0.65"/>
+      <path d="M143.0 160.4 q7.0 3 14.0 1" fill="none" stroke="#55483B" stroke-width="1.0" opacity="0.45"/>
+      <path clip-path="url(#cB3)" d="M97.2 165.4 C136.0 199.4,168.0 221.4,196.7 257.4 L198.8 283.4 C164.0 245.4,132.0 221.4,95.2 193.4 Z" fill="#8C7C67" opacity="0.62"/>
+      <path clip-path="url(#cB3)" d="M97.2 165.4 C136.0 199.4,168.0 221.4,196.7 257.4 L198.8 283.4 C164.0 245.4,132.0 221.4,95.2 193.4 Z" fill="url(#h2)" opacity="0.38"/>
+      <path clip-path="url(#cB3)" d="M97.2 165.4 C136.0 199.4,168.0 221.4,196.7 257.4 L198.8 283.4 C164.0 245.4,132.0 221.4,95.2 193.4 Z" fill="none" stroke="#241E1A" stroke-width="2.0" stroke-linejoin="round"/>
+      <path clip-path="url(#cB3)" d="M97.2 165.4 C93.2 199.4,97.2 229.4,105.2 251.4 L95.2 193.4 Z" fill="#8C7C67" opacity="0.62" stroke="#241E1A" stroke-width="1.8"/>
+      <path d="M100.2 249.4 l-1.5 9" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.7"/>
+      <path d="M104.2 251.4 l-1.5 9" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.7"/>
+      <path d="M108.2 253.4 l-1.5 9" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.7"/>
+      <path clip-path="url(#cB3)" d="M124.2 233.4 L97.2 229.4 L97.2 247.4 L124.2 251.4 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.7"/>
+      <path d="M120.2 237.4 l3.2 3.2 M123.4 237.4 l-3.2 3.2" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.85"/>
+      <path d="M113.2 237.4 l3.2 3.2 M116.4 237.4 l-3.2 3.2" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.85"/>
+      <path d="M106.2 237.4 l3.2 3.2 M109.4 237.4 l-3.2 3.2" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.85"/>
+      <path clip-path="url(#cB3)" d="M175.8 233.4 L202.8 229.4 L202.8 247.4 L175.8 251.4 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.7"/>
+      <path d="M179.8 237.4 l3.2 3.2 M183.0 237.4 l-3.2 3.2" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.85"/>
+      <path d="M186.8 237.4 l3.2 3.2 M190.0 237.4 l-3.2 3.2" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.85"/>
+      <path d="M193.8 237.4 l3.2 3.2 M197.0 237.4 l-3.2 3.2" fill="none" stroke="#241E1A" stroke-width="1.1" opacity="0.85"/>
+      <path d="M137.0 165.4 Q150 187.4 163.0 165.4" fill="none" stroke="#241E1A" stroke-width="1.6"/>
+      <circle cx="150" cy="185.4" r="3.2" fill="#EDE2C8" stroke="#241E1A" stroke-width="1.3"/>
+      </g>
+      <g clip-path="url(#cSea)">
+        <rect x="16.0" y="180.0" width="268.0" height="46.0" fill="url(#seaVeil)"/>
+        <path d="M16.0 189.0 q22.0 -5.0 44.0 0 q22.0 5.0 44.0 0 q22.0 -5.0 44.0 0 q22.0 5.0 44.0 0 q22.0 -5.0 44.0 0 q22.0 5.0 44.0 0 q22.0 -5.0 44.0 0" fill="none" stroke="#241E1A" stroke-width="1.4" opacity="0.85"/>
+        <path d="M16.0 197.5 q25.5 -5.0 51.0 0 q25.5 5.0 51.0 0 q25.5 -5.0 51.0 0 q25.5 5.0 51.0 0 q25.5 -5.0 51.0 0 q25.5 5.0 51.0 0" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.71"/>
+        <path d="M16.0 206.0 q29.0 -5.0 58.0 0 q29.0 5.0 58.0 0 q29.0 -5.0 58.0 0 q29.0 5.0 58.0 0 q29.0 -5.0 58.0 0" fill="none" stroke="#241E1A" stroke-width="1.2" opacity="0.57"/>
+        <path d="M16.0 214.5 q32.5 -5.0 65.0 0 q32.5 5.0 65.0 0 q32.5 -5.0 65.0 0 q32.5 5.0 65.0 0 q32.5 -5.0 65.0 0" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.43"/>
+      </g>
+    </g>
+    <text class="cjk lod2-hide" x="150" y="246.0" font-size="19" font-weight="700" text-anchor="middle" fill="#241E1A">陪酒女</text>
+    <line class="lod1-hide" x1="40" y1="258.0" x2="260" y2="258.0" stroke="#241E1A" stroke-width="0.8" opacity="0.45"/>
+    <g id="thirst" class="lod2-hide">
+    <text class="cjk lod1-hide" x="28" y="274.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">口渴　除下列之外</text>
+      <g>
+        <rect x="23.0" y="282.0" width="54.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="23.0" y="282.0" width="54.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="50.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">珠宝商</text>
+        <path d="M26.0 305.0 L74.0 285.0" stroke="#A8402C" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g>
+        <rect x="83.0" y="282.0" width="54.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="83.0" y="282.0" width="54.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="110.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">陪酒女</text>
+        <path d="M86.0 305.0 L134.0 285.0" stroke="#A8402C" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g>
+        <rect x="143.0" y="282.0" width="54.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="143.0" y="282.0" width="54.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="170.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">收藏家</text>
+        <path d="M146.0 305.0 L194.0 285.0" stroke="#A8402C" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g>
+        <rect x="203.0" y="282.0" width="42.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="203.0" y="282.0" width="42.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="224.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">小孩</text>
+        <path d="M206.0 305.0 L242.0 285.0" stroke="#A8402C" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      <g>
+        <rect x="251.0" y="282.0" width="26.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="251.0" y="282.0" width="26.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <g transform="translate(254.6 285.6) scale(0.2925)"><g fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(-32 32 32)"><path d="M28 5 h8 v34 h-8 Z" fill="#241E1A" stroke="none"/><path d="M24 37 h16 v18 c0 3 -3 5 -8 5 c-5 0 -8 -2 -8 -5 Z" fill="#241E1A" stroke="none"/><path d="M32 9 L32 35" stroke="#EDE2C8" stroke-width="2" opacity="0.9"/></g></g></g>
+      </g>
+    </g>
+    <g id="rule-panel" class="lod1-hide lod2-hide">
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <text class="cjk" x="150" y="344.0" font-size="6.52" font-weight="500" text-anchor="middle" fill="#241E1A">海鸥 +1 · 口渴：除珠宝商、陪酒女、收藏家、小孩外所有人、划过船的人</text>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">COURSE</text>
+      </g>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="30" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">陪酒女落海</text>
+  </g>
+</svg>

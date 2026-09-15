@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" width="300" height="420">
+  <title>怒海狂涛 · 航海卡 · nav_29</title>
+  <defs>
+    <style type="text/css">
+      /* 字体热替换入口：覆盖 --cjk 即可，见 art/fonts.json */
+      svg {
+        --cjk:   'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
+        --latin: 'Old Standard TT','EB Garamond',serif;
+      }
+      .cjk   { font-family: var(--cjk); }
+      .latin { font-family: var(--latin); }
+      /* LOD2 专用的大号牌名：母版里默认隐藏。
+         这条必须写在 SVG 自己身上 —— 只靠渲染脚本的 CSS 盖住，
+         等于校对看到的和别人打开 SVG 看到的不是同一张图。 */
+      .lod01-hide { display: none; }
+    </style>
+    <pattern id="h1" width="3.4" height="3.4" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="3.4" stroke="#241E1A" stroke-width="1" opacity="0.62"/>
+    </pattern>
+    <pattern id="h2" width="2.2" height="2.2" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.2" stroke="#241E1A" stroke-width="0.95" opacity="0.78"/>
+    </pattern>
+    <pattern id="hx" width="2.6" height="2.6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+      <line x1="0" y1="0" x2="0" y2="2.6" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+      <line x1="0" y1="0" x2="2.6" y2="0" stroke="#241E1A" stroke-width="0.9" opacity="0.8"/>
+    </pattern>
+    <radialGradient id="vig" cx="50%" cy="42%" r="62%">
+      <stop offset="60%" stop-color="#241E1A" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#241E1A" stop-opacity="0.16"/>
+    </radialGradient>
+    <clipPath id="clipArt"><rect x="16" y="76.0" width="268" height="246.0"/></clipPath>
+    <clipPath id="clipCard"><rect width="300" height="420" rx="5"/></clipPath>
+    <clipPath id="clipCardW"><rect width="420" height="300" rx="5"/></clipPath>
+    <clipPath id="cSea"><rect x="16.0" y="180.0" width="268.0" height="46.0"/></clipPath>
+    <clipPath id="cBand"><rect x="16.0" y="78.0" width="268.0" height="148.0"/></clipPath>
+    <linearGradient id="seaFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3D6360" stop-opacity="0.24"/><stop offset="70%" stop-color="#3D6360" stop-opacity="0.16"/><stop offset="100%" stop-color="#3D6360" stop-opacity="0.0"/></linearGradient>
+    <linearGradient id="seaVeil" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3D6360" stop-opacity="0.34"/><stop offset="70%" stop-color="#3D6360" stop-opacity="0.24"/><stop offset="100%" stop-color="#3D6360" stop-opacity="0.0"/></linearGradient>
+  </defs>
+  <g clip-path="url(#clipCard)">
+    <g id="paper">
+      <rect width="300" height="420" fill="#E8DCC0"/>
+      <path d="M0 0 L58 0 C36 16 16 36 0 58 Z" fill="#CBB995" opacity="0.26"/>
+      <path d="M300 420 L242 420 C264 404 284 384 300 362 Z" fill="#CBB995" opacity="0.22"/>
+      <g class="lod2-hide" fill="#CBB995" stroke="none">
+        <path opacity="0.16" d="M254 346 c9 -7,21 -4,24 4 c3 8,-3 15,-12 16 c-10 1,-17 -4,-17 -11 c0 -4,2 -7,5 -9 Z"/>
+        <path opacity="0.13" d="M22 176 c6 -5,14 -2,15 5 c1 6,-4 10,-10 9 c-6 -1,-9 -7,-5 -14 Z"/>
+      </g>
+      <rect width="300" height="420" fill="url(#vig)"/>
+    </g>
+    <g id="frame" fill="none" stroke="#241E1A">
+      <rect x="9.5" y="9.5" width="281" height="401" stroke-width="3.0"/>
+      <rect class="lod2-hide" x="15.5" y="15.5" width="269" height="389" stroke-width="1.0" opacity="0.75"/>
+      <g class="lod2-hide" stroke-width="1.2" opacity="0.6">
+        <path d="M15.5 23.5 L15.5 15.5 L23.5 15.5"/>
+        <path d="M276.5 15.5 L284.5 15.5 L284.5 23.5"/>
+        <path d="M284.5 396.5 L284.5 404.5 L276.5 404.5"/>
+        <path d="M23.5 404.5 L15.5 404.5 L15.5 396.5"/>
+      </g>
+    </g>
+    <g id="header">
+      <circle cx="28" cy="29.5" r="3.4" fill="#8A5A3C"/>
+      <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">航海</text>
+      <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 29</text>
+      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">无人落海</text>
+      <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
+      <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
+    </g>
+    <g id="gull">
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="240.0" y="20.0" width="44" height="42" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <g transform="translate(253.2 23.0) scale(0.34)" fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 36 q9 -12 18 0 q9 -12 18 0"/>
+        <path d="M20 30 q6 -8 12 -2" stroke-width="2.2" opacity="0.6"/>
+      </g>
+      <text class="latin" x="262.0" y="57.0" font-size="15" font-weight="700" text-anchor="middle" fill="#241E1A">+1</text>
+    </g>
+    <g id="overboard" clip-path="url(#cBand)">
+    <text class="cjk lod1-hide" x="28" y="94.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">落海</text>
+      <rect x="16.0" y="180.0" width="268.0" height="46.0" fill="url(#seaFade)"/>
+      <line x1="16.0" y1="180.0" x2="284.0" y2="180.0" stroke="#241E1A" stroke-width="1.5" opacity="0.8"/>
+      <g transform="translate(150.0 186.0) rotate(0.0) scale(0.920)" opacity="1.0"><path d="M-18 -6 L-46 16" stroke="#241E1A" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M18 -6 L46 16" stroke="#241E1A" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M-33.0 -13 C-32.0 -19,-28.4 -20,-28.2 -22 C-29.6 -29,-18.4 -29,-19.8 -22 C-19.6 -20,-16.0 -19,-15.0 -13 Z" fill="#55483B" stroke="#241E1A" stroke-width="1.8" stroke-linejoin="round"/><path d="M-9.0 -13 C-8.0 -19,-4.4 -20,-4.2 -22 C-5.6 -29,5.6 -29,4.2 -22 C4.4 -20,8.0 -19,9.0 -13 Z" fill="#55483B" stroke="#241E1A" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.0 -13 C16.0 -19,19.6 -20,19.8 -22 C18.4 -29,29.6 -29,28.2 -22 C28.4 -20,32.0 -19,33.0 -13 Z" fill="#55483B" stroke="#241E1A" stroke-width="1.8" stroke-linejoin="round"/><path d="M-50 -12 C-40 -20,40 -20,50 -12 C48 -4,45 2,43 6 C20 8,-20 8,-43 6 C-45 2,-48 -4,-50 -12 Z" fill="#EDE2C8" stroke="#241E1A" stroke-width="2.6" stroke-linejoin="round"/><path d="M-46 -11 C-36 -18,36 -18,46 -11" fill="none" stroke="#241E1A" stroke-width="1.4" opacity="0.8"/><path d="M-50 -12 C-46 0,-20 7,0 7 C20 7,46 0,50 -12" fill="url(#h1)" opacity="0.5"/><path d="M-40 5 q-8 3 -17 0" fill="none" stroke="#241E1A" stroke-width="1.8" opacity="0.8"/><path d="M40 5 q8 3 17 0" fill="none" stroke="#241E1A" stroke-width="1.8" opacity="0.8"/><path d="M-50 -12 l-3 -7 M50 -12 l3 -7" stroke="#241E1A" stroke-width="2.6" stroke-linecap="round" fill="none"/></g>
+      <g clip-path="url(#cSea)">
+        <rect x="16.0" y="180.0" width="268.0" height="46.0" fill="url(#seaVeil)"/>
+        <path d="M16.0 189.0 q22.0 -1.8 44.0 0 q22.0 1.8 44.0 0 q22.0 -1.8 44.0 0 q22.0 1.8 44.0 0 q22.0 -1.8 44.0 0 q22.0 1.8 44.0 0 q22.0 -1.8 44.0 0" fill="none" stroke="#241E1A" stroke-width="1.4" opacity="0.85"/>
+        <path d="M16.0 197.5 q25.5 -1.8 51.0 0 q25.5 1.8 51.0 0 q25.5 -1.8 51.0 0 q25.5 1.8 51.0 0 q25.5 -1.8 51.0 0 q25.5 1.8 51.0 0" fill="none" stroke="#241E1A" stroke-width="1.3" opacity="0.71"/>
+        <path d="M16.0 206.0 q29.0 -1.8 58.0 0 q29.0 1.8 58.0 0 q29.0 -1.8 58.0 0 q29.0 1.8 58.0 0 q29.0 -1.8 58.0 0" fill="none" stroke="#241E1A" stroke-width="1.2" opacity="0.57"/>
+        <path d="M16.0 214.5 q32.5 -1.8 65.0 0 q32.5 1.8 65.0 0 q32.5 -1.8 65.0 0 q32.5 1.8 65.0 0 q32.5 -1.8 65.0 0" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.43"/>
+      </g>
+    </g>
+    <text class="cjk lod2-hide" x="150" y="246.0" font-size="19" font-weight="700" text-anchor="middle" fill="#241E1A">无人</text>
+    <line class="lod1-hide" x1="40" y1="258.0" x2="260" y2="258.0" stroke="#241E1A" stroke-width="0.8" opacity="0.45"/>
+    <g id="thirst" class="lod2-hide">
+    <text class="cjk lod1-hide" x="28" y="274.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">口渴</text>
+      <g>
+        <rect x="129.0" y="282.0" width="42.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
+        <rect x="129.0" y="282.0" width="42.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
+        <text class="cjk" x="150.0" y="299.3" font-size="12" font-weight="500" text-anchor="middle" fill="#241E1A">无人</text>
+      </g>
+    </g>
+    <g id="rule-panel" class="lod1-hide lod2-hide">
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
+      <rect x="24" y="324.0" width="252" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
+      <text class="cjk" x="150" y="344.0" font-size="10" font-weight="500" text-anchor="middle" fill="#241E1A">海鸥 +1 · 口渴：无人</text>
+    </g>
+    <g id="footer" class="lod2-hide">
+      <g transform="rotate(-6 253.0 384.0)" opacity="0.6">
+        <rect x="234.0" y="378.0" width="38" height="12" rx="1.5" fill="none" stroke="#A8402C" stroke-width="1.6"/>
+        <text class="latin" x="253.0" y="386.6" font-size="7.6" fill="#A8402C" text-anchor="middle" letter-spacing="1.2">COURSE</text>
+      </g>
+    </g>
+    <text class="cjk lod01-hide" x="150" y="368" font-size="30" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">无人落海</text>
+  </g>
+</svg>

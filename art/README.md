@@ -1,11 +1,11 @@
 # art/ —— 美术资源
 
-55 件 SVG：卡面插画 36 · 图标 13 · 牌背 3 · LOD 示例 3，外加一份字体配置。
+86 件 SVG：卡面插画 67 · 图标 13 · 牌背 3 · LOD 示例 3，外加一份字体配置。
 全部为本项目原创，许可 CC BY-SA 4.0，见根目录 `LICENSE-ASSETS`。
 
 ```
 art/
-  cards/       36 张卡面：物资 18 · 角色 8 · 天候 10
+  cards/       67 张卡面：物资 18 · 角色 8 · 天候 10 · 航海 31
   icons/       13 个图标，64×64 母版
   backs/       3 张牌背：通用 · 秘密 · 物资
   lod/         同一张卡的三档 LOD 示例
@@ -21,7 +21,11 @@ provision.<id>.svg    water · medical_kit · bait_bucket · ration · rum · co
 character.<id>.svg    jeweler · collector · captain · mate · hostess · sailor · doctor · kid
 weather.<id>.svg      becalmed · clear_skies · dense_fog · gale · huge_wave
                       rain · scorching_heat · storm · sunday · sweltering
+nav.<id>.svg          nav_00 … nav_30
 ```
+
+航海牌没有名字，只有编号 —— 它与 `data/navigation` 共用这一套 id，`<title>` 末段印的就是 id。
+牌面上那句「医生落海」是**由数据现算的摘要**，不是给它起的专名：起了名就有了第二个真相源。
 
 角色的文件名用**职业**，不用角色的名字。`data/roster` 与本目录共用这一套 id，
 中间不需要映射表；名字（珀尔、莫罗……）只是显示名，改名不动主键。
@@ -82,7 +86,12 @@ svg { --cjk: 'KingHwa_OldSong','Huiwen-MinchoGBK','Noto Serif SC',serif;
 SVG 是手写的矢量源文件，可直接编辑 —— 改一张卡、换一处颜色、挪一个元素，
 都不需要别的工具。
 
+❗**航海牌是唯一「内容即插画」的一类**：其余三类各有一个可画的主角（一只桶、一个人、一场暴风雨），
+而航海牌的主角是「今天谁下水」—— 一份名单。所以它的画面就是那份名单：一条水线，
+点名的那个人站在水里（用的就是角色卡那副胸像），不点名就放艇或酒瓶。浪的高低由这一天动了多少人决定，
+不是随手给每张来点变化。
+
 生成它们的 Python 管线**不在本仓库、也不会迁进来**。这不影响你使用或修改：
 SVG 本身就是首选的修改形式。但**整套改版**（调色板、版面坐标、字号一次性统一变更）
-另当别论 —— 那些参数集中在一个样式模块里，逐文件去改 55 个 SVG 一定会漂移，
+另当别论 —— 那些参数集中在一个样式模块里，逐文件去改 86 个 SVG 一定会漂移，
 这种改动请联系维护者。

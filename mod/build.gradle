@@ -254,6 +254,75 @@ tasks.named('check') {
     dependsOn checkProvisionNames
 }
 
+// 航海牌的 31 张卡面必须与 data/navigation 一一对应（adr/0020）。
+//
+// 为什么要一道闸：卡面由内部管线生成、产物入库，而**数据在这边**。数据加一张牌、改一个 id，
+// 卡面不会自己跟着变；表现是那一张在 GUI 里画不出来（或画出另一张），而构建、单测、起服全是绿的。
+//
+// 判据取自与卡面正交的来源：id 来自 data，卡面只被问「你自称是谁」（`<title>` 末段）。
+// 英文名那种「有且非空」的软判据在这里不适用 —— 这一族根本没有名字，只有 id。
+def checkNavigationCards = tasks.register('checkNavigationCards') {
+    group = 'verification'
+    description = '每张航海牌都要有对应的卡面 SVG，且 SVG 自称的 id 与数据一致；不许多出没有数据的卡面'
+    def dataFile = rootProject.file('data/navigation/default.json')
+    // 做成任务属性而不是局部变量：红测要能把它指向造坏的副本，而不去改被跟踪的卡面。
+    ext.cardDir = rootProject.file('art/cards')
+    inputs.file(dataFile)
+    inputs.dir(ext.cardDir).optional()
+    doLast {
+        File cardDir = ext.cardDir
+        def ids = (new groovy.json.JsonSlurper().parse(dataFile, 'UTF-8') as Map)
+                .cards.collect { it.id.toString() }
+        if (ids.isEmpty()) {
+            throw new GradleException('data/navigation 里一个 id 都没读到 —— 判据坏了，不是真的没有牌')
+        }
+        // 用单引号字符串而不是斜杠字面量：里头要写 </title>，斜杠会提前结束字面量。
+        def title = java.util.regex.Pattern.compile('<title>([^<]*)</title>')
+        def problems = []
+        int compared = 0
+        ids.each { id ->
+            def svg = new File(cardDir, "nav.${id}.svg")
+            if (!svg.isFile()) {
+                problems << "data/navigation 有 ${id}，但卡面 ${svg.name} 不在"
+                return
+            }
+            def m = title.matcher(svg.getText('UTF-8'))
+            if (!m.find()) {
+                problems << "${svg.name} 里没有 <title> —— 它自称是谁无从问起"
+                return
+            }
+            // <title> 形如「怒海狂涛 · 航海卡 · nav_07」，末段才是 id。
+            def parts = m.group(1).split(' · ')
+            def claimed = parts[parts.length - 1].trim()
+            compared++
+            if (claimed != id) {
+                problems << "${svg.name} 自称 ${claimed}，但它该是 ${id}"
+            }
+        }
+        // 多出来的卡面同样要拦：删一张数据而卡面留着，GUI 会画出一张规则里不存在的牌。
+        def known = ids.collect { "nav.${it}.svg".toString() } as Set
+        (cardDir.listFiles({ f -> f.name.startsWith('nav.') && f.name.endsWith('.svg') } as FileFilter) ?: [])
+                .each { f ->
+            if (!known.contains(f.name)) {
+                problems << "${f.name} 在 art/cards 里，但 data/navigation 里没有这张牌"
+            }
+        }
+        // 正向对照：一张都没比到时，「全都对」与「没在比」输出一样。本仓库已实证八次假绿。
+        if (compared == 0) {
+            throw new GradleException('一张航海卡都没比对到 —— 判据坏了，不是 id 都对')
+        }
+        if (problems) {
+            throw new GradleException((['航海卡面与数据核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("航海卡面核对通过：${compared} 张与 data/navigation 的 id 一一对应")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkNavigationCards
+}
+
 // Minecraft 不认 SVG —— GUI 里能画的只有 PNG。贴图由内部管线烘出来并**入库**：
 // 生成物入库是有意的，否则一份干净的克隆构建不出能用的 jar。
 //
