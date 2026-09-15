@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.fabricmc.api.ClientModInitializer;
@@ -57,6 +58,14 @@ public final class HeavySeasClient implements ClientModInitializer {
         // ❗必须在客户端也注册接收器：类型只在一端注册的话，包会被安静地丢掉，不报错。
         ClientPlayNetworking.registerGlobalReceiver(ProvisionUpdateS2C.ID, (payload, context) ->
                 context.client().execute(() -> onProvisionUpdate(context.client(), payload)));
+        // 「这张是替你选的」。服务端先发它、后发留牌那一包，两者都排进同一条主线程队列，
+        // 所以到这里时次序是有保证的 —— 先立住「顿」，再由下面那一包决定什么时候关。
+        ClientPlayNetworking.registerGlobalReceiver(ProvisionAutoPickS2C.ID, (payload, context) ->
+                context.client().execute(() -> {
+                    if (context.client().currentScreen instanceof ProvisionScreen screen) {
+                        screen.autoPicked(payload.index());
+                    }
+                }));
     }
 
     /**
@@ -89,6 +98,10 @@ public final class HeavySeasClient implements ClientModInitializer {
         if (client.currentScreen instanceof ProvisionScreen screen) {
             if (mine) {
                 screen.apply(payload);
+            } else if (screen.snapping()) {
+                // ❗替你选的那一下还没播完。这里要是照常关掉，界面在「顿」的第一帧就消失了 ——
+                //   和手动点完就关**长得一模一样**，等于这一条又回到 ADR-0018 §6 清单第 4 条的反面。
+                screen.closeAfterSnap();
             } else {
                 client.setScreen(null);      // 传走了就关掉，别让界面挂在那儿
             }

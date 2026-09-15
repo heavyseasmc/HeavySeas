@@ -5,6 +5,7 @@ import io.github.heavyseasmc.mod.command.SeasCommand;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.game.ProvisionPhase;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
+import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -40,6 +41,7 @@ public final class HeavySeasMod implements ModInitializer {
         // 两个包都要在**两端**注册类型，否则一端发得出、另一端认不得，
         // 表现是安静地丢包而不是报错。客户端那一半在 HeavySeasClient。
         PayloadTypeRegistry.playS2C().register(ProvisionUpdateS2C.ID, ProvisionUpdateS2C.CODEC);
+        PayloadTypeRegistry.playS2C().register(ProvisionAutoPickS2C.ID, ProvisionAutoPickS2C.CODEC);
         PayloadTypeRegistry.playC2S().register(ProvisionActionC2S.ID, ProvisionActionC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(ProvisionActionC2S.ID,
                 (payload, context) -> context.player().server.execute(

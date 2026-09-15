@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.game.ProvisionPhase;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
@@ -8,6 +9,8 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -45,8 +48,8 @@ public final class ProvisionScreen extends GameScreen {
     private static final int MARGIN = 6;
     /** 座位轨：一行字，下面一条线。 */
     private static final int RAIL_H = 12;
-    /** 卡顶上留给「抬」与边框的空：抬起来的那张不能碰到座位轨的线。 */
-    private static final int LIFT_ROOM = (int) Math.ceil(GuiLanguage.LIFT_PX) + 2 + 4;
+    /** 金框画在卡外 2 像素（{@code drawBorder(-2, …)}），再留 4 像素余量。 */
+    private static final int BORDER_ROOM = 2 + 4;
     private static final int BELOW_CARDS = 6;
     private static final int BAR_H = 3;
     private static final int BAR_TO_TEXT = 3;
@@ -55,6 +58,8 @@ public final class ProvisionScreen extends GameScreen {
     /** 窗口小到离谱时卡也不能缩没了 —— 缩没了与「没有牌」长得一样。 */
     private static final int MIN_CARD_H = 24;
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
     private ProvisionUpdateS2C data;
     private int highlight;
     private long dealAt;
@@ -62,6 +67,13 @@ public final class ProvisionScreen extends GameScreen {
     private float[] lift = new float[0];
     /** 上一帧的墙钟。插值按真实毫秒推，不按帧 —— 否则高刷新率屏幕上「抬」会明显更快。 */
     private long lastFrameMs = System.currentTimeMillis();
+
+    /** 服务端替你选的那张；{@code -1} 表示这一轮没被替选（你自己点的，或还没到点）。 */
+    private int snapIndex = -1;
+    /** 「顿」的起点，0 表示没在播。 */
+    private long snapAt;
+    /** 播完这一下就把界面收掉 —— 留牌那一包已经到了，只是被这一下拦着。 */
+    private boolean closeWhenSnapDone;
 
     public ProvisionScreen(ProvisionUpdateS2C data) {
         super(Text.translatable("heavyseas.provision.title"));
@@ -76,12 +88,44 @@ public final class ProvisionScreen extends GameScreen {
             this.dealAt = System.currentTimeMillis();
             this.highlight = 0;
             this.lift = new float[next.offer().size()];
+            this.snapIndex = -1;
+            this.snapAt = 0L;
+            this.closeWhenSnapDone = false;
             send(0, false);
         }
     }
 
     public ProvisionUpdateS2C data() {
         return data;
+    }
+
+    /**
+     * 服务端替你选了一张（ADR-0018 §6 清单第 4 条：这一下不能省）。
+     *
+     * <p>先把高亮挪到<b>服务端说的那一张</b>再播：服务端拿的是它最后收到的高亮，
+     * 而玩家最后一次移动高亮的包可能还在路上 —— 不以服务端为准的话，
+     * 屏幕上顿的那张会和真正进手里的那张不是同一张，比不做还糟。
+     */
+    public void autoPicked(int index) {
+        if (data == null || index < 0 || index >= data.offer().size()) {
+            return;
+        }
+        highlight = index;
+        snapIndex = index;
+        snapAt = System.currentTimeMillis();
+        // 验收靠这一行：超时有、手动没有。抓帧看不清 396ms 时，它是第二个来源。
+        LOGGER.info("补给箱：第 {} 张是替你选的（{}），播一次「顿」",
+                index + 1, data.offer().get(index));
+    }
+
+    /** 「顿」还在播吗。留牌那一包到了但这一下没播完时，界面要再挂一会儿。 */
+    public boolean snapping() {
+        return snapAt > 0L && GuiLanguage.snap(System.currentTimeMillis(), snapAt) < 1f;
+    }
+
+    /** 播完就关。 */
+    public void closeAfterSnap() {
+        closeWhenSnapDone = true;
     }
 
     @Override
@@ -107,13 +151,17 @@ public final class ProvisionScreen extends GameScreen {
     private Layout layout() {
         int n = Math.max(1, data.offer().size());
         int text = textRenderer.fontHeight;
-        int fixed = RAIL_H + LIFT_ROOM + BELOW_CARDS + BAR_H + BAR_TO_TEXT
-                + text + HINT_GAP + text + LINE_GAP + text;
+        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + text + HINT_GAP + text + LINE_GAP + text;
+        // 卡顶要留多少空，取决于卡有多高（「顿」放大 7%，绕底边，长出来的那一截全在上面）；
+        // 而卡有多高又取决于留了多少空。先按一个偏大的 h 算出空，再据此定 h ——
+        // 空只会偏大一点点，卡因此略小一点点，绝不会反过来压上座位轨。
+        int room = topRoom(cardHeightFor(n, RAIL_H + topRoom(0) + below));
+        int fixed = RAIL_H + room + below;
         int h = cardHeightFor(n, fixed);
         int w = GuiLanguage.cardWidth(h);
 
         int railY = Math.max(MARGIN, (height - fixed - h) / 2);
-        int cardsTop = railY + RAIL_H + LIFT_ROOM;
+        int cardsTop = railY + RAIL_H + room;
         int barY = cardsTop + h + BELOW_CARDS;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         int hintY = countdownY + text + HINT_GAP;
@@ -127,6 +175,20 @@ public final class ProvisionScreen extends GameScreen {
         int railCell = GuiLanguage.cardWidth(cardHeightFor(seats, fixed)) + GAP;
         return new Layout(w, h, (width - rowW) / 2, railY, (width - seats * railCell) / 2, railCell,
                 cardsTop, barY, (width - barW) / 2, barW, countdownY, hintY, hintY + text + LINE_GAP);
+    }
+
+    /**
+     * 卡顶上要留多少空，才让最高的那一帧碰不到座位轨的线。
+     *
+     * <p>三件事叠起来：「抬」9 像素 · 「顿」的位移 6 像素 · 「顿」放大 7% ——
+     * 卡是绕<b>底边</b>缩放的，所以长出来的那一截 {@code (scale-1)×h} 全在上面。
+     *
+     * <p>❗只算「抬」的那一版（本轮之前）在真实客户端上实拍到了：超时那一下弹起时，
+     * 金框的上边切进了座位轨上「珠宝商」那几个字。版面留空必须把动效算进去。
+     */
+    private static int topRoom(int cardHeight) {
+        return (int) Math.ceil(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE
+                + (GuiLanguage.SNAP_PEAK_SCALE - 1f) * cardHeight) + BORDER_ROOM;
     }
 
     /** N 张一排时卡能画多高：竖着剩下的、横着放得下的、像素上限以内还清楚的，三者取小。 */
@@ -146,11 +208,16 @@ public final class ProvisionScreen extends GameScreen {
         long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));   // 掉帧时别让插值一步跳到底
         lastFrameMs = now;
         Layout l = layout();
+        float snapP = GuiLanguage.snap(now, snapAt);
 
         drawRail(context, l);
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
-        if (mouseActuallyMoved(mouseX, mouseY)) {
+        // ❗即使这一轮已经定了也要每帧调一次：它记的是上一帧指针在哪，停一帧就会漏掉一次移动。
+        // 「顿」一开始决定就定了，之后鼠标与键盘都不该再改高亮 —— 所以判的是 decided()，
+        // 不是「还在播」：播完到界面收掉之间那几帧，同样不许再改。
+        boolean moved = mouseActuallyMoved(mouseX, mouseY);
+        if (moved && !decided()) {
             int hovered = indexAt(mouseX, mouseY, l);
             if (hovered >= 0 && hovered != highlight) {
                 setHighlight(hovered);    // 超时认高亮，鼠标与键盘两套指示不能各说各话
@@ -170,6 +237,12 @@ public final class ProvisionScreen extends GameScreen {
             // 入场：从下方抬起 + 轻微放大。全部走矩阵，不碰布局。
             float rise = (1f - in) * GuiLanguage.DEAL_RISE;
             float scale = GuiLanguage.dealScale(in);
+            if (i == snapIndex) {
+                // 「顿」：带过冲地弹一下再回原位。叠在「抬」之上 —— 服务端挑的要是另一张，
+                // 这一下正好连「高亮挪过去了」一起说清楚。
+                rise += GuiLanguage.snapRise(snapP);
+                scale *= GuiLanguage.snapScale(snapP);
+            }
             context.getMatrices().translate(l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h() - lift[i] + rise, 0);
             context.getMatrices().scale(scale, scale, 1f);
             context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
@@ -186,6 +259,20 @@ public final class ProvisionScreen extends GameScreen {
 
         drawCountdown(context, now, l);
         drawHint(context, l);
+    }
+
+    /**
+     * 留牌那一包早到了，界面是被这一下「顿」拦着的 —— 播完就放它走。
+     *
+     * <p>❗收在 {@code tick} 不收在 {@code render}：在渲染当中把界面换掉，
+     * 等于在一帧画到一半时改客户端状态。这一下结束时卡已经回到原位、缩放回 1，
+     * 所以晚上至多一个 tick（50ms）看不出来。
+     */
+    @Override
+    public void tick() {
+        if (closeWhenSnapDone && !snapping() && client != null) {
+            client.setScreen(null);
+        }
     }
 
     /** 座位轨：箱子传到哪了。**公开信息** —— 等待要看得见（决策 ⑨）。 */
@@ -271,9 +358,14 @@ public final class ProvisionScreen extends GameScreen {
         }
     }
 
+    /** 「顿」开始之后这一轮就定了 —— 再点再按都不作数，否则会往服务端发一个已经没意义的留牌。 */
+    private boolean decided() {
+        return snapAt > 0L;
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (data != null && !data.offer().isEmpty()) {
+        if (data != null && !data.offer().isEmpty() && !decided()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout());
             if (i >= 0) {
                 send(i, true);
@@ -285,7 +377,7 @@ public final class ProvisionScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (data == null || data.offer().isEmpty()) {
+        if (data == null || data.offer().isEmpty() || decided()) {
             return super.keyPressed(keyCode, scanCode, modifiers);
         }
         switch (keyCode) {

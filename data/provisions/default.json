@@ -3,7 +3,7 @@
   "id": "heavyseas:default",
   "total": 47,
   "_comment": [
-    "id 与美术资产共用一套主键（art/cards/item.*.svg）。",
+    "id 与美术资产共用一套主键（art/cards/provision.*.svg）。",
     "显示名与规则文本走 lang 文件，本目录只有 id、数量与机制字段。",
     "三张名画是三个独立 id 而非一个 id 带数量——它们面值不同（2/3/3），",
     "且美术上要求三幅互不相似，玩家需要分辨。",

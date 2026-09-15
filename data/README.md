@@ -33,4 +33,4 @@
 | `roster/default.json` | 八名角色：体型、生存分、技能、座位 |
 | `provisions/default.json` | 47 张物资牌的配比与效果 |
 | `navigation/default.json` | 31 张航海牌的海鸥 / 落海 / 口渴 |
-| `weather/default.json` | 10 张天候牌（M5 启用） |
+| `weather/default.json` | 10 张天候牌 —— **尚未入库**，M5 才导出 |

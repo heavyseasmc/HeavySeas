@@ -160,6 +160,127 @@ public final class GuiLanguage {
 
     // ---------------------------------------------------------------- 顿 Snap
 
-    /** 顿：<b>系统替你做的</b>。180ms，带过冲 —— 必须与手动看得出不同。 */
-    public static final long SNAP_MS = 180L;
+    /**
+     * 顿：<b>系统替你做的</b>。带过冲 —— 必须与手动看得出不同。
+     *
+     * <h2>为什么是 396 而不是 ADR-0018 §7.2 写的 180</h2>
+     * 交互稿里参数表记的是 {@code snap: { ms: 180 }}，可 {@code snap()} 传给动画的是
+     * {@code M.snap.ms * 2.2}。<b>用户看过并说「就定这版」的是跑出来那个</b>，
+     * 所以实现按 396ms —— 六个动词里只有它这样，其余五个印的与跑的一致。
+     *
+     * <p>ADR 是快照不回头改（文档纪律），这条记在 CURRENT_STATUS 的 O20 与
+     * ENGINEERING 的证伪表里：<b>同源保的是参数，不是数值</b>。
+     */
+    public static final long SNAP_MS = 396L;
+
+    /** 「顿」的缓动：{@code cubic-bezier(.6,-.3,.4,1.3)}，两头都冲出 [0,1]。 */
+    private static final float SNAP_X1 = .6f;
+    private static final float SNAP_Y1 = -.3f;
+    private static final float SNAP_X2 = .4f;
+    private static final float SNAP_Y2 = 1.3f;
+
+    /** 关键帧：进度 → 上抬像素（负号向上）。与交互稿逐帧相同。 */
+    private static final float[] SNAP_STOPS = {0f, .45f, .70f, 1f};
+    private static final float[] SNAP_RISE = {0f, -6f, 2f, 0f};
+    private static final float[] SNAP_SCALE = {1f, 1.07f, .98f, 1f};
+
+    /** 「顿」峰值时最多抬起多少（GUI 单位，正数）。 */
+    public static final float SNAP_PEAK_RISE;
+    /** 「顿」峰值时的最大缩放。卡绕底边缩放，所以它同时决定卡顶要多留多少空。 */
+    public static final float SNAP_PEAK_SCALE;
+
+    static {
+        // ❗从关键帧现算，不另写两个常量。今天刚记进证伪表：同源保的是参数不是数值 ——
+        //   把 6 和 1.07 再抄一遍，改了关键帧而版面不跟着改，卡就会压上座位轨而没人报错。
+        //   缓动两头会冲出 [0,1]，外推出的值不会超过这两个峰（外推段都朝静止方向走）。
+        float rise = 0f;
+        float scale = 1f;
+        for (float v : SNAP_RISE) {
+            rise = Math.max(rise, -v);
+        }
+        for (float v : SNAP_SCALE) {
+            scale = Math.max(scale, v);
+        }
+        SNAP_PEAK_RISE = rise;
+        SNAP_PEAK_SCALE = scale;
+    }
+
+    /**
+     * 「顿」走到哪了，0 → 1（线性，未过缓动）。
+     *
+     * @param startedAt 起点；{@code <= 0} 表示没在播，返回 1（已结束）
+     */
+    public static float snap(long now, long startedAt) {
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        return MathHelper.clamp((now - startedAt) / (float) SNAP_MS, 0f, 1f);
+    }
+
+    /** 「顿」此刻的上抬量（GUI 单位，负号向上）。 */
+    public static float snapRise(float progress) {
+        return sampleSnap(SNAP_RISE, ease(progress));
+    }
+
+    /** 「顿」此刻的缩放。 */
+    public static float snapScale(float progress) {
+        return sampleSnap(SNAP_SCALE, ease(progress));
+    }
+
+    /**
+     * 按缓动后的进度取关键帧。
+     *
+     * <p>❗缓动后的进度会<b>冲出 [0,1]</b>（y1 = -.3、y2 = 1.3 就是为此写的），
+     * 这时按最近的那一段<b>外推</b>而不是夹住 —— 夹住等于把过冲抹掉，
+     * 而过冲正是「顿」与「抬」唯一看得出的区别。
+     */
+    private static float sampleSnap(float[] values, float eased) {
+        int i = 0;
+        while (i < SNAP_STOPS.length - 2 && eased > SNAP_STOPS[i + 1]) {
+            i++;
+        }
+        float span = SNAP_STOPS[i + 1] - SNAP_STOPS[i];
+        float t = (eased - SNAP_STOPS[i]) / span;              // 越界时 t 自然落在 [0,1] 之外
+        return values[i] + (values[i + 1] - values[i]) * t;
+    }
+
+    /**
+     * 三次贝塞尔缓动：给横轴进度，求纵轴。
+     *
+     * <p>CSS 的 {@code cubic-bezier(x1,y1,x2,y2)} 定的是一条参数曲线，横轴不是参数本身 ——
+     * 要先按 x 解出参数 t，再拿 t 求 y。用牛顿迭代解；导数太小时退回二分，
+     * 免得在曲线平坦处除出一个巨大的步长。
+     */
+    private static float ease(float x) {
+        if (x <= 0f) {
+            return 0f;
+        }
+        if (x >= 1f) {
+            return 1f;
+        }
+        float t = x;
+        for (int i = 0; i < 8; i++) {
+            float dx = bezier(t, SNAP_X1, SNAP_X2) - x;
+            if (Math.abs(dx) < 1e-5f) {
+                break;
+            }
+            float slope = bezierSlope(t, SNAP_X1, SNAP_X2);
+            if (Math.abs(slope) < 1e-5f) {
+                break;
+            }
+            t = MathHelper.clamp(t - dx / slope, 0f, 1f);
+        }
+        return bezier(t, SNAP_Y1, SNAP_Y2);
+    }
+
+    /** 首末控制点固定在 0 与 1 的三次贝塞尔。 */
+    private static float bezier(float t, float a, float b) {
+        float u = 1f - t;
+        return 3f * u * u * t * a + 3f * u * t * t * b + t * t * t;
+    }
+
+    private static float bezierSlope(float t, float a, float b) {
+        float u = 1f - t;
+        return 3f * u * u * a + 6f * u * t * (b - a) + 3f * t * t * (1f - b);
+    }
 }

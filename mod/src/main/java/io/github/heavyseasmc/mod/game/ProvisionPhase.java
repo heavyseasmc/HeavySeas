@@ -5,6 +5,7 @@ import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
+import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
@@ -97,9 +98,31 @@ public final class ProvisionPhase {
                 // 客户端一次都没上报过高亮（比如离线）时取第一张 —— 决策 ⑧ 要求局面不能卡住。
                 int index = Math.min(component.provisionHighlight(),
                         Math.max(0, session.provisionOffer().size() - 1));
+                // ❗先告诉持有者「这张是替你选的」，再真的留牌。
+                //   顺序不能反：keep 里紧接着就 broadcast，那一包会让客户端关掉界面 ——
+                //   通知落在它后面，就没有界面来播这一下「顿」了。
+                notifyAutoPick(world, component, index);
                 keep(world, component, index);
             }
         }
+    }
+
+    /**
+     * 告诉持有者：这一张是替你选的。
+     *
+     * <h2>ADR-0018 §6 的一致性清单第 4 条</h2>
+     * 「系统替你做的决定与你自己做的长得一样，是最伤的一种不诚实」。超时与手动在屏幕上
+     * 必须看得出区别 —— 手动是点完就关，超时是先<b>顿</b>一下再关。
+     *
+     * <p>只发给持有者本人，而且只在他<b>在线且是真人</b>时发：替身根本走不到超时
+     * （{@link #autoPlayIfDummy} 已经替它选了），离线的人也没有界面可播。
+     */
+    private static void notifyAutoPick(ServerWorld world, GameComponent component, int index) {
+        component.requireSession().provisionHolder()
+                .flatMap(component::occupantOf)
+                .map(GameComponent.Occupant::player)
+                .map(uuid -> world.getServer().getPlayerManager().getPlayer(uuid))
+                .ifPresent(player -> ServerPlayNetworking.send(player, new ProvisionAutoPickS2C(index)));
     }
 
     private static void keep(ServerWorld world, GameComponent component, int index) {

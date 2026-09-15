@@ -175,6 +175,85 @@ tasks.named('check') {
     dependsOn checkLangKeys
 }
 
+// 物资的中文名必须与卡面 SVG 的 <title> 完全一致。
+//
+// 为什么单独一道闸：checkLangKeys 只认**字面量**键，而物资名在界面上是
+// `"heavyseas.provision." + id` 拼出来的 —— 它整族都在那道闸的视野之外。
+// 2026-09-15 实测：把 knife 的译名改成「小刀」、把 rum 从两份 lang 里一起删掉，
+// checkLangKeys 照样打印「核对通过」。
+//
+// 为什么要紧：显示「小刀」而卡面印着「短刀」，**没有任何机器会报错**。
+// 它和漏译不同 —— 漏译会露出键名，不一致则安安静静地一直错下去。
+//
+// 英文名只能查「有且非空」：卡面只印中文，没有可对照的权威英文。
+def checkProvisionNames = tasks.register('checkProvisionNames') {
+    group = 'verification'
+    description = '物资的中文名必须与卡面 SVG 的 <title> 相同；英文名必须有且非空'
+    def dataFile = rootProject.file('data/provisions/default.json')
+    // 做成任务属性而不是局部变量：红测要能把它们指向造坏的副本，而不去改被跟踪的文件。
+    ext.cardDir = rootProject.file('art/cards')
+    ext.langDir = file('src/main/resources/assets/heavyseas/lang')
+    inputs.file(dataFile)
+    inputs.dir(ext.cardDir).optional()
+    inputs.dir(ext.langDir).optional()
+    doLast {
+        File cardDir = ext.cardDir
+        File langDir = ext.langDir
+        def slurper = new groovy.json.JsonSlurper()
+        def zh = slurper.parse(new File(langDir, 'zh_cn.json'), 'UTF-8') as Map
+        def en = slurper.parse(new File(langDir, 'en_us.json'), 'UTF-8') as Map
+        def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
+        if (ids.isEmpty()) {
+            throw new GradleException('data/provisions 里一个 id 都没读到 —— 判据坏了，不是真的没有牌')
+        }
+        // 用单引号字符串而不是斜杠字面量：里头要写 </title>，斜杠会提前结束字面量。
+        def title = java.util.regex.Pattern.compile('<title>([^<]*)</title>')
+
+        def problems = []
+        int compared = 0
+        ids.each { id ->
+            def key = "heavyseas.provision.${id}".toString()
+            def svg = new File(cardDir, "provision.${id}.svg")
+            if (!svg.isFile()) {
+                problems << "data/provisions 有 ${id}，但卡面 ${svg.name} 不在"
+                return
+            }
+            def m = title.matcher(svg.getText('UTF-8'))
+            if (!m.find()) {
+                problems << "${svg.name} 里没有 <title> —— 权威名字无从取"
+                return
+            }
+            // <title> 形如「怒海狂涛 · 物资卡 · 短刀」，末段才是名字。
+            def parts = m.group(1).split(' · ')
+            def authoritative = parts[parts.length - 1].trim()
+            compared++
+            if (!zh.containsKey(key)) {
+                problems << "${id}：zh_cn 里没有 ${key}（SVG 里的名字为「${authoritative}」）"
+            } else if (zh[key] != authoritative) {
+                problems << "${id}：zh_cn 为「${zh[key]}」，SVG 里为「${authoritative}」"
+            }
+            if (!en.containsKey(key)) {
+                problems << "${id}：en_us 里没有 ${key}"
+            } else if (!en[key].toString().trim()) {
+                problems << "${id}：en_us 的 ${key} 是空的"
+            }
+        }
+        // 正向对照：一张都没比到时，「全都对」与「没在比」输出一样。本仓库已实证七次假绿。
+        if (compared == 0) {
+            throw new GradleException('一张物资卡都没比对到 —— 判据坏了，不是名字都对')
+        }
+        if (problems) {
+            throw new GradleException((['物资名与卡面核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("物资名核对通过：${compared} 张与卡面 <title> 完全一致，英文名 ${ids.size()} 个都在")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkProvisionNames
+}
+
 // Minecraft 不认 SVG —— GUI 里能画的只有 PNG。贴图由内部管线烘出来并**入库**：
 // 生成物入库是有意的，否则一份干净的克隆构建不出能用的 jar。
 //
