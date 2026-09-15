@@ -14,6 +14,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +53,15 @@ public final class NavigationPhase {
         Session session = component.requireSession();
         if (session.navigatedThisTurn().isPresent() || component.helmDeadline() > 0) {
             return;                           // 这一回合已经结算过，或者窗口已经开着：别再开一次
+        }
+        // 舵手握着指南针时，挑牌之前多抽一张进划船堆（设计决策 §8.1）。必须排在「能不能挑」之前 ——
+        // ❗这一行原先没有：指南针在真实对局里从来不生效，而单测、出口验收、实拍全都是绿的（ADR-0021 §9）。
+        int extra = session.prepareRowStack();
+        if (extra > 0) {
+            CharacterId helmsman = session.state().helmsman().orElseThrow();
+            GameFlow.broadcast(world, Text.translatable("heavyseas.game.compass",
+                    GameFlow.characterName(helmsman), extra).formatted(Formatting.GRAY));
+            LOGGER.info("指南针：舵手 {} 挑牌之前多抽 {} 张进划船堆", helmsman.value(), extra);
         }
         if (!session.helmsmanMayPick()) {
             boolean nobodyRowed = session.table().rowStackIsEmpty();

@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.engine.data;
 
+import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 
 import java.util.List;
@@ -35,7 +36,12 @@ public final class LocalData {
     }
 
     public static Set<String> provisionIds() {
-        return ProvisionLoader.loadIds(dir().file("provisions/default.json"));
+        return provisions().ids();
+    }
+
+    /** 真实物资目录：18 种的类别、张数与效果。 */
+    public static Provisions provisions() {
+        return ProvisionLoader.loadCatalog(dir().file("provisions/default.json"));
     }
 
     /** 真实航海牌堆。文件不在就是失败 —— 它已经落库，缺席只可能是配错了路径。 */

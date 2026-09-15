@@ -1,11 +1,11 @@
 package io.github.heavyseasmc.mod.data;
 
 import io.github.heavyseasmc.engine.data.RosterData;
+import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * 一整套配平：角色表 · 物资 id 全集 · 航海牌堆，外加它们共同自称的变体 id。
@@ -17,18 +17,17 @@ import java.util.Set;
  *
  * @param variant    三份数据共同自称的 id，形如 {@code heavyseas:default}
  * @param roster     角色表与预设
- * @param provisions 物资 id 全集（航海牌的 conditional 条件靠它做白名单）
- * @param provisionDeck 整副物资牌，按张数展开成 47 张 —— 发牌要的是这一份，不是全集
+ * @param provisions 物资目录：18 种的类别、张数与<b>效果</b>。
+ *                   整副牌（按张数展开的 47 张）由它给出，不另存一份 —— 两份会漂
  * @param navigation 航海牌堆
  */
-public record GameData(String variant, RosterData roster, Set<String> provisions,
-                       List<String> provisionDeck, List<NavigationCard> navigation) {
+public record GameData(String variant, RosterData roster, Provisions provisions,
+                       List<NavigationCard> navigation) {
 
     public GameData {
         Objects.requireNonNull(variant, "variant");
         Objects.requireNonNull(roster, "roster");
-        provisions = Set.copyOf(provisions);
-        provisionDeck = List.copyOf(provisionDeck);
+        Objects.requireNonNull(provisions, "provisions");
         navigation = List.copyOf(navigation);
     }
 }

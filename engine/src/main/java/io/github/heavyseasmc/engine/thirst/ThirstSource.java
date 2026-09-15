@@ -34,5 +34,17 @@ public enum ThirstSource {
     FOUGHT,
 
     /** 你的名字出现在本张航海牌的「口渴」名单里。 */
-    NAMED
+    NAMED,
+
+    /**
+     * 你这一回合喝过酒（{@code buff_size} 的 {@code side_effect: thirst_at_end_of_turn}）。
+     *
+     * <p>❗<b>它不看牌面</b>：船桨与战斗那两个来源要航海牌上印着对应图示才算数，
+     * 而喝酒的口渴是酒自己带的副作用，与今天翻到哪张牌无关。
+     *
+     * <p>本枚举的类注释早就写着「M5 天候要加第四个来源，加一个枚举常量是加法」——
+     * 第四个来源提前到了 M2，形状与那时的预期相同：{@code count()} 的上限由常量数给出，
+     * 不变量因此也不需要改成新的数字（{@code Invariants} 用的就是 {@code values().length}）。
+     */
+    DRANK_RUM
 }

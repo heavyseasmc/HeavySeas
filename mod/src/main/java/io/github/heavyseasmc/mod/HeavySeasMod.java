@@ -6,6 +6,7 @@ import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.game.NavigationPhase;
+import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.game.ProvisionPhase;
 import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.HelmActionC2S;
@@ -14,6 +15,7 @@ import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
+import io.github.heavyseasmc.mod.net.ThirstActionC2S;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -69,10 +71,16 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(HelmActionC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> NavigationPhase.onAction(context.player(), payload)));
+        // 口渴：喝几张（ADR-0021）。同样是「移高亮 / 就按这个数」两用。
+        PayloadTypeRegistry.playC2S().register(ThirstActionC2S.ID, ThirstActionC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(ThirstActionC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> ThirstPhase.onAction(context.player(), payload)));
 
         // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
         ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(NavigationPhase::tick);
+        ServerTickEvents.END_SERVER_TICK.register(ThirstPhase::tick);
         // 排程：替身的一步、航海结算后的停顿（ADR-0019）。
         ServerTickEvents.END_SERVER_TICK.register(GameFlow::tick);
     }

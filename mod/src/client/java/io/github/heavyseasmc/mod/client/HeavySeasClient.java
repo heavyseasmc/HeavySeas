@@ -71,6 +71,9 @@ public final class HeavySeasClient implements ClientModInitializer {
     /** 已经为哪一个挑牌窗口弹过舵手一面（以窗口的超时时刻认）。 */
     private static long helmWindowShown;
 
+    /** 上一次弹出口渴一面的那个窗口。同一个窗口只弹一次。 */
+    private static long thirstWindowShown;
+
     public static KeyBinding actKey() {
         return actKey;
     }
@@ -165,6 +168,26 @@ public final class HeavySeasClient implements ClientModInitializer {
             rowPending = false;
         }
         wasRowing = rowing;
+
+        // ❗口渴排在舵手前面判：这两面都在航海阶段，但口渴是舵手挑完之后的事 ——
+        //   同一帧里两者不会同时为真，排序只是让「后来的那一面」不被前面那条 return 截在半路。
+        if (view.myThirstChoice()) {
+            long window = view.thirstPrompt().deadlineMs();
+            boolean fresh = window != thirstWindowShown;
+            if (fresh) {
+                thirstWindowShown = window;
+                // 与语言无关的一行：GUI 回归靠它判「口渴一面真的问到了我」。
+                LOGGER.info("口渴：轮到我决定，还需化解 {} 次 · 手上 {} 张水",
+                        view.thirstPrompt().remaining(), view.myWaters());
+            }
+            if (client.currentScreen instanceof ThirstScreen) {
+                return;
+            }
+            if (fresh || client.currentScreen == null) {
+                client.setScreen(new ThirstScreen(view));
+            }
+            return;
+        }
 
         if (view.myHelmPick()) {
             long window = view.sea().helmDeadlineMs();

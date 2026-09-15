@@ -2,6 +2,8 @@ package io.github.heavyseasmc.engine.data;
 
 import io.github.heavyseasmc.engine.model.Ability;
 import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Provisions;
+import io.github.heavyseasmc.engine.model.ProvisionEffect;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.model.TreasureKind;
@@ -270,9 +272,18 @@ class DataLoadingTest {
                   "id": "heavyseas:test",
                   "total": 6,
                   "cards": [
-                    {"id": "water", "count": 3, "category": "consumable", "effect": {"kind": "prevent_thirst"}},
-                    {"id": "rum", "count": 2, "category": "consumable", "effect": {"kind": "drink"}},
-                    {"id": "parasol", "count": 1, "category": "equipment", "effect": {"kind": "cover"}}
+                    {"id": "water", "count": 3, "category": "consumable",
+                     "effect": {"kind": "prevent_thirst", "amount": 1, "unit": "thirst_source",
+                                "target": "any_character", "may_target_others": true,
+                                "resolved_during": "thirst_resolution", "discard_on_use": true}},
+                    {"id": "rum", "count": 2, "category": "equipment",
+                     "effect": {"kind": "buff_size", "amount": 3, "duration": "turn",
+                                "side_effect": "thirst_at_end_of_turn", "persists_in_front": true,
+                                "once_per_turn": true, "stacks": false}},
+                    {"id": "parasol", "count": 1, "category": "equipment",
+                     "effect": {"kind": "prevent_thirst", "amount": 1, "unit": "thirst_source",
+                                "target": "self", "persistent": true, "requires_open": true,
+                                "costs_action_to_open": true, "lost_when_overboard": true}}
                   ]
                 }""";
 
@@ -281,6 +292,26 @@ class DataLoadingTest {
         void loadsIds() {
             assertEquals(Set.of("water", "rum", "parasol"),
                     ProvisionLoader.loadIds(write("provisions.json", THREE_PROVISIONS)));
+        }
+
+        @Test
+        @DisplayName("效果真的读进来了 —— 而且读的是字段，不是 kind 这个名字")
+        void loadsEffects() {
+            Provisions catalog = ProvisionLoader.loadCatalog(write("effects.json", THREE_PROVISIONS));
+
+            ProvisionEffect water = catalog.get("water").effect();
+            assertInstanceOf(ProvisionEffect.PreventThirst.class, water);
+            assertTrue(((ProvisionEffect.PreventThirst) water).discardOnUse(), "水用后要弃");
+            assertFalse(((ProvisionEffect.PreventThirst) water).persistent(), "水不是常驻的");
+
+            // 同一个 kind，字段不同 —— 这正是「按 kind 分而不是按卡分」要守住的那件事。
+            ProvisionEffect parasol = catalog.get("parasol").effect();
+            assertInstanceOf(ProvisionEffect.PreventThirst.class, parasol);
+            assertTrue(((ProvisionEffect.PreventThirst) parasol).requiresOpen(), "伞要撑开才算");
+            assertEquals(Set.of(ProvisionEffect.Timing.SPECIAL_ACTION, ProvisionEffect.Timing.PASSIVE),
+                    parasol.timings(), "撑伞占行动，撑开之后常驻");
+            assertEquals(Set.of(ProvisionEffect.Timing.ON_RESOLUTION), water.timings(),
+                    "水是口渴结算时打出的，不占行动");
         }
 
         @Test
@@ -299,6 +330,56 @@ class DataLoadingTest {
             String json = THREE_PROVISIONS.replace("\"id\": \"rum\"", "\"id\": \"water\"");
             assertTrue(assertThrows(DataFormatException.class,
                     () -> ProvisionLoader.loadIds(write("dup.json", json))).getMessage().contains("重复"));
+        }
+
+        @Test
+        @DisplayName("❗效果里多一个引擎不认识的字段就抛，不默默忽略")
+        void unknownEffectFieldRejected() {
+            // 38 个字段里有 26 个只出现一次 —— 忽略不认识的字段与「效果读全了」在输出上完全相同。
+            String json = THREE_PROVISIONS.replace("\"kind\": \"buff_size\"",
+                    "\"kind\": \"buff_size\", \"heals_everyone\": true");
+            DataFormatException e = assertThrows(DataFormatException.class,
+                    () -> ProvisionLoader.loadIds(write("extra_field.json", json)));
+            assertTrue(e.getMessage().contains("heals_everyone"), e.getMessage());
+            assertTrue(e.getMessage().contains("cards[1].effect"), "要点名是哪张牌：" + e.getMessage());
+        }
+
+        @Test
+        @DisplayName("不认识的 kind 就抛，并列出认识哪些")
+        void unknownKindRejected() {
+            String json = THREE_PROVISIONS.replace("\"kind\": \"buff_size\"", "\"kind\": \"drink\"");
+            DataFormatException e = assertThrows(DataFormatException.class,
+                    () -> ProvisionLoader.loadIds(write("bad_kind.json", json)));
+            assertTrue(e.getMessage().contains("drink"), e.getMessage());
+            assertTrue(e.getMessage().contains("buff_size"), "要列出认识哪些：" + e.getMessage());
+        }
+
+        @Test
+        @DisplayName("❗字段名对、值不认识，照样抛 —— 那会让这张牌按另一种规则生效")
+        void unknownEnumValueRejected() {
+            String json = THREE_PROVISIONS.replace("\"duration\": \"turn\"", "\"duration\": \"forever\"");
+            DataFormatException e = assertThrows(DataFormatException.class,
+                    () -> ProvisionLoader.loadIds(write("bad_value.json", json)));
+            assertTrue(e.getMessage().contains("forever"), e.getMessage());
+        }
+
+        @Test
+        @DisplayName("套组表的键必须从 1 起连续 —— 缺一档会静默取到错的分")
+        void jewelrySetTableMustBeContiguous() {
+            String json = """
+                    {
+                      "schema_version": 1,
+                      "id": "heavyseas:test",
+                      "total": 3,
+                      "cards": [
+                        {"id": "jewelry", "count": 3, "category": "treasure",
+                         "effect": {"kind": "score_set", "table": {"1": 1, "3": 8},
+                                    "doubled_by": "jeweler", "doubling_applies_to": "set_total"}}
+                      ]
+                    }""";
+            DataFormatException e = assertThrows(DataFormatException.class,
+                    () -> ProvisionLoader.loadIds(write("gap.json", json)));
+            assertTrue(e.getMessage().contains("连续"), e.getMessage());
         }
     }
 

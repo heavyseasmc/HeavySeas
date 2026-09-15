@@ -1,7 +1,9 @@
 package io.github.heavyseasmc.engine.play;
 
 import io.github.heavyseasmc.engine.model.Ability;
+import io.github.heavyseasmc.engine.data.TestProvisions;
 import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
@@ -11,7 +13,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,19 +55,24 @@ class ProvisionPhaseTest {
                 new Random(1));
     }
 
-    /** 一副固定的物资牌，内容可预期 —— 洗牌用定种子，失败时复现得了。 */
-    private static List<String> deck(int waters, int extras) {
-        List<String> cards = new ArrayList<>();
-        for (int i = 0; i < waters; i++) {
-            cards.add("water");
+    /**
+     * 一副固定的物资牌，内容可预期 —— 洗牌用定种子，失败时复现得了。
+     *
+     * <p>❗效果定义取自真实数据（{@code TestProvisions.counting}），只有张数是这里定的：
+     * 手里抄一份效果就会有第二个真相源。
+     */
+    private static Provisions deck(int waters, int extras) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        if (waters > 0) {
+            counts.put("water", waters);
         }
-        for (int i = 0; i < extras; i++) {
-            cards.add("knife");
+        if (extras > 0) {
+            counts.put("knife", extras);
         }
-        return cards;
+        return TestProvisions.counting(counts);
     }
 
-    private static Session session(List<String> provisions) {
+    private static Session session(Provisions provisions) {
         return new Session("test", roster(), new Table(navDeck(), provisions, new Random(7)));
     }
 

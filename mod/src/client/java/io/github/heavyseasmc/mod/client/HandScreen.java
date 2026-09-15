@@ -1,10 +1,13 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -38,6 +41,8 @@ import java.util.List;
  * 同一动词在不同界面用不同时长，就又变回十种游戏了。
  */
 public final class HandScreen extends GameScreen {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     /**
      * 手牌那一排的高度取屏幕高的这个比例，再夹进上下限。
@@ -176,6 +181,12 @@ public final class HandScreen extends GameScreen {
         // 身份那一行原先就在这 20 里，被抬起的牌压住了一半（真实客户端上看到的）。
         int statusY = drawExamined(context, TOP_BAND_H, handTop - 20);
         drawIdentity(context, view, statusY);
+        // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
+        //   与 HUD 那一行「按 H 查看」同一条理由。
+        if (!hand.isEmpty()) {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hand.keys"),
+                    width / 2, statusY + textRenderer.fontHeight + 2, GuiLanguage.MUTED);
+        }
 
         if (hand.isEmpty()) {
             return;                           // 下带没东西可画，但上面三条照样在
@@ -306,6 +317,46 @@ public final class HandScreen extends GameScreen {
      * 大图的内容一模一样 —— 不动一下，看起来就像没换（用户 2026-09-15 在真实客户端上指出）。
      * 用「抬」而不是别的动词：大图换一张的含义就是「选中变了」（ADR-0018 §7.2）。
      */
+    /**
+     * 亮出正在看的那一张。
+     *
+     * <h2>为什么亮出值得有个键</h2>
+     * 规则里一大半效果<b>只有亮在面前才算</b>：救生圈挡落水、阳伞能撑开、船桨让划船多抽、
+     * 指南针让划船堆多一张。握在手里的那几张一点用都没有 —— 亮出不是装饰动作，是真的取舍
+     * （亮了就看得见、落水时会被冲走）。
+     *
+     * <p>走的是 {@code /seas reveal}，不是新包：这一下每局最多十来次，而每加一个包
+     * 就多一处「两端字段表要对上」。等这一面有了更多动作再一起做成包。
+     */
+    private void reveal() {
+        List<String> hand = view.hand();
+        if (selected < 0 || selected >= hand.size() || client == null || client.player == null) {
+            return;
+        }
+        String card = hand.get(selected);
+        // 与语言无关的一行：GUI 回归靠它判「亮出这一下真的发出去了」。
+        LOGGER.info("手牌：亮出 {}", card);
+        client.player.networkHandler.sendChatCommand(
+                "seas reveal " + view.character() + " " + card);
+    }
+
+    /**
+     * 打出正在看的那一张（特殊行动）。
+     *
+     * <p>❗<b>目标还不能挑</b>：医疗箱默认治伤得最重的那个（服务端定的便利），
+     * 真正的「挑一个人」要等指定模式（O23）。这一点记在 CURRENT_STATUS 的开放项里，
+     * 不假装这一面已经完整。
+     */
+    private void use() {
+        List<String> hand = view.hand();
+        if (selected < 0 || selected >= hand.size() || client == null || client.player == null) {
+            return;
+        }
+        String card = hand.get(selected);
+        LOGGER.info("手牌：打出 {}", card);
+        client.player.networkHandler.sendChatCommand("seas use " + card);
+    }
+
     private void select(int index) {
         if (index != selected) {
             selected = index;
@@ -319,6 +370,17 @@ public final class HandScreen extends GameScreen {
         if (count > 0 && (keyCode == GLFW.GLFW_KEY_LEFT || keyCode == GLFW.GLFW_KEY_RIGHT)) {
             select(Math.max(0, Math.min(count - 1,
                     selected + (keyCode == GLFW.GLFW_KEY_RIGHT ? 1 : -1))));
+            return true;
+        }
+        // 亮出：把正在看的那张放到面前。**不可逆**，所以要按回车而不是随手点一下（规则 §5.2）。
+        if (count > 0 && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
+            reveal();
+            return true;
+        }
+        // 用：花掉这一个行动打出去（医疗箱 · 撑伞 · 信号枪当信号 · 绝境）。
+        // ❗只有轮到你时才行得通 —— 它占行动。按不动时服务端会回一句人话，不是静默丢掉。
+        if (count > 0 && keyCode == GLFW.GLFW_KEY_U) {
+            use();
             return true;
         }
         // 用哪个键开的，就用哪个键收起来。写死 H 的话玩家改了键位就收不起来了。

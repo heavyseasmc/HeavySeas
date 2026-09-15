@@ -67,13 +67,20 @@ class ThirstTest {
         }
 
         @Test
-        @DisplayName("三个来源可以叠加，且上限就是来源种类数")
-        void allThreeStack() {
-            ThirstTally t = ThirstTally.of(
+        @DisplayName("来源可以叠加，且上限就是来源种类数")
+        void allSourcesStack() {
+            ThirstTally three = ThirstTally.of(
                     ThirstSource.ROWED, ThirstSource.FOUGHT, ThirstSource.NAMED);
-            assertEquals(3, t.count());
-            assertEquals(ThirstSource.values().length, t.count(),
-                    "单回合上限应当恒等于来源种类数；M5 加天候来源时本断言会自动跟着变");
+            assertEquals(3, three.count(), "规则基线 §9.5 写着的那三个来源");
+
+            // ❗上限跟着枚举走，不写死数字。2026-09-16 物资建模加了第四个来源（喝酒）时，
+            //   这条断言正是按预期自动跟着变的那一条。
+            ThirstTally all = ThirstTally.none();
+            for (ThirstSource source : ThirstSource.values()) {
+                all = all.with(source);
+            }
+            assertEquals(ThirstSource.values().length, all.count(),
+                    "单回合上限应当恒等于来源种类数");
         }
 
         @Test

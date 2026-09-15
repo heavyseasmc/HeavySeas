@@ -1,10 +1,12 @@
 package io.github.heavyseasmc.mod.data;
 
+import io.github.heavyseasmc.engine.data.DataConsistency;
 import io.github.heavyseasmc.engine.data.DataDocument;
 import io.github.heavyseasmc.engine.data.NavigationLoader;
 import io.github.heavyseasmc.engine.data.ProvisionLoader;
 import io.github.heavyseasmc.engine.data.RosterData;
 import io.github.heavyseasmc.engine.data.RosterLoader;
+import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
@@ -84,22 +86,25 @@ public final class GameDataLoader implements SimpleSynchronousResourceReloadList
     public void reload(ResourceManager manager) {
         DataDocument<RosterData> roster =
                 read(manager, "roster", RosterLoader::loadDocument);
-        // 读整副（47 张，按张数展开）而不是 id 全集：全集回答「有哪些东西」，
-        // 拿它当牌堆会发出一副 18 张的牌。id 全集由它派生，只有一处解析。
-        DataDocument<List<String>> provisions =
-                read(manager, "provisions", ProvisionLoader::loadDeckDocument);
+        // 读整份目录（18 种的类别、张数与效果）。整副牌由目录展开，id 全集也由它派生 ——
+        // 只有一处解析，也就只有一份真相源。
+        DataDocument<Provisions> provisions =
+                read(manager, "provisions", ProvisionLoader::loadCatalog);
         // 航海牌点名角色与物资，必须在那两份之后读 —— 顺序是规则决定的，不是随手排的。
         DataDocument<List<NavigationCard>> navigation =
                 read(manager, "navigation", (source, reader) -> NavigationLoader.loadDocument(
-                        source, reader, roster.value().ids(), Set.copyOf(provisions.value())));
+                        source, reader, roster.value().ids(), provisions.value().ids()));
 
         requireSameVariant(roster, provisions, navigation);
+        // ❗跨文件核对：角色表与物资表互相点名的地方（诱饵穿透水手的免伤、医生的医疗箱不弃、
+        //   陪酒女蹭什么、哪个角色让哪种财宝翻倍）两边说的必须是同一件事。
+        //   单份校验永远发现不了 —— 两份文件各自都合法。
+        DataConsistency.require(resource("provisions").toString(), roster.value(), provisions.value());
 
-        current = new GameData(roster.id(), roster.value(), Set.copyOf(provisions.value()),
-                provisions.value(), navigation.value());
+        current = new GameData(roster.id(), roster.value(), provisions.value(), navigation.value());
         LOGGER.info("数值数据已加载：变体 {} · 角色 {} 个 · 物资 {} 种 {} 张 · 航海牌 {} 张",
                 roster.id(), roster.value().characters().size(),
-                Set.copyOf(provisions.value()).size(), provisions.value().size(),
+                provisions.value().ids().size(), provisions.value().total(),
                 navigation.value().size());
     }
 

@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.engine.sim;
 
+import io.github.heavyseasmc.engine.data.TestProvisions;
 import io.github.heavyseasmc.engine.play.Invariants;
 import io.github.heavyseasmc.engine.model.Ability;
 import io.github.heavyseasmc.engine.model.CharacterId;
@@ -100,21 +101,27 @@ class SimulatorTest {
         void pinnedSeeds() {
             record Pinned(long seed, int turns, int alive, int fights, GameState.Outcome outcome) {
             }
+            // ❗2026-09-16 整表重钉过一次（ADR-0021 物资建模）。
+            //   <b>那一次不是「搬家」，是规则变了</b>：此前模拟器发不出物资，口渴时喝的是不存在的水、
+            //   打架时的武器加值是凭空 1..8 随机出来的。把两者改成真牌之后，
+            //   每一局都必然不同 —— 这张表全红说明不了任何事，所以那一次改看分布
+            //   （见 DistributionDumpTest 与 ADR-0021 §9），再照新行为重钉。
+            //   钉死的种子也顺势换了四个：新行为下原来那四个靠岸的种子都变成了全灭。
             List<Pinned> expected = List.of(
-                    new Pinned(0L, 25, 0, 4, GameState.Outcome.ALL_DEAD),
-                    new Pinned(1L, 9, 0, 8, GameState.Outcome.ALL_DEAD),
-                    new Pinned(2L, 11, 0, 10, GameState.Outcome.ALL_DEAD),
-                    new Pinned(3L, 9, 0, 5, GameState.Outcome.ALL_DEAD),
-                    new Pinned(28L, 34, 1, 2, GameState.Outcome.LANDED),
-                    new Pinned(43L, 15, 1, 6, GameState.Outcome.LANDED),
-                    new Pinned(51L, 14, 1, 5, GameState.Outcome.LANDED),
-                    new Pinned(57L, 9, 1, 7, GameState.Outcome.LANDED));
+                    new Pinned(0L, 10, 0, 7, GameState.Outcome.ALL_DEAD),
+                    new Pinned(1L, 6, 0, 6, GameState.Outcome.ALL_DEAD),
+                    new Pinned(2L, 8, 0, 7, GameState.Outcome.ALL_DEAD),
+                    new Pinned(3L, 12, 0, 5, GameState.Outcome.ALL_DEAD),
+                    new Pinned(6L, 12, 1, 8, GameState.Outcome.LANDED),
+                    new Pinned(20L, 8, 4, 7, GameState.Outcome.LANDED),
+                    new Pinned(30L, 11, 1, 6, GameState.Outcome.LANDED),
+                    new Pinned(44L, 12, 1, 8, GameState.Outcome.LANDED));
 
             // 正向对照：两种终局都得在表里，否则这张表只钉住了一条路。
             assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.LANDED));
             assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.ALL_DEAD));
 
-            Simulator sim = new Simulator(roster(), deck());
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
             for (Pinned e : expected) {
                 Simulator.Result r = sim.run(e.seed());
                 assertEquals(e.outcome(), r.outcome(), "seed=" + e.seed() + " 终局变了");
@@ -127,7 +134,7 @@ class SimulatorTest {
         @Test
         @DisplayName("2000 局全部跑到终局，无死锁、无非法状态")
         void thousandsOfGames() {
-            Simulator sim = new Simulator(roster(), deck());
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
             Map<GameState.Outcome, Integer> outcomes = new HashMap<>();
             long totalTurns = 0;
             int totalFights = 0;
@@ -154,7 +161,7 @@ class SimulatorTest {
         @Test
         @DisplayName("同一个种子跑两次结果完全一致 —— 失败时才复现得了")
         void seedIsReproducible() {
-            Simulator sim = new Simulator(roster(), deck());
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
             for (long seed : new long[]{0, 1, 42, 12345, -7}) {
                 assertEquals(sim.run(seed), sim.run(seed), "seed=" + seed + " 不可复现");
             }
@@ -163,7 +170,7 @@ class SimulatorTest {
         @Test
         @DisplayName("不同种子会走出不同的局 —— 否则随机没生效")
         void seedsDiffer() {
-            Simulator sim = new Simulator(roster(), deck());
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
             Set<Integer> turnCounts = new java.util.HashSet<>();
             for (long seed = 0; seed < 50; seed++) {
                 turnCounts.add(sim.run(seed).turns());
@@ -214,8 +221,14 @@ class SimulatorTest {
             assertEquals(Condition.DEAD, dead.conditionOf(KID));
             String msg = String.join(";", Invariants.checkTransition(dead, revived));
             assertTrue(msg.contains("复活"), msg);
-            assertTrue(msg.contains("伤害从"), msg);
+            assertTrue(msg.contains("伤害合计降了"), msg);
             assertTrue(Invariants.checkTransition(fresh, dead).isEmpty(), "受伤加重是正常的");
+
+            // ❗治疗额度只放宽「伤害下降」那一条，<b>不放宽复活</b>：
+            //   治好一具尸体在规则上是不可能的，给多少额度都不行。
+            String healed = String.join(";", Invariants.checkTransition(dead, revived, 4));
+            assertTrue(healed.contains("复活"), healed);
+            assertFalse(healed.contains("伤害合计降了"), "治疗额度够时，伤害下降本身不算违规：" + healed);
         }
 
         @Test
@@ -248,7 +261,7 @@ class SimulatorTest {
         @DisplayName("空牌堆拒绝构造 —— 没有牌就永远结束不了")
         void emptyDeckRejected() {
             assertThrows(IllegalArgumentException.class,
-                    () -> new Simulator(roster(), List.of()));
+                    () -> new Simulator(roster(), List.of(), TestProvisions.synthetic()));
         }
 
         @Test
@@ -256,7 +269,7 @@ class SimulatorTest {
         void deadlockIsReported() {
             List<NavigationCard> harmless = List.of(new NavigationCard(
                     "calm", 0, new Selector.Nobody(), new Selector.Nobody(), false, false));
-            Simulator sim = new Simulator(roster(), harmless);
+            Simulator sim = new Simulator(roster(), harmless, TestProvisions.synthetic());
             IllegalStateException e = assertThrows(IllegalStateException.class, () -> sim.run(1));
             assertTrue(e.getMessage().contains("疑似死锁"), e.getMessage());
             assertTrue(e.getMessage().contains("seed=1"), e.getMessage());
@@ -267,7 +280,7 @@ class SimulatorTest {
         void soloRosterFinishes() {
             Roster solo = new Roster(List.of(
                     new Survivor(KID, 1, 3, 9, "base", new Ability.None())));
-            Simulator sim = new Simulator(solo, deck());
+            Simulator sim = new Simulator(solo, deck(), TestProvisions.synthetic());
             for (long seed = 0; seed < 200; seed++) {
                 sim.run(seed);
             }
@@ -295,7 +308,7 @@ class SimulatorTest {
         }
 
         private double overboardRate(NavigationPolicy policy, int games) {
-            Simulator sim = new Simulator(solo(), List.of(harmless, soaking), policy);
+            Simulator sim = new Simulator(solo(), List.of(harmless, soaking), TestProvisions.synthetic(), policy);
             Exposure total = Exposure.NONE;
             for (long seed = 0; seed < games; seed++) {
                 total = total.plus(sim.run(seed).exposure().get(KID));
@@ -350,7 +363,7 @@ class SimulatorTest {
         void noCardIsLost() {
             // 守恒由 Simulator 内部每回合核对，丢牌会当场抛。这里负责把它跑够多次：
             // 8 个人、31 张牌规模的划船量，才可能让「放回」漏掉一条路径。
-            Simulator sim = new Simulator(roster(), deck(), NavigationPolicy.SELF_INTERESTED);
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic(), NavigationPolicy.SELF_INTERESTED);
             for (long seed = 0; seed < 2000; seed++) {
                 sim.run(seed);
             }
@@ -359,7 +372,7 @@ class SimulatorTest {
         @Test
         @DisplayName("换了策略，同一个种子仍然可复现")
         void stillReproducible() {
-            Simulator sim = new Simulator(roster(), deck(), NavigationPolicy.SELF_INTERESTED);
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic(), NavigationPolicy.SELF_INTERESTED);
             for (long seed : new long[]{0, 1, 42, -7}) {
                 assertEquals(sim.run(seed), sim.run(seed), "seed=" + seed + " 不可复现");
             }
@@ -390,7 +403,8 @@ class SimulatorTest {
         @DisplayName("分母只数活着的回合：体型 3 的角色在第 4 次落海时死，分母就停在 4")
         void deadStopAccruing() {
             // 每回合必落海、不点口渴、没有海鸥。伤害 3 = 昏迷，4 = 死亡。
-            Simulator sim = new Simulator(solo(KID, 3), oneCard(0, new Selector.Everyone(), new Selector.Nobody()));
+            Simulator sim = new Simulator(solo(KID, 3),
+                    oneCard(0, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
             Simulator.Result r = sim.run(0);
 
             assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
@@ -412,7 +426,8 @@ class SimulatorTest {
             Roster pair = new Roster(List.of(
                     new Survivor(KID, 1, 3, 9, "base", new Ability.None()),
                     new Survivor(MATE, 2, 8, 4, "base", new Ability.None())));
-            Simulator sim = new Simulator(pair, oneCard(0, new Selector.Everyone(), new Selector.Nobody()));
+            Simulator sim = new Simulator(pair,
+                    oneCard(0, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
 
             int clean = 0;
             for (long seed = 0; seed < 500; seed++) {
@@ -436,7 +451,8 @@ class SimulatorTest {
             Roster solo = new Roster(List.of(new Survivor(SAILOR, 1, 6, 6, "base",
                     new Ability.OverboardImmune(true, List.of("bait_bucket")))));
             // 每张牌一只海鸥：第 4 只出现时当场结束，那一回合的落海不再结算。
-            Simulator sim = new Simulator(solo, oneCard(1, new Selector.Everyone(), new Selector.Nobody()));
+            Simulator sim = new Simulator(solo,
+                    oneCard(1, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
             Simulator.Result r = sim.run(0);
 
             assertEquals(GameState.Outcome.LANDED, r.outcome());
@@ -449,7 +465,8 @@ class SimulatorTest {
         @Test
         @DisplayName("没点到的人分母照样在涨 —— 否则「没被点到」与「没上过场」分不开")
         void unnamedStillAccrueChances() {
-            Simulator sim = new Simulator(solo(KID, 3), oneCard(1, new Selector.Nobody(), new Selector.Everyone()));
+            Simulator sim = new Simulator(solo(KID, 3),
+                    oneCard(1, new Selector.Nobody(), new Selector.Everyone()), TestProvisions.inert());
             Simulator.Result r = sim.run(0);
 
             Exposure kid = r.exposure().get(KID);
@@ -463,7 +480,8 @@ class SimulatorTest {
         @DisplayName("多人局：点名只落在名单里的人身上，别人一次都不该有")
         void onlyNamedAreHit() {
             Simulator sim = new Simulator(roster(),
-                    oneCard(1, new Selector.Only(Set.of(MATE)), new Selector.Only(Set.of(KID))));
+                    oneCard(1, new Selector.Only(Set.of(MATE)), new Selector.Only(Set.of(KID))),
+                    TestProvisions.inert());
             Simulator.Result r = sim.run(7);
 
             for (CharacterId id : List.of(JEWELER, HOSTESS, SAILOR)) {
@@ -479,7 +497,9 @@ class SimulatorTest {
         @Test
         @DisplayName("几千局汇总：每个角色都有机会数，且命中不多于机会")
         void aggregateOverManyGames() {
-            Simulator sim = new Simulator(roster(), deck());
+            // ❗这一局用整副合成牌堆，里面有 used_rum 那一族 —— 目录必须认得 rum，
+            //   否则条件判定会当场抛（不认识的条件不许静默算成「没人满足」）。
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
             Map<CharacterId, Exposure> total = new HashMap<>();
             for (long seed = 0; seed < 2000; seed++) {
                 sim.run(seed).exposure().forEach((id, e) ->

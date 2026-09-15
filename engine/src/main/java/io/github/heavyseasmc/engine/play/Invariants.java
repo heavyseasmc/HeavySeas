@@ -4,6 +4,7 @@ import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.SurvivorState;
+import io.github.heavyseasmc.engine.thirst.ThirstSource;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,8 +46,17 @@ public final class Invariants {
             if (s.damage() < 0) {
                 bad.add("%s 的伤害为负: %d".formatted(id, s.damage()));
             }
-            if (s.thirst().count() > 3) {
-                bad.add("%s 单回合口渴 %d 次，超过来源种类数".formatted(id, s.thirst().count()));
+            // ❗上限取自枚举的常量数，不写死数字：来源加一种时这条不需要跟着改，
+            //   而写死的 3 会在加了第四种来源之后变成一条**拦下正确状态**的判据。
+            if (s.thirst().count() > ThirstSource.values().length) {
+                bad.add("%s 单回合口渴 %d 次，超过来源种类数 %d"
+                        .formatted(id, s.thirst().count(), ThirstSource.values().length));
+            }
+            // 撑开的伞必须还在面前 —— 两者脱节的表现是它一直白挡口渴，而没有任何一步会报错。
+            for (String open : s.opened()) {
+                if (!s.front().contains(open)) {
+                    bad.add("%s 的 %s 标着已打开，却不在他面前".formatted(id, open));
+                }
             }
 
             // 生死状态必须与「伤害 vs 体型」一致。这条看起来是废话，正是它要防的 ——
@@ -107,7 +117,24 @@ public final class Invariants {
      * @return 违规描述；空列表表示通过
      */
     public static List<String> checkTransition(GameState before, GameState after) {
+        return checkTransition(before, after, 0);
+    }
+
+    /**
+     * 同上，但允许伤害因治疗而下降。
+     *
+     * <p>❗这一条原本是「伤害只增不减」，注释里写着「真用起来时要放宽」。
+     * 物资建模之后医疗箱与绝境真的会减伤 —— <b>而直接删掉这条的话，「复活」与「治疗」从此再也分不开</b>，
+     * 那正是这条不变量存在的理由。所以改成「只能由治疗减少，且总量不超过这两步之间治了几点」。
+     *
+     * @param healed 这两个状态之间一共治了几点（{@code Session#healedSincePhaseStart}）
+     */
+    public static List<String> checkTransition(GameState before, GameState after, int healed) {
         List<String> bad = new ArrayList<>();
+        if (healed < 0) {
+            bad.add("治疗点数不能为负: " + healed);
+        }
+        int dropped = 0;
         for (CharacterId id : before.bySeat()) {
             Condition was = before.conditionOf(id);
             Condition now = after.conditionOf(id);
@@ -116,10 +143,12 @@ public final class Invariants {
             }
             int d0 = before.stateOf(id).damage();
             int d1 = after.stateOf(id).damage();
-            // 医疗箱能减伤，但模拟器不用它；真用起来时这条要放宽成「只能由治疗减少」。
             if (d1 < d0) {
-                bad.add("%s 的伤害从 %d 降到 %d，而本局没有任何治疗".formatted(id, d0, d1));
+                dropped += d0 - d1;
             }
+        }
+        if (dropped > healed) {
+            bad.add("全场伤害合计降了 %d 点，而这两步之间只治了 %d 点".formatted(dropped, healed));
         }
         if (after.turn() < before.turn()) {
             bad.add("回合数倒退: %d → %d".formatted(before.turn(), after.turn()));
@@ -129,7 +158,13 @@ public final class Invariants {
 
     /** 跨状态检查并在有违规时抛出。 */
     public static void requireValidTransition(GameState before, GameState after, long seed, String where) {
-        requireValidTransition(before, after, "seed=%d".formatted(seed), where);
+        requireValidTransition(before, after, "seed=%d".formatted(seed), where, 0);
+    }
+
+    /** 同上，允许这两步之间治掉 {@code healed} 点伤。 */
+    public static void requireValidTransition(GameState before, GameState after, long seed,
+                                              String where, int healed) {
+        requireValidTransition(before, after, "seed=%d".formatted(seed), where, healed);
     }
 
     /** 检查并在有违规时抛出，附上全部违规与一个可复现的种子。 */
@@ -145,7 +180,13 @@ public final class Invariants {
      */
     public static void requireValidTransition(
             GameState before, GameState after, String context, String where) {
-        List<String> bad = checkTransition(before, after);
+        requireValidTransition(before, after, context, where, 0);
+    }
+
+    /** 同上，允许这两步之间治掉 {@code healed} 点伤。 */
+    public static void requireValidTransition(
+            GameState before, GameState after, String context, String where, int healed) {
+        List<String> bad = checkTransition(before, after, healed);
         if (!bad.isEmpty()) {
             throw new IllegalStateException(
                     "状态转移非法（%s, %s, 回合 %d → %d）：%s"

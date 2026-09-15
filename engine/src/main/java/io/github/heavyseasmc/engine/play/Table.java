@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.engine.play;
 
+import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.NavigationDeck;
 
@@ -12,19 +13,28 @@ import java.util.Objects;
 import java.util.Random;
 
 /**
- * 桌面：牌堆与划船堆。
+ * 桌面：两副牌堆、划船堆、物资弃牌堆，外加物资的效果目录。
  *
  * <h2>为什么不塞进 GameState</h2>
  * {@link io.github.heavyseasmc.engine.state.GameState} 是不可变的，为的是「状态推进可回放」。
  * 而牌堆每抽一张都在变 —— 把它塞进不可变状态，就要每抽一张复制一整副牌。
  * 两者性质不同，分开放。
  *
- * <h2>牌只在三个地方</h2>
+ * <h2>航海牌只在三个地方</h2>
  * 牌堆里、划船者手上（抽出来看过、还没定去向），或划船堆里。少一张的表现**不是报错，是某些名单再也不出现** ——
  * 那种错能安静地跑完几千局。所以每一步之后都对账。
  *
  * <p>「划船者手上」是划船拆成「先抽 / 再定」两步之后才有的：真人要一张一张想，
  * 两张牌在他手上停留的时间可能很长。不把这一处记进账，对账在他想的时候就会报牌丢了。
+ *
+ * <h2>物资牌在五个地方</h2>
+ * 牌堆里、补给箱在传的那几张、某人手上、某人面前、弃牌堆。前两处与弃牌堆在本类，
+ * 后两处在每个人的 {@code SurvivorState} 里，所以物资的对账在 {@link Session} 上 —— 见
+ * {@code Session#requireNoProvisionLost}。
+ *
+ * <h2>效果目录也在这里</h2>
+ * 牌堆由目录展开（{@link Provisions#deck()}），所以两者必须同源；分开传就会出现
+ * 「牌堆里有一张目录不认识的牌」这种只有运行时才发现的错。
  */
 public final class Table {
 
@@ -36,28 +46,46 @@ public final class Table {
     /** 划船者手上：抽出来、还没定去向的牌。只有划船者本人看得到。 */
     private final List<NavigationCard> rowerHand = new ArrayList<>();
 
-    /** 物资牌堆。**抽完即止，不洗回重用**（规则明写），所以它只会变短。 */
-    private final Deque<String> provisions = new ArrayDeque<>();
+    /** 物资的效果目录。整副牌由它展开，所以两者同源。 */
+    private final Provisions provisions;
 
-    /** 只有航海牌堆：物资阶段没有牌可发，会被直接跳过。模拟器走的就是这条。 */
-    public Table(NavigationDeck pile) {
+    /** 物资牌堆。**抽完即止，不洗回重用**（规则明写），所以它只会变短。 */
+    private final Deque<String> provisionPile = new ArrayDeque<>();
+
+    /** 物资弃牌堆。用掉的水、医疗箱、信号枪都到这里 —— 有它，物资才对得上账。 */
+    private final List<String> provisionDiscard = new ArrayList<>();
+
+    /**
+     * 只有航海牌堆：物资阶段没有牌可发，会被直接跳过。
+     *
+     * <p>❗<b>目录仍然是必须的</b>：没有目录就无法回答「这张牌有什么效果」，
+     * 而「查不到就当没效果」会让「数据少了一张」与「这张牌本来就没效果」在运行时完全相同。
+     */
+    public Table(NavigationDeck pile, Provisions provisions) {
         this.pile = Objects.requireNonNull(pile, "pile");
+        this.provisions = Objects.requireNonNull(provisions, "provisions");
     }
 
     /**
-     * 连物资牌堆一起。
+     * 连物资牌堆一起：整副按目录展开（47 张，水出现 16 次）并洗牌。
      *
-     * @param provisionCards 展开后的整副（47 张，水出现 16 次），由本方法洗牌
+     * <p>❗<b>牌堆不单独传</b>：它就是 {@code provisions.deck()}。分开传等于允许
+     * 「牌堆与目录不是同一套」，而那种错只有在某个人打出那张牌时才会露头。
      */
-    public Table(NavigationDeck pile, List<String> provisionCards, Random rng) {
-        this(pile);
-        List<String> shuffled = new ArrayList<>(Objects.requireNonNull(provisionCards, "provisionCards"));
+    public Table(NavigationDeck pile, Provisions provisions, Random rng) {
+        this(pile, provisions);
+        List<String> shuffled = new ArrayList<>(provisions.deck());
         Collections.shuffle(shuffled, Objects.requireNonNull(rng, "rng"));
-        provisions.addAll(shuffled);
+        provisionPile.addAll(shuffled);
+    }
+
+    /** 物资的效果目录。 */
+    public Provisions provisions() {
+        return provisions;
     }
 
     public int provisionsLeft() {
-        return provisions.size();
+        return provisionPile.size();
     }
 
     /**
@@ -70,10 +98,40 @@ public final class Table {
             throw new IllegalArgumentException("抽牌数不能为负: " + n);
         }
         List<String> out = new ArrayList<>();
-        for (int i = 0; i < n && !provisions.isEmpty(); i++) {
-            out.add(provisions.removeFirst());
+        for (int i = 0; i < n && !provisionPile.isEmpty(); i++) {
+            out.add(provisionPile.removeFirst());
         }
         return out;
+    }
+
+    /**
+     * 从物资牌堆里抽走指定的一张（<b>夹具</b>，不是规则）。
+     *
+     * <p>❗它存在的唯一理由是：有些东西<b>不摆好局面就验不了</b> —— 口渴那一面要有人既渴着又手里有水，
+     * 而发牌是随机的，等它自己出现的验收脚本一定会时灵时不灵。
+     *
+     * <p>它<b>不是凭空造牌</b>：牌真的从牌堆里少一张，所以对账照样成立。
+     * 这与「调用方自己往手牌里塞一张」有本质区别，后者会让 {@code requireNoProvisionLost} 当场红。
+     *
+     * @return 牌堆里有没有这张
+     */
+    boolean takeFromProvisionPile(String cardId) {
+        return provisionPile.remove(cardId);
+    }
+
+    /** 弃掉一张物资。用后即弃的牌（水、医疗箱、信号枪、绝境）走这里，<b>不是凭空消失</b>。 */
+    public void discardProvision(String cardId) {
+        provisionDiscard.add(Objects.requireNonNull(cardId, "cardId"));
+    }
+
+    /** 弃牌堆的只读视图。物资不洗回重用，所以它只会变长。 */
+    public List<String> provisionDiscard() {
+        return List.copyOf(provisionDiscard);
+    }
+
+    /** 物资牌一共几张（发出去的 + 还在堆里的 + 弃掉的）。对账的分母。 */
+    public int provisionTotal() {
+        return provisions.total();
     }
 
     public NavigationDeck pile() {
@@ -117,7 +175,7 @@ public final class Table {
     }
 
     /**
-     * 对账：牌堆 + 划船者手上 + 划船堆必须等于总张数。
+     * 航海牌对账：牌堆 + 划船者手上 + 划船堆必须等于总张数。
      *
      * @param context 出处（种子或对局标识），报错时靠它定位
      */

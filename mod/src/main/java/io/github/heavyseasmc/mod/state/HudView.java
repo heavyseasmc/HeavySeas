@@ -34,26 +34,68 @@ import java.util.Optional;
  * @param maxHealth 体型
  * @param condition 清醒 / 昏迷 / 死亡
  * @param thirst    口渴标记数
+ * @param thirstPrompt 口渴结算正在问谁、还需化解几次、还剩多久 · <b>公开</b>（他手上有几张水不在这里）
  * @param yourTurn  行动阶段正轮到他、而且他没有划船抽到还没定完的牌 —— ❗只在行动阶段为真（见 GameComponent 的 writeView）
  * @param hand      收件人自己的手牌（物资 id，<b>可重复</b>：水有 16 张）。
  *                  旁观者与没座位的人拿到的是空表
+ * @param front     收件人自己<b>亮在面前</b>的牌。规则上这一区是公开的，但别人的那份这一版还没发 ——
+ *                  要等头顶信息条（决策 ⑥）才有地方显示
  */
 public record HudView(boolean active, int turn, Phase phase, int gulls,
-                      List<String> seats, String actor, Sea sea,
+                      List<String> seats, String actor, Sea sea, Thirst thirstPrompt,
                       boolean seated, String character, int health, int maxHealth,
-                      Condition condition, int thirst, boolean yourTurn, List<String> hand) {
+                      Condition condition, int thirst, boolean yourTurn, List<String> hand,
+                      List<FrontCard> front) {
 
     public HudView {
         seats = List.copyOf(Objects.requireNonNull(seats, "seats"));
         actor = Objects.requireNonNull(actor, "actor");
         sea = Objects.requireNonNull(sea, "sea");
+        thirstPrompt = Objects.requireNonNull(thirstPrompt, "thirstPrompt");
         hand = List.copyOf(Objects.requireNonNull(hand, "hand"));
+        front = List.copyOf(Objects.requireNonNull(front, "front"));
     }
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
-            false, 0, Phase.PROVISION, 0, List.of(), "", Sea.NONE,
-            false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of());
+            false, 0, Phase.PROVISION, 0, List.of(), "", Sea.NONE, Thirst.NONE,
+            false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of(), List.of());
+
+    /**
+     * 亮在面前的一张。
+     *
+     * @param id   物资 id
+     * @param open 已经「打开」并持续生效（撑开的伞）。收着的伞与撑开的伞在界面上必须看得出不同
+     */
+    public record FrontCard(String id, boolean open) {
+
+        public FrontCard {
+            Objects.requireNonNull(id, "id");
+        }
+    }
+
+    /**
+     * 口渴结算正在问谁。**公开**：全船都看得见轮到谁、还剩多久。
+     *
+     * @param who        正被问的角色 id；空串表示没人在被问
+     * @param sources    他这一回合实际有几次口渴（划船 / 战斗 / 点名 / 喝酒）
+     * @param covered    撑开的阳伞替他抵掉几次
+     * @param shared     蹭别人喝的水抵掉几次（陪酒女）
+     * @param remaining  还需要化解几次 —— 每一次要么喝 1 张水，要么挨 1 点
+     * @param deadlineMs 超时时刻（服务端时钟）；0 = 没开窗口（他没水、或者不清醒，直接按不喝结算）
+     */
+    public record Thirst(String who, int sources, int covered, int shared, int remaining, long deadlineMs) {
+
+        public Thirst {
+            who = Objects.requireNonNull(who, "who");
+        }
+
+        public static final Thirst NONE = new Thirst("", 0, 0, 0, 0, 0L);
+
+        public boolean active() {
+            return !who.isEmpty();
+        }
+    }
 
     /** 在局里、有座位，而且手上有牌 —— 手牌界面开不开得起来只看这一条。 */
     public boolean hasHand() {
@@ -73,6 +115,23 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
     /** 该我挑航海牌了：航海阶段，而且划船堆的牌进了我这一包（只有舵手、只在挑牌窗口里才会有）。 */
     public boolean myHelmPick() {
         return active && seated && phase == Phase.NAVIGATION && !sea.helmOffer().isEmpty();
+    }
+
+    /** 该我决定喝不喝水了：口渴结算问到我，而且窗口开着（没水或昏迷时服务端不开窗口）。 */
+    public boolean myThirstChoice() {
+        return active && seated && thirstPrompt.active() && thirstPrompt.deadlineMs() > 0
+                && thirstPrompt.who().equals(character);
+    }
+
+    /**
+     * 我现在拿得出几张水：手上的加亮在面前的。亮出来的水照样能喝（规则 §5.2）。
+     *
+     * <p>❗id 取引擎那一处常量（{@link Session#WATER}），不在客户端再写一个字面量 ——
+     * 两处字面量迟早会分家，而分家的表现是「界面说你有水，服务端说没有」。
+     */
+    public int myWaters() {
+        int waters = (int) hand.stream().filter(Session.WATER::equals).count();
+        return waters + (int) front.stream().filter(card -> Session.WATER.equals(card.id())).count();
     }
 
     /**

@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.engine.play;
 
 import io.github.heavyseasmc.engine.model.Ability;
+import io.github.heavyseasmc.engine.data.TestProvisions;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
@@ -54,7 +55,7 @@ class RowingTest {
 
     /** 洗牌用定种子：两局用同一副牌、同一个顺序，才比得出「两种走法结果一样」。 */
     private static Session session(int deckSize) {
-        return new Session("test", roster(), new Table(new NavigationDeck(cards(deckSize), new Random(3))));
+        return new Session("test", roster(), new Table(new NavigationDeck(cards(deckSize), new Random(3)), TestProvisions.minimal()));
     }
 
     /** 开局在物资阶段；划船是行动阶段的事。 */
@@ -243,6 +244,7 @@ class RowingTest {
         assertTrue(wrongPhase.getMessage().contains("航海阶段"), wrongPhase.getMessage());
 
         s.advancePhase();                          // 行动 → 航海
+        s.prepareRowStack();                       // 结算之前先备划船堆（没人划船，这一步什么也不抽）
         NavigationCard first = s.takeCardForNavigation(null);
         assertEquals(Optional.of(first), s.navigatedThisTurn(), "执行的那张是公开的");
         IllegalStateException twice = assertThrows(IllegalStateException.class, () -> s.takeCardForNavigation(null));
@@ -252,6 +254,7 @@ class RowingTest {
         assertEquals(Optional.empty(), s.navigatedThisTurn(), "下一回合还没结算");
         s.advancePhase();
         s.advancePhase();                          // 又到航海
+        s.prepareRowStack();
         assertDoesNotThrow(() -> s.takeCardForNavigation(null));
     }
 }

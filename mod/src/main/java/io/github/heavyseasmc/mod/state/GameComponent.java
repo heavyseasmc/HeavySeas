@@ -154,6 +154,20 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         Optional<NavigationCard> revealed = session.navigatedThisTurn();
         buf.writeBoolean(revealed.isPresent());
         revealed.ifPresent(card -> NavCardView.of(card).write(buf));
+        // 口渴这一段是**公开**的：全船都看得见「轮到医生决定喝不喝水、还剩几秒」。
+        // ❗看不见的是他手上有几张水 —— 那在他自己那一包里（手牌），不在这里。
+        Optional<Session.ThirstPrompt> thirst = g.phase() == Phase.NAVIGATION
+                ? session.thirstPending() : Optional.empty();
+        buf.writeBoolean(thirst.isPresent());
+        if (thirst.isPresent()) {
+            Session.ThirstPrompt prompt = thirst.get();
+            buf.writeString(prompt.who().value());
+            buf.writeVarInt(prompt.effective().count());
+            buf.writeVarInt(prompt.covered());
+            buf.writeVarInt(prompt.shared());
+            buf.writeVarInt(prompt.remaining());
+            buf.writeVarLong(thirstDeadline);
+        }
 
         Optional<CharacterId> seat = seatOf(recipient.getUuid());
         buf.writeBoolean(seat.isPresent());
@@ -177,6 +191,15 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(hand.size());
         for (String card : hand) {
             buf.writeString(card);
+        }
+        // ❗面前那一区是**公开**的（亮出来就是给全船看的），但这一版只写收件人自己那份：
+        //   别人的「面前」要等头顶信息条（决策 ⑥）才有地方显示，现在发了也没人读。
+        //   记在 CURRENT_STATUS 的开放项里，不在这里偷偷发。
+        List<String> front = g.stateOf(id).front();
+        buf.writeVarInt(front.size());
+        for (String card : front) {
+            buf.writeString(card);
+            buf.writeBoolean(g.stateOf(id).isOpen(card));
         }
         // 划船抽到的牌只写给划船者本人：只有他知道自己放了什么（决策 ⑭ 的三层信息）。
         List<Session.RowCard> rowing = session.rower().map(id::equals).orElse(false) ? session.rowing() : List.of();
@@ -225,10 +248,15 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         String helmsman = buf.readString();
         long helmDeadline = buf.readVarLong();
         Optional<NavCardView> revealed = buf.readBoolean() ? Optional.of(NavCardView.read(buf)) : Optional.empty();
+        HudView.Thirst thirstPrompt = HudView.Thirst.NONE;
+        if (buf.readBoolean()) {
+            thirstPrompt = new HudView.Thirst(buf.readString(), buf.readVarInt(), buf.readVarInt(),
+                    buf.readVarInt(), buf.readVarInt(), buf.readVarLong());
+        }
         if (!buf.readBoolean()) {
             return new HudView(true, turn, phase, gulls, seats, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
-                    false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of());
+                    thirstPrompt, false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of(), List.of());
         }
         String character = buf.readString();
         int health = buf.readVarInt();
@@ -240,6 +268,11 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         List<String> hand = new ArrayList<>(cards);
         for (int i = 0; i < cards; i++) {
             hand.add(buf.readString());
+        }
+        int frontCount = buf.readVarInt();
+        List<HudView.FrontCard> front = new ArrayList<>(frontCount);
+        for (int i = 0; i < frontCount; i++) {
+            front.add(new HudView.FrontCard(buf.readString(), buf.readBoolean()));
         }
         int rowCount = buf.readVarInt();
         List<HudView.Sea.RowCard> rowing = new ArrayList<>(rowCount);
@@ -254,7 +287,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         }
         return new HudView(true, turn, phase, gulls, seats, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
-                true, character, health, maxHealth, condition, thirst, yourTurn, List.copyOf(hand));
+                thirstPrompt, true, character, health, maxHealth, condition, thirst, yourTurn,
+                List.copyOf(hand), List.copyOf(front));
     }
 
     /**
@@ -316,6 +350,53 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     public void clearHelm() {
         this.helmDeadline = 0L;
         this.helmHighlight = 0;
+    }
+
+    /**
+     * 口渴选择窗口的运行时状态：超时时刻与当前打算喝几张。理由与另外两处相同，也同样不持久化。
+     *
+     * <p>❗<b>高亮在这里是个「几张」而不是「哪一张」</b>：手上三张水完全等价，没有编号可指。
+     */
+    private long thirstDeadline;
+    private int thirstHighlight;
+
+    public long thirstDeadline() {
+        return thirstDeadline;
+    }
+
+    public void setThirstDeadline(long millis) {
+        this.thirstDeadline = millis;
+    }
+
+    /** 口渴的人最后一次上报的张数。超时时认它（与另外三面同一条规则）。 */
+    public int thirstHighlight() {
+        return thirstHighlight;
+    }
+
+    public void setThirstHighlight(int waters) {
+        this.thirstHighlight = Math.max(0, waters);
+    }
+
+    /**
+     * 这一轮口渴里，别人替他打出来的水（一张一个人，可以重复）。
+     *
+     * <p>❗<b>攒着而不是当场结算</b>：一次只打一张的话，剩下几次会当场变成伤害，
+     * 而他自己那几张水还没轮到说话。窗口关上时两边一起交给引擎。
+     */
+    private final List<CharacterId> thirstDonors = new ArrayList<>();
+
+    public List<CharacterId> thirstDonors() {
+        return List.copyOf(thirstDonors);
+    }
+
+    public void addThirstDonor(CharacterId donor) {
+        thirstDonors.add(donor);
+    }
+
+    public void clearThirst() {
+        this.thirstDeadline = 0L;
+        this.thirstHighlight = 0;
+        this.thirstDonors.clear();
     }
 
     /**
@@ -399,6 +480,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.endedFor.clear();
         clearProvision();
         clearHelm();
+        clearThirst();
         steps.clear();
     }
 
@@ -408,6 +490,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.occupants.clear();
         clearProvision();
         clearHelm();
+        clearThirst();
         steps.clear();
     }
 

@@ -69,6 +69,10 @@ public final class GameHud {
         if (view.phase() == Phase.ACTION || view.phase() == Phase.NAVIGATION) {
             lines.add(seaLine(view));
         }
+        // 口渴结算轮到谁，是**公开**的：全船都该看见在等谁（决策 ⑭ 的同一条 —— 等待要看得见）。
+        if (view.thirstPrompt().active()) {
+            lines.add(thirstLine(view));
+        }
         view.sea().revealed().ifPresent(card -> lines.add(Text.translatable("heavyseas.hud.revealed",
                 NavCardText.describe(card, view.seats())).formatted(Formatting.AQUA)));
         if (view.seated()) {
@@ -106,6 +110,19 @@ public final class GameHud {
                 y += LINE_HEIGHT;
             }
         }
+    }
+
+    /** 轮到我就说「按哪个键」，轮到别人就说在等谁、还剩几秒。 */
+    private static Text thirstLine(HudView view) {
+        HudView.Thirst prompt = view.thirstPrompt();
+        if (view.myThirstChoice()) {
+            return Text.translatable("heavyseas.hud.thirst_choose",
+                    HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW);
+        }
+        long left = Math.max(0L, prompt.deadlineMs() - System.currentTimeMillis());
+        return Text.translatable("heavyseas.hud.thirst_waiting",
+                Text.translatable("heavyseas.character." + prompt.who()),
+                (left + 999) / 1000).formatted(Formatting.AQUA);
     }
 
     /** 「划船堆 N 张 · 舵手 X」，舵手在挑牌时再加「· N 秒」。 */

@@ -192,6 +192,48 @@ final class JsonSupport {
         return List.copyOf(out);
     }
 
+    /**
+     * 可选的布尔。缺字段时给默认值。
+     *
+     * <p>❗<b>只有「这张牌没有这条性质」才该用它</b>：物资数据里的布尔字段大多只写 true、省略即 false
+     * （诱饵没有 {@code discard_on_use}，就是用后不弃）。要是某个字段缺了就该报错，用 {@link #bool}。
+     */
+    static boolean optionalBool(String source, String where, JsonObject object, String key, boolean fallback) {
+        return object.has(key) && !object.get(key).isJsonNull() ? bool(source, where, object, key) : fallback;
+    }
+
+    /** 可选的整数。 */
+    static int optionalInt(String source, String where, JsonObject object, String key, int fallback) {
+        return object.has(key) && !object.get(key).isJsonNull() ? integer(source, where, object, key) : fallback;
+    }
+
+    /** 可选的字符串。缺字段时给默认值（通常是空串，表示「数据没写」）。 */
+    static String optionalString(String source, String where, JsonObject object, String key, String fallback) {
+        return object.has(key) && !object.get(key).isJsonNull() ? string(source, where, object, key) : fallback;
+    }
+
+    /** 可选的字符串数组。缺字段时给空表。 */
+    static List<String> optionalStrings(String source, String where, JsonObject object, String key) {
+        return object.has(key) && !object.get(key).isJsonNull()
+                ? strings(source, where, object, key)
+                : List.of();
+    }
+
+    /**
+     * 枚举值白名单：取值必须在已知集合里。
+     *
+     * <p>理由与 {@link #onlyKeys} 相同、方向相反：字段名对了但<b>值</b>是引擎没实现的那一种时，
+     * 「照读不误」的表现是这张牌按另一种规则生效，而没有任何一行报错。
+     */
+    static String oneOf(String source, String where, JsonObject object, String key, Set<String> allowed) {
+        String value = string(source, where, object, key);
+        if (!allowed.contains(value)) {
+            throw DataFormatException.at(source, where + "." + key,
+                    "值 %s 引擎不认识 —— 认识的是 %s".formatted(value, allowed.stream().sorted().toList()));
+        }
+        return value;
+    }
+
     static JsonObject asObject(String source, String where, JsonElement element) {
         if (!element.isJsonObject()) {
             throw DataFormatException.at(source, where, "应当是对象，实际是 " + kindOf(element));

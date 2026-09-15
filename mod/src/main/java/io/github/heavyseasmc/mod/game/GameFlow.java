@@ -110,7 +110,7 @@ public final class GameFlow {
         //   而对局照样能打到终局，所以这个漏接在别处一点痕迹都没有。
         Table table = new Table(
                 new NavigationDeck(data.navigation(), new Random(world.getRandom().nextLong())),
-                data.provisionDeck(), new Random(world.getRandom().nextLong()));
+                data.provisions(), new Random(world.getRandom().nextLong()));
         Session session = new Session("world=" + world.getRegistryKey().getValue(), roster, table);
 
         GameComponent component = GameComponents.of(world);
@@ -246,8 +246,8 @@ public final class GameFlow {
         Session session = component.requireSession();
         NavigationCard card = session.takeCardForNavigation(pick);
         component.clearHelm();
-        // ❗没有手牌就没有水。返回 0 是「这件事还没做」的老实写法，不是平衡取舍。
-        NavigationReport report = session.navigate(card, (who, effective, state) -> 0);
+        // 海鸥与落海当场算完；口渴逐个问（ADR-0021）——「喝几张水」是决策，真人答不了同步的问题。
+        NavigationReport report = session.beginNavigate(card);
 
         // 结算后只公开被执行的那一张（决策 ⑭）。播的是它印着什么，不是它的 id —— id 不是给人读的。
         List<String> seats = session.state().bySeat().stream().map(CharacterId::value).toList();
@@ -262,6 +262,26 @@ public final class GameFlow {
         LOGGER.info("航海牌 {}：海鸥 {} · 落海 {} · 口渴 {}", card.id(), card.gull(),
                 ids(report.overboardSelected()), ids(report.thirstSelected()));
         sync(world);                          // 执行的那张进投影：HUD 这时才拿得到
+        if (session.state().isOver()) {
+            announceOutcome(world, component);
+            return;
+        }
+        ThirstPhase.begin(world, component);
+    }
+
+    /**
+     * 口渴全部结算完之后：停一下让人看清刚才那张牌，然后进下一回合。由 {@link ThirstPhase} 调用。
+     *
+     * <p>❗这一段原先在 {@link #navigate} 的末尾。口渴拆成逐个问之后，
+     * 「什么时候算完」不再是同一次调用里的事 —— 写在原处的话，下一回合会在还有人没决定时就开始。
+     */
+    public static void afterNavigation(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        // ❗与语言无关的一行，而且是**这一回合真的走完了**的唯一标志：
+        //   「航海牌 …」只说明牌结算到了口渴那一步，口渴要逐个问，问完才算完（ADR-0021）。
+        //   演示脚本与验收脚本判「可以进下一步了」认的是这一行，不是那一行。
+        LOGGER.info("航海阶段结束：第 {} 回合（口渴已结算完）", session.state().turn());
+        sync(world);
         if (session.state().isOver()) {
             announceOutcome(world, component);
             return;

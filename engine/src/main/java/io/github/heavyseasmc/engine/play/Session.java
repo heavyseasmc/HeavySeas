@@ -2,20 +2,28 @@ package io.github.heavyseasmc.engine.play;
 
 import io.github.heavyseasmc.engine.model.Ability;
 import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Provision;
+import io.github.heavyseasmc.engine.model.ProvisionEffect;
+import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.model.Roster;
+import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.scoring.Treasures;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.engine.state.SurvivorState;
 import io.github.heavyseasmc.engine.thirst.ThirstResolver;
 import io.github.heavyseasmc.engine.thirst.ThirstSource;
 import io.github.heavyseasmc.engine.thirst.ThirstTally;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -79,10 +87,37 @@ public final class Session {
     /** 推进到下一阶段（航海之后回到物资并推进回合数）。 */
     public void advancePhase() {
         requireNoRowInProgress("推进阶段");
+        requireNoThirstInProgress("推进阶段");
+        int was = state.turn();
         state = state.advancePhase();
         navigatedThisTurn = null;
+        rowStackPrepared = false;
+        weaponsPlayed.clear();
+        healedSincePhaseStart = 0;
+        if (state.turn() != was) {
+            // 蹭到的酒与「本回合用过」同寿命：一个大回合。后者在 SurvivorState.endOfTurn 里清。
+            sharedRum.clear();
+        }
         Invariants.requireValid(state, context, "阶段推进后");
     }
+
+    /** 物资的效果目录。 */
+    public Provisions provisions() {
+        return table.provisions();
+    }
+
+    /**
+     * 本阶段治了几点伤。
+     *
+     * <p>❗给 {@link Invariants#checkTransition} 用。那条不变量原本是「伤害只增不减」，
+     * 而医疗箱与绝境真的会减 —— 直接删掉它的话，「复活」与「治疗」从此再也分不开。
+     * 所以改成「只能由治疗减少，且减的不超过治了几点」，判据需要这个数。
+     */
+    public int healedSincePhaseStart() {
+        return healedSincePhaseStart;
+    }
+
+    private int healedSincePhaseStart;
 
     /**
      * 物资阶段该抽几张 = <b>存活且清醒者数</b>。
@@ -257,6 +292,9 @@ public final class Session {
      *
      * <p>抽出来的牌在定去向之前待在 {@link Table#rowerHand()}：既不在牌堆里，也不在划船堆里，对账照样算得清。
      *
+     * <p>面前亮着船桨的人多抽（{@code weapon_and_row_bonus}，可叠加）—— 手上的船桨不算，
+     * 被动效果一律「在面前才算」（ADR-0021 决策 4）。
+     *
      * @return 抽到的牌，按抽出顺序。牌堆不够时有几张抽几张；<b>一张都没抽到时这次划船当场结束</b>（照样领划船标记）
      * @throws IllegalStateException 不在行动阶段，或者上一次划船抽到的牌还没定完
      */
@@ -268,7 +306,8 @@ public final class Session {
         requireNoRowInProgress("再划一次船");
         state.stateOf(rower);                          // 阵容里没有这个人就在这里抛，别等到领标记时才抛
         List<NavigationCard> drawn = new ArrayList<>();
-        for (int i = 0; i < CARDS_DRAWN_WHEN_ROWING && !table.pile().isEmpty(); i++) {
+        int draws = CARDS_DRAWN_WHEN_ROWING + rowExtraDraw(rower);
+        for (int i = 0; i < draws && !table.pile().isEmpty(); i++) {
             NavigationCard card = table.pile().draw();
             table.takeIntoRowerHand(card);
             drawn.add(card);
@@ -372,7 +411,8 @@ public final class Session {
      */
     public Fight.Outcome applyFight(Fight fight) {
         requireNoRowInProgress("结算战斗");
-        Fight.Outcome outcome = fight.resolve(id -> state.roster().get(id).size());
+        // 体型按满值算，并加上本回合喝过的酒（{@code buff_size}，规则 §11.2：喝下后整个大回合有效）。
+        Fight.Outcome outcome = fight.resolve(this::fightingSize);
         GameState next = state;
         for (CharacterId loser : outcome.losers()) {
             next = next.withState(loser, next.stateOf(loser).hurt(outcome.damagePerLoser()));
@@ -381,7 +421,90 @@ public final class Session {
             next = next.withState(c, next.stateOf(c).thirstFrom(ThirstSource.FOUGHT));
         }
         state = next;
+        // 这一场真的打出去的武器里，用后即弃的（信号枪）到此弃掉。
+        // ❗只弃「这一场打出去的」：亮在面前而本场没用的不弃（规则 §9.1：亮出后也可以选择本场不使用）。
+        weaponsPlayed.forEach((who, cards) -> {
+            for (String cardId : cards) {
+                if (table.provisions().get(cardId).effect().discardOnUse()) {
+                    state = state.withState(who, state.stateOf(who).withoutCardInFront(cardId));
+                    table.discardProvision(cardId);
+                }
+            }
+        });
+        weaponsPlayed.clear();
+        requireNoProvisionLost("战斗结算后");
         return outcome;
+    }
+
+    /**
+     * 战斗时算几点体型：满体型 + 本回合喝过的酒。
+     *
+     * <p>❗<b>与伤害无关</b> —— 「攻击力 = 剩余血量」是村规，{@link Fight} 连伤害都看不到。
+     */
+    private int fightingSize(CharacterId id) {
+        int size = state.roster().get(id).size();
+        SurvivorState s = state.stateOf(id);
+        for (String cardId : new LinkedHashSet<>(s.front())) {
+            if (!s.usedThisTurn(cardId)) {
+                continue;
+            }
+            Provision card = table.provisions().get(cardId);
+            if (card.effect() instanceof ProvisionEffect.BuffSize buff) {
+                // stacks=false：同一张牌喝两瓶也只算一次。面前有几瓶不影响，集合已经去重。
+                size += buff.stacks() ? buff.amount() * countInFront(s, cardId) : buff.amount();
+            }
+        }
+        return size + sharedRumBonus(id);
+    }
+
+    /**
+     * 战斗中打出一张武器：从手上或面前拿出来，亮在面前，并把加值挂到这一场上。
+     *
+     * <p>武器打出即亮出（规则 §9.1：武器保持亮出状态，落水即失），所以手上那张会挪到面前。
+     * 信号枪（{@code discard_after_any_use}）在 {@link #applyFight} 之后弃掉 ——
+     * <b>这就是要记住「这一场打了哪几张」的原因</b>：亮在面前而本场没用的信号枪不该被弃。
+     *
+     * @return 加上这张之后的战斗（{@link Fight} 不可变）
+     * @throws IllegalArgumentException 这张不是武器，或者他手上与面前都没有
+     */
+    public Fight playWeapon(Fight fight, CharacterId who, String cardId) {
+        Objects.requireNonNull(fight, "fight");
+        Provision card = table.provisions().get(cardId);
+        if (card.weaponPower() <= 0) {
+            throw new IllegalArgumentException("%s 不是武器，打不出加值".formatted(cardId));
+        }
+        if (!fight.combatants().contains(who)) {
+            throw new IllegalArgumentException("%s 没有参战，不能打武器".formatted(who.value()));
+        }
+        SurvivorState s = state.stateOf(who);
+        if (s.hasInHand(cardId)) {
+            state = state.withState(who, s.reveal(cardId));
+        } else if (!s.hasInFront(cardId)) {
+            throw new IllegalArgumentException("%s 手上与面前都没有 %s".formatted(who.value(), cardId));
+        }
+        weaponsPlayed.computeIfAbsent(who, k -> new ArrayList<>()).add(cardId);
+        return fight.arm(who, card.weaponPower());     // arm 本身就是累加，多张武器各调一次
+    }
+
+    /** 这一场战斗里，每个人已经打出去的武器。{@link #applyFight} 之后清空。 */
+    private final Map<CharacterId, List<String>> weaponsPlayed = new LinkedHashMap<>();
+
+    /**
+     * 他现在能凑出多少战斗加值（手上 + 面前的武器之和）。
+     *
+     * <p>❗<b>手上的也算</b>：武器可以在战斗中随时打出，打出即亮出。这与被动效果那条不矛盾 ——
+     * 武器不是被动生效的，是打出去才生效的。
+     */
+    public int weaponPowerAvailable(CharacterId who) {
+        SurvivorState s = state.stateOf(who);
+        int power = 0;
+        for (String cardId : s.hand()) {
+            power += table.provisions().get(cardId).weaponPower();
+        }
+        for (String cardId : s.front()) {
+            power += table.provisions().get(cardId).weaponPower();
+        }
+        return power;
     }
 
     /** 能被抢夺/攻击的对象：<b>清醒</b>的人才能拒绝，所以昏迷与死亡者不会触发战斗。 */
@@ -409,7 +532,8 @@ public final class Session {
      * 所以提前放回不改变任何结果，却让「牌不会凭空消失」在每个出口都成立。
      *
      * @throws IllegalStateException 不在航海阶段，或者这一回合已经结算过一张 ——
-     *                               模组里超时与指令可能前后脚到，第二下若也照做，一回合就执行了两张牌
+     *                               模组里超时与指令可能前后脚到，第二下若也照做，一回合就执行了两张牌；
+     *                               或者这一回合还没 {@link #prepareRowStack}
      */
     public NavigationCard takeCardForNavigation(NavigationCard helmsmanPick) {
         if (state.phase() != Phase.NAVIGATION) {
@@ -418,6 +542,13 @@ public final class Session {
         if (navigatedThisTurn != null) {
             throw new IllegalStateException("%s 第 %d 回合已经结算过航海牌 %s —— 每回合只执行一张"
                     .formatted(context, state.turn(), navigatedThisTurn.id()));
+        }
+        if (!rowStackPrepared) {
+            // ❗漏调 prepareRowStack 的表现不是报错，是指南针永远不生效。2026-09-16 核对时发现
+            //   模组的航海阶段一次都没调过 —— 而单测、出口验收、真人实拍全都是绿的。所以在这里当场点名。
+            throw new IllegalStateException(
+                    "%s 第 %d 回合结算航海牌之前没有先 prepareRowStack（舵手持有指南针时要多抽的那一张）—— 驱动者漏了一步"
+                            .formatted(context, state.turn()));
         }
         NavigationCard chosen;
         if (helmsmanPick == null) {
@@ -451,8 +582,34 @@ public final class Session {
      *
      * <p>海鸥凑够 4 只当场结束，该牌的落海与口渴一律不再结算。
      * 落海之后若已终局，口渴同样不再结算。
+     *
+     * <p>这是 {@link #beginNavigate} 加逐个 {@link #decideThirst} 的简写，<b>按结算次序</b>每人问一次
+     * {@code water}。模拟器与 {@code /seas navigate} 走这里，界面走两步 —— 规则只有两步那一份。
      */
     public NavigationReport navigate(NavigationCard card, WaterChoice water) {
+        NavigationReport report = beginNavigate(card);
+        Optional<ThirstPrompt> prompt;
+        while ((prompt = thirstPending()).isPresent()) {
+            decideThirst(water.waterFrom(prompt.get(), state));
+        }
+        return report;
+    }
+
+    /**
+     * 航海结算的前两步：海鸥与落海，然后点名口渴、排好结算队列。
+     *
+     * <h2>为什么口渴要拆出去</h2>
+     * 与划船那次是同一个形状：<b>「喝几张水」是决策，而真人答不了同步的问题</b>。
+     * 原先口渴在一个循环里同步问回调，模组只能一律返回 0（那句「这件事还没做」的老实写法）。
+     *
+     * <p>❗<b>次序必须串行，不能并行收集</b>：陪酒女排在最后，要看着别人喝完再决定自己喝不喝 ——
+     * 这正是「最后结算」那条规则的全部意义。并行收集会把它抹掉，而抹掉之后没有任何断言会红。
+     *
+     * @return 这一步点到了谁。口渴的两份名单在点名时就定了，所以报告在这里就是完整的
+     */
+    public NavigationReport beginNavigate(NavigationCard card) {
+        Objects.requireNonNull(card, "card");
+        requireNoThirstInProgress("再结算一张航海牌");
         // a) 海鸥。
         state = state.withGulls(card.gull());
         Invariants.requireValid(state, context, "海鸥结算后");
@@ -462,7 +619,6 @@ public final class Session {
 
         // b) 落海。候选含尸体 —— 死者被冲下去会彻底退出游戏。
         Set<CharacterId> overboardPool = new LinkedHashSet<>(state.bySeat());
-        Selector.ConditionResolver noConditions = (c, who) -> false;
         // 分母：这一步真正执行时还活着的人。先记分母再点名，两者必须同一个时刻取。
         List<CharacterId> overboardCandidates = new ArrayList<>();
         for (CharacterId id : overboardPool) {
@@ -470,15 +626,27 @@ public final class Session {
                 overboardCandidates.add(id);
             }
         }
+        List<CharacterId> inWater = List.copyOf(card.overboard().select(overboardPool, usedProvisionResolver()));
         List<CharacterId> overboardSelected = new ArrayList<>();
-        for (CharacterId id : card.overboard().select(overboardPool, noConditions)) {
+        for (CharacterId id : inWater) {
             if (state.conditionOf(id) != Condition.DEAD) {
                 overboardSelected.add(id);       // 数的是下水，不是受伤：水手落水不受伤
             }
-            if (!isOverboardImmune(state, id)) {
-                state = state.withState(id, state.stateOf(id).hurt(1));
+        }
+        // 诱饵先算：它决定每个下水的人挨几点，而扣血之后才轮到冲走面前的牌。
+        int shark = sharkDamage(inWater);
+        for (CharacterId id : inWater) {
+            int hurt = isOverboardImmune(state, id) ? 0 : 1;
+            hurt += shark;                       // 鲨鱼伤害穿透水手与救生圈，两者都挡不住
+            if (hurt > 0) {
+                state = state.withState(id, state.stateOf(id).hurt(hurt));
             }
         }
+        // 冲走面前的牌。救生圈留下（{@code survives_overboard}），其余全部进弃牌堆。
+        for (CharacterId id : inWater) {
+            washAwayFront(id);
+        }
+        requireNoProvisionLost("落海结算后");
         Invariants.requireValid(state, context, "落海结算后");
         if (state.isOver()) {
             return new NavigationReport(card, false, overboardCandidates, overboardSelected,
@@ -494,34 +662,217 @@ public final class Session {
         }
         List<CharacterId> thirstCandidates = List.copyOf(thirstPool);
         List<CharacterId> thirstSelected = new ArrayList<>();
-        for (CharacterId id : card.thirst().select(thirstPool, noConditions)) {
+        for (CharacterId id : card.thirst().select(thirstPool, usedProvisionResolver())) {
             thirstSelected.add(id);              // 只数牌面点名，划船与战斗的口渴不在内
             state = state.withState(id, state.stateOf(id).thirstFrom(ThirstSource.NAMED));
         }
 
-        // 按结算次序逐个算账。带「最后结算」标记的排在最后。
-        for (var survivor : ThirstResolver.resolutionOrder(state.roster())) {
+        // 排队。带「最后结算」标记的排在最后；这一回合一点都不渴的人不进队列 ——
+        // 没有可做的决定就不该弹窗，8 人局的航海阶段本来就够长了。
+        thirstCard = card;
+        thirstWatersSpent = 0;
+        thirstQueue.clear();
+        thirstAt = 0;
+        for (Survivor survivor : ThirstResolver.resolutionOrder(state.roster())) {
             CharacterId id = survivor.id();
-            if (!state.conditionOf(id).suffersThirst()) {
-                continue;
-            }
-            // 牌上没有船桨/战斗图示时，对应的标记不产生口渴。
-            ThirstTally effective = state.stateOf(id).thirst();
-            if (!card.thirstRowers()) {
-                effective = withoutSource(effective, ThirstSource.ROWED);
-            }
-            if (!card.thirstFighters()) {
-                effective = withoutSource(effective, ThirstSource.FOUGHT);
-            }
-            int spent = water.spend(id, effective, state);
-            var outcome = ThirstResolver.resolveSpendingUpTo(effective, 0, spent);
-            if (outcome.damage() > 0) {
-                state = state.withState(id, state.stateOf(id).hurt(outcome.damage()));
+            if (state.conditionOf(id).suffersThirst() && !effectiveThirst(id, card).isEmpty()) {
+                thirstQueue.add(id);
             }
         }
-        Invariants.requireValid(state, context, "口渴结算后");
+        if (thirstQueue.isEmpty()) {
+            thirstCard = null;
+        }
         return new NavigationReport(card, false, overboardCandidates, overboardSelected,
                 thirstCandidates, thirstSelected);
+    }
+
+    /**
+     * 轮到谁决定喝不喝水。空表示这一张牌的口渴已经结算完 —— 航海阶段到此结束。
+     *
+     * <p>❗<b>每问一次都现算</b>：陪酒女蹭到几张水，取决于在她之前的人喝了多少，
+     * 而那是在她被问到之前一刻才知道的。提前算好整张表就把「最后结算」抹掉了。
+     */
+    public Optional<ThirstPrompt> thirstPending() {
+        int at = nextThirstIndex();
+        return at < 0 ? Optional.empty() : Optional.of(promptFor(thirstQueue.get(at)));
+    }
+
+    /**
+     * 队列里下一个真的要结算口渴的人的下标；没有了就是 -1。
+     *
+     * <p>❗<b>不改状态</b>。它看起来该顺手把 {@code thirstAt} 推过那些跳过的人，但不能 ——
+     * 模组每次同步都会替<b>每一个收件人</b>问一次「现在轮到谁」，
+     * 而那是个序列化路径：在那里推进规则状态，等于让「有几个人在线」影响对局。
+     */
+    private int nextThirstIndex() {
+        for (int at = thirstAt; at < thirstQueue.size(); at++) {
+            // 排队之后可能有人死了（前面的人喝不到水、掉了血）—— 死者不结算口渴。
+            if (state.conditionOf(thirstQueue.get(at)).suffersThirst()) {
+                return at;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 这一次口渴喝谁的水，一张一个人（可以重复：同一个人出两张）。空表示不喝。
+     *
+     * <p>喝下的水立刻离开出水人的手牌进弃牌堆；没化解掉的每一次口渴各扣 1 点。
+     *
+     * @throws IllegalStateException    现在没有人在等这个决定
+     * @throws IllegalArgumentException 张数多于还需化解的次数；出水的人手上没有水；
+     *                                  或者出水的人不清醒（❗<b>昏迷者不能自己打水，别人可以替他打</b>）
+     */
+    public void decideThirst(List<CharacterId> donors) {
+        Objects.requireNonNull(donors, "donors");
+        // ❗先记下他在队列里的下标：结算完他可能就死了，那时再问「下一个是谁」会把真正的下一个跳过去。
+        int at = nextThirstIndex();
+        if (at < 0) {
+            throw new IllegalStateException("%s 现在没有人在等口渴的决定".formatted(context));
+        }
+        ThirstPrompt prompt = promptFor(thirstQueue.get(at));
+        if (donors.size() > prompt.remaining()) {
+            throw new IllegalArgumentException(
+                    "%s %s 只还需化解 %d 次口渴，却要喝 %d 张水"
+                            .formatted(context, prompt.who().value(), prompt.remaining(), donors.size()));
+        }
+        for (CharacterId donor : donors) {
+            SurvivorState from = state.stateOf(donor);
+            if (!state.conditionOf(donor).canAct()) {
+                throw new IllegalArgumentException(
+                        "%s %s 不清醒，打不出水（别人可以替他打）".formatted(context, donor.value()));
+            }
+            // ❗手上的与<b>亮在面前的</b>都能喝。规则 §5.2：亮出是为了防偷与「随时可用」，
+            //   不是把牌锁死 —— 只认手牌的话，亮过的水就永远喝不了了，而屏幕上看不出任何异常。
+            if (from.hasInHand(WATER)) {
+                state = state.withState(donor, from.withoutCard(WATER));
+            } else if (from.hasInFront(WATER)) {
+                state = state.withState(donor, from.withoutCardInFront(WATER));
+            } else {
+                throw new IllegalArgumentException(
+                        "%s %s 手上与面前都没有水".formatted(context, donor.value()));
+            }
+            table.discardProvision(WATER);
+        }
+        thirstWatersSpent += donors.size();
+        int damage = prompt.remaining() - donors.size();
+        if (damage > 0) {
+            state = state.withState(prompt.who(), state.stateOf(prompt.who()).hurt(damage));
+        }
+        thirstAt = at + 1;
+        if (nextThirstIndex() < 0) {
+            thirstCard = null;
+        }
+        requireNoProvisionLost("口渴结算后");
+        Invariants.requireValid(state, context, "口渴结算后");
+    }
+
+    /** 这一张航海牌的口渴还没结算完。 */
+    public boolean thirstInProgress() {
+        return thirstPending().isPresent();
+    }
+
+    /**
+     * 该谁决定喝水，以及他面对的账。
+     *
+     * @param who       轮到谁
+     * @param effective 这一回合他真正生效的口渴来源（牌上没有船桨图示时，划船标记不算数）
+     * @param covered   常驻遮蔽抵掉几次（撑开的阳伞）
+     * @param shared    蹭到别人喝的水抵掉几次（陪酒女）
+     * @param remaining 还需要化解几次 —— 每一次要么喝 1 张水，要么挨 1 点
+     * @param ownWaters 他自己拿得出几张水（手上的 + 亮在面前的）。
+     *                  别人能不能给他打水，规则上没有限制，所以这里只报他自己的
+     */
+    public record ThirstPrompt(CharacterId who, ThirstTally effective, int covered, int shared,
+                               int remaining, int ownWaters) {
+
+        public ThirstPrompt {
+            Objects.requireNonNull(who, "who");
+            Objects.requireNonNull(effective, "effective");
+        }
+    }
+
+    /** 水的物资 id。全项目只有这一处字面量 —— 多一处就多一个会写错的地方。 */
+    public static final String WATER = "water";
+
+    private NavigationCard thirstCard;
+    private final List<CharacterId> thirstQueue = new ArrayList<>();
+    private int thirstAt;
+    private int thirstWatersSpent;
+
+    private ThirstPrompt promptFor(CharacterId id) {
+        ThirstTally effective = effectiveThirst(id, thirstCard);
+        int covered = coverCharges(id);
+        int shared = sharedWaterCancels(id);
+        // 遮蔽与蹭到的水都是「不付代价就抵掉」，所以一起作为 ThirstResolver 的 coverCharges。
+        var outcome = ThirstResolver.resolve(effective, Math.min(effective.count(), covered + shared), 0);
+        return new ThirstPrompt(id, effective, Math.min(effective.count(), covered),
+                Math.min(Math.max(0, effective.count() - covered), shared),
+                outcome.damage(), watersOf(id));
+    }
+
+    /** 他能拿出几张水：手上的加面前的。亮出来的水照样能喝（规则 §5.2）。 */
+    public int watersOf(CharacterId id) {
+        SurvivorState s = state.stateOf(id);
+        return s.countInHand(WATER) + (int) s.front().stream().filter(WATER::equals).count();
+    }
+
+    /** 牌上没有船桨/战斗图示时，对应的标记不产生口渴。喝酒带来的口渴不看牌面。 */
+    private ThirstTally effectiveThirst(CharacterId id, NavigationCard card) {
+        ThirstTally effective = state.stateOf(id).thirst();
+        if (!card.thirstRowers()) {
+            effective = withoutSource(effective, ThirstSource.ROWED);
+        }
+        if (!card.thirstFighters()) {
+            effective = withoutSource(effective, ThirstSource.FOUGHT);
+        }
+        return effective;
+    }
+
+    /** 撑开的阳伞能抵几次。❗<b>要在落海之后才取值</b> —— 伞可能刚被冲走。 */
+    private int coverCharges(CharacterId id) {
+        SurvivorState s = state.stateOf(id);
+        int charges = 0;
+        for (String cardId : s.front()) {
+            if (!(table.provisions().get(cardId).effect() instanceof ProvisionEffect.PreventThirst cover)) {
+                continue;
+            }
+            if (!cover.persistent()) {
+                continue;                        // 水不是常驻的，它要打出来才算
+            }
+            if (cover.requiresOpen() && !s.isOpen(cardId)) {
+                continue;                        // 收着的伞不挡太阳
+            }
+            charges += cover.amount();
+        }
+        return charges;
+    }
+
+    /**
+     * 蹭到别人喝的水（陪酒女）。
+     *
+     * <p>她排在最后结算，所以「在她之前喝掉的水」就是这一轮的全部。
+     * {@code stacking.water = true} —— 别人喝几张她蹭几次；若数据改成不叠加则最多蹭一次。
+     */
+    private int sharedWaterCancels(CharacterId id) {
+        if (!(state.roster().get(id).ability() instanceof Ability.ShareEffect share)) {
+            return 0;
+        }
+        if (!share.sources().contains(WATER)) {
+            return 0;
+        }
+        if (share.requiresConscious() && state.conditionOf(id) != Condition.CONSCIOUS) {
+            return 0;
+        }
+        return Boolean.TRUE.equals(share.stacking().get(WATER)) ? thirstWatersSpent : Math.min(1, thirstWatersSpent);
+    }
+
+    private void requireNoThirstInProgress(String what) {
+        int at = nextThirstIndex();
+        if (at >= 0) {
+            throw new IllegalStateException("%s %s 还没决定喝不喝水，不能%s"
+                    .formatted(context, thirstQueue.get(at).value(), what));
+        }
     }
 
     /** 还活着几个人。 */
@@ -538,13 +889,540 @@ public final class Session {
         return new ThirstTally(kept);
     }
 
-    /** 落海免伤（水手）。❗<b>要求清醒</b> —— 昏迷的水手落水照样受伤。 */
-    private static boolean isOverboardImmune(GameState g, CharacterId id) {
+    /**
+     * 落海免伤：水手的技能，或者<b>亮在面前</b>的救生圈。
+     *
+     * <p>❗水手那一条<b>要求清醒</b> —— 昏迷的水手落水照样受伤（于是照样会死）。
+     * ❗救生圈<b>必须亮在面前</b>：手里攥着的救生圈不挡落水（规则 §9.2「自己亮出或别人帮他亮出」）。
+     * ❗两者都<b>挡不住鲨鱼</b>，那一份在 {@link #sharkDamage} 里单独加。
+     */
+    private boolean isOverboardImmune(GameState g, CharacterId id) {
         Ability ability = g.roster().get(id).ability();
-        if (!(ability instanceof Ability.OverboardImmune oi)) {
+        if (ability instanceof Ability.OverboardImmune oi
+                && (!oi.requiresConscious() || g.conditionOf(id) == Condition.CONSCIOUS)) {
+            return true;
+        }
+        for (String cardId : g.stateOf(id).front()) {
+            if (table.provisions().get(cardId).effect() instanceof ProvisionEffect.PreventOverboardDamage) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 这一轮下水的人各额外挨几点鲨鱼伤害（诱饵）。
+     *
+     * <p>条件是<b>下水的人里有谁面前亮着诱饵</b>（规则：「本就亮在落水者面前」）——
+     * 所以亮诱饵这件事对自己也危险。多张不叠加（{@code stacks: false}）。
+     *
+     * <p>❗这一份<b>穿透水手的免伤与救生圈</b>，所以它不走 {@link #isOverboardImmune}，而是直接加在后面。
+     * 数据两边都写着这件事：诱饵的 {@code bypasses} 与水手的 {@code not_protected_from}，
+     * 由 {@code DataConsistency} 核对两者一致。
+     */
+    private int sharkDamage(List<CharacterId> inWater) {
+        int worst = 0;
+        int sum = 0;
+        for (CharacterId id : inWater) {
+            for (String cardId : state.stateOf(id).front()) {
+                if (table.provisions().get(cardId).effect() instanceof ProvisionEffect.DamageInWater bait) {
+                    worst = Math.max(worst, bait.amount());
+                    sum += bait.amount();
+                    if (!bait.stacks()) {
+                        return worst;
+                    }
+                }
+            }
+        }
+        return sum == 0 ? 0 : Math.max(worst, sum);
+    }
+
+    /** 落水：面前的牌全部冲走，只有{@code survives_overboard}的（救生圈）留下。手牌不动。 */
+    private void washAwayFront(CharacterId id) {
+        SurvivorState s = state.stateOf(id);
+        if (s.front().isEmpty()) {
+            return;
+        }
+        List<String> kept = new ArrayList<>();
+        for (String cardId : s.front()) {
+            ProvisionEffect effect = table.provisions().get(cardId).effect();
+            boolean survives = effect instanceof ProvisionEffect.PreventOverboardDamage lp
+                    && lp.survivesOverboard();
+            if (survives) {
+                kept.add(cardId);
+            } else {
+                table.discardProvision(cardId);
+            }
+        }
+        state = state.withState(id, s.withFront(kept));
+    }
+
+    /**
+     * 航海牌 {@code conditional} 条件的判定：条件名形如 {@code used_<物资 id>}。
+     *
+     * <p>nav_04 点名「本回合喝过朗姆酒的人」落海，靠的就是这一条。
+     * 此前这里传的是「一律不成立」，那张牌<b>必定点不到任何人</b>。
+     *
+     * @throws IllegalArgumentException 条件名不认识 —— 静默返回 false 会让写错的条件与「没人满足」长得一样
+     */
+    private Selector.ConditionResolver usedProvisionResolver() {
+        return (condition, who) -> {
+            if (!condition.startsWith("used_")) {
+                throw new IllegalArgumentException(
+                        "%s 航海牌上的条件 %s 引擎不认识（认识的形如 used_<物资 id>）".formatted(context, condition));
+            }
+            String cardId = condition.substring("used_".length());
+            if (!table.provisions().has(cardId)) {
+                throw new IllegalArgumentException(
+                        "%s 航海牌上的条件 %s 指着一个不存在的物资 %s".formatted(context, condition, cardId));
+            }
+            return state.stateOf(who).usedThisTurn(cardId);
+        };
+    }
+
+    /** 面前亮着的船桨让他划船多抽几张（{@code weapon_and_row_bonus}，可叠加）。 */
+    private int rowExtraDraw(CharacterId who) {
+        int extra = 0;
+        for (String cardId : state.stateOf(who).front()) {
+            if (table.provisions().get(cardId).effect() instanceof ProvisionEffect.WeaponAndRowBonus oar) {
+                extra += oar.rowExtraDraw();
+                if (!oar.stacks()) {
+                    return oar.rowExtraDraw();
+                }
+            }
+        }
+        return extra;
+    }
+
+    private static int countInFront(SurvivorState s, String cardId) {
+        return (int) s.front().stream().filter(cardId::equals).count();
+    }
+
+    // ---------------------------------------------------------------- 物资：亮出 · 赠送 · 特殊行动
+
+    /**
+     * 亮出：手牌 → 面前。任何时候都可以，不占行动，<b>不可逆</b>（规则 §5.2）。
+     *
+     * <p>亮出是真的取舍：亮了才有用（救生圈挡落水、指南针多抽、伞能撑开），
+     * 亮了也就落水时会被冲走、并且看得见。
+     */
+    public void reveal(CharacterId who, String cardId) {
+        table.provisions().get(cardId);           // 目录不认识这张就在这里抛
+        state = state.withState(who, state.stateOf(who).reveal(cardId));
+        requireNoProvisionLost("亮出后");
+    }
+
+    /**
+     * <b>夹具</b>：从牌堆里取一张指定的牌，直接发到某人手上。
+     *
+     * <h2>这不是规则，而且它必须说出来</h2>
+     * 规则里牌只能从补给箱传下来。本方法是给<b>验收</b>用的：口渴那一面要有人既渴着又手里有水，
+     * 而发牌是随机的 —— 等它自己出现的脚本一定会时灵时不灵，而「时灵时不灵的验收」比没有验收更坏。
+     *
+     * <p>牌<b>真的从牌堆里少一张</b>，所以对账照样成立 —— 这是它与「直接往手牌里塞一张」的本质区别。
+     *
+     * @throws IllegalArgumentException 牌堆里已经没有这张了
+     */
+    public void dealFromPile(CharacterId who, String cardId) {
+        table.provisions().get(cardId);
+        if (!table.takeFromProvisionPile(cardId)) {
+            throw new IllegalArgumentException(
+                    "%s 物资牌堆里已经没有 %s 了（还剩 %d 张）"
+                            .formatted(context, cardId, table.provisionsLeft()));
+        }
+        state = state.withState(who, state.stateOf(who).withCard(cardId));
+        requireNoProvisionLost("发指定的一张之后");
+    }
+
+    /**
+     * 送一张牌给别人。
+     *
+     * <p>规则 §5.2：<b>只在行动阶段</b>可以自由赠送 / 交换，数量不限、不占行动；
+     * 物资阶段与航海阶段不能交易。两个例外（航海阶段给落水者亮救生圈、给口渴者打水）
+     * 走各自的结算入口，不走这里 —— 打水在 {@link #decideThirst} 里。
+     *
+     * <p>❗<b>亮出的牌送出去之后对方也必须保持亮出</b>（规则 §5.2），所以面前的牌进对方的面前，
+     * 手牌进对方的手牌。
+     *
+     * @throws IllegalStateException    不在行动阶段
+     * @throws IllegalArgumentException 他手上与面前都没有这张
+     */
+    public void giveCard(CharacterId from, CharacterId to, String cardId) {
+        if (state.phase() != Phase.ACTION) {
+            throw new IllegalStateException(
+                    "%s 只有行动阶段能交易，现在是 %s".formatted(context, state.phase()));
+        }
+        if (from.equals(to)) {
+            throw new IllegalArgumentException("%s 送给自己没有意义".formatted(context));
+        }
+        table.provisions().get(cardId);
+        SurvivorState giver = state.stateOf(from);
+        if (giver.hasInHand(cardId)) {
+            state = state.withState(from, giver.withoutCard(cardId))
+                    .withState(to, state.stateOf(to).withCard(cardId));
+        } else if (giver.hasInFront(cardId)) {
+            state = state.withState(from, giver.withoutCardInFront(cardId))
+                    .withState(to, state.stateOf(to).withCardInFront(cardId));
+        } else {
+            throw new IllegalArgumentException(
+                    "%s %s 手上与面前都没有 %s".formatted(context, from.value(), cardId));
+        }
+        requireNoProvisionLost("赠送后");
+    }
+
+    /**
+     * 特殊行动：医疗箱。给一个人回 1 点伤。
+     *
+     * <p>规则上它用来救醒昏迷者，但卡面只写「移除 1 个伤害标记」，所以引擎不限制目标是不是昏迷 ——
+     * 只要求他真的受了伤（{@link SurvivorState#heal} 会替我们把「治一个没受伤的人」拦下来）。
+     * 医生用后不弃（{@code no_discard_for}），留在面前。
+     *
+     * @throws IllegalArgumentException 手上没有医疗箱，或者目标没受伤
+     */
+    public void useMedicalKit(CharacterId user, CharacterId target, String cardId) {
+        Provision card = requireHeld(user, cardId);
+        if (!(card.effect() instanceof ProvisionEffect.Heal heal)) {
+            throw new IllegalArgumentException("%s 不是治疗用的物资".formatted(cardId));
+        }
+        // ❗死亡不可复生（规则 §9.4）。少了这一条，医疗箱能把尸体治回昏迷 ——
+        //   2026-09-16 随机对局当场红在 Invariants 的「从死亡复活」上，而单测一条都没红：
+        //   要红就得有人恰好去治一具尸体，那正是「谁来挑输入」的差别。
+        if (state.conditionOf(target) == Condition.DEAD) {
+            throw new IllegalArgumentException(
+                    "%s %s 已经死了，治不回来 —— 死亡不可复生".formatted(context, target.value()));
+        }
+        state = state.withState(target, state.stateOf(target).heal(heal.amount()));
+        healedSincePhaseStart += heal.amount();
+        consume(user, cardId, heal.discardedBy(user));
+        Invariants.requireValid(state, context, "治疗后");
+        requireNoProvisionLost("治疗后");
+    }
+
+    /**
+     * 特殊行动：撑开阳伞。撑开后常驻，直到落水被冲走；结算口渴时抵掉 1 个来源。
+     *
+     * <p>亮出与撑开是两件事：亮出不占行动、只是防偷；撑开占一个行动才开始挡太阳。
+     * 手上那张会先亮出来再撑开 —— 撑着的伞不可能还在手里。
+     */
+    public void openParasol(CharacterId who, String cardId) {
+        Provision card = table.provisions().get(cardId);
+        if (!(card.effect() instanceof ProvisionEffect.PreventThirst cover) || !cover.requiresOpen()) {
+            throw new IllegalArgumentException("%s 不是要撑开才生效的物资".formatted(cardId));
+        }
+        SurvivorState s = state.stateOf(who);
+        if (s.hasInHand(cardId)) {
+            s = s.reveal(cardId);
+        } else if (!s.hasInFront(cardId)) {
+            throw new IllegalArgumentException(
+                    "%s %s 手上与面前都没有 %s".formatted(context, who.value(), cardId));
+        }
+        state = state.withState(who, s.open(cardId));
+        requireNoProvisionLost("撑伞后");
+    }
+
+    /**
+     * 特殊行动：绝境。船上有尸体时，<b>每个清醒的角色</b>各回 1 点。
+     *
+     * <p>❗<b>昏迷的不算尸体</b>（规则 §11.1 与中文 FAQ）。
+     * ❗<b>反对不在这里</b>：那是一场战斗，而两段式战斗还没做 —— 谁反对、打不打得赢由调用方决定，
+     * 与 {@link #applyFight} 的分工一致（ADR-0021 §7）。
+     *
+     * @return 真的回了血的人
+     * @throws IllegalStateException 船上没有尸体
+     */
+    public List<CharacterId> useRation(CharacterId user, String cardId) {
+        Provision card = requireHeld(user, cardId);
+        if (!(card.effect() instanceof ProvisionEffect.HealAll heal)) {
+            throw new IllegalArgumentException("%s 不是全体回血的物资".formatted(cardId));
+        }
+        if (heal.requiresCorpse() && state.bySeat().stream()
+                .noneMatch(id -> state.conditionOf(id) == Condition.DEAD)) {
+            throw new IllegalStateException("%s 船上没有尸体，%s 用不了".formatted(context, cardId));
+        }
+        List<CharacterId> healed = new ArrayList<>();
+        for (CharacterId id : state.bySeat()) {
+            if (state.conditionOf(id) != Condition.CONSCIOUS || state.stateOf(id).damage() == 0) {
+                continue;
+            }
+            state = state.withState(id, state.stateOf(id).healIfHurt(heal.amount()));
+            healedSincePhaseStart += heal.amount();
+            healed.add(id);
+        }
+        consume(user, cardId, heal.discardOnUse());
+        Invariants.requireValid(state, context, "绝境之后");
+        requireNoProvisionLost("绝境之后");
+        return List.copyOf(healed);
+    }
+
+    /**
+     * 特殊行动：信号枪当信号用。抽 3 张航海牌，<b>只结算其上的海鸥</b>，三张回牌堆底部。
+     *
+     * <p>抽到「去掉一只海鸥」照样算 —— 会让全船倒退一格。也可能当场凑够 4 只而结束一局，
+     * 那时后面几张<b>照样翻完</b>（它们已经被抽出来了，结算次序在一张之内）。
+     *
+     * @return 抽到的那几张，按抽出顺序
+     */
+    public List<NavigationCard> fireSignal(CharacterId user, String cardId) {
+        Provision card = requireHeld(user, cardId);
+        if (!(card.effect() instanceof ProvisionEffect.WeaponOrSpecial weapon)) {
+            throw new IllegalArgumentException("%s 没有「当信号用」这种用法".formatted(cardId));
+        }
+        ProvisionEffect.WeaponOrSpecial.Signal signal = weapon.special();
+        List<NavigationCard> drawn = new ArrayList<>();
+        for (int i = 0; i < signal.draw() && !table.pile().isEmpty(); i++) {
+            NavigationCard nav = table.pile().draw();
+            drawn.add(nav);
+            int gull = signal.includesGullRemoval() ? nav.gull() : Math.max(0, nav.gull());
+            state = state.withGulls(gull);
+        }
+        drawn.forEach(nav -> table.pile().bottom(nav));
+        table.requireNoCardLost(context, "放信号后");
+        consume(user, cardId, weapon.discardOnUse());
+        Invariants.requireValid(state, context, "放信号后");
+        requireNoProvisionLost("放信号后");
+        return List.copyOf(drawn);
+    }
+
+    /**
+     * 喝一口酒：本回合战斗时体型 +3，<b>回合结束时口渴一次</b>。每回合最多一次，不叠加。
+     *
+     * <p>不占行动（数据里没有 {@code costs_action}）。酒留在面前，下一回合还能再喝。
+     * 手上那瓶会先亮出来 —— 喝过的酒不可能还在手里。
+     *
+     * @throws IllegalStateException 这一回合已经喝过了
+     */
+    public void drinkRum(CharacterId who, String cardId) {
+        Provision card = table.provisions().get(cardId);
+        if (!(card.effect() instanceof ProvisionEffect.BuffSize buff)) {
+            throw new IllegalArgumentException("%s 不是能喝的加体型物资".formatted(cardId));
+        }
+        SurvivorState s = state.stateOf(who);
+        if (buff.oncePerTurn() && s.usedThisTurn(cardId)) {
+            throw new IllegalStateException(
+                    "%s %s 这一回合已经喝过 %s 了".formatted(context, who.value(), cardId));
+        }
+        if (s.hasInHand(cardId)) {
+            s = s.reveal(cardId);
+        } else if (!s.hasInFront(cardId)) {
+            throw new IllegalArgumentException(
+                    "%s %s 手上与面前都没有 %s".formatted(context, who.value(), cardId));
+        }
+        s = s.markUsedThisTurn(cardId);
+        if (buff.causesThirst()) {
+            s = s.thirstFrom(ThirstSource.DRANK_RUM);
+        }
+        state = state.withState(who, s);
+        // 陪酒女蹭酒：她也跟着喝到，同样带口渴。不叠加（数据里 stacking.rum = false）。
+        for (CharacterId other : state.bySeat()) {
+            if (other.equals(who) || !sharesRum(other, cardId)) {
+                continue;
+            }
+            SurvivorState guest = state.stateOf(other);
+            if (guest.usedThisTurn(cardId)) {
+                continue;
+            }
+            // ❗她蹭到的是效果，不是那张牌 —— 牌仍然只有一张，所以这里<b>不</b>把牌放到她面前。
+            //   而「本回合用过」是挂在牌 id 上的标记，她面前没有那张牌就挂不上去。
+            //   所以蹭酒记在这里，见 sharedRumBonus。
+            sharedRum.add(other);
+            if (buff.causesThirst()) {
+                state = state.withState(other, guest.thirstFrom(ThirstSource.DRANK_RUM));
+            }
+        }
+        requireNoProvisionLost("喝酒后");
+    }
+
+    /** 本回合蹭到别人喝的酒的人（陪酒女）。回合结束时清空。 */
+    private final Set<CharacterId> sharedRum = new LinkedHashSet<>();
+
+    private boolean sharesRum(CharacterId id, String cardId) {
+        if (!(state.roster().get(id).ability() instanceof Ability.ShareEffect share)) {
             return false;
         }
-        return !oi.requiresConscious() || g.conditionOf(id) == Condition.CONSCIOUS;
+        if (!share.sources().contains(cardId)) {
+            return false;
+        }
+        return !share.requiresConscious() || state.conditionOf(id) == Condition.CONSCIOUS;
+    }
+
+    /** 蹭到的酒给几点体型。不叠加，所以按目录里那张牌的加值算一次。 */
+    private int sharedRumBonus(CharacterId id) {
+        if (!sharedRum.contains(id)) {
+            return 0;
+        }
+        int best = 0;
+        for (Provision card : table.provisions().all()) {
+            if (card.effect() instanceof ProvisionEffect.BuffSize buff) {
+                best = Math.max(best, buff.amount());
+            }
+        }
+        return best;
+    }
+
+    /**
+     * 航海阶段开始时把划船堆备好：<b>舵手</b>持有指南针时，挑牌之前从牌堆顶再抽 1 张进划船堆
+     * （{@code before_navigator_chooses}）。
+     *
+     * <p>❗<b>必须在舵手看到划船堆之前</b>调用，一回合只做一次（重复调用会一直往里加牌）；
+     * {@link #takeCardForNavigation} 在没调过它时直接抛 —— 漏调的驱动者不会再安安静静地让指南针失效。
+     *
+     * <h2>三个条件，各有出处</h2>
+     * <ul>
+     *   <li><b>持有者必须是舵手</b>：设计决策 §8.1「当你是舵手时」。别人手里的指南针什么也不做 ——
+     *       想让它生效就得交给舵手，这正是它作为交易筹码的意义。
+     *       （ADR-0021 初稿裁定成「谁面前亮着都算」，与 §8.1 相反，同日改回。）</li>
+     *   <li><b>手里的也算</b>：决策 ⑥「指南针亮出的唯一理由是防小孩偷」—— 亮不亮不影响效果。
+     *       这是被动效果「在面前才算」那一条的例外。</li>
+     *   <li><b>划船堆是空的就不抽</b>：没人划船时规则是直接翻顶牌，没有「挑选」这一步，
+     *       「挑选之前」也就无从谈起。结果上两者一样（抽进来的那张就是顶牌），
+     *       但不这么写的话，没人划船时舵手一面会为一张牌弹出来（ADR-0018 §7.4 明确不要）。</li>
+     * </ul>
+     *
+     * @return 这一回合因此多进划船堆的张数
+     */
+    public int prepareRowStack() {
+        if (state.phase() != Phase.NAVIGATION) {
+            throw new IllegalStateException(
+                    "%s 备划船堆是航海阶段的事，现在是 %s".formatted(context, state.phase()));
+        }
+        if (rowStackPrepared) {
+            return 0;
+        }
+        rowStackPrepared = true;
+        Optional<CharacterId> helmsman = state.helmsman();
+        if (helmsman.isEmpty() || table.rowStackIsEmpty()) {
+            return 0;
+        }
+        SurvivorState helm = state.stateOf(helmsman.get());
+        List<String> held = new ArrayList<>(helm.hand());
+        held.addAll(helm.front());
+        int added = 0;
+        for (String cardId : held) {
+            if (!(table.provisions().get(cardId).effect()
+                    instanceof ProvisionEffect.NavigatorExtraDraw extra)) {
+                continue;
+            }
+            for (int i = 0; i < extra.amount() && !table.pile().isEmpty(); i++) {
+                table.addToRowStack(table.pile().draw());
+                added++;
+            }
+        }
+        table.requireNoCardLost(context, "指南针多抽后");
+        return added;
+    }
+
+    private boolean rowStackPrepared;
+
+    /**
+     * 终局时某人名下的财宝：<b>手牌与面前都算</b>（终局时全部亮出）。
+     *
+     * <p>分值不在这里 —— 它在 {@code data/roster} 的 {@code treasure_scoring} 里，
+     * 由 {@link io.github.heavyseasmc.engine.scoring.Scorer} 查。本方法只数张数与面值。
+     */
+    public Treasures treasuresOf(CharacterId id) {
+        SurvivorState s = state.stateOf(id);
+        int cash = 0;
+        int jewelry = 0;
+        int fineArt = 0;
+        List<String> owned = new ArrayList<>(s.hand());
+        owned.addAll(s.front());
+        for (String cardId : owned) {
+            Provision card = table.provisions().get(cardId);
+            if (card.effect() instanceof ProvisionEffect.ScoreSet) {
+                jewelry++;
+            } else if (card.effect() instanceof ProvisionEffect.ScoreFlat flat) {
+                // 现金与美术品都是 score_flat，靠分值分不开 —— 靠的是「一张算一张」还是「按面值累加」。
+                // 数据里现金每张 1 分且三张名画面值不同，所以按 points 是不是 1 分不开；
+                // 用类别分：treasure 里 points 固定为 1 的那一族是现金。
+                if (isCash(card)) {
+                    cash++;
+                } else {
+                    fineArt += flat.points();
+                }
+            }
+        }
+        return new Treasures(cash, jewelry, fineArt);
+    }
+
+    /**
+     * 这张 {@code score_flat} 是现金还是美术品。
+     *
+     * <p>❗两者在数据里同为 {@code score_flat}，唯一的区别是<b>谁让它翻倍</b>
+     * （现金 → 船长，美术品 → 收藏家），而那正是 {@code Ability.ScoreMultiplier.target} 的取值。
+     * 所以判据取自角色那一份，不是在这里写死 id。
+     */
+    private boolean isCash(Provision card) {
+        if (!(card.effect() instanceof ProvisionEffect.ScoreFlat flat)) {
+            return false;
+        }
+        for (Survivor s : state.roster().survivors()) {
+            if (s.id().value().equals(flat.doubledBy())
+                    && s.ability() instanceof Ability.ScoreMultiplier mult) {
+                return mult.target() == io.github.heavyseasmc.engine.model.TreasureKind.CASH;
+            }
+        }
+        // ❗分不出来就抛，不猜。三个加倍者在每一套预设里都在场（6/7/8 人局都含船长与收藏家），
+        //   所以走到这里只可能是数据被改成了自相矛盾的样子 —— 而「猜一个」会让某个人的财宝分安静地少掉一半。
+        //   DataConsistency 在加载期就守着同一条，这里是它的运行期对照。
+        throw new IllegalStateException(
+                "%s 分不出 %s 属于哪一类财宝：它写着由 %s 加倍，而阵容里没有这个角色或他没有加倍技能"
+                        .formatted(context, card.id(), flat.doubledBy()));
+    }
+
+    /**
+     * 拿一张出来用：手上或面前都算，并核对目录认识它。
+     *
+     * <p>❗<b>面前也算</b>，因为医生的医疗箱用后留在面前而且下一回合还能再用
+     * （{@code no_discard_for}）。只认手牌的话，那张牌用过一次就永远用不了了 ——
+     * 而表现只是「医生的技能好像没什么用」。
+     */
+    private Provision requireHeld(CharacterId who, String cardId) {
+        Provision card = table.provisions().get(cardId);
+        SurvivorState s = state.stateOf(who);
+        if (!s.hasInHand(cardId) && !s.hasInFront(cardId)) {
+            throw new IllegalArgumentException(
+                    "%s %s 手上与面前都没有 %s".formatted(context, who.value(), cardId));
+        }
+        return card;
+    }
+
+    /** 用掉一张：弃牌堆，或者留在面前（医生的医疗箱）。手上那张用过之后不回手牌。 */
+    private void consume(CharacterId who, String cardId, boolean discard) {
+        SurvivorState s = state.stateOf(who);
+        if (discard) {
+            state = state.withState(who, s.hasInHand(cardId)
+                    ? s.withoutCard(cardId)
+                    : s.withoutCardInFront(cardId));
+            table.discardProvision(cardId);
+        } else if (s.hasInHand(cardId)) {
+            state = state.withState(who, s.reveal(cardId));   // 不弃的留在面前，不回手牌
+        }
+    }
+
+    /**
+     * 物资对账：牌堆 + 补给箱在传的 + 每人手牌 + 每人面前 + 弃牌堆 = 总张数。
+     *
+     * <p>理由与航海牌那条相同：少一张<b>不会报错</b>，只会让某个效果再也不出现，
+     * 而那种错能安静地跑完几千局。
+     *
+     * <p>❗它建立在「没有牌会离开游戏」之上。规则里尸体落海会把牌一起带走，
+     * 而引擎还没有「移出游戏」这回事 —— 哪天做了，这里要同时加一个「已退出」的桶。
+     */
+    public void requireNoProvisionLost(String where) {
+        int inHands = 0;
+        int inFront = 0;
+        for (CharacterId id : state.bySeat()) {
+            inHands += state.stateOf(id).hand().size();
+            inFront += state.stateOf(id).front().size();
+        }
+        int accounted = table.provisionsLeft() + provisionOffer.size() + inHands + inFront
+                + table.provisionDiscard().size();
+        if (accounted != table.provisionTotal()) {
+            throw new IllegalStateException(
+                    "%s %s：物资对不上，牌堆 %d + 补给箱 %d + 手牌 %d + 面前 %d + 弃牌 %d ≠ 共 %d 张"
+                            .formatted(context, where, table.provisionsLeft(), provisionOffer.size(),
+                                    inHands, inFront, table.provisionDiscard().size(), table.provisionTotal()));
+        }
     }
 
     /** 划船时对每一张抽到的牌：留进划船堆（true）还是塞回牌堆底部（false）。 */
@@ -553,9 +1431,14 @@ public final class Session {
         boolean keep(NavigationCard card, GameState state, CharacterId rower);
     }
 
-    /** 口渴结算时这个人喝几张水。返回值会被 {@code ThirstResolver} 夹到合法范围内。 */
+    /**
+     * 口渴结算时这一次喝谁的水 —— 一张水一个人，可以重复（同一个人出两张），空表示不喝。
+     *
+     * <p>❗<b>返回的是「谁出的水」，不是「喝几张」。</b> 只报张数的话，水从谁手里出去这件事
+     * 根本表达不出来，于是没有任何一张牌真的被消耗 —— M1 期间正是如此。
+     */
     @FunctionalInterface
     public interface WaterChoice {
-        int spend(CharacterId who, ThirstTally effective, GameState state);
+        List<CharacterId> waterFrom(ThirstPrompt prompt, GameState state);
     }
 }

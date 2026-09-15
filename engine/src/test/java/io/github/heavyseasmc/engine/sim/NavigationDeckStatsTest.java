@@ -47,7 +47,7 @@ class NavigationDeckStatsTest {
     }
 
     private static Measured measure(Roster roster, List<NavigationCard> deck, NavigationPolicy policy) {
-        Simulator simulator = new Simulator(roster, deck, policy);
+        Simulator simulator = new Simulator(roster, deck, LocalData.provisions(), policy);
         Map<CharacterId, Exposure> total = new LinkedHashMap<>();
         Map<String, Integer> outcomes = new LinkedHashMap<>();
         long turns = 0;
