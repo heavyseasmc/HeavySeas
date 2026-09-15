@@ -19,9 +19,12 @@ import java.util.Random;
  * 而牌堆每抽一张都在变 —— 把它塞进不可变状态，就要每抽一张复制一整副牌。
  * 两者性质不同，分开放。
  *
- * <h2>牌只在两个地方</h2>
- * 牌堆里，或划船堆里。少一张的表现**不是报错，是某些名单再也不出现** ——
+ * <h2>牌只在三个地方</h2>
+ * 牌堆里、划船者手上（抽出来看过、还没定去向），或划船堆里。少一张的表现**不是报错，是某些名单再也不出现** ——
  * 那种错能安静地跑完几千局。所以每一步之后都对账。
+ *
+ * <p>「划船者手上」是划船拆成「先抽 / 再定」两步之后才有的：真人要一张一张想，
+ * 两张牌在他手上停留的时间可能很长。不把这一处记进账，对账在他想的时候就会报牌丢了。
  */
 public final class Table {
 
@@ -29,6 +32,9 @@ public final class Table {
 
     /** 划船堆。面朝下，只有舵手看得到全部；结算完清空。 */
     private final List<NavigationCard> rowStack = new ArrayList<>();
+
+    /** 划船者手上：抽出来、还没定去向的牌。只有划船者本人看得到。 */
+    private final List<NavigationCard> rowerHand = new ArrayList<>();
 
     /** 物资牌堆。**抽完即止，不洗回重用**（规则明写），所以它只会变短。 */
     private final Deque<String> provisions = new ArrayDeque<>();
@@ -91,6 +97,19 @@ public final class Table {
         return rowStack.remove(card);
     }
 
+    /** 划船者手上还没定去向的牌（只读视图）。 */
+    public List<NavigationCard> rowerHand() {
+        return List.copyOf(rowerHand);
+    }
+
+    void takeIntoRowerHand(NavigationCard card) {
+        rowerHand.add(card);
+    }
+
+    boolean releaseFromRowerHand(NavigationCard card) {
+        return rowerHand.remove(card);
+    }
+
     /** 划船堆整堆回到牌堆底部并清空。 */
     void recycleRowStack() {
         rowStack.forEach(pile::bottom);
@@ -98,16 +117,16 @@ public final class Table {
     }
 
     /**
-     * 对账：牌堆 + 划船堆必须等于总张数。
+     * 对账：牌堆 + 划船者手上 + 划船堆必须等于总张数。
      *
      * @param context 出处（种子或对局标识），报错时靠它定位
      */
     public void requireNoCardLost(String context, String where) {
-        int accounted = pile.size() + rowStack.size();
+        int accounted = pile.size() + rowerHand.size() + rowStack.size();
         if (accounted != pile.total()) {
             throw new IllegalStateException(
-                    "%s %s：牌对不上，牌堆 %d + 划船堆 %d ≠ 共 %d 张"
-                            .formatted(context, where, pile.size(), rowStack.size(), pile.total()));
+                    "%s %s：牌对不上，牌堆 %d + 划船者手上 %d + 划船堆 %d ≠ 共 %d 张"
+                            .formatted(context, where, pile.size(), rowerHand.size(), rowStack.size(), pile.total()));
         }
     }
 }

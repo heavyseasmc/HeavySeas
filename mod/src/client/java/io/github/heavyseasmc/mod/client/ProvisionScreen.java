@@ -75,6 +75,9 @@ public final class ProvisionScreen extends GameScreen {
     /** 播完这一下就把界面收掉 —— 留牌那一包已经到了，只是被这一下拦着。 */
     private boolean closeWhenSnapDone;
 
+    /** 见过一次「对局还在」的投影没有。见 {@link #tick()}。 */
+    private boolean sawGame;
+
     public ProvisionScreen(ProvisionUpdateS2C data) {
         super(Text.translatable("heavyseas.provision.title"));
         apply(data);
@@ -92,6 +95,10 @@ public final class ProvisionScreen extends GameScreen {
             this.snapAt = 0L;
             this.closeWhenSnapDone = false;
             send(0, false);
+            // 与语言无关的一行：验收要判「箱子真的传到我手上了」。
+            // ❗不能拿「界面：打开 ProvisionScreen」当这件事的证据 —— 界面已经开着时这里是**换牌**，不重开，
+            //   那一行就不会再出现（实拍踩过：上一局的界面还开着，下一局的箱子到了，验收脚本干等了 25 秒）。
+            LOGGER.info("补给箱：收到 {} 张", next.offer().size());
         }
     }
 
@@ -270,6 +277,19 @@ public final class ProvisionScreen extends GameScreen {
      */
     @Override
     public void tick() {
+        // ❗对局没了就收起来。这一面原先只认「传走了」那一包（{@code finished()}），而 {@code /seas end}
+        //   不发那一包 —— 于是箱子开着时结束对局，界面会一直挂在屏幕上，直到下一局的箱子把它换掉
+        //   （2026-09-15 实拍到的）。与行动、划船、舵手三面同一条：**收界面认投影，不认某一个包**。
+        //
+        // ❗「见过一次活的投影」是必要的：这一面可能比投影先到（船头那一位的箱子就在开局那一瞬间）。
+        //   只判 active 的那一版实拍到的是箱子一闪即没、然后干等 16 秒超时 —— 服务端那边已经改成开局先推投影，
+        //   这道闩是第二重：包的先后顺序不该让界面自己消失。
+        if (projection().active()) {
+            sawGame = true;
+        } else if (sawGame) {
+            close();
+            return;
+        }
         if (closeWhenSnapDone && !snapping() && client != null) {
             client.setScreen(null);
         }
@@ -298,24 +318,13 @@ public final class ProvisionScreen extends GameScreen {
         long left = Math.max(0L, data.deadlineMs() - now);
         long total = Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD;
         float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
-        boolean urgent = left <= urgencyThreshold(total);
+        boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
         context.fill(l.barX(), l.barY(), l.barX() + l.barW(), l.barY() + BAR_H, GuiLanguage.GROUND);
         context.fill(l.barX(), l.barY(), l.barX() + Math.round(l.barW() * frac), l.barY() + BAR_H,
                 urgent ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
         context.drawCenteredTextWithShadow(textRenderer,
                 Text.literal(String.format("%.1fs", left / 1000f)),
                 width / 2, l.countdownY(), urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
-    }
-
-    /**
-     * 倒计时从哪一刻起变朱砂。
-     *
-     * <p>原先写死剩 3 秒。可 2 张牌的倒计时一共只有 4 秒 —— 真实客户端上看，它出现 1 秒就红了，
-     * 红了四分之三的时间。朱砂只给紧迫（ADR-0018 §7.3），一直红着就喊不动了。
-     * 所以按总长的比例算、夹在 1 到 3 秒之间。比例可调（§8 右列）；「只在最后一段才红」不可调。
-     */
-    static long urgencyThreshold(long totalMs) {
-        return Math.min(3000L, Math.max(1000L, Math.round(totalMs * 0.35)));
     }
 
     /** 说明只跟高亮走一行 —— 每张都摊开就变成读说明书了。 */

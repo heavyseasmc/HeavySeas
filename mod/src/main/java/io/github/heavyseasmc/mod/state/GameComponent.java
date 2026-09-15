@@ -2,6 +2,7 @@ package io.github.heavyseasmc.mod.state;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
@@ -16,6 +17,7 @@ import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -122,7 +124,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      */
     private static final int SYNC_END = 0x53_45_41_53;
 
-    /** ❗按收件人裁剪：每个人只拿到自己那一份。手牌走的就是这条路。 */
+    /** ❗按收件人裁剪：每个人只拿到自己那一份。手牌、划船抽到的牌、舵手看的划船堆走的都是这条路。 */
     @Override
     public void writeSyncPacket(RegistryByteBuf buf, ServerPlayerEntity recipient) {
         writeView(buf, recipient);
@@ -144,6 +146,15 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeString(s.value());
         }
         buf.writeString(g.phase() == Phase.ACTION ? g.nextActor().map(CharacterId::value).orElse("") : "");
+        // 航海这一段的公开部分（决策 ⑭）：划船堆几张、舵手是谁、挑牌还剩多久、执行的是哪一张。
+        // ❗划船堆里是什么牌不在这里 —— 那一项下面只写给舵手。
+        buf.writeVarInt(session.table().rowStack().size());
+        buf.writeString(g.helmsman().map(CharacterId::value).orElse(""));
+        buf.writeVarLong(helmDeadline);
+        Optional<NavigationCard> revealed = session.navigatedThisTurn();
+        buf.writeBoolean(revealed.isPresent());
+        revealed.ifPresent(card -> NavCardView.of(card).write(buf));
+
         Optional<CharacterId> seat = seatOf(recipient.getUuid());
         buf.writeBoolean(seat.isPresent());
         if (seat.isEmpty()) {
@@ -158,12 +169,29 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(g.stateOf(id).thirst().count());
         // ❗nextActor 只看「能行动」与「本回合还没行动过」，不看阶段 —— 行动阶段以外它照样可能指向某一位。
         //   HUD 的「轮到你行动」与行动一面的自动弹出都认这一位，所以阶段要在这里一起判。
-        buf.writeBoolean(g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false));
+        // ❗划船抽到的牌还没定完时，nextActor 仍然是他（行动要等两张都定了才算完），但他该看的是划船一面，不是行动一面。
+        buf.writeBoolean(g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false)
+                && session.rower().isEmpty());
         // 手牌只写这一份 —— 别人的包里没有这些字节，不是「发了再藏」。
         List<String> hand = g.stateOf(id).hand();
         buf.writeVarInt(hand.size());
         for (String card : hand) {
             buf.writeString(card);
+        }
+        // 划船抽到的牌只写给划船者本人：只有他知道自己放了什么（决策 ⑭ 的三层信息）。
+        List<Session.RowCard> rowing = session.rower().map(id::equals).orElse(false) ? session.rowing() : List.of();
+        buf.writeVarInt(rowing.size());
+        for (Session.RowCard row : rowing) {
+            NavCardView.of(row.card()).write(buf);
+            buf.writeEnumConstant(row.fate());
+        }
+        // 划船堆的牌只写给舵手，而且只在挑牌窗口里 —— 决策 ⑭：界面不能揭穿舵手，结算后只公开被执行的那一张。
+        boolean picking = helmDeadline > 0 && g.phase() == Phase.NAVIGATION
+                && g.helmsman().map(id::equals).orElse(false);
+        List<NavigationCard> offer = picking ? session.table().rowStack() : List.of();
+        buf.writeVarInt(offer.size());
+        for (NavigationCard card : offer) {
+            NavCardView.of(card).write(buf);
         }
     }
 
@@ -193,9 +221,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             seats.add(buf.readString());
         }
         String actor = buf.readString();
+        int rowStack = buf.readVarInt();
+        String helmsman = buf.readString();
+        long helmDeadline = buf.readVarLong();
+        Optional<NavCardView> revealed = buf.readBoolean() ? Optional.of(NavCardView.read(buf)) : Optional.empty();
         if (!buf.readBoolean()) {
-            return new HudView(true, turn, phase, gulls, seats, actor, false, "", 0, 0,
-                    Condition.CONSCIOUS, 0, false, List.of());
+            return new HudView(true, turn, phase, gulls, seats, actor,
+                    new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
+                    false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of());
         }
         String character = buf.readString();
         int health = buf.readVarInt();
@@ -208,8 +241,20 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         for (int i = 0; i < cards; i++) {
             hand.add(buf.readString());
         }
-        return new HudView(true, turn, phase, gulls, seats, actor, true, character, health, maxHealth,
-                condition, thirst, yourTurn, List.copyOf(hand));
+        int rowCount = buf.readVarInt();
+        List<HudView.Sea.RowCard> rowing = new ArrayList<>(rowCount);
+        for (int i = 0; i < rowCount; i++) {
+            NavCardView card = NavCardView.read(buf);
+            rowing.add(new HudView.Sea.RowCard(card, buf.readEnumConstant(Session.RowFate.class)));
+        }
+        int offerCount = buf.readVarInt();
+        List<NavCardView> offer = new ArrayList<>(offerCount);
+        for (int i = 0; i < offerCount; i++) {
+            offer.add(NavCardView.read(buf));
+        }
+        return new HudView(true, turn, phase, gulls, seats, actor,
+                new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
+                true, character, health, maxHealth, condition, thirst, yourTurn, List.copyOf(hand));
     }
 
     /**
@@ -243,6 +288,96 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.provisionHighlight = 0;
     }
 
+    /**
+     * 舵手挑牌窗口的运行时状态：超时时刻与当前高亮。理由与补给箱那两项相同，也同样不持久化。
+     *
+     * <p>超时时刻为 0 表示窗口没开：没人划船时不开（当场翻顶牌），替身开着自动推进时也不开（ADR-0019）。
+     */
+    private long helmDeadline;
+    private int helmHighlight;
+
+    public long helmDeadline() {
+        return helmDeadline;
+    }
+
+    public void setHelmDeadline(long millis) {
+        this.helmDeadline = millis;
+    }
+
+    /** 舵手最后一次上报的高亮下标。超时时认它（用户 2026-09-15 定，与补给箱同一条规则）。 */
+    public int helmHighlight() {
+        return helmHighlight;
+    }
+
+    public void setHelmHighlight(int index) {
+        this.helmHighlight = Math.max(0, index);
+    }
+
+    public void clearHelm() {
+        this.helmDeadline = 0L;
+        this.helmHighlight = 0;
+    }
+
+    /**
+     * 替身自动推进（ADR-0019）：开着时轮到替身「什么也不做」、替身当舵手挑第一张；关着时替身等指令。
+     *
+     * <p><b>默认开，不持久化</b> —— 重启回到开。对局本身都不持久化，开关比对局活得久没有意义。
+     * 它挂在组件上而不是对局上：{@code playthrough-check.sh} 要在同一次起服里开着、关着各打一局。
+     */
+    private boolean dummyAutoplay = true;
+
+    public boolean dummyAutoplay() {
+        return dummyAutoplay;
+    }
+
+    public void setDummyAutoplay(boolean on) {
+        this.dummyAutoplay = on;
+    }
+
+    /**
+     * 推迟到之后某个 tick 再做的一步（ADR-0019）。
+     *
+     * <h2>为什么要有它</h2>
+     * 各阶段互相直接调用（{@code finishAction → announceTurn → …}）。替身若在轮到它的那一刻当场行动，
+     * 全是替身的一局会在一次调用里递归打完，而且整局落在同一个 tick 里 —— 客户端一帧都看不到。
+     * 替身那一步排到下一 tick，递归就断在这里。
+     *
+     * @param dueMs   什么时候到期（{@code System.currentTimeMillis()} 同一时钟）
+     * @param session 排的时候是哪一局。❗那一局结束或重开了，这一步就作废 —— 不许把上一局的动作做到下一局上
+     * @param what    这一步是什么，出错时进日志
+     * @param action  要做的事
+     */
+    public record Step(long dueMs, Session session, String what, Runnable action) {
+    }
+
+    private final ArrayDeque<Step> steps = new ArrayDeque<>();
+
+    /** 排一步。只能在有对局时排：排进来的一步都属于当前这一局。 */
+    public void schedule(long dueMs, String what, Runnable action) {
+        steps.add(new Step(dueMs, requireSession(), what, action));
+    }
+
+    /**
+     * 到期的下一步；属于别的对局的一律丢掉。
+     *
+     * <p>每 tick 至多取一步：一步推进一个人，客户端的投影才一格一格地跟得上。
+     * 先进先出 —— 流程上同一时刻只会有一步排着（下一个替身、或者航海结算后的停顿）。
+     */
+    public Optional<Step> pollDueStep(long nowMs) {
+        while (!steps.isEmpty()) {
+            Step head = steps.peek();
+            if (head.session() != session) {
+                steps.poll();
+                continue;
+            }
+            if (head.dueMs() > nowMs) {
+                return Optional.empty();
+            }
+            return Optional.of(steps.poll());
+        }
+        return Optional.empty();
+    }
+
     public Optional<Session> session() {
         return Optional.ofNullable(session);
     }
@@ -262,6 +397,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.interruptedTurn = 0;
         this.pendingDummies.clear();
         this.endedFor.clear();
+        clearProvision();
+        clearHelm();
+        steps.clear();
     }
 
     public void end() {
@@ -269,6 +407,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.session = null;
         this.occupants.clear();
         clearProvision();
+        clearHelm();
+        steps.clear();
     }
 
     public Map<CharacterId, Occupant> occupants() {
@@ -277,6 +417,11 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public Optional<Occupant> occupantOf(CharacterId id) {
         return Optional.ofNullable(occupants.get(id));
+    }
+
+    /** 座位上有没有真人。有人要看，节奏才需要停下来等人读（ADR-0019：航海结算后的停顿）。 */
+    public boolean anyHumanSeated() {
+        return occupants.values().stream().anyMatch(o -> !o.isDummy());
     }
 
     /** 这个玩家占着哪个角色。一个玩家最多占一个座位。 */

@@ -98,6 +98,10 @@ public final class ProvisionPhase {
                 // 客户端一次都没上报过高亮（比如离线）时取第一张 —— 决策 ⑧ 要求局面不能卡住。
                 int index = Math.min(component.provisionHighlight(),
                         Math.max(0, session.provisionOffer().size() - 1));
+                // 与语言无关的一行（与「舵手超时」同一对）：验收要分得开「他自己按的」与「等超时」——
+                // 两者在对局推进上完全一样，而界面没弹出来时也会走到这里。
+                LOGGER.info("补给箱超时：替 {} 选了第 {} 张（当前高亮）",
+                        session.provisionHolder().map(CharacterId::value).orElse("?"), index + 1);
                 // ❗先告诉持有者「这张是替你选的」，再真的留牌。
                 //   顺序不能反：keep 里紧接着就 broadcast，那一包会让客户端关掉界面 ——
                 //   通知落在它后面，就没有界面来播这一下「顿」了。

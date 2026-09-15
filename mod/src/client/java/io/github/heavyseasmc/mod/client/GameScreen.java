@@ -3,10 +3,14 @@ package io.github.heavyseasmc.mod.client;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 对局里的界面（补给箱、手牌……）共用的底子。
@@ -17,6 +21,8 @@ import net.minecraft.text.Text;
  * 这些是每一面都要、而且必须一致的东西，放一处。HUD 认的也是这个类型（见 {@link GameHud}）。
  */
 public abstract class GameScreen extends Screen {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     /**
      * 卡面画到多高（物理像素）还算清楚：烘出来的贴图高 840，允许放大一成。
@@ -29,6 +35,9 @@ public abstract class GameScreen extends Screen {
     private int lastMouseX;
     private int lastMouseY;
 
+    /** 这一面打开过了没有。见 {@link #init()}。 */
+    private boolean announced;
+
     protected GameScreen(Text title) {
         super(title);
     }
@@ -38,10 +47,44 @@ public abstract class GameScreen extends Screen {
      *
      * <p>坐标系一变，鼠标没动也会换一个数，所以在这里把鼠标位置忘掉、重新起算。
      * 子类覆写时要先调 {@code super.init()}。
+     *
+     * <p>第一次调时打一行「界面：打开 X」—— GUI 回归靠它判「这一面到底弹没弹」：
+     * 截图里看不到它，与「没弹」和「弹了但被别的顶掉」长得一样（与语言无关，用类名）。
      */
     @Override
     protected void init() {
         mouseSeen = false;
+        if (!announced) {
+            announced = true;
+            LOGGER.info("界面：打开 {}", getClass().getSimpleName());
+        }
+    }
+
+    /** 当前世界的对局投影；没有世界时是 {@link HudView#IDLE}。 */
+    protected HudView projection() {
+        return client == null || client.world == null ? HudView.IDLE : GameComponents.of(client.world).hudView();
+    }
+
+    /**
+     * 上带下面那一行：划船堆几张 · 舵手是谁（决策 ⑭）。全船都知道的数 —— 划船与舵手两面都画，放在这里。
+     */
+    protected void drawSeaLine(DrawContext context, HudView view, int y) {
+        drawSeaLine(context, view, y, view.sea().rowStack());
+    }
+
+    /**
+     * 同上，但张数由调用方给。
+     *
+     * <p>舵手一面用它：挑中那一刻服务端就把划船堆整堆收回了，投影里的张数<b>当场变 0</b>，
+     * 而屏幕上那几张还在（「顿」要播完 396ms）。照投影画的话，这段时间里这一行说 0 张、底下摆着 2 张
+     * —— 实拍到的。这一面该说的是<b>它正摊开的那一叠</b>。
+     */
+    protected void drawSeaLine(DrawContext context, HudView view, int y, int rowStack) {
+        Text helm = view.sea().helmsman().isEmpty()
+                ? Text.literal("—")
+                : Text.translatable("heavyseas.character." + view.sea().helmsman());
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hud.sea", rowStack, helm),
+                width / 2, y, GuiLanguage.MUTED);
     }
 
     /**

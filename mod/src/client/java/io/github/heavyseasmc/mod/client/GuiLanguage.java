@@ -47,6 +47,11 @@ public final class GuiLanguage {
     /** 底槽：进度条与轨道没走到的那一段。 */
     public static final int GROUND = 0xFF2A3A34;
 
+    /** 纸：画出来的牌面的底色。与 {@link #INK} 是同一个颜色 —— 深底上的正文用的就是纸色，所以引用它，不另写一遍。 */
+    public static final int PAPER = INK;
+    /** 墨 {@code #241E1A}：印在纸色牌面上的字（ADR-0018 §7.3）。 */
+    public static final int CARD_INK = 0xFF241E1A;
+
     /**
      * 罩在 {@code Screen.renderBackground} 那层模糊之上的底色（底 {@code #0B120F} 带透明度）。
      *
@@ -75,6 +80,21 @@ public final class GuiLanguage {
     /** 按高度求卡面宽度，保持比例。 */
     public static int cardWidth(int height) {
         return Math.round(height * (float) CARD_W / CARD_H);
+    }
+
+    // ---------------------------------------------------------------- 时间：倒计时
+
+    /**
+     * 倒计时从哪一刻起变朱砂。
+     *
+     * <p>原先写死剩 3 秒。可 2 张牌的倒计时一共只有 4 秒 —— 真实客户端上看，它出现 1 秒就红了，
+     * 红了四分之三的时间。朱砂只给紧迫（ADR-0018 §7.3），一直红着就喊不动了。
+     * 所以按总长的比例算、夹在 1 到 3 秒之间。比例可调（§8 右列）；「只在最后一段才红」不可调。
+     *
+     * <p>放在这里而不是某一面里：补给箱与舵手挑牌两面都有倒计时，「什么时候算紧迫」是同一句话。
+     */
+    public static long urgencyThreshold(long totalMs) {
+        return Math.min(3000L, Math.max(1000L, Math.round(totalMs * 0.35)));
     }
 
     // ---------------------------------------------------------------- 发 Deal
@@ -152,6 +172,35 @@ public final class GuiLanguage {
     /** 弧顶抬 54px —— 直线会读成「移动」，弧线才读得出是「交出去」。 */
     public static final float FLY_ARC = 54f;
 
+    /** 「飞」的缓动：{@code cubic-bezier(.3,.8,.25,1)}。 */
+    private static final float FLY_X1 = .3f;
+    private static final float FLY_Y1 = .8f;
+    private static final float FLY_X2 = .25f;
+    private static final float FLY_Y2 = 1f;
+
+    /**
+     * 「飞」走到哪了，0 → 1（已过缓动）。
+     *
+     * @param startedAt 起飞的时刻；{@code <= 0} 表示没在飞，返回 0（还在原位）
+     */
+    public static float fly(long now, long startedAt) {
+        if (startedAt <= 0L) {
+            return 0f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) FLY_MS, 0f, 1f);
+        return cubicBezier(x, FLY_X1, FLY_Y1, FLY_X2, FLY_Y2);
+    }
+
+    /** 还在飞吗。飞完之前界面不许收：牌离开你手里的那一下不能被截断。 */
+    public static boolean flying(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt < FLY_MS;
+    }
+
+    /** 飞行途中弧线额外抬起多少（GUI 单位，正数向上）：起点与终点为 0，正中是 {@link #FLY_ARC}。 */
+    public static float flyArc(float progress) {
+        return FLY_ARC * 4f * progress * (1f - progress);
+    }
+
     // ---------------------------------------------------------------- 滑 Slide
 
     /** 滑：轮次推进。550ms，带轻微过冲。 */
@@ -223,12 +272,12 @@ public final class GuiLanguage {
 
     /** 「顿」此刻的上抬量（GUI 单位，负号向上）。 */
     public static float snapRise(float progress) {
-        return sampleSnap(SNAP_RISE, ease(progress));
+        return sampleSnap(SNAP_RISE, cubicBezier(progress, SNAP_X1, SNAP_Y1, SNAP_X2, SNAP_Y2));
     }
 
     /** 「顿」此刻的缩放。 */
     public static float snapScale(float progress) {
-        return sampleSnap(SNAP_SCALE, ease(progress));
+        return sampleSnap(SNAP_SCALE, cubicBezier(progress, SNAP_X1, SNAP_Y1, SNAP_X2, SNAP_Y2));
     }
 
     /**
@@ -249,13 +298,13 @@ public final class GuiLanguage {
     }
 
     /**
-     * 三次贝塞尔缓动：给横轴进度，求纵轴。
+     * 三次贝塞尔缓动：给横轴进度，求纵轴。「顿」与「飞」共用。
      *
      * <p>CSS 的 {@code cubic-bezier(x1,y1,x2,y2)} 定的是一条参数曲线，横轴不是参数本身 ——
      * 要先按 x 解出参数 t，再拿 t 求 y。用牛顿迭代解；导数太小时退回二分，
      * 免得在曲线平坦处除出一个巨大的步长。
      */
-    private static float ease(float x) {
+    private static float cubicBezier(float x, float x1, float y1, float x2, float y2) {
         if (x <= 0f) {
             return 0f;
         }
@@ -264,17 +313,17 @@ public final class GuiLanguage {
         }
         float t = x;
         for (int i = 0; i < 8; i++) {
-            float dx = bezier(t, SNAP_X1, SNAP_X2) - x;
+            float dx = bezier(t, x1, x2) - x;
             if (Math.abs(dx) < 1e-5f) {
                 break;
             }
-            float slope = bezierSlope(t, SNAP_X1, SNAP_X2);
+            float slope = bezierSlope(t, x1, x2);
             if (Math.abs(slope) < 1e-5f) {
                 break;
             }
             t = MathHelper.clamp(t - dx / slope, 0f, 1f);
         }
-        return bezier(t, SNAP_Y1, SNAP_Y2);
+        return bezier(t, y1, y2);
     }
 
     /** 首末控制点固定在 0 与 1 的三次贝塞尔。 */

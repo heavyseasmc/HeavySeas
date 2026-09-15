@@ -1,8 +1,11 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.state.HudView;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -13,6 +16,8 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 客户端入口。
@@ -23,6 +28,8 @@ import org.lwjgl.glfw.GLFW;
  * 这种引用在**编译期**就失败 —— 拆之前实测过，main 里能直接编译过。见 ADR-0013。
  */
 public final class HeavySeasClient implements ClientModInitializer {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     /**
      * 打开手牌。
@@ -43,7 +50,8 @@ public final class HeavySeasClient implements ClientModInitializer {
     }
 
     /**
-     * 打开行动一面（决策 ⑦）。默认 G；显示与关界面同样走绑定的那个键，理由同 {@link #handKey}。
+     * 打开行动一面（决策 ⑦）；划船抽到的牌还没定完时，打开的是划船一面。默认 G；
+     * 显示与关界面同样走绑定的那个键，理由同 {@link #handKey}。
      */
     private static KeyBinding actKey;
 
@@ -55,6 +63,13 @@ public final class HeavySeasClient implements ClientModInitializer {
      */
     private static boolean actionPending;
     private static boolean wasMyTurn;
+
+    /** 划船抽到的牌到了、划船一面还没弹出来。与 {@link #actionPending} 同一个道理：只弹一次。 */
+    private static boolean rowPending;
+    private static boolean wasRowing;
+
+    /** 已经为哪一个挑牌窗口弹过舵手一面（以窗口的超时时刻认）。 */
+    private static long helmWindowShown;
 
     public static KeyBinding actKey() {
         return actKey;
@@ -71,7 +86,7 @@ public final class HeavySeasClient implements ClientModInitializer {
         actKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.act", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G,
                 "key.categories.heavyseas"));
-        ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollActionTurn);
+        ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollTurn);
 
         // 进服就把卡面载好：补给箱第一次打开时现场载，「发」的动画会在那一帧卡掉一截。
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
@@ -85,6 +100,13 @@ public final class HeavySeasClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(ProvisionAutoPickS2C.ID, (payload, context) ->
                 context.client().execute(() -> {
                     if (context.client().currentScreen instanceof ProvisionScreen screen) {
+                        screen.autoPicked(payload.index());
+                    }
+                }));
+        // 「这张是替你挑的」（舵手超时）。次序的道理与上面相同：先到，结算后的那一次投影后到。
+        ClientPlayNetworking.registerGlobalReceiver(HelmAutoPickS2C.ID, (payload, context) ->
+                context.client().execute(() -> {
+                    if (context.client().currentScreen instanceof HelmScreen screen) {
                         screen.autoPicked(payload.index());
                     }
                 }));
@@ -110,28 +132,69 @@ public final class HeavySeasClient implements ClientModInitializer {
     }
 
     /**
-     * 轮到你行动：刚轮到时弹一次，之后按键再开。
+     * 轮到你的几面：行动、划船、舵手挑牌。
      *
-     * <p>❗只在「刚轮到」时弹，不是「轮到期间一直弹」：这一面不计时，玩家把它收起来是为了
-     * 回到世界里谈判 —— 每 tick 都弹的话，Esc 就收不起来了。
+     * <p>❗行动与划船只在「刚轮到」时弹一次，之后按行动键再开：这两面不计时，玩家收起来是为了回世界里谈判 ——
+     * 每 tick 都弹的话，Esc 就收不起来了。
+     *
+     * <p>舵手一面有倒计时，与补给箱同一个优先级：窗口一开就弹，顶掉不计时的界面；被什么顶掉了，窗口还开着就回来。
      */
-    private static void pollActionTurn(MinecraftClient client) {
+    private static void pollTurn(MinecraftClient client) {
         boolean pressed = false;
         while (actKey.wasPressed()) {
             pressed = true;
         }
-        boolean mine = client.world != null
-                && GameComponents.of(client.world).hudView().myTurnToAct();
-        if (!mine) {
-            wasMyTurn = false;
-            actionPending = false;
-            return;
-        }
-        if (!wasMyTurn) {
+        HudView view = client.world == null ? HudView.IDLE : GameComponents.of(client.world).hudView();
+
+        boolean mine = view.myTurnToAct();
+        if (mine && !wasMyTurn) {
             actionPending = true;
         }
-        wasMyTurn = true;
-        if (client.currentScreen == null && (actionPending || pressed)) {
+        if (!mine) {
+            actionPending = false;
+        }
+        wasMyTurn = mine;
+
+        boolean rowing = view.myRowPending();
+        if (rowing && !wasRowing) {
+            rowPending = true;
+            // 与语言无关的一行：GUI 回归靠它判「抽到的牌进了我这一包」。
+            LOGGER.info("划船：收到抽到的 {} 张", view.sea().rowing().size());
+        }
+        if (!rowing) {
+            rowPending = false;
+        }
+        wasRowing = rowing;
+
+        if (view.myHelmPick()) {
+            long window = view.sea().helmDeadlineMs();
+            boolean fresh = window != helmWindowShown;
+            if (fresh) {
+                helmWindowShown = window;
+                // ❗这一行是「划船堆的牌只进舵手那一包」在接收端的证据：不是舵手的客户端上永远不该出现。
+                LOGGER.info("舵手：收到划船堆 {} 张", view.sea().helmOffer().size());
+            }
+            if (client.currentScreen instanceof HelmScreen || client.currentScreen instanceof ProvisionScreen) {
+                return;
+            }
+            if (client.currentScreen instanceof RowScreen row && row.flying()) {
+                return;                       // 划船的最后一张还在飞：飞完再弹，不截断
+            }
+            if (fresh || client.currentScreen == null) {
+                client.setScreen(new HelmScreen(view));
+            }
+            return;
+        }
+
+        if (client.currentScreen != null) {
+            return;                           // 已经有界面开着（补给箱、聊天……）时不抢
+        }
+        if (rowing && (rowPending || pressed)) {
+            rowPending = false;
+            client.setScreen(new RowScreen());
+            return;
+        }
+        if (mine && (actionPending || pressed)) {
             actionPending = false;
             client.setScreen(new ActionScreen());
         }

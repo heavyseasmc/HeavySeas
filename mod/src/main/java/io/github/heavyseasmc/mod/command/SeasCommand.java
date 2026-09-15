@@ -15,6 +15,7 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
+import io.github.heavyseasmc.mod.game.NavigationPhase;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.minecraft.server.command.CommandManager;
@@ -22,7 +23,6 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +31,16 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * {@code /seas} —— M1 的全部操作入口。
+ * {@code /seas} —— M1 的全部操作入口；M2 起是开发脚手架（ADR-0017：玩家侧指令作废，GUI 是唯一路径）。
  *
- * <h2>为什么是指令而不是界面</h2>
- * 实物操作与界面是 M3/M4（决策 ①⑥⑦⑨）。M1 的出口只要求「在主世界任意水面跑通完整一局」，
- * 用指令驱动就够，而且**指令能被一个人跑完** —— 配合 dummy，开发期不必凑 6 个真人。
+ * <h2>为什么还留着</h2>
+ * 指令能被一个人跑完 —— 配合 dummy，开发期不必凑 6 个真人；出口验收 {@code playthrough-check.sh}
+ * 关着替身自动推进打的那一局，靠的就是这里的 {@code pass · row · swap · fight}（ADR-0019）。
+ * 玩家侧的几条等 GUI 能驱动整局之后再删（O18）。
  *
  * <h2>谁能替谁下指令</h2>
  * 真人占的座位只有他本人能动；dummy 占的座位要 2 级权限（它是测试夹具，不该让普通玩家随手替人行动）。
+ * {@code navigate} 与 {@code dummy auto} 一律 2 级：舵手挑牌走界面，指令只是开发者提前定的口子。
  */
 public final class SeasCommand {
 
@@ -93,7 +95,13 @@ public final class SeasCommand {
                         .then(CommandManager.literal("add")
                                 .then(CommandManager.argument("character", StringArgumentType.word())
                                         .suggests(CHARACTERS)
-                                        .executes(guarded(SeasCommand::dummyAdd)))))
+                                        .executes(guarded(SeasCommand::dummyAdd))))
+                        .then(CommandManager.literal("auto")
+                                .executes(guarded(context -> dummyAuto(context, null)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyAuto(context, true))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyAuto(context, false))))))
                 .then(CommandManager.literal("status").executes(guarded(SeasCommand::status)))
                 .then(CommandManager.literal("pass").executes(guarded(SeasCommand::pass)))
                 .then(CommandManager.literal("row")
@@ -112,6 +120,7 @@ public final class SeasCommand {
                                 .suggests(CHARACTERS)
                                 .executes(guarded(SeasCommand::fight))))
                 .then(CommandManager.literal("navigate")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .executes(guarded(context -> navigate(context, null)))
                         .then(CommandManager.argument("card", StringArgumentType.word())
                                 .executes(guarded(context -> navigate(context,
@@ -171,6 +180,25 @@ public final class SeasCommand {
         return 1;
     }
 
+    /**
+     * 替身自动推进的开关（ADR-0019）。不带参数时只报当前值。
+     *
+     * <p>对局中途切换时，从下一次「轮到谁」起生效：已经排下的那一步执行前会自己再看一眼开关。
+     * 那一行日志是 {@code playthrough-check.sh} 分开两局的界线，别改措辞。
+     */
+    private static int dummyAuto(CommandContext<ServerCommandSource> context, Boolean on) {
+        GameComponent component = GameComponents.of(context.getSource().getWorld());
+        if (on != null) {
+            component.setDummyAutoplay(on);
+            LOGGER.info("替身自动推进：{}", on ? "开" : "关");
+        }
+        boolean now = component.dummyAutoplay();
+        context.getSource().sendFeedback(() -> Text.translatable("heavyseas.command.autoplay",
+                Text.translatable(now ? "heavyseas.command.autoplay_on" : "heavyseas.command.autoplay_off")),
+                on != null);
+        return 1;
+    }
+
     private static int status(CommandContext<ServerCommandSource> context) {
         GameComponent component = GameComponents.of(context.getSource().getWorld());
         if (component.session().isEmpty()) {
@@ -185,7 +213,7 @@ public final class SeasCommand {
     }
 
     private static int pass(CommandContext<ServerCommandSource> context) {
-        return act(context, (world, component, actor) -> {
+        return act(context, "PASS", (world, component, actor) -> {
             context.getSource().sendFeedback(
                     () -> Text.translatable("heavyseas.command.passed", GameFlow.characterName(actor)), true);
             return true;
@@ -193,9 +221,9 @@ public final class SeasCommand {
     }
 
     private static int row(CommandContext<ServerCommandSource> context, boolean keepFirst, boolean keepSecond) {
-        return act(context, (world, component, actor) -> {
+        return act(context, "ROW", (world, component, actor) -> {
             Session session = component.requireSession();
-            // 与行动一面共用同一段 —— 「逐张去留」两处各写一份的话，迟早各说各话。
+            // 一次走完两步：指令没有「想一想」这回事。底下与划船一面是同一份规则（Session#row 就是那两步）。
             List<NavigationCard> drawn = ActionPhase.rowKeeping(session, actor, keepFirst, keepSecond);
             context.getSource().sendFeedback(
                     () -> Text.translatable("heavyseas.command.rowed", GameFlow.characterName(actor), drawn.size()),
@@ -205,7 +233,7 @@ public final class SeasCommand {
     }
 
     private static int swap(CommandContext<ServerCommandSource> context) {
-        return act(context, (world, component, actor) -> {
+        return act(context, "SWAP", (world, component, actor) -> {
             Session session = component.requireSession();
             Optional<CharacterId> target = resolve(context, session);
             if (target.isEmpty()) {
@@ -223,7 +251,7 @@ public final class SeasCommand {
     }
 
     private static int fight(CommandContext<ServerCommandSource> context) {
-        return act(context, (world, component, actor) -> {
+        return act(context, "FIGHT", (world, component, actor) -> {
             Session session = component.requireSession();
             Optional<CharacterId> target = resolve(context, session);
             if (target.isEmpty()) {
@@ -243,6 +271,12 @@ public final class SeasCommand {
         });
     }
 
+    /**
+     * 舵手挑牌窗口里提前定（dev）。
+     *
+     * <p>❗航海阶段已经不等这条指令了（ADR-0019）：没人划船时当场翻顶牌，替身开着自动推进时当场挑第一张，
+     * 其余情况开 12 秒窗口、超时认高亮。这条指令只在窗口开着时有用。
+     */
     private static int navigate(CommandContext<ServerCommandSource> context, String cardId) {
         ServerWorld world = context.getSource().getWorld();
         GameComponent component = GameComponents.of(world);
@@ -255,22 +289,24 @@ public final class SeasCommand {
             context.getSource().sendError(Text.translatable("heavyseas.command.not_navigation"));
             return 0;
         }
-        NavigationCard pick = null;
-        if (session.helmsmanMayPick()) {
-            List<NavigationCard> stack = session.table().rowStack();
-            if (cardId == null) {
-                context.getSource().sendError(Text.translatable("heavyseas.command.pick_needed",
-                        String.join("、", stack.stream().map(NavigationCard::id).toList())));
-                return 0;
-            }
-            pick = stack.stream().filter(c -> c.id().equals(cardId)).findFirst().orElse(null);
-            if (pick == null) {
-                context.getSource().sendError(Text.translatable("heavyseas.command.not_in_row_stack", cardId));
-                return 0;
+        if (component.helmDeadline() <= 0) {
+            context.getSource().sendError(Text.translatable("heavyseas.command.no_pick_window"));
+            return 0;
+        }
+        List<NavigationCard> stack = session.table().rowStack();
+        if (cardId == null) {
+            context.getSource().sendError(Text.translatable("heavyseas.command.pick_needed",
+                    String.join("、", stack.stream().map(NavigationCard::id).toList())));
+            return 0;
+        }
+        for (int i = 0; i < stack.size(); i++) {
+            if (stack.get(i).id().equals(cardId)) {
+                NavigationPhase.pickByCommand(world, component, i);
+                return 1;
             }
         }
-        GameFlow.navigate(world, component, pick);
-        return 1;
+        context.getSource().sendError(Text.translatable("heavyseas.command.not_in_row_stack", cardId));
+        return 0;
     }
 
     private static Optional<CharacterId> resolve(CommandContext<ServerCommandSource> context, Session session) {
@@ -288,8 +324,10 @@ public final class SeasCommand {
      *
      * <p>把这层抽出来是因为四个动作里有三件事一模一样，而**漏掉「推进」那一步的表现是
      * 游戏卡住不动**，不是报错 —— 那种 bug 每个动作都得重犯一次才发现得了。
+     *
+     * @param what 与语言无关的动作名，进日志：验收脚本靠它判「指令那条路真的走通了」
      */
-    private static int act(CommandContext<ServerCommandSource> context, Action action) {
+    private static int act(CommandContext<ServerCommandSource> context, String what, Action action) {
         ServerCommandSource source = context.getSource();
         ServerWorld world = source.getWorld();
         GameComponent component = GameComponents.of(world);
@@ -300,6 +338,12 @@ public final class SeasCommand {
         Session session = component.requireSession();
         if (session.state().phase() != Phase.ACTION) {
             source.sendError(Text.translatable("heavyseas.command.not_action"));
+            return 0;
+        }
+        // ❗有人在划船一面上还没定完：他的行动还没结束，谁都不能插进来（引擎也会抛，这里先给一句人话）。
+        Optional<CharacterId> rower = session.rower();
+        if (rower.isPresent()) {
+            source.sendError(Text.translatable("heavyseas.command.rowing_pending", GameFlow.characterName(rower.get())));
             return 0;
         }
         Optional<CharacterId> actor = session.nextActor();
@@ -320,6 +364,7 @@ public final class SeasCommand {
         if (!action.run(world, component, actor.get())) {
             return 0;                        // 动作自己报过错了，不推进
         }
+        LOGGER.info("行动（指令）：{} {}", actor.get().value(), what);
         GameFlow.finishAction(world, component, actor.get());
         return 1;
     }
