@@ -19,7 +19,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 头顶信息条（决策 ⑥）：<b>所有亮出的牌走这里</b>。
@@ -55,7 +57,8 @@ public final class Nameplates {
      * {@code heavyseas_DemoPl} 与 {@code heavyseas_Deckha}，这一局侥幸没撞。
      * 改用<b>角色 id</b>：一局里天然唯一，最长的 {@code collector} 也只有 12 个字符。
      */
-    private static final String TEAM_PREFIX = "hs_";
+    /** 同名外部队伍或已有玩家队伍只报一次，避免每次组件同步都刷日志。 */
+    private static final Set<String> REPORTED_CONFLICTS = new HashSet<>();
 
     private Nameplates() {
     }
@@ -81,6 +84,9 @@ public final class Nameplates {
                 continue;                     // 替身没有身体，也就没有名牌（ADR-0024 §7.6）
             }
             Team team = teamFor(board, player, id);
+            if (team == null) {
+                continue;                     // 外部队伍优先：名牌可以缺，权限/友伤/格式不能被我们改掉
+            }
             // 前缀：他是谁。世界里此前完全看不出「那个人是大副」——名字是 MC 账号名。
             Text prefix = Text.empty().append(GameFlow.characterName(id)).append(Text.literal(" "))
                     .formatted(Formatting.GOLD);
@@ -150,16 +156,34 @@ public final class Nameplates {
     }
 
     private static Team teamFor(ServerScoreboard board, ServerPlayerEntity player, CharacterId id) {
-        String name = TEAM_PREFIX + id.value();
+        String name = NameplateTeamNames.teamName(id.value());
         Team team = board.getTeam(name);
+        if (team != null && !NameplateTeamNames.owns(name, team.getDisplayName().getString())) {
+            reportConflict(name, "同名队伍不属于 HeavySeas");
+            return null;
+        }
         if (team == null) {
             team = board.addTeam(name);
+            team.setDisplayName(Text.literal(NameplateTeamNames.marker(name)));
+            board.updateScoreboardTeam(team);
+        }
+        String holder = player.getNameForScoreboard();
+        Team current = board.getScoreHolderTeam(holder);
+        if (!NameplateTeamNames.mayJoin(name, current == null ? null : current.getName())) {
+            reportConflict(holder, "玩家已经属于队伍 " + current.getName());
+            return null;
         }
         // 同理：已经在队里就别再加一次，否则每次同步都会广播一遍成员变更。
-        if (!team.getPlayerList().contains(player.getNameForScoreboard())) {
-            board.addScoreHolderToTeam(player.getNameForScoreboard(), team);
+        if (!team.getPlayerList().contains(holder)) {
+            board.addScoreHolderToTeam(holder, team);
         }
         return team;
+    }
+
+    private static void reportConflict(String key, String detail) {
+        if (REPORTED_CONFLICTS.add(key)) {
+            LOGGER.warn("头顶信息条：{}；保留原队伍，不接管 {}", detail, key);
+        }
     }
 
     /**
@@ -173,7 +197,7 @@ public final class Nameplates {
         ServerScoreboard board = world.getServer().getScoreboard();
         List<Team> ours = new ArrayList<>();
         for (Team team : board.getTeams()) {
-            if (team.getName().startsWith(TEAM_PREFIX)) {
+            if (NameplateTeamNames.owns(team.getName(), team.getDisplayName().getString())) {
                 ours.add(team);
             }
         }
@@ -184,5 +208,6 @@ public final class Nameplates {
             // 0 不打：这一句只在真的删过东西时才有意义（与座位收摊同一个写法）。
             LOGGER.info("头顶信息条：收摊，删了 {} 个队伍", ours.size());
         }
+        REPORTED_CONFLICTS.clear();
     }
 }

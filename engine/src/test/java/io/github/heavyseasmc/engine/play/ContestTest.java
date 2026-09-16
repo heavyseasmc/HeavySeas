@@ -352,6 +352,61 @@ class ContestTest {
         }
     }
 
+    // ------------------------------------------------------------------ 绝境
+
+    @Nested
+    @DisplayName("绝境：每个清醒角色都能反对")
+    class Ration {
+
+        private Session rationGame() {
+            Session s = deal(crew(), "ration", "water", "water", "water");
+            beat(s, MATE, KID, 4);                                  // 船上留一具尸体，满足绝境前提
+            return s;
+        }
+
+        @Test
+        @DisplayName("逐个问完都不反对才回血；牌在询问开始前已经弃掉")
+        void everyoneMayPass() {
+            Session s = rationGame();
+            beat(s, MATE, CAPTAIN, 1);
+            assertTrue(s.beginRation(MATE, "ration").isEmpty(), "有人能反对，所以不能当场回血");
+            assertFalse(s.state().stateOf(MATE).hasInHand("ration"));
+            assertEquals(List.of("ration"), s.table().provisionDiscard(), "无论最后结果都先弃牌");
+            assertEquals(CAPTAIN, s.contest().orElseThrow().target());
+
+            s.consent(false);
+            assertEquals(SAILOR, s.contest().orElseThrow().target(), "按座位继续问下一位清醒角色");
+            assertEquals(1, damage(s, CAPTAIN), "还有人没回答时不能提前回血");
+            s.consent(false);
+
+            assertTrue(s.contest().isEmpty());
+            assertEquals(0, damage(s, CAPTAIN));
+        }
+
+        @Test
+        @DisplayName("有人反对后攻方获胜才回血")
+        void objectionStartsTheExistingFight() {
+            Session won = rationGame();
+            beat(won, MATE, SAILOR, 1);
+            won.beginRation(MATE, "ration");
+            won.consent(true);
+            assertEquals(Contest.Stage.STANCES, stage(won));
+            won.closeStances();
+            assertTrue(won.resolveContest().attackerGetsWhatTheyWanted(), "8 对 7，打牌方赢");
+            assertEquals(0, damage(won, SAILOR), "打牌方赢，绝境生效");
+
+            Session lost = rationGame();
+            beat(lost, MATE, CAPTAIN, 1);
+            lost.beginRation(MATE, "ration");
+            lost.consent(true);
+            lost.join(SAILOR, Fight.Side.DEFEND);                    // 8 对 7 + 6
+            lost.closeStances();
+            assertFalse(lost.resolveContest().attackerGetsWhatTheyWanted());
+            assertEquals(1, damage(lost, CAPTAIN), "反对方赢，绝境不生效");
+            assertEquals(List.of("ration"), lost.table().provisionDiscard(), "失败照样弃牌");
+        }
+    }
+
     // ------------------------------------------------------------------ 进行中
 
     @Nested

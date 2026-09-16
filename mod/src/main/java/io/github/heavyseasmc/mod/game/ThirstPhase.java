@@ -92,7 +92,7 @@ public final class ThirstPhase {
             resolve(world, component, 0);
             return;
         }
-        boolean canDecide = own > 0 && session.state().conditionOf(who).canAct();
+        boolean canDecide = ThirstEligibility.canChoose(session.state().conditionOf(who), own);
         boolean canReceiveDonation = hasHumanDonor(session, component, who);
         if (!canDecide && !canReceiveDonation) {
             // 没有可做的决定。说一句为什么，不然屏幕上只会看到血无缘无故掉了。
@@ -138,6 +138,10 @@ public final class ThirstPhase {
         // ❗只认正被问的那个人本人。不校验的话，谁都能替别人把水喝掉。
         if (pending.isEmpty() || seat.isEmpty() || !seat.get().equals(pending.get().who())) {
             return;
+        }
+        CharacterId who = pending.get().who();
+        if (!ThirstEligibility.canChoose(session.state().conditionOf(who), session.watersOf(who))) {
+            return;                             // 这是只给旁人捐水的窗口；本人无权用 0 提前收场
         }
         int waters = clamp(session, pending.get(), action.waters(), component.thirstDonors().size());
         component.setThirstHighlight(waters);

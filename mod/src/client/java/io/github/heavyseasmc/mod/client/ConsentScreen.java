@@ -87,8 +87,11 @@ public final class ConsentScreen extends GameScreen {
         drawPublicBand(context, view, TOP_BAND_Y);
         int askY = TOP_BAND_Y + 30;
         context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable(kind == Contest.Kind.STEAL
-                        ? "heavyseas.consent.steal" : "heavyseas.consent.swap", nameOf(attacker)),
+                Text.translatable(switch (kind) {
+                    case SWAP -> "heavyseas.consent.swap";
+                    case STEAL -> "heavyseas.consent.steal";
+                    case RATION -> "heavyseas.consent.ration";
+                }, nameOf(attacker)),
                 width / 2, askY, GuiLanguage.INK);
 
         List<Text> labels = List.of(Text.translatable("heavyseas.consent.agree"),

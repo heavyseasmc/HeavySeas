@@ -440,6 +440,9 @@ public final class Session {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(target, "target");
+        if (kind == Contest.Kind.RATION) {
+            throw new IllegalArgumentException("绝境要带着牌走 beginRation，不能当普通指定动作宣告");
+        }
         if (state.phase() != Phase.ACTION) {
             throw new IllegalStateException("%s %s是行动阶段的事，现在是 %s"
                     .formatted(context, kindName(kind), state.phase()));
@@ -458,7 +461,8 @@ public final class Session {
                     .formatted(context, target.value(), kindName(kind)));
         }
         boolean handOnly = kind == Contest.Kind.STEAL && stealsUncontested(actor);
-        contest = new Contest(kind, actor, target, Contest.Stage.CONSENT, Optional.empty(), handOnly, Map.of());
+        contest = new Contest(kind, actor, target, Contest.Stage.CONSENT, Optional.empty(), handOnly, Map.of(),
+                "", Set.of());
         if (handOnly || !state.conditionOf(target).canAct()) {
             agreed();
         }
@@ -473,6 +477,18 @@ public final class Session {
     public void consent(boolean fight) {
         Contest c = requireStage(Contest.Stage.CONSENT, "表态");
         if (!fight) {
+            if (c.kind() == Contest.Kind.RATION) {
+                Set<CharacterId> passed = new LinkedHashSet<>(c.passed());
+                passed.add(c.target());
+                Optional<CharacterId> next = nextRationOpponent(c.attacker(), passed);
+                if (next.isPresent()) {
+                    contest = c.passAndAsk(c.target(), next.get());
+                } else {
+                    contest = null;
+                    applyRation(c.provision());
+                }
+                return;
+            }
             agreed();
             return;
         }
@@ -557,10 +573,10 @@ public final class Session {
         }
         Fight.Outcome outcome = applyFight(fight);
         if (outcome.attackerGetsWhatTheyWanted()) {
-            if (c.kind() == Contest.Kind.SWAP) {
-                swapSeats(c.attacker(), c.target());
-            } else {
-                enterPick(c);
+            switch (c.kind()) {
+                case SWAP -> swapSeats(c.attacker(), c.target());
+                case STEAL -> enterPick(c);
+                case RATION -> applyRation(c.provision());
             }
         }
         return outcome;
@@ -613,10 +629,10 @@ public final class Session {
     private void agreed() {
         Contest c = contest;
         contest = null;
-        if (c.kind() == Contest.Kind.SWAP) {
-            swapSeats(c.attacker(), c.target());
-        } else {
-            enterPick(c);
+        switch (c.kind()) {
+            case SWAP -> swapSeats(c.attacker(), c.target());
+            case STEAL -> enterPick(c);
+            case RATION -> throw new IllegalStateException("绝境要逐个询问反对者，不能走普通同意分支");
         }
     }
 
@@ -652,7 +668,11 @@ public final class Session {
     }
 
     private static String kindName(Contest.Kind kind) {
-        return kind == Contest.Kind.SWAP ? "换座位" : "抢夺";
+        return switch (kind) {
+            case SWAP -> "换座位";
+            case STEAL -> "抢夺";
+            case RATION -> "绝境反对";
+        };
     }
 
     /**
@@ -1417,17 +1437,39 @@ public final class Session {
     }
 
     /**
-     * 特殊行动：绝境。船上有尸体时，<b>每个清醒的角色</b>各回 1 点。
+     * 特殊行动：绝境的真人路径。牌先弃掉，再逐个问其余清醒角色是否反对；有人反对就进入既有战斗状态机。
      *
-     * <p>❗<b>昏迷的不算尸体</b>（规则 §11.1 与中文 FAQ）。
-     * ❗<b>反对不在这里</b>：那是一场战斗，而两段式战斗还没做 —— 谁反对、打不打得赢由调用方决定，
-     * 与 {@link #applyFight} 的分工一致（ADR-0021 §7）。
+     * <p>规则要求无论结果如何都弃牌，所以不能等到战斗胜负出来才消费。这样战斗期间也不存在把这张牌
+     * 转手、亮出或重复打出的竞态。
      *
-     * @return 真的回了血的人
-     * @throws IllegalStateException 船上没有尸体
+     * @return 有值表示无需等待、效果已经结算；空表示正在等反对者，调用方必须等 {@link #contest()} 收场
+     */
+    public Optional<List<CharacterId>> beginRation(CharacterId user, String cardId) {
+        requireNoContest("打出绝境");
+        ProvisionEffect.HealAll heal = requireRation(user, cardId);
+        consume(user, cardId, heal.discardOnUse());
+        Optional<CharacterId> first = heal.contestable() ? nextRationOpponent(user, Set.of()) : Optional.empty();
+        if (first.isPresent()) {
+            contest = new Contest(Contest.Kind.RATION, user, first.get(), Contest.Stage.CONSENT,
+                    Optional.empty(), false, Map.of(), cardId, Set.of());
+            requireNoProvisionLost("绝境等待反对时");
+            return Optional.empty();
+        }
+        return Optional.of(applyRation(cardId));
+    }
+
+    /**
+     * 不含玩家决策的直达入口，供模拟器与规则夹具使用；真人模组必须走 {@link #beginRation}。
      */
     public List<CharacterId> useRation(CharacterId user, String cardId) {
         requireNoContest("打出绝境");
+        ProvisionEffect.HealAll heal = requireRation(user, cardId);
+        consume(user, cardId, heal.discardOnUse());
+        return applyRation(cardId);
+    }
+
+    /** 昏迷不算尸体；这一条必须在弃牌之前查，失败不能吃掉玩家的牌。 */
+    private ProvisionEffect.HealAll requireRation(CharacterId user, String cardId) {
         Provision card = requireHeld(user, cardId);
         if (!(card.effect() instanceof ProvisionEffect.HealAll heal)) {
             throw new IllegalArgumentException("%s 不是全体回血的物资".formatted(cardId));
@@ -1435,6 +1477,22 @@ public final class Session {
         if (heal.requiresCorpse() && state.onBoatBySeat().stream()
                 .noneMatch(id -> state.conditionOf(id) == Condition.DEAD)) {
             throw new IllegalStateException("%s 船上没有尸体，%s 用不了".formatted(context, cardId));
+        }
+        return heal;
+    }
+
+    /** 下一位仍能反对的人，按座位顺序；打牌者、已回答者与不清醒者都跳过。 */
+    private Optional<CharacterId> nextRationOpponent(CharacterId user, Set<CharacterId> passed) {
+        return state.onBoatBySeat().stream()
+                .filter(id -> !id.equals(user) && !passed.contains(id) && state.conditionOf(id).canAct())
+                .findFirst();
+    }
+
+    /** 牌已经消费之后让绝境生效。 */
+    private List<CharacterId> applyRation(String cardId) {
+        ProvisionEffect effect = table.provisions().get(cardId).effect();
+        if (!(effect instanceof ProvisionEffect.HealAll heal)) {
+            throw new IllegalStateException("绝境待决的牌已经不是全体回血物资：" + cardId);
         }
         List<CharacterId> healed = new ArrayList<>();
         for (CharacterId id : state.bySeat()) {
@@ -1445,7 +1503,6 @@ public final class Session {
             healedSincePhaseStart += heal.amount();
             healed.add(id);
         }
-        consume(user, cardId, heal.discardOnUse());
         Invariants.requireValid(state, context, "绝境之后");
         requireNoProvisionLost("绝境之后");
         return List.copyOf(healed);

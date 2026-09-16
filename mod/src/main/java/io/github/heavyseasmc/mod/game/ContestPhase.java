@@ -83,16 +83,36 @@ public final class ContestPhase {
         after(world, component, actor);
     }
 
+    /** 打出绝境：无论有没有人反对都先弃牌；有反对资格的人按座位逐个表态。 */
+    public static void beginRation(ServerWorld world, GameComponent component, CharacterId actor, String cardId) {
+        Session session = component.requireSession();
+        Optional<List<CharacterId>> immediate = session.beginRation(actor, cardId);
+        LOGGER.info("绝境：{} 打出 {}{}", actor.value(), cardId, immediate.isPresent() ? "，无人能反对" : "，等待反对");
+        if (immediate.isPresent()) {
+            announceRationed(world, actor, immediate.get().size());
+            GameFlow.finishAction(world, component, actor);
+            return;
+        }
+        CharacterId asked = session.contest().orElseThrow().target();
+        GameFlow.broadcast(world, Text.translatable("heavyseas.contest.declared_ration",
+                GameFlow.characterName(actor), GameFlow.characterName(asked)).formatted(Formatting.AQUA));
+        after(world, component, actor);
+    }
+
     /** 被指定的人表态。{@code fight = false} 是同意（超时也走这一条）。 */
     public static void consent(ServerWorld world, GameComponent component, boolean fight) {
         Session session = component.requireSession();
         Contest contest = session.contest().orElseThrow();
         CharacterId attacker = contest.attacker();
         CharacterId target = contest.target();
+        int rationHealed = contest.kind() == Contest.Kind.RATION ? healable(session) : 0;
         session.consent(fight);
         LOGGER.info("表态：{} {}", target.value(), fight ? "战斗" : "同意");
         GameFlow.broadcast(world, Text.translatable(fight ? "heavyseas.contest.refused" : "heavyseas.contest.agreed",
                 GameFlow.characterName(target)).formatted(fight ? Formatting.RED : Formatting.GRAY));
+        if (!fight && contest.kind() == Contest.Kind.RATION && session.contest().isEmpty()) {
+            announceRationed(world, attacker, rationHealed);
+        }
         after(world, component, attacker);
     }
 
@@ -136,6 +156,7 @@ public final class ContestPhase {
         Contest contest = session.contest().orElseThrow();
         CharacterId attacker = contest.attacker();
         CharacterId target = contest.target();
+        int rationHealed = contest.kind() == Contest.Kind.RATION ? healable(session) : 0;
         Fight.Outcome outcome = session.resolveContest();
         boolean won = outcome.attackerGetsWhatTheyWanted();
         LOGGER.info("战斗结算：{} 对 {} —— {}方胜，败方每人 {} 点", attacker.value(), target.value(),
@@ -147,7 +168,14 @@ public final class ContestPhase {
             GameFlow.broadcast(world, Text.translatable("heavyseas.contest.damage", outcome.damagePerLoser())
                     .formatted(Formatting.RED));
         }
-        if (won && !session.contest().isPresent()) {
+        if (contest.kind() == Contest.Kind.RATION) {
+            if (won) {
+                announceRationed(world, attacker, rationHealed);
+            } else {
+                GameFlow.broadcast(world, Text.translatable("heavyseas.contest.ration_blocked",
+                        GameFlow.characterName(target)).formatted(Formatting.GRAY));
+            }
+        } else if (won && !session.contest().isPresent()) {
             // 换座位当场生效；抢夺时被抢方身上一张都没有，挑牌那一步跳过。
             announceTaken(world, contest, session);
         }
@@ -410,6 +438,19 @@ public final class ContestPhase {
         }
         GameFlow.broadcast(world, Text.translatable("heavyseas.contest.nothing_to_take",
                 GameFlow.characterName(contest.target())).formatted(Formatting.GRAY));
+    }
+
+    /** 此刻会被绝境治到的人数；在规则结算前取，给播报用。 */
+    private static int healable(Session session) {
+        return (int) session.state().bySeat().stream()
+                .filter(id -> session.state().conditionOf(id) == io.github.heavyseasmc.engine.state.Condition.CONSCIOUS)
+                .filter(id -> session.state().stateOf(id).damage() > 0)
+                .count();
+    }
+
+    private static void announceRationed(ServerWorld world, CharacterId actor, int healed) {
+        GameFlow.broadcast(world, Text.translatable("heavyseas.command.rationed",
+                GameFlow.characterName(actor), healed));
     }
 
     /**

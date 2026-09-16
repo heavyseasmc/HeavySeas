@@ -50,6 +50,10 @@ dependencies {
     // 引擎的 Gson 不嵌：生产环境里用的是 Minecraft 自带的那一份，版本对齐见 engine/build.gradle。
     implementation project(':engine')
     include project(':engine')
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 // fabric.mod.json 里的版本约束全部从 gradle.properties 展开，JSON 里不另写一份。

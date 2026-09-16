@@ -82,8 +82,11 @@ public final class StanceScreen extends GameScreen {
         drawPublicBand(context, view, TOP_BAND_Y);
         int headerY = TOP_BAND_Y + 30;
         context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable(kind == Contest.Kind.STEAL
-                        ? "heavyseas.stance.header_steal" : "heavyseas.stance.header_swap",
+                Text.translatable(switch (kind) {
+                            case SWAP -> "heavyseas.stance.header_swap";
+                            case STEAL -> "heavyseas.stance.header_steal";
+                            case RATION -> "heavyseas.stance.header_ration";
+                        },
                         nameOf(attacker), nameOf(target)), width / 2, headerY, GuiLanguage.INK);
         // 两边各一行：站了谁 · 体型和。朱砂留给倒计时见底那一段，这里两边一视同仁。
         int attackY = headerY + fh + GAP;

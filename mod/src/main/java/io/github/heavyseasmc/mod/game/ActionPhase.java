@@ -225,9 +225,9 @@ public final class ActionPhase {
             GameFlow.broadcast(world, Text.translatable("heavyseas.command.opened",
                     GameFlow.characterName(actor), provisionName(cardId)));
         } else if (effect instanceof ProvisionEffect.HealAll) {
-            List<CharacterId> healed = session.useRation(actor, cardId);
-            GameFlow.broadcast(world, Text.translatable("heavyseas.command.rationed",
-                    GameFlow.characterName(actor), healed.size()));
+            // 绝境不是按一下就生效：其余清醒角色要逐个有机会反对，反对后复用完整战斗状态机。
+            ContestPhase.beginRation(world, component, actor, cardId);
+            return;
         } else if (effect instanceof ProvisionEffect.WeaponOrSpecial) {
             int before = session.state().gulls();
             session.fireSignal(actor, cardId);

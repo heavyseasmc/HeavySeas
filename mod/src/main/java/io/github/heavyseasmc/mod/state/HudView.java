@@ -5,6 +5,7 @@ import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.mod.game.ThirstEligibility;
 
 import java.util.List;
 import java.util.Objects;
@@ -217,7 +218,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
     /** 该我决定喝不喝水了：口渴结算问到我，而且窗口开着（没水或昏迷时服务端不开窗口）。 */
     public boolean myThirstChoice() {
         return active && seated && thirstPrompt.active() && thirstPrompt.deadlineMs() > 0
-                && thirstPrompt.who().equals(character);
+                && thirstPrompt.who().equals(character) && ThirstEligibility.canChoose(condition, myWaters());
     }
 
     /** 服务器已经认下这张治疗牌，正等我挑一个受伤目标。 */

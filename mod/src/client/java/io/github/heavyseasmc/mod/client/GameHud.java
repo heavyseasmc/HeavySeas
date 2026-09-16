@@ -164,8 +164,11 @@ public final class GameHud {
      */
     private static Text contestLine(HudView view) {
         ContestView contest = view.contest();
-        Text kind = Text.translatable(contest.kind() == Contest.Kind.STEAL
-                ? "heavyseas.contest.kind_steal" : "heavyseas.contest.kind_swap");
+        Text kind = Text.translatable(switch (contest.kind()) {
+            case SWAP -> "heavyseas.contest.kind_swap";
+            case STEAL -> "heavyseas.contest.kind_steal";
+            case RATION -> "heavyseas.contest.kind_ration";
+        });
         Text attacker = Text.translatable("heavyseas.character." + contest.attacker());
         Text target = Text.translatable("heavyseas.character." + contest.target());
         Text stage = stageName(contest.stage());
