@@ -18,11 +18,14 @@ import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.NavCardView;
+import io.github.heavyseasmc.mod.world.Seats;
+
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +75,7 @@ public final class GameFlow {
 
     /** 开一局。座位顺序由角色决定（夫人永远在船头），与谁来占无关。 */
     public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
-                             Set<CharacterId> reservedForDummies) {
+                             Set<CharacterId> reservedForDummies, Vec3d boatAt, float boatYaw) {
         GameData data = GameDataLoader.require();
         Roster roster = data.roster().preset(players);
 
@@ -136,6 +139,8 @@ public final class GameFlow {
         LOGGER.info("对局开始：{} 人局 · 座位 {} · 替身自动推进{}", players,
                 session.state().bySeat().stream().map(CharacterId::value).toList(),
                 component.dummyAutoplay() ? "开" : "关");
+        // 位次摆进世界（ADR-0024）。放在播报之后：摆船会再推一次投影，而开局那一帧已经推过了。
+        Seats.place(world, component, boatAt, boatYaw, session.state().bySeat().size());
         enterProvision(world, component);
     }
 

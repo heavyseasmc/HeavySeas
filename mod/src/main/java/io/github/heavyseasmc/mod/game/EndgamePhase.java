@@ -10,6 +10,9 @@ import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.world.Nameplates;
+import io.github.heavyseasmc.mod.world.Seats;
+
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -153,6 +156,9 @@ public final class EndgamePhase {
 
     private static void finish(ServerWorld world, GameComponent component) {
         LOGGER.info("终局结束：会话收起");
+        DesignationPhase.clear(world, component);   // 还举着拳头的那一位要熄灯
+        Nameplates.clear(world);             // 队伍进存档：不删的话下一局名牌上还挂着上一局的数
+        Seats.clear(world, component);       // 先收座位再收会话：clear 要读组件里那份名单
         component.end();
         GameComponents.sync(world);          // 结束那一帧也要推到（endedFor），否则计分面板一直挂着
     }

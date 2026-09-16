@@ -2,6 +2,7 @@ package io.github.heavyseasmc.mod.game;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.play.Contest;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
@@ -59,6 +60,18 @@ public final class ActionPhase {
         if (session.rower().isPresent()) {
             return;                       // 划船抽到的牌还没定完：行动一面上再按一次不作数（改过的客户端发得出来）
         }
+        if (component.designating().isPresent()) {
+            // 举着拳头时只认「取消」这一下；别的一律当作没按（改过的客户端发得出任何东西）。
+            Optional<CharacterId> raised = component.seatOf(player.getUuid());
+            if (kind.get() == ActionChoiceC2S.Kind.CANCEL && raised.isPresent()
+                    && component.designating().get().equals(raised.get())) {
+                DesignationPhase.cancel(world, component, raised.get());
+            }
+            return;
+        }
+        if (kind.get() == ActionChoiceC2S.Kind.CANCEL) {
+            return;                       // 没在举着拳头，没什么可取消的
+        }
         if (session.contest().isPresent()) {
             // ❗这一场还没收场：引擎照样会抛（requireNoContest），但抛出来的是一句堆栈 ——
             //   而这条路上没有「指令出错」那句人话可说，静默丢掉才是对的（ADR-0023）。
@@ -79,6 +92,10 @@ public final class ActionPhase {
                 GameFlow.broadcast(world, Text.translatable("heavyseas.command.passed", GameFlow.characterName(who)));
                 GameFlow.finishAction(world, component, who);
             }
+            // ❗这两件**不是当场生效**：进指定模式，回到世界里看着那个人右键（ADR-0025 · 决策 ⑦）。
+            //   那个预告窗口本身就是谈判游戏的内容 —— GUI 里选目标是瞬发的，那一幕就没有了。
+            case SWAP -> DesignationPhase.begin(world, component, who, Contest.Kind.SWAP);
+            case STEAL -> DesignationPhase.begin(world, component, who, Contest.Kind.STEAL);
         }
     }
 

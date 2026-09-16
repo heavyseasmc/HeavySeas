@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
@@ -8,11 +9,13 @@ import io.github.heavyseasmc.mod.state.ContestView;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.world.SeatEntity;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
@@ -98,6 +101,9 @@ public final class HeavySeasClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         HudRenderCallback.EVENT.register(GameHud::render);
+
+        // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
+        EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);
 
         handKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_H,
@@ -208,6 +214,16 @@ public final class HeavySeasClient implements ClientModInitializer {
             return;
         }
         endgameStageShown = null;
+
+        // 举着拳头找人时（ADR-0025）：行动一面不该弹（投影里 yourTurn 已经排掉了），
+        // 按行动键是**取消**，退回行动一面 —— 决策 ⑦ 的「退回 GUI 重选」由它提供。
+        if (view.myDesignating()) {
+            if (pressed) {
+                ClientPlayNetworking.send(ActionChoiceC2S.of(ActionChoiceC2S.Kind.CANCEL));
+                LOGGER.info("指定模式：按了取消");
+            }
+            return;
+        }
 
         // 换座位 / 抢夺的四面（ADR-0023）。排在这里是因为它属于行动阶段，而下面那两面属于航海与口渴 ——
         // 同一帧里不会两者都为真，排序只是让「轮到我表态」不被后面任何一条 return 截在半路。

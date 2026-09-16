@@ -77,6 +77,18 @@ public final class Session {
         Invariants.requireValid(state, context, "开局");
     }
 
+    /**
+     * 他的抢夺是不是「不问、不打、只偷手牌」—— 小孩那一手（决策 ⑦）。
+     *
+     * <p>❗提成一个查询，是因为<b>驱动者也要问这一句</b>：指定模式里小孩没有预告（不发光、不播报，
+     * ADR-0025）。两处各写一份判据的话，两份迟早分家 —— 而分家的表现是「小孩发起时全船看见了」，
+     * 规则上他因此被系统性削弱，却没有任何东西会报错。
+     */
+    public boolean stealsUncontested(CharacterId who) {
+        return state.roster().get(who).ability() instanceof Ability.StealUncontested steal
+                && "hand".equals(steal.zone());
+    }
+
     public GameState state() {
         return state;
     }
@@ -445,9 +457,7 @@ public final class Session {
             throw new IllegalArgumentException("%s %s 已经被移出游戏，不能对他%s"
                     .formatted(context, target.value(), kindName(kind)));
         }
-        boolean handOnly = kind == Contest.Kind.STEAL
-                && state.roster().get(actor).ability() instanceof Ability.StealUncontested steal
-                && "hand".equals(steal.zone());
+        boolean handOnly = kind == Contest.Kind.STEAL && stealsUncontested(actor);
         contest = new Contest(kind, actor, target, Contest.Stage.CONSENT, Optional.empty(), handOnly, Map.of());
         if (handOnly || !state.conditionOf(target).canAct()) {
             agreed();

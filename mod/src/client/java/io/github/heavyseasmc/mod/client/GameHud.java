@@ -99,6 +99,12 @@ public final class GameHud {
                 lines.add(Text.translatable("heavyseas.hud.contest_you",
                         HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW));
             }
+            // 举着拳头找人（ADR-0025）：不写这一行，玩家按下「换座位」之后界面一关，就不知道该干什么了。
+            if (view.myDesignating()) {
+                long left = Math.max(0L, view.designateUntil() - System.currentTimeMillis());
+                lines.add(Text.translatable("heavyseas.hud.designating", (left + 999) / 1000,
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.RED));
+            }
             if (view.myTurnToAct()) {
                 // 键同样显示实际绑定的那个，理由同下面手牌那一行。
                 lines.add(Text.translatable("heavyseas.hud.your_turn",

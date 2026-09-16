@@ -1,6 +1,10 @@
 package io.github.heavyseasmc.mod.state;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.world.Nameplates;
+import io.github.heavyseasmc.mod.world.Seats;
+
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.ComponentKey;
@@ -46,8 +50,19 @@ public final class GameComponents implements WorldComponentInitializer {
         return world.getComponent(GAME);
     }
 
-    /** 把组件推给该收到的玩家。同上，走注入进 World 的那个接口。 */
+    /**
+     * 把组件推给该收到的玩家。同上，走注入进 World 的那个接口。
+     *
+     * <p>顺带把世界里的位次也摆对（ADR-0024）：**座位上的位置和 HUD 一样是投影**，
+     * 事实源永远是引擎的 {@code bySeat()}。放在这里是因为这里正是「投影该更新了」那一刻 ——
+     * 换座位、被海水带走、重连，全都只是「名单变了，再摆一次」，不必各自记得去挪人。
+     * {@code Seats#refresh} 对已经坐对的人什么都不做，所以每帧走一遍是便宜的。
+     */
     public static void sync(World world) {
         world.syncComponent(GAME);
+        if (world instanceof ServerWorld server) {
+            Seats.refresh(server, of(world));
+            Nameplates.refresh(server, of(world));   // 头顶信息条同理：投影，不是状态（决策 ⑥）
+        }
     }
 }

@@ -241,5 +241,18 @@
   "heavyseas.pick.header": "Take one card from %s",
   "heavyseas.pick.from_hand": "one at random from the hand (%s cards)",
   "heavyseas.pick.hint": "left/right to choose · enter to take · no answer draws one from the hand",
-  "heavyseas.command.pile_empty_of": "No %s left in the provision deck (%s cards remain)."
+  "heavyseas.command.pile_empty_of": "No %s left in the provision deck (%s cards remain).",
+  "heavyseas.action.swap_hint": "Then go back into the world and right-click them — everyone sees you rise",
+  "heavyseas.action.steal_hint": "Then go back into the world and right-click them — everyone sees you rise",
+  "heavyseas.designate.announce_swap": "%s rises, after someone's seat — %s s left.",
+  "heavyseas.designate.announce_steal": "%s rises, after someone's cards — %s s left.",
+  "heavyseas.designate.not_aboard": "They are not aboard this boat.",
+  "heavyseas.designate.not_self": "You cannot go after yourself.",
+  "heavyseas.hud.designating": "Choosing a target · %s s · right-click them · press %s to sit back down",
+  "heavyseas.plate.health": "%s/%s",
+  "heavyseas.plate.power": " ⚔%s",
+  "heavyseas.plate.preserver": " ◯",
+  "heavyseas.plate.treasure": " $%s",
+  "heavyseas.plate.hand": " ♠%s",
+  "heavyseas.plate.designating": " rising"
 }

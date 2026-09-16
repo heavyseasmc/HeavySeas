@@ -241,5 +241,18 @@
   "heavyseas.pick.header": "从 %s 那里拿走一张",
   "heavyseas.pick.from_hand": "手牌里随机一张（他手上 %s 张）",
   "heavyseas.pick.hint": "← → 选 · 回车拿走 · 超时替你从手牌里抽一张",
-  "heavyseas.command.pile_empty_of": "物资牌堆里已经没有 %s 了（还剩 %s 张）。"
+  "heavyseas.command.pile_empty_of": "物资牌堆里已经没有 %s 了（还剩 %s 张）。",
+  "heavyseas.action.swap_hint": "选了之后回到世界里，看着那个人右键 —— 全船会看见你要动手",
+  "heavyseas.action.steal_hint": "选了之后回到世界里，看着那个人右键 —— 全船会看见你要动手",
+  "heavyseas.designate.announce_swap": "%s 站了起来，要和某个人换座位 —— 还有 %s 秒。",
+  "heavyseas.designate.announce_steal": "%s 站了起来，要抢某个人的牌 —— 还有 %s 秒。",
+  "heavyseas.designate.not_aboard": "他不在这条船上。",
+  "heavyseas.designate.not_self": "不能对自己动手。",
+  "heavyseas.hud.designating": "举着拳头找人 · %s 秒 · 看着那个人右键 · 按 %s 收手",
+  "heavyseas.plate.health": "%s/%s",
+  "heavyseas.plate.power": " ⚔%s",
+  "heavyseas.plate.preserver": " ◯",
+  "heavyseas.plate.treasure": " 宝%s",
+  "heavyseas.plate.hand": " 牌%s",
+  "heavyseas.plate.designating": " 要动手"
 }

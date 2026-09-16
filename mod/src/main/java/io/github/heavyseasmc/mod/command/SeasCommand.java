@@ -1,11 +1,5 @@
 package io.github.heavyseasmc.mod.command;
 
-import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
-import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.ProvisionEffect;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
@@ -17,16 +11,27 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.ContestPhase;
+import io.github.heavyseasmc.mod.game.DesignationPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.game.NavigationPhase;
 import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.world.Nameplates;
+import io.github.heavyseasmc.mod.world.Seats;
+
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,8 +226,12 @@ public final class SeasCommand {
             return 0;
         }
         List<ServerPlayerEntity> humans = new ArrayList<>(world.getServer().getPlayerManager().getPlayerList());
+        // 船摆在调用者脚下、朝他面朝的方向（ADR-0024 §7.5）。控制台没有身体，那就用世界出生点。
+        ServerPlayerEntity caller = context.getSource().getPlayer();
+        Vec3d boatAt = caller != null ? caller.getPos() : Vec3d.ofBottomCenter(world.getSpawnPos());
+        float boatYaw = caller != null ? caller.getYaw() : 0f;
         try {
-            GameFlow.start(world, players, humans, component.pendingDummies());
+            GameFlow.start(world, players, humans, component.pendingDummies(), boatAt, boatYaw);
         } catch (RuntimeException e) {
             context.getSource().sendError(Text.literal(String.valueOf(e.getMessage())));
             return 0;
@@ -236,6 +245,9 @@ public final class SeasCommand {
             context.getSource().sendError(Text.translatable("heavyseas.command.no_game"));
             return 0;
         }
+        DesignationPhase.clear(context.getSource().getWorld(), component);
+        Nameplates.clear(context.getSource().getWorld());
+        Seats.clear(context.getSource().getWorld(), component);
         component.end();
         GameComponents.sync(context.getSource().getWorld());
         context.getSource().sendFeedback(() -> Text.translatable("heavyseas.command.ended"), true);

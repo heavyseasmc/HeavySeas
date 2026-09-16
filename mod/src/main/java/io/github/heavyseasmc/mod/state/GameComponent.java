@@ -251,8 +251,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         // ❗这一场进行中时也不算「轮到你」：进攻方在收场之前一直还是 nextActor（行动是收场那一刻才记的），
         //   不排除的话，他的行动一面会在这一场当中弹出来，而按下去的那一下会撞上引擎的 requireNoContest ——
         //   那是一句堆栈，不是一次被拒绝的操作。
+        // ❗举着拳头时也不算「轮到你选一件事」：不排掉的话，按下「换座位」之后行动一面会当场弹回来，
+        //   而它发出的包会被服务端当作「已经在指定模式里了」静默丢掉 —— 屏幕上只是「按了没反应」。
         buf.writeBoolean(g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false)
-                && session.rower().isEmpty() && session.contest().isEmpty());
+                && session.rower().isEmpty() && session.contest().isEmpty()
+                && designating().isEmpty());
+        // 我正举着拳头找人吗（ADR-0025）· 还剩多久。只写给他自己 —— 别人看的是世界里那个发光的人。
+        buf.writeBoolean(designating().map(id::equals).orElse(false));
+        buf.writeVarLong(designating().map(id::equals).orElse(false) ? designationDeadline : 0L);
         // 手牌只写这一份 —— 别人的包里没有这些字节，不是「发了再藏」。
         List<String> hand = g.stateOf(id).hand();
         buf.writeVarInt(hand.size());
@@ -435,7 +441,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             return new HudView(true, turn, phase, gulls, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
-                    false, List.of(), List.of(), HudView.Score.NONE);
+                    false, false, 0L, List.of(), List.of(), HudView.Score.NONE);
         }
         String character = buf.readString();
         int health = buf.readVarInt();
@@ -449,6 +455,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             myScore = new HudView.Score(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
         }
         boolean yourTurn = buf.readBoolean();
+        boolean designating = buf.readBoolean();
+        long designateUntil = buf.readVarLong();
         int cards = buf.readVarInt();
         List<String> hand = new ArrayList<>(cards);
         for (int i = 0; i < cards; i++) {
@@ -483,7 +491,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return new HudView(true, turn, phase, gulls, seats, removed, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
-                love, hate, yourTurn, List.copyOf(hand), List.copyOf(front), myScore);
+                love, hate, yourTurn, designating, designateUntil,
+                List.copyOf(hand), List.copyOf(front), myScore);
     }
 
     /** 一串角色 id：写的那一侧都是「先张数再逐个」，读的这一侧就只此一份。 */
@@ -732,6 +741,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     public void begin(Session started, Map<CharacterId, Occupant> seats) {
+        clearDesignation();
         this.session = started;
         this.occupants.clear();
         this.occupants.putAll(seats);
@@ -745,8 +755,60 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         steps.clear();
     }
 
+    /**
+     * 这一局摆在世界里的那几个座位（船头到船尾）· ADR-0024。
+     *
+     * <p>❗<b>不写进 NBT，也不该写</b>：对局本身就不持久化（存档时服务端会说「这一局不会被保存」），
+     * 而实体是要存盘的 —— 存了它，重启之后就会有一份指着一局并不存在的对局的座位名单。
+     * 起服时那些座位一律当孤儿清掉（{@code Seats#sweep}）。
+     */
+    private List<UUID> seatIds = List.of();
+
+    public List<UUID> seatIds() {
+        return seatIds;
+    }
+
+    public void setSeatIds(List<UUID> ids) {
+        this.seatIds = List.copyOf(ids);
+    }
+
+    /**
+     * 指定模式（ADR-0025）：谁在举着拳头找人、要做什么、到点时刻。
+     *
+     * <p>❗与另外几个窗口同一个写法：**服务端超时，客户端不参与判定**。
+     * 和座位一样不写进 NBT —— 对局本身就不持久化。
+     */
+    private CharacterId designating;
+    private Contest.Kind designationKind;
+    private long designationDeadline;
+
+    public Optional<CharacterId> designating() {
+        return Optional.ofNullable(designating);
+    }
+
+    public Optional<Contest.Kind> designationKind() {
+        return Optional.ofNullable(designationKind);
+    }
+
+    public long designationDeadline() {
+        return designationDeadline;
+    }
+
+    public void beginDesignation(CharacterId who, Contest.Kind kind, long millis) {
+        this.designating = who;
+        this.designationKind = kind;
+        this.designationDeadline = System.currentTimeMillis() + millis;
+    }
+
+    public void clearDesignation() {
+        this.designating = null;
+        this.designationKind = null;
+        this.designationDeadline = 0L;
+    }
+
     public void end() {
         occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
+        clearDesignation();
         this.session = null;
         this.occupants.clear();
         clearProvision();

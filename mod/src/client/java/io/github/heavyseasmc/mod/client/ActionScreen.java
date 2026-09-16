@@ -44,8 +44,8 @@ public final class ActionScreen extends GameScreen {
     /** 交互稿里的五件事，次序照稿子。{@code kind} 为空的就是这一版按不动的。 */
     private enum Choice {
         ROW("heavyseas.action.row", "heavyseas.action.row_hint", ActionChoiceC2S.Kind.ROW, false),
-        SWAP("heavyseas.action.swap", "heavyseas.action.needs_target", null, false),
-        STEAL("heavyseas.action.steal", "heavyseas.action.needs_target", null, true),
+        SWAP("heavyseas.action.swap", "heavyseas.action.swap_hint", ActionChoiceC2S.Kind.SWAP, false),
+        STEAL("heavyseas.action.steal", "heavyseas.action.steal_hint", ActionChoiceC2S.Kind.STEAL, true),
         USE("heavyseas.action.use", "heavyseas.action.use_hint", null, false),
         PASS("heavyseas.action.pass", "heavyseas.action.pass_hint", ActionChoiceC2S.Kind.PASS, false);
 

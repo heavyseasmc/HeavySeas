@@ -5,10 +5,11 @@ import io.github.heavyseasmc.mod.command.SeasCommand;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.ContestPhase;
+import io.github.heavyseasmc.mod.game.DesignationPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.game.NavigationPhase;
-import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.game.ProvisionPhase;
+import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.ContestActionC2S;
 import io.github.heavyseasmc.mod.net.HelmActionC2S;
@@ -18,8 +19,15 @@ import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
 import io.github.heavyseasmc.mod.net.ThirstActionC2S;
+import io.github.heavyseasmc.mod.world.SeatEntity;
+import io.github.heavyseasmc.mod.world.Nameplates;
+import io.github.heavyseasmc.mod.world.Seats;
+
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -46,6 +54,19 @@ public final class HeavySeasMod implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("规则引擎已接入：一回合 {} 个阶段", Phase.values().length);
         GameDataLoader.register();
+        // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。
+        SeatEntity.register();
+        // ❗孤儿座位：对局不持久化，所以存档里留下的每一个座位都是上次没收干净的。
+        //   认的是「实体进世界」那一刻，不是起服那一刻 —— 起服时孤儿还躺在没加载的区块里，
+        //   第一版那样写实测永远报「清掉 0 个」，而世界里真有 7 个（ADR-0024 §9）。
+        ServerEntityEvents.ENTITY_LOAD.register(Seats::onSeatLoaded);
+        // 队伍与座位同一个形状：它进 scoreboard.dat，上次没收干净的会原样留到下一次起服。
+        ServerLifecycleEvents.SERVER_STARTED.register(
+                server -> server.getWorlds().forEach(Nameplates::clear));
+        // 指定模式（ADR-0025）：世界里右键一个人就是「我要对他动手」。
+        // ❗只在指定模式里才作数，其余一律放行 —— 吃掉别人的右键会让人觉得「右键偶尔失灵」。
+        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) ->
+                DesignationPhase.onUseEntity(player, world, entity));
         CommandRegistrationCallback.EVENT.register(
                 (dispatcher, registryAccess, environment) -> SeasCommand.register(dispatcher));
 
@@ -90,6 +111,7 @@ public final class HeavySeasMod implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(NavigationPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ThirstPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ContestPhase::tick);
+        ServerTickEvents.END_SERVER_TICK.register(DesignationPhase::tick);
         // 排程：替身的一步、航海结算后的停顿（ADR-0019）。
         ServerTickEvents.END_SERVER_TICK.register(GameFlow::tick);
     }

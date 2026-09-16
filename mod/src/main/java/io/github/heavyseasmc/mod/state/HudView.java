@@ -45,6 +45,8 @@ import java.util.Optional;
  * @param myScore   计分阶段收件人自己的四项明细；不在计分阶段时为 {@link Score#NONE}
  * @param thirstPrompt 口渴结算正在问谁、还需化解几次、还剩多久 · <b>公开</b>（他手上有几张水不在这里）
  * @param yourTurn  行动阶段正轮到他、而且他没有划船抽到还没定完的牌 —— ❗只在行动阶段为真（见 GameComponent 的 writeView）
+ * @param designating  他正举着拳头找人（ADR-0025）· <b>只有本人</b>；别人看的是世界里那个发光的人
+ * @param designateUntil 举着拳头的超时时刻（服务端时钟）；0 = 没在举
  * @param hand      收件人自己的手牌（物资 id，<b>可重复</b>：水有 16 张）。
  *                  旁观者与没座位的人拿到的是空表
  * @param front     收件人自己<b>亮在面前</b>的牌。规则上这一区是公开的，但别人的那份这一版还没发 ——
@@ -54,7 +56,8 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
                       List<String> seats, List<String> removed, String actor, Sea sea, Thirst thirstPrompt,
                       Endgame endgame, ContestView contest, boolean seated, String character,
                       int health, int maxHealth, Condition condition, int thirst, String love, String hate,
-                      boolean yourTurn, List<String> hand, List<FrontCard> front, Score myScore) {
+                      boolean yourTurn, boolean designating, long designateUntil,
+                      List<String> hand, List<FrontCard> front, Score myScore) {
 
     public HudView {
         seats = List.copyOf(Objects.requireNonNull(seats, "seats"));
@@ -74,7 +77,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
             false, 0, Phase.PROVISION, 0, List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
-            ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false,
+            ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, false, 0L,
             List.of(), List.of(), Score.NONE);
 
     /** 终局序列在进行，而且我在局里 —— 翻牌与计分两面开不开得起来只看这一条。 */
@@ -168,6 +171,15 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
     /** 在局里、有座位，而且手上有牌 —— 手牌界面开不开得起来只看这一条。 */
     public boolean hasHand() {
         return active && seated && !hand.isEmpty();
+    }
+
+    /**
+     * 我正举着拳头找人（ADR-0025 · 决策 ⑦）。
+     *
+     * <p>这一条为真时 {@link #myTurnToAct()} 一定为假 —— 否则行动一面会在按下「换座位」之后当场弹回来。
+     */
+    public boolean myDesignating() {
+        return active && seated && designating;
     }
 
     /** 该我在行动一面上选一件事了：在局里、有座位、行动阶段、正轮到我。 */
