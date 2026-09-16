@@ -134,7 +134,7 @@ public interface NavigationPolicy {
         int score(NavigationCard card, GameState state, CharacterId who) {
             int score = card.gull() * gullWeight;
 
-            Set<CharacterId> everyone = Set.copyOf(state.bySeat());
+            Set<CharacterId> everyone = Set.copyOf(state.onBoatBySeat());   // 被移出的人不会再被点到
             Selector.ConditionResolver noConditions = (condition, id) -> false;
             if (card.overboard().select(everyone, noConditions).contains(who)) {
                 score += OVERBOARD;

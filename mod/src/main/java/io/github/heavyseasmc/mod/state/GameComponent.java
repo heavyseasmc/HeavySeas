@@ -1,12 +1,17 @@
 package io.github.heavyseasmc.mod.state;
 
+import io.github.heavyseasmc.engine.model.Affinities;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.play.Contest;
 import io.github.heavyseasmc.engine.play.Session;
+import io.github.heavyseasmc.engine.scoring.ScoreSheet;
 import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.engine.state.SurvivorState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.RegistryByteBuf;
@@ -145,6 +150,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         for (CharacterId s : g.bySeat()) {
             buf.writeString(s.value());
         }
+        // 被移出游戏的人（ADR-0022）：公开 —— 全船都看见他被海水带走了，座位条上他那一格要显示「没了」。
+        List<CharacterId> removed = g.bySeat().stream().filter(g::isRemoved).toList();
+        buf.writeVarInt(removed.size());
+        for (CharacterId r : removed) {
+            buf.writeString(r.value());
+        }
         buf.writeString(g.phase() == Phase.ACTION ? g.nextActor().map(CharacterId::value).orElse("") : "");
         // 航海这一段的公开部分（决策 ⑭）：划船堆几张、舵手是谁、挑牌还剩多久、执行的是哪一张。
         // ❗划船堆里是什么牌不在这里 —— 那一项下面只写给舵手。
@@ -168,6 +179,45 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeVarInt(prompt.remaining());
             buf.writeVarLong(thirstDeadline);
         }
+        // 终局（ADR-0022）：这一轮已经翻开的目标对全船公开；最后那张不翻的谁都不发；计分阶段只发合计。
+        // ❗四项明细不在这里 —— 明细会把没翻的那张泄出去（「所恨的人死了 7」就指明了是谁），下面只写给本人。
+        buf.writeBoolean(endgame != null);
+        if (endgame != null) {
+            buf.writeEnumConstant(endgame.outcome());
+            buf.writeVarInt(endgame.alive());
+            buf.writeEnumConstant(endgame.stage());
+            buf.writeVarInt(endgame.flipped());
+            buf.writeBoolean(endgame.withheld());
+            Affinities aff = session.affinities().orElseThrow();
+            boolean scoring = endgame.stage() == EndgameProgress.Stage.SCORES;
+            buf.writeVarInt(endgame.order().size());
+            for (int i = 0; i < endgame.order().size(); i++) {
+                CharacterId who = endgame.order().get(i);
+                buf.writeString(who.value());
+                boolean open = !scoring && i < endgame.flipped();
+                CharacterId target = endgame.stage() == EndgameProgress.Stage.HATE ? aff.hateOf(who) : aff.loveOf(who);
+                buf.writeString(open ? target.value() : "");
+                buf.writeVarInt(scoring ? endgame.scores().get(who).total() : -1);
+            }
+        }
+
+        // 进行中的换座位 / 抢夺（ADR-0023）：谁对谁 · 哪一段 · 还剩多久 · 两边站了谁 · 两边的体型和，全都**公开**。
+        // 理由与划船堆张数、口渴轮到谁同一条（决策 ⑭）：等待要看得见。
+        // ❗战力和里**不含已押的武器** —— 武器是全场唯一的暗牌（决策 ④），含进去的话减一减就知道对面押了几点。
+        Optional<Contest> contest = session.contest();
+        buf.writeBoolean(contest.isPresent());
+        if (contest.isPresent()) {
+            Contest c = contest.get();
+            buf.writeEnumConstant(c.kind());
+            buf.writeString(c.attacker().value());
+            buf.writeString(c.target().value());
+            buf.writeEnumConstant(c.stage());
+            buf.writeVarLong(contestDeadline);
+            buf.writeVarLong(contestWindow);
+            Optional<Fight> fight = c.fight();
+            writeSide(buf, g, fight.map(Fight::attackSide).orElse(Set.of()));
+            writeSide(buf, g, fight.map(Fight::defendSide).orElse(Set.of()));
+        }
 
         Optional<CharacterId> seat = seatOf(recipient.getUuid());
         buf.writeBoolean(seat.isPresent());
@@ -181,11 +231,28 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(survivor.size());
         buf.writeEnumConstant(g.conditionOf(id));
         buf.writeVarInt(g.stateOf(id).thirst().count());
+        // 自己的爱恨只写给自己（规则：爱恨卡全程保密，不能亮出来证明自己）。别人的包里没有这两个字节。
+        Optional<Affinities> own = session.affinities();
+        buf.writeString(own.map(a -> a.loveOf(id).value()).orElse(""));
+        buf.writeString(own.map(a -> a.hateOf(id).value()).orElse(""));
+        // 计分阶段：自己的四项明细（照交互稿：舞台上列的是「你」的四行）。
+        boolean scoring = endgame != null && endgame.stage() == EndgameProgress.Stage.SCORES;
+        buf.writeBoolean(scoring);
+        if (scoring) {
+            ScoreSheet sheet = endgame.scores().get(id);
+            buf.writeVarInt(sheet.selfSurvival());
+            buf.writeVarInt(sheet.treasure());
+            buf.writeVarInt(sheet.loved());
+            buf.writeVarInt(sheet.hated());
+        }
         // ❗nextActor 只看「能行动」与「本回合还没行动过」，不看阶段 —— 行动阶段以外它照样可能指向某一位。
         //   HUD 的「轮到你行动」与行动一面的自动弹出都认这一位，所以阶段要在这里一起判。
         // ❗划船抽到的牌还没定完时，nextActor 仍然是他（行动要等两张都定了才算完），但他该看的是划船一面，不是行动一面。
+        // ❗这一场进行中时也不算「轮到你」：进攻方在收场之前一直还是 nextActor（行动是收场那一刻才记的），
+        //   不排除的话，他的行动一面会在这一场当中弹出来，而按下去的那一下会撞上引擎的 requireNoContest ——
+        //   那是一句堆栈，不是一次被拒绝的操作。
         buf.writeBoolean(g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false)
-                && session.rower().isEmpty());
+                && session.rower().isEmpty() && session.contest().isEmpty());
         // 手牌只写这一份 —— 别人的包里没有这些字节，不是「发了再藏」。
         List<String> hand = g.stateOf(id).hand();
         buf.writeVarInt(hand.size());
@@ -216,6 +283,71 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         for (NavigationCard card : offer) {
             NavCardView.of(card).write(buf);
         }
+        // 这一场里只进他自己那一包的几样（ADR-0023）。
+        // ❗押武器是暗牌，所以**连他自己那一包里也没有「谁押了什么」**：只有「我还押得出哪几张」与「我押了几张」。
+        if (contest.isPresent()) {
+            Contest c = contest.get();
+            List<String> weapons = committableWeapons(session, c, id);
+            buf.writeVarInt(weapons.size());
+            for (String card : weapons) {
+                buf.writeString(card);
+            }
+            buf.writeVarInt(c.committedBy(id).size());
+            // 挑牌那一段：被抢方**面前**那一区只写给抢夺方（那一区规则上本来就是公开的），
+            // 手牌只给张数 —— 手牌是暗的，抢夺方也不能看着牌挑（规则 §5）。
+            boolean contestPick = c.stage() == Contest.Stage.PICK && c.attacker().equals(id);
+            List<String> victimFront = contestPick && !c.handOnly()
+                    ? g.stateOf(c.target()).front() : List.of();
+            buf.writeVarInt(victimFront.size());
+            for (String card : victimFront) {
+                buf.writeString(card);
+            }
+            buf.writeVarInt(contestPick ? g.stateOf(c.target()).hand().size() : 0);
+        }
+    }
+
+    /**
+     * 一边：站了谁（公开），加上他们的<b>体型和</b>。
+     *
+     * <p>❗只有体型。押下的武器是暗牌，加进来就等于提前把它亮了 —— 而且是以最难发现的方式：
+     * 界面上只是一个数变大了，没有任何人会报错。
+     */
+    private static void writeSide(RegistryByteBuf buf, GameState g, Set<CharacterId> side) {
+        buf.writeVarInt(side.size());
+        int power = 0;
+        for (CharacterId who : side) {
+            buf.writeString(who.value());
+            power += g.roster().get(who).size();
+        }
+        buf.writeVarInt(power);
+    }
+
+    /**
+     * 他此刻还押得出的武器：手上与面前的武器牌，减去已经押下的那几张（两支船桨押了一支，还剩一支）。
+     *
+     * <p>判据与引擎 {@code Session#commitWeapon} 同源 —— 同一句「手上 + 面前 − 已押」，
+     * 只是一个用来拦、一个用来画。<b>不许在这里另立一套</b>：两套一旦分家，界面上摆着的牌会押不出去，
+     * 而那时看到的只是「按了没反应」。
+     */
+    private static List<String> committableWeapons(Session session, Contest contest, CharacterId who) {
+        if (contest.stage() != Contest.Stage.WEAPONS
+                || !contest.fight().map(f -> f.combatants().contains(who)).orElse(false)) {
+            return List.of();
+        }
+        SurvivorState s = session.state().stateOf(who);
+        List<String> owned = new ArrayList<>(s.hand());
+        owned.addAll(s.front());
+        List<String> committed = new ArrayList<>(contest.committedBy(who));
+        List<String> out = new ArrayList<>();
+        for (String card : owned) {
+            if (session.provisions().get(card).weaponPower() <= 0) {
+                continue;
+            }
+            if (!committed.remove(card)) {         // 已经押下的先一张一张扣掉，扣不掉的才是还押得出的
+                out.add(card);
+            }
+        }
+        return out;
     }
 
     @Override
@@ -243,6 +375,11 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         for (int i = 0; i < seatCount; i++) {
             seats.add(buf.readString());
         }
+        int removedCount = buf.readVarInt();
+        List<String> removed = new ArrayList<>(removedCount);
+        for (int i = 0; i < removedCount; i++) {
+            removed.add(buf.readString());
+        }
         String actor = buf.readString();
         int rowStack = buf.readVarInt();
         String helmsman = buf.readString();
@@ -253,16 +390,64 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             thirstPrompt = new HudView.Thirst(buf.readString(), buf.readVarInt(), buf.readVarInt(),
                     buf.readVarInt(), buf.readVarInt(), buf.readVarLong());
         }
+        HudView.Endgame endgame = HudView.Endgame.NONE;
+        if (buf.readBoolean()) {
+            GameState.Outcome outcome = buf.readEnumConstant(GameState.Outcome.class);
+            int alive = buf.readVarInt();
+            EndgameProgress.Stage stage = buf.readEnumConstant(EndgameProgress.Stage.class);
+            int flipped = buf.readVarInt();
+            boolean withheld = buf.readBoolean();
+            int entryCount = buf.readVarInt();
+            List<HudView.Endgame.Entry> entries = new ArrayList<>(entryCount);
+            for (int i = 0; i < entryCount; i++) {
+                entries.add(new HudView.Endgame.Entry(buf.readString(), buf.readString(), buf.readVarInt()));
+            }
+            endgame = new HudView.Endgame(outcome, alive, stage, flipped, withheld, entries);
+        }
+        boolean hasContest = buf.readBoolean();
+        Contest.Kind contestKind = Contest.Kind.SWAP;
+        String attacker = "";
+        String target = "";
+        Contest.Stage contestStage = null;
+        long contestDeadline = 0L;
+        long contestWindow = 0L;
+        List<String> attackSide = List.of();
+        List<String> defendSide = List.of();
+        int attackPower = 0;
+        int defendPower = 0;
+        if (hasContest) {
+            contestKind = buf.readEnumConstant(Contest.Kind.class);
+            attacker = buf.readString();
+            target = buf.readString();
+            contestStage = buf.readEnumConstant(Contest.Stage.class);
+            contestDeadline = buf.readVarLong();
+            contestWindow = buf.readVarLong();
+            attackSide = readNames(buf);
+            attackPower = buf.readVarInt();
+            defendSide = readNames(buf);
+            defendPower = buf.readVarInt();
+        }
+        ContestView publicContest = hasContest
+                ? new ContestView(contestKind, attacker, target, contestStage, contestDeadline, contestWindow,
+                        attackSide, defendSide, attackPower, defendPower, List.of(), 0, List.of(), 0)
+                : ContestView.NONE;
         if (!buf.readBoolean()) {
-            return new HudView(true, turn, phase, gulls, seats, actor,
+            return new HudView(true, turn, phase, gulls, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
-                    thirstPrompt, false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of(), List.of());
+                    thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
+                    false, List.of(), List.of(), HudView.Score.NONE);
         }
         String character = buf.readString();
         int health = buf.readVarInt();
         int maxHealth = buf.readVarInt();
         Condition condition = buf.readEnumConstant(Condition.class);
         int thirst = buf.readVarInt();
+        String love = buf.readString();
+        String hate = buf.readString();
+        HudView.Score myScore = HudView.Score.NONE;
+        if (buf.readBoolean()) {
+            myScore = new HudView.Score(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
+        }
         boolean yourTurn = buf.readBoolean();
         int cards = buf.readVarInt();
         List<String> hand = new ArrayList<>(cards);
@@ -285,10 +470,30 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         for (int i = 0; i < offerCount; i++) {
             offer.add(NavCardView.read(buf));
         }
-        return new HudView(true, turn, phase, gulls, seats, actor,
+        ContestView contest = publicContest;
+        if (hasContest) {
+            List<String> myWeapons = readNames(buf);
+            int myCommitted = buf.readVarInt();
+            List<String> victimFront = readNames(buf);
+            int victimHand = buf.readVarInt();
+            contest = new ContestView(contestKind, attacker, target, contestStage, contestDeadline, contestWindow,
+                    attackSide, defendSide, attackPower, defendPower, myWeapons, myCommitted,
+                    victimFront, victimHand);
+        }
+        return new HudView(true, turn, phase, gulls, seats, removed, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
-                thirstPrompt, true, character, health, maxHealth, condition, thirst, yourTurn,
-                List.copyOf(hand), List.copyOf(front));
+                thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
+                love, hate, yourTurn, List.copyOf(hand), List.copyOf(front), myScore);
+    }
+
+    /** 一串角色 id：写的那一侧都是「先张数再逐个」，读的这一侧就只此一份。 */
+    private static List<String> readNames(RegistryByteBuf buf) {
+        int count = buf.readVarInt();
+        List<String> out = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            out.add(buf.readString());
+        }
+        return out;
     }
 
     /**
@@ -378,6 +583,45 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     /**
+     * 进行中的那一场换座位 / 抢夺，当前这一段的超时时刻（ADR-0023）。0 = 没开窗口。
+     *
+     * <h2>为什么只有一个数</h2>
+     * 走到哪一段、谁在打、押了什么，全在引擎的 {@code Session#contest} 里 —— 这里只存「什么时候到点」。
+     * 两段软倒计时（有人加入 / 有人押武器就重置）也只是把这个数往后推一次。
+     *
+     * <p>❗<b>没开窗口不等于没有这一场</b>：全是替身的那几段不开窗口，由排程一步一步推。
+     */
+    private long contestDeadline;
+
+    /** 这一段<b>本来有多长</b>。见 {@link #openContestWindow}。 */
+    private long contestWindow;
+
+    public long contestDeadline() {
+        return contestDeadline;
+    }
+
+    public long contestWindow() {
+        return contestWindow;
+    }
+
+    /**
+     * 开一段窗口：记下什么时候到点，也记下这一段本来有多长。
+     *
+     * <p>❗<b>两个数一起设，不给分开设的入口</b>。倒计时那条横杠按「这一段有多长」画 ——
+     * 只记到点时刻的话，有人加入把 15 秒重置成 8 秒之后，杠会从一半开始走，
+     * 而它看起来<b>完全正常</b>：没有报错，只是每个看它的人都以为还剩得更多。
+     */
+    public void openContestWindow(long millis) {
+        this.contestDeadline = System.currentTimeMillis() + millis;
+        this.contestWindow = millis;
+    }
+
+    public void clearContest() {
+        this.contestDeadline = 0L;
+        this.contestWindow = 0L;
+    }
+
+    /**
      * 这一轮口渴里，别人替他打出来的水（一张一个人，可以重复）。
      *
      * <p>❗<b>攒着而不是当场结算</b>：一次只打一张的话，剩下几次会当场变成伤害，
@@ -397,6 +641,22 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.thirstDeadline = 0L;
         this.thirstHighlight = 0;
         this.thirstDonors.clear();
+    }
+
+    /**
+     * 终局序列走到哪了（ADR-0022）；{@code null} = 不在终局。运行时状态，不持久化。
+     *
+     * <p>❗它在的时候会话还活着 —— 翻牌与计分要靠投影推给客户端，会话收起就什么都推不出去了。
+     * 由 {@code EndgamePhase} 在序列走完时调 {@link #end()}。
+     */
+    private EndgameProgress endgame;
+
+    public Optional<EndgameProgress> endgame() {
+        return Optional.ofNullable(endgame);
+    }
+
+    public void setEndgame(EndgameProgress progress) {
+        this.endgame = progress;
     }
 
     /**
@@ -481,6 +741,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearProvision();
         clearHelm();
         clearThirst();
+        endgame = null;
         steps.clear();
     }
 
@@ -491,6 +752,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearProvision();
         clearHelm();
         clearThirst();
+        endgame = null;
         steps.clear();
     }
 

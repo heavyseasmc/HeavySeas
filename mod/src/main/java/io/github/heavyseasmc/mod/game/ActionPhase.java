@@ -59,6 +59,11 @@ public final class ActionPhase {
         if (session.rower().isPresent()) {
             return;                       // 划船抽到的牌还没定完：行动一面上再按一次不作数（改过的客户端发得出来）
         }
+        if (session.contest().isPresent()) {
+            // ❗这一场还没收场：引擎照样会抛（requireNoContest），但抛出来的是一句堆栈 ——
+            //   而这条路上没有「指令出错」那句人话可说，静默丢掉才是对的（ADR-0023）。
+            return;
+        }
         Optional<CharacterId> actor = session.nextActor();
         Optional<CharacterId> seat = component.seatOf(player.getUuid());
         // ❗只认正轮到的那个人本人。不校验的话，任何人都能替别人划船。

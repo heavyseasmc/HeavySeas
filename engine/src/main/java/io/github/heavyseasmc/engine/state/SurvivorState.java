@@ -266,6 +266,17 @@ public record SurvivorState(
                         hand, front, opened, Set.of());
     }
 
+    /**
+     * 移出游戏：手牌与面前一律清空，「打开」与「本回合用过」一起收掉。
+     *
+     * <p>❗<b>牌由调用方先交给 Table 的「已退出」桶</b>再调这里 —— 直接清空的话，对账会在下一步报「物资对不上」。
+     */
+    public SurvivorState withoutAllCards() {
+        return hand.isEmpty() && front.isEmpty()
+                ? this
+                : new SurvivorState(id, seat, damage, thirst, actedThisTurn, List.of(), List.of(), Set.of(), Set.of());
+    }
+
     private SurvivorState withHand(List<String> nextHand) {
         return new SurvivorState(id, seat, damage, thirst, actedThisTurn, nextHand, front, opened, usedThisTurn);
     }

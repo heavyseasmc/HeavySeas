@@ -206,10 +206,73 @@ public final class GuiLanguage {
     /** 滑：轮次推进。550ms，带轻微过冲。 */
     public static final long SLIDE_MS = 550L;
 
+    /**
+     * 「滑」的缓动：{@code cubic-bezier(.34,1.3,.5,1)}。y1 = 1.3 冲出 1 —— 越过终点一点再回来，这就是「过冲」。
+     *
+     * <p>❗数值照交互稿<b>实跑</b>的那一份核对过（{@code slide(el, dx)} 直接用 {@code M.slide.ms}，没有再乘什么），
+     * 不重蹈「顿」印 180、跑 396 那一次。
+     */
+    private static final float SLIDE_X1 = .34f;
+    private static final float SLIDE_Y1 = 1.3f;
+    private static final float SLIDE_X2 = .5f;
+    private static final float SLIDE_Y2 = 1f;
+
+    /**
+     * 「滑」走到哪了：0 → 1，<b>中途会略超过 1</b>（过冲）再落回 1。乘上位移就是这一帧该在的位置。
+     *
+     * @param startedAt 起点；{@code <= 0} 表示没在滑，返回 1（已到位）
+     */
+    public static float slide(long now, long startedAt) {
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) SLIDE_MS, 0f, 1f);
+        return cubicBezier(x, SLIDE_X1, SLIDE_Y1, SLIDE_X2, SLIDE_Y2);
+    }
+
+    /** 还在滑吗。 */
+    public static boolean sliding(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt < SLIDE_MS;
+    }
+
     // ---------------------------------------------------------------- 翻 Flip
 
     /** 翻：暗牌变明牌。全局唯一的「信息状态改变」，400ms，中点换面。 */
     public static final long FLIP_MS = 400L;
+
+    /** 「翻」的缓动：CSS 的 {@code ease-in-out}，即 {@code cubic-bezier(.42,0,.58,1)}（交互稿的 {@code M.flip.ease}）。 */
+    private static final float FLIP_X1 = .42f;
+    private static final float FLIP_Y1 = 0f;
+    private static final float FLIP_X2 = .58f;
+    private static final float FLIP_Y2 = 1f;
+
+    /**
+     * 「翻」此刻的横向缩放：rotateY 0° → 90° → 0° 投影到屏幕上的宽度 |cos θ|。
+     *
+     * <p>GUI 里没有真正的三维旋转，绕竖轴转一张牌在正面看就是宽度收窄再展开 —— 到中点正好侧过来（宽度 0），
+     * 就在那一刻换面。下限夹在一个很小的正数：宽度真为 0 的矩阵在有的驱动上会画出一条闪烁的竖线。
+     *
+     * @param startedAt 起点；{@code <= 0} 表示没在翻，返回 1
+     */
+    public static float flipScaleX(long now, long startedAt) {
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) FLIP_MS, 0f, 1f);
+        float eased = cubicBezier(x, FLIP_X1, FLIP_Y1, FLIP_X2, FLIP_Y2);
+        float quarter = eased < .5f ? eased / .5f : (1f - eased) / .5f;        // 0 → 1 → 0
+        return Math.max(0.02f, (float) Math.abs(Math.cos(quarter * Math.PI / 2)));
+    }
+
+    /**
+     * 翻到这一刻，露出来的是不是正面。
+     *
+     * <p>❗按<b>墙钟的中点</b>换面（稿子里是 {@code setTimeout(after, M.flip.ms / 2)}），不按缓动后的进度 ——
+     * ease-in-out 两头对称，两者恰好落在同一刻；换一条不对称的缓动时，照这里写的才仍与稿子一致。
+     */
+    public static boolean flipShowsFront(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt >= FLIP_MS / 2;
+    }
 
     // ---------------------------------------------------------------- 顿 Snap
 

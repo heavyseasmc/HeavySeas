@@ -61,8 +61,12 @@ public final class Invariants {
 
             // 生死状态必须与「伤害 vs 体型」一致。这条看起来是废话，正是它要防的 ——
             // 哪天有人把 Condition 缓存进 SurvivorState，这条立刻红。
+            // 被移出游戏的人：手上与面前都必须是空的 —— 牌随人离场。不空的话，那几张牌既在他身上又「退出了游戏」。
+            if (g.isRemoved(id) && (!s.hand().isEmpty() || !s.front().isEmpty())) {
+                bad.add("%s 已被移出游戏，手上或面前却还有牌（%s / %s）".formatted(id, s.hand(), s.front()));
+            }
             int size = g.roster().get(id).size();
-            Condition expected = Condition.onBoat(s.damage(), size);
+            Condition expected = g.isRemoved(id) ? Condition.DEAD : Condition.onBoat(s.damage(), size);
             if (g.conditionOf(id) != expected) {
                 bad.add("%s 的状态 %s 与伤害/体型 %d/%d 不符（应为 %s）"
                         .formatted(id, g.conditionOf(id), s.damage(), size, expected));
@@ -140,6 +144,10 @@ public final class Invariants {
             Condition now = after.conditionOf(id);
             if (was == Condition.DEAD && now != Condition.DEAD) {
                 bad.add("%s 从死亡复活到 %s —— 死亡不可复生".formatted(id, now));
+            }
+            // 与上一条不同源：移出是一个标志，单看一个状态看不出它是不是被弄丢过。
+            if (before.isRemoved(id) && !after.isRemoved(id)) {
+                bad.add("%s 已被移出游戏，却又回到了船上".formatted(id));
             }
             int d0 = before.stateOf(id).damage();
             int d1 = after.stateOf(id).damage();

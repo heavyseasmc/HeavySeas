@@ -5,6 +5,7 @@ import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.scoring.ScoreSheet;
 import io.github.heavyseasmc.engine.state.GameState;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,18 +48,29 @@ class DistributionDumpTest {
         List<NavigationCard> deck = LocalData.navigationDeck();
         Provisions provisions = LocalData.provisions();
 
-        Simulator sim = new Simulator(roster, deck, provisions);
+        // 带上分值表：每一局都算一次终局分（ADR-0022）。计分器在终局状态不自洽时会当场抛。
+        Simulator sim = new Simulator(roster, deck, provisions, NavigationPolicy.INDIFFERENT,
+                LocalData.roster().treasureScoring());
         long turns = 0;
         long alive = 0;
         long fights = 0;
         Map<String, Integer> outcomes = new LinkedHashMap<>();
-        Map<CharacterId, Integer> deaths = new LinkedHashMap<>();
+        // 每个角色：[得分合计, 拿到最高分的局数（并列都算）]
+        Map<CharacterId, long[]> scoring = new LinkedHashMap<>();
         for (long seed = 0; seed < GAMES; seed++) {
             Simulator.Result r = sim.run(seed);
             turns += r.turns();
             alive += r.alive();
             fights += r.fights();
             outcomes.merge(r.outcome().name(), 1, Integer::sum);
+            int best = r.scores().values().stream().mapToInt(ScoreSheet::total).max().orElse(0);
+            r.scores().forEach((id, sheet) -> {
+                long[] acc = scoring.computeIfAbsent(id, k -> new long[2]);
+                acc[0] += sheet.total();
+                if (sheet.total() == best) {
+                    acc[1]++;
+                }
+            });
         }
         System.out.printf("分布快照（%d 局 · 8 人局 · 真实数据）%n", GAMES);
         System.out.printf("  平均回合数 %.3f%n", (double) turns / GAMES);
@@ -67,8 +79,12 @@ class DistributionDumpTest {
         System.out.printf("  靠岸 %d 局 · 全灭 %d 局%n",
                 outcomes.getOrDefault(GameState.Outcome.LANDED.name(), 0),
                 outcomes.getOrDefault(GameState.Outcome.ALL_DEAD.name(), 0));
-        if (!deaths.isEmpty()) {
-            System.out.println("  " + deaths);
+        // 正向对照：分值表传进去了却一个分都没有，说明计分那条路根本没走 —— 那不是「分布」，是没在量。
+        if (scoring.isEmpty()) {
+            throw new IllegalStateException("2000 局里一次终局计分都没有：模拟器没把分值表用上");
         }
+        System.out.println("  平均得分 · 拿到最高分的局数（并列都算）：");
+        scoring.forEach((id, acc) -> System.out.printf("    %-10s %6.2f 分 · %4d 局%n",
+                id.value(), (double) acc[0] / GAMES, acc[1]));
     }
 }

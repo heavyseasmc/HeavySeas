@@ -27,10 +27,10 @@ import java.util.Random;
  * <p>「划船者手上」是划船拆成「先抽 / 再定」两步之后才有的：真人要一张一张想，
  * 两张牌在他手上停留的时间可能很长。不把这一处记进账，对账在他想的时候就会报牌丢了。
  *
- * <h2>物资牌在五个地方</h2>
- * 牌堆里、补给箱在传的那几张、某人手上、某人面前、弃牌堆。前两处与弃牌堆在本类，
- * 后两处在每个人的 {@code SurvivorState} 里，所以物资的对账在 {@link Session} 上 —— 见
- * {@code Session#requireNoProvisionLost}。
+ * <h2>物资牌在六个地方</h2>
+ * 牌堆里、补给箱在传的那几张、某人手上、某人面前、弃牌堆、随被移出游戏的人离场的那一堆（ADR-0022）。
+ * 手上与面前在每个人的 {@code SurvivorState} 里，补给箱在 {@link Session} 里，其余在本类 ——
+ * 所以物资的对账在 {@link Session} 上，见 {@code Session#requireNoProvisionLost}。
  *
  * <h2>效果目录也在这里</h2>
  * 牌堆由目录展开（{@link Provisions#deck()}），所以两者必须同源；分开传就会出现
@@ -89,6 +89,17 @@ public final class Table {
     }
 
     /**
+     * 牌堆里还剩几张这个 id（<b>夹具用</b>，与 {@link #takeFromProvisionPile} 成对）。
+     *
+     * <p>❗有了它，发指定一张的那条夹具指令才能<b>先问再发</b>。问不到就只剩「发了再看抛不抛」，
+     * 而抛出来是一句堆栈 —— 出口验收里「拒绝了你」与「有 bug」就又分不开了（ADR-0023 实拍到三次）。
+     */
+    public int provisionsLeft(String cardId) {
+        Objects.requireNonNull(cardId, "cardId");
+        return (int) provisionPile.stream().filter(cardId::equals).count();
+    }
+
+    /**
      * 从物资牌堆顶抽最多 {@code n} 张。
      *
      * <p>不够就有几张抽几张 —— 规则写的是「抽完即止」，而不是「不够就不发」。
@@ -129,7 +140,25 @@ public final class Table {
         return List.copyOf(provisionDiscard);
     }
 
-    /** 物资牌一共几张（发出去的 + 还在堆里的 + 弃掉的）。对账的分母。 */
+    /**
+     * 随被移出游戏的人一起离场的物资。
+     *
+     * <p>❗<b>不进弃牌堆</b>：规则写的是「连人带牌移出游戏」，那些牌退出了游戏，不是被用掉。
+     * 分开放，对账时才看得出一张牌是被喝掉的还是被海水带走的。
+     */
+    private final List<String> removedProvisions = new ArrayList<>();
+
+    /** 这些牌随一个被移出游戏的人离场。 */
+    void removeWithCharacter(List<String> cards) {
+        removedProvisions.addAll(cards);
+    }
+
+    /** 已随人离场的物资（只读）。 */
+    public List<String> removedProvisions() {
+        return List.copyOf(removedProvisions);
+    }
+
+    /** 物资牌一共几张（发出去的 + 还在堆里的 + 弃掉的 + 随人离场的）。对账的分母。 */
     public int provisionTotal() {
         return provisions.total();
     }

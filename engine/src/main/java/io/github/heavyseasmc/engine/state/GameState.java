@@ -5,12 +5,15 @@ import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 一局的完整状态。不可变；推进靠返回新值。
@@ -33,16 +36,20 @@ public final class GameState {
     private final int turn;
     private final int gulls;
 
+    /** 被移出游戏的人（死在水里，连人带牌离场，ADR-0022）。只增不减。 */
+    private final Set<CharacterId> removed;
+
     /** 第几只海鸥到达时靠岸获救。 */
     public static final int GULLS_TO_LAND = 4;
 
     private GameState(Roster roster, Map<CharacterId, SurvivorState> states,
-                      Phase phase, int turn, int gulls) {
+                      Phase phase, int turn, int gulls, Set<CharacterId> removed) {
         this.roster = roster;
         this.states = Map.copyOf(states);
         this.phase = phase;
         this.turn = turn;
         this.gulls = gulls;
+        this.removed = Collections.unmodifiableSet(new LinkedHashSet<>(removed));
     }
 
     /** 开局：全员未受伤，回合 1，物资阶段，0 只海鸥。 */
@@ -55,7 +62,7 @@ public final class GameState {
         for (Survivor s : roster.survivors()) {
             initial.put(s.id(), SurvivorState.fresh(s.id(), s.seat()));
         }
-        return new GameState(roster, initial, Phase.PROVISION, 1, 0);
+        return new GameState(roster, initial, Phase.PROVISION, 1, 0, Set.of());
     }
 
     public Roster roster() {
@@ -82,16 +89,42 @@ public final class GameState {
         return s;
     }
 
-    /** 生死状态。全项目唯一的「两半配对」处。 */
+    /**
+     * 生死状态。全项目唯一的「两半配对」处。
+     *
+     * <p>❗<b>被移出游戏的人一律是 {@link Condition#DEAD}</b> —— 移出只发生在他死在水里的时候（ADR-0022），
+     * 而「水里恰好等于体型、没有救生圈」在伤害数上与船上的昏迷一模一样。
+     * 这是设计决策 §3.3 的写法：置一个独立标志纳入判定，而不是把伤害凑成「超过体型」让伤害数说谎。
+     */
     public Condition conditionOf(CharacterId id) {
-        return Condition.onBoat(stateOf(id).damage(), roster.get(id).size());
+        SurvivorState s = stateOf(id);
+        if (removed.contains(id)) {
+            return Condition.DEAD;
+        }
+        return Condition.onBoat(s.damage(), roster.get(id).size());
     }
 
-    /** 按座位升序（船头 → 船尾）的全体角色 id。 */
+    /**
+     * 按座位升序（船头 → 船尾）的全体角色 id —— <b>含被移出游戏的人</b>。
+     *
+     * <p>终局要翻他们的爱恨、算他们的分，座位条也要显示他们没了；所以「这一局的每个人」仍是这一份。
+     * 只指「船上」的地方用 {@link #onBoatBySeat()}（ADR-0022 §5）。
+     */
     public List<CharacterId> bySeat() {
         List<SurvivorState> all = new ArrayList<>(states.values());
         all.sort(Comparator.comparingInt(SurvivorState::seat));
         return all.stream().map(SurvivorState::id).toList();
+    }
+
+    /** 还在船上的人（按座位）。落海的候选、换座位的对象、绝境要的尸体都只看这一份。 */
+    public List<CharacterId> onBoatBySeat() {
+        return bySeat().stream().filter(id -> !removed.contains(id)).toList();
+    }
+
+    /** 他是不是已经被移出游戏（死在水里，连人带牌离场）。 */
+    public boolean isRemoved(CharacterId id) {
+        stateOf(id);            // 存在性校验：问一个阵容里没有的人，多半是调用方写错了
+        return removed.contains(id);
     }
 
     /** 按座位升序的清醒角色。物资阶段的抽牌数与传牌次序都用它。 */
@@ -165,7 +198,7 @@ public final class GameState {
         stateOf(id);            // 存在性校验
         Map<CharacterId, SurvivorState> copy = new LinkedHashMap<>(states);
         copy.put(id, next);
-        return new GameState(roster, copy, phase, turn, gulls);
+        return new GameState(roster, copy, phase, turn, gulls, removed);
     }
 
     /**
@@ -175,7 +208,22 @@ public final class GameState {
      * 下限钳到 0；上限<b>不钳</b>：凑够 4 只就是终局，多出来的没有意义但也不该报错。
      */
     public GameState withGulls(int delta) {
-        return new GameState(roster, states, phase, turn, Math.max(0, gulls + delta));
+        return new GameState(roster, states, phase, turn, Math.max(0, gulls + delta), removed);
+    }
+
+    /**
+     * 把一个人移出游戏。<b>只由落海结算调用</b>（{@code Session}）—— 它负责先把他的牌交给 Table。
+     *
+     * <p>重复移出同一个人是原样返回，不是错误：同一张牌上他只会被判一次，但判据不该依赖这一点。
+     */
+    public GameState withRemoved(CharacterId id) {
+        stateOf(id);
+        if (removed.contains(id)) {
+            return this;
+        }
+        Set<CharacterId> next = new LinkedHashSet<>(removed);
+        next.add(id);
+        return new GameState(roster, states, phase, turn, gulls, next);
     }
 
     /**
@@ -191,10 +239,10 @@ public final class GameState {
         }
         Phase next = phase.next();
         if (!phase.endsTurn()) {
-            return new GameState(roster, states, next, turn, gulls);
+            return new GameState(roster, states, next, turn, gulls, removed);
         }
         Map<CharacterId, SurvivorState> cleared = new LinkedHashMap<>();
         states.forEach((id, s) -> cleared.put(id, s.endOfTurn()));
-        return new GameState(roster, cleared, next, turn + 1, gulls);
+        return new GameState(roster, cleared, next, turn + 1, gulls, removed);
     }
 }

@@ -38,7 +38,6 @@ public final class ThirstScreen extends GameScreen {
     private static final int SEA_LINE_Y = 38;
     private static final int GAP = 6;
     private static final int BELOW_CARDS = 6;
-    private static final int BAR_H = 3;
     private static final int BAR_TO_TEXT = 3;
     private static final int HINT_GAP = 5;
     private static final int BORDER_ROOM = 2 + 4;
@@ -124,7 +123,8 @@ public final class ThirstScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, now, l);
+        drawCountdown(context, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS,
+                l.barX(), l.barY(), l.barW(), l.countdownY());
         int hurt = Math.max(0, remaining - chosen);
         context.drawCenteredTextWithShadow(textRenderer,
                 Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
@@ -170,18 +170,6 @@ public final class ThirstScreen extends GameScreen {
         int sharp = sharpCardHeight();
         return Math.max(MIN_CARD_H, Math.min(Math.min(Math.min(availH, byWidth), sharp),
                 Math.round(height * MAX_CARD_H_RATIO)));
-    }
-
-    private void drawCountdown(DrawContext context, long now, Layout l) {
-        long total = ThirstPhase.CHOOSE_MILLIS;
-        long left = Math.max(0L, deadlineMs - now);
-        float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
-        boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
-        context.fill(l.barX(), l.barY(), l.barX() + l.barW(), l.barY() + BAR_H, GuiLanguage.GROUND);
-        context.fill(l.barX(), l.barY(), l.barX() + Math.round(l.barW() * frac), l.barY() + BAR_H,
-                urgent ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(String.format("%.1fs", left / 1000f)),
-                width / 2, l.countdownY(), urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
     }
 
     /** 改张数并上报：超时认的是它，服务端不知道的话只能按开窗时那个默认值算。 */

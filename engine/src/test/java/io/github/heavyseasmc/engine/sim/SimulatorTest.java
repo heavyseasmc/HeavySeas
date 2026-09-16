@@ -101,21 +101,23 @@ class SimulatorTest {
         void pinnedSeeds() {
             record Pinned(long seed, int turns, int alive, int fights, GameState.Outcome outcome) {
             }
-            // ❗2026-09-16 整表重钉过一次（ADR-0021 物资建模）。
-            //   <b>那一次不是「搬家」，是规则变了</b>：此前模拟器发不出物资，口渴时喝的是不存在的水、
-            //   打架时的武器加值是凭空 1..8 随机出来的。把两者改成真牌之后，
-            //   每一局都必然不同 —— 这张表全红说明不了任何事，所以那一次改看分布
-            //   （见 DistributionDumpTest 与 ADR-0021 §9），再照新行为重钉。
-            //   钉死的种子也顺势换了四个：新行为下原来那四个靠岸的种子都变成了全灭。
+            // ❗2026-09-16 同一天整表重钉过三次，三次都<b>不是「搬家」，是规则变了</b>：
+            //   ① ADR-0021 物资建模 —— 此前模拟器发不出物资，口渴时喝的是不存在的水、武器加值是凭空随机的；
+            //   ② ADR-0022 终局 —— 开局发爱恨要消耗随机数（每一局从第一步起就不同），
+            //      水里「恰好等于体型、没救生圈」的人从昏迷着回船改成淹死并移出；
+            //   ③ ADR-0023 换座位与抢夺 —— 换座位从「不问对方」改成要问，打架只从拒绝里来，抢赢了真的拿牌。
+            //   三次都是「每一局必然不同」，这张表全红说明不了任何事 —— 所以看分布（DistributionDumpTest），
+            //   再照新行为重钉。第二次顺势把靠岸的种子换成四个（全灭四个 · 靠岸四个，两种终局各占一半）；
+            //   第三次靠岸的四个种子全部改掉了 —— 合成牌堆下原先那四个都不再靠岸（真实数据那一侧反而是靠岸变多）。
             List<Pinned> expected = List.of(
-                    new Pinned(0L, 10, 0, 7, GameState.Outcome.ALL_DEAD),
-                    new Pinned(1L, 6, 0, 6, GameState.Outcome.ALL_DEAD),
-                    new Pinned(2L, 8, 0, 7, GameState.Outcome.ALL_DEAD),
-                    new Pinned(3L, 12, 0, 5, GameState.Outcome.ALL_DEAD),
-                    new Pinned(6L, 12, 1, 8, GameState.Outcome.LANDED),
-                    new Pinned(20L, 8, 4, 7, GameState.Outcome.LANDED),
-                    new Pinned(30L, 11, 1, 6, GameState.Outcome.LANDED),
-                    new Pinned(44L, 12, 1, 8, GameState.Outcome.LANDED));
+                    new Pinned(0L, 4, 0, 5, GameState.Outcome.ALL_DEAD),
+                    new Pinned(1L, 9, 0, 9, GameState.Outcome.ALL_DEAD),
+                    new Pinned(2L, 9, 0, 2, GameState.Outcome.ALL_DEAD),
+                    new Pinned(3L, 19, 0, 6, GameState.Outcome.ALL_DEAD),
+                    new Pinned(12L, 19, 1, 6, GameState.Outcome.LANDED),
+                    new Pinned(18L, 14, 1, 6, GameState.Outcome.LANDED),
+                    new Pinned(19L, 19, 1, 5, GameState.Outcome.LANDED),
+                    new Pinned(25L, 12, 1, 7, GameState.Outcome.LANDED));
 
             // 正向对照：两种终局都得在表里，否则这张表只钉住了一条路。
             assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.LANDED));
@@ -400,21 +402,23 @@ class SimulatorTest {
         }
 
         @Test
-        @DisplayName("分母只数活着的回合：体型 3 的角色在第 4 次落海时死，分母就停在 4")
+        @DisplayName("分母只数活着的回合：体型 3 的角色在第 3 次落海时淹死，分母就停在 3")
         void deadStopAccruing() {
-            // 每回合必落海、不点口渴、没有海鸥。伤害 3 = 昏迷，4 = 死亡。
+            // 每回合必落海、不点口渴、没有海鸥。
+            // ❗在水里伤害 3 = 体型、没有救生圈就是淹死（ADR-0022）—— 船上那只是昏迷。
+            //   这条原先写的是「第 4 次落海才死」：那是 M1 起一直没接上的水中判定，不是规则。
             Simulator sim = new Simulator(solo(KID, 3),
                     oneCard(0, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
             Simulator.Result r = sim.run(0);
 
             assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
             Exposure kid = r.exposure().get(KID);
-            assertEquals(4, kid.overboardTurns(), "第 4 次落海把他打死，之后不该再有机会数");
-            assertEquals(4, kid.overboards(), "每一回合都被点到，命中数应当等于机会数");
+            assertEquals(3, kid.overboardTurns(), "第 3 次落海把他淹死，之后不该再有机会数");
+            assertEquals(3, kid.overboards(), "每一回合都被点到，命中数应当等于机会数");
 
-            // ❗口渴的分母比落海少一次：第 4 回合他死在落海那一步，口渴结算根本没轮到。
+            // ❗口渴的分母比落海少一次：第 3 回合他死在落海那一步，口渴结算根本没轮到。
             //   两个分母分开数，正是为了让这种「死在半途」不被算成「口渴过但没被点」。
-            assertEquals(3, kid.thirstTurns());
+            assertEquals(2, kid.thirstTurns());
             assertEquals(0, kid.thirsts());
         }
 
@@ -422,7 +426,8 @@ class SimulatorTest {
         @DisplayName("❗死了就不再计入分母，而这只有在「他死了、局还没完」时才看得出来")
         void deadStopAccruingWhileTheGameGoesOn() {
             // 单人局里死亡就是终局，分母停不停都一样 —— 那种局面证明不了任何事。
-            // 两人局才分得开：小孩第 4 次落海时死，大副还要再挨 5 次。
+            // 两人局才分得开：小孩第 3 次落海时淹死（水里恰好等于体型、没救生圈，ADR-0022），
+            // 大副还要再挨 5 次，第 8 次同样淹死。
             Roster pair = new Roster(List.of(
                     new Survivor(KID, 1, 3, 9, "base", new Ability.None()),
                     new Survivor(MATE, 2, 8, 4, "base", new Ability.None())));
@@ -437,10 +442,10 @@ class SimulatorTest {
                 }
                 clean++;
                 assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
-                assertEquals(9, r.turns(), "seed=" + seed);
-                assertEquals(4, r.exposure().get(KID).overboardTurns(),
+                assertEquals(8, r.turns(), "seed=" + seed);
+                assertEquals(3, r.exposure().get(KID).overboardTurns(),
                         "seed=" + seed + " 小孩死后还在涨分母");
-                assertEquals(9, r.exposure().get(MATE).overboardTurns(), "seed=" + seed);
+                assertEquals(8, r.exposure().get(MATE).overboardTurns(), "seed=" + seed);
             }
             assertTrue(clean > 0, "500 局里没有一局是零战斗，这条断言其实一次都没执行");
         }

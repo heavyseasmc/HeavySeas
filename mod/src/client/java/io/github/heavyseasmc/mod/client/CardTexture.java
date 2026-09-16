@@ -31,7 +31,7 @@ import java.util.Set;
  *
  * <h2>卡面只能经这里画</h2>
  * 直接拿标识去 {@code drawTexture}，找不到已注册的贴图时 Minecraft 会按默认方式自己载一份 ——
- * 照样有图，只是又糊回去了，而且不报错。所以标识不外露，对外只有 {@link #drawProvision}。
+ * 照样有图，只是又糊回去了，而且不报错。所以标识不外露，对外只有这几个 {@code draw*}。
  */
 public final class CardTexture extends AbstractTexture {
 
@@ -39,6 +39,8 @@ public final class CardTexture extends AbstractTexture {
     private static final int MIP_LEVELS = 4;
 
     private static final String PROVISION_DIR = "textures/gui/cards/provision";
+    private static final String CHARACTER_DIR = "textures/gui/cards/character";
+    private static final String BACK_DIR = "textures/gui/cards/back";
 
     /** 已经换成本类载入的标识。只在渲染线程上碰。 */
     private static final Set<Identifier> REGISTERED = new HashSet<>();
@@ -73,17 +75,35 @@ public final class CardTexture extends AbstractTexture {
     }
 
     /**
-     * 进服时把全部物资卡面先载好。
+     * 画一张角色卡面：爱恨的目标、终局翻牌那一面的被点名者（ADR-0022）。
+     *
+     * <p>id 就是 {@code data/roster} 的角色 id —— 贴图与数据共用一套主键，中间没有映射表。
+     */
+    public static void drawCharacter(DrawContext context, String characterId, int x, int y, int w, int h) {
+        context.drawTexture(ensure(Identifier.of(HeavySeasMod.MOD_ID, CHARACTER_DIR + "/" + characterId + ".png")),
+                x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+    }
+
+    /** 画一张牌背。终局翻牌的暗牌用 {@code secret} —— 爱恨卡的背面。 */
+    public static void drawBack(DrawContext context, String backId, int x, int y, int w, int h) {
+        context.drawTexture(ensure(Identifier.of(HeavySeasMod.MOD_ID, BACK_DIR + "/" + backId + ".png")),
+                x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+    }
+
+    /**
+     * 进服时把全部卡面（物资 · 角色 · 牌背）先载好。
      *
      * <p>不预载的话，补给箱第一次打开的那一帧要现场解码、生成缩小版、上传最多 8 张 ——
      * 那一帧会卡一下，而「发」的动画按墙钟算，卡掉的那几十毫秒会直接跳过去。
      */
-    public static void preloadProvisions(MinecraftClient client) {
-        client.getResourceManager()
-                .findResources(PROVISION_DIR, id -> id.getPath().endsWith(".png"))
-                .keySet().stream()
-                .filter(id -> id.getNamespace().equals(HeavySeasMod.MOD_ID))
-                .forEach(CardTexture::ensure);
+    public static void preload(MinecraftClient client) {
+        for (String dir : new String[]{PROVISION_DIR, CHARACTER_DIR, BACK_DIR}) {
+            client.getResourceManager()
+                    .findResources(dir, id -> id.getPath().endsWith(".png"))
+                    .keySet().stream()
+                    .filter(id -> id.getNamespace().equals(HeavySeasMod.MOD_ID))
+                    .forEach(CardTexture::ensure);
+        }
     }
 
     private static Identifier provisionId(String cardId) {

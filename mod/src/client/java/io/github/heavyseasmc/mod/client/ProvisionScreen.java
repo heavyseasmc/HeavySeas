@@ -7,7 +7,6 @@ import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +50,6 @@ public final class ProvisionScreen extends GameScreen {
     /** 金框画在卡外 2 像素（{@code drawBorder(-2, …)}），再留 4 像素余量。 */
     private static final int BORDER_ROOM = 2 + 4;
     private static final int BELOW_CARDS = 6;
-    private static final int BAR_H = 3;
     private static final int BAR_TO_TEXT = 3;
     private static final int HINT_GAP = 5;
     private static final int LINE_GAP = 3;
@@ -264,7 +262,9 @@ public final class ProvisionScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, now, l);
+        drawCountdown(context, now, data.deadlineMs(),
+                Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD,
+                l.barX(), l.barY(), l.barW(), l.countdownY());
         drawHint(context, l);
     }
 
@@ -312,19 +312,6 @@ public final class ProvisionScreen extends GameScreen {
             context.drawCenteredTextWithShadow(textRenderer, name, x + cell / 2, y,
                     here ? GuiLanguage.GOLD : (done ? GuiLanguage.MUTED : GuiLanguage.DIM));
         }
-    }
-
-    private void drawCountdown(DrawContext context, long now, Layout l) {
-        long left = Math.max(0L, data.deadlineMs() - now);
-        long total = Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD;
-        float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
-        boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
-        context.fill(l.barX(), l.barY(), l.barX() + l.barW(), l.barY() + BAR_H, GuiLanguage.GROUND);
-        context.fill(l.barX(), l.barY(), l.barX() + Math.round(l.barW() * frac), l.barY() + BAR_H,
-                urgent ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.literal(String.format("%.1fs", left / 1000f)),
-                width / 2, l.countdownY(), urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
     }
 
     /** 说明只跟高亮走一行 —— 每张都摊开就变成读说明书了。 */

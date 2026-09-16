@@ -4,6 +4,8 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
+import io.github.heavyseasmc.mod.state.ContestView;
+import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.fabricmc.api.ClientModInitializer;
@@ -13,6 +15,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
@@ -74,6 +77,20 @@ public final class HeavySeasClient implements ClientModInitializer {
     /** 上一次弹出口渴一面的那个窗口。同一个窗口只弹一次。 */
     private static long thirstWindowShown;
 
+    /**
+     * 换座位 / 抢夺那一场里，已经为哪一个窗口弹过界面（以窗口的超时时刻认，与口渴、舵手同一个写法）。
+     *
+     * <p>❗窗口会在一段中途<b>重置</b>：有人加入把站队那 15 秒重置成 8 秒、有人押牌把 10 秒重置成 6 秒。
+     * 重置就是一个新窗口 —— 局面变了（多了一个人、多了一张暗牌），该再问一次。
+     */
+    private static long contestWindowShown;
+
+    /**
+     * 终局的哪一个阶段已经弹过（恨 · 爱 · 计分）。每个阶段只自己弹一次：Esc 收起之后按行动键再开。
+     * <b>真的弹出来了才记</b> —— 阶段开始时聊天正开着，关掉聊天之后照样要弹。
+     */
+    private static EndgameProgress.Stage endgameStageShown;
+
     public static KeyBinding actKey() {
         return actKey;
     }
@@ -93,7 +110,7 @@ public final class HeavySeasClient implements ClientModInitializer {
 
         // 进服就把卡面载好：补给箱第一次打开时现场载，「发」的动画会在那一帧卡掉一截。
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
-                client.execute(() -> CardTexture.preloadProvisions(client)));
+                client.execute(() -> CardTexture.preload(client)));
 
         // ❗必须在客户端也注册接收器：类型只在一端注册的话，包会被安静地丢掉，不报错。
         ClientPlayNetworking.registerGlobalReceiver(ProvisionUpdateS2C.ID, (payload, context) ->
@@ -119,7 +136,8 @@ public final class HeavySeasClient implements ClientModInitializer {
      * 按键抬起后才算一次。
      *
      * <p>{@code wasPressed()} 每次只消一次按下，所以用 while 排空 —— 一 tick 内按两下也认两下。
-     * 手上没牌时什么都不做：开一个空界面比不开更让人以为坏了。
+     * 手上没牌、也还没发爱恨时什么都不做：开一个空界面比不开更让人以为坏了。
+     * 爱恨发下来之后空手也开 —— 自己爱谁恨谁就写在那一面里（ADR-0022）。
      */
     private static void pollHandKey(MinecraftClient client) {
         boolean pressed = false;
@@ -129,13 +147,14 @@ public final class HeavySeasClient implements ClientModInitializer {
         if (!pressed || client.world == null || client.currentScreen != null) {
             return;                           // 已经有界面开着（比如补给箱）时不抢
         }
-        if (GameComponents.of(client.world).hudView().hasHand()) {
+        HudView view = GameComponents.of(client.world).hudView();
+        if (view.hasHand() || (view.active() && view.seated() && !view.love().isEmpty())) {
             client.setScreen(new HandScreen());
         }
     }
 
     /**
-     * 轮到你的几面：行动、划船、舵手挑牌。
+     * 轮到你的几面：行动、划船、舵手挑牌；对局结束之后是终局的翻牌与计分（ADR-0022）。
      *
      * <p>❗行动与划船只在「刚轮到」时弹一次，之后按行动键再开：这两面不计时，玩家收起来是为了回世界里谈判 ——
      * 每 tick 都弹的话，Esc 就收不起来了。
@@ -168,6 +187,33 @@ public final class HeavySeasClient implements ClientModInitializer {
             rowPending = false;
         }
         wasRowing = rowing;
+
+        // 终局排在所有决策面前面：对局已经结束，决策面开着也没有东西可选了。
+        if (view.myEndgame()) {
+            EndgameProgress.Stage stage = view.endgame().stage();
+            boolean scores = stage == EndgameProgress.Stage.SCORES;
+            Screen current = client.currentScreen;
+            if (scores ? current instanceof ScoreScreen : current instanceof RevealScreen) {
+                endgameStageShown = stage;
+                return;
+            }
+            boolean fresh = endgameStageShown != stage;
+            // 决策面一律顶掉；手牌是玩家自己按开的，只在换阶段时顶掉 —— 不然终局里就再也看不了手牌。
+            // ❗聊天等别的界面开着时不抢：终局正是全船在聊天里喊「最后一张是谁」的时候。
+            boolean stale = current instanceof GameScreen && !(current instanceof HandScreen);
+            if (stale || (current instanceof HandScreen && fresh) || (current == null && (fresh || pressed))) {
+                endgameStageShown = stage;
+                client.setScreen(scores ? new ScoreScreen() : new RevealScreen());
+            }
+            return;
+        }
+        endgameStageShown = null;
+
+        // 换座位 / 抢夺的四面（ADR-0023）。排在这里是因为它属于行动阶段，而下面那两面属于航海与口渴 ——
+        // 同一帧里不会两者都为真，排序只是让「轮到我表态」不被后面任何一条 return 截在半路。
+        if (pollContest(client, view, pressed)) {
+            return;
+        }
 
         // ❗口渴排在舵手前面判：这两面都在航海阶段，但口渴是舵手挑完之后的事 ——
         //   同一帧里两者不会同时为真，排序只是让「后来的那一面」不被前面那条 return 截在半路。
@@ -221,6 +267,93 @@ public final class HeavySeasClient implements ClientModInitializer {
             actionPending = false;
             client.setScreen(new ActionScreen());
         }
+    }
+
+    /**
+     * 换座位 / 抢夺那一场里轮到我的四面（ADR-0023 · 决策 ④）。返回 {@code true} 表示这一帧归它，别的界面别再抢。
+     *
+     * <h2>一场只停在一段上，而每一段只问一种人</h2>
+     * 所以下面四条至多一条为真 —— 判据全在 {@link HudView} 那四个谓词里，这里只回答「什么时候弹」。
+     *
+     * <h2>两种优先级，分界线是「不答会怎样」</h2>
+     * <b>表态与挑牌不答也有后果</b>（超时按同意算 · 超时替你从他手牌里抽一张），所以它们与口渴、舵手同一条：
+     * 被什么顶掉了，只要窗口还开着就回来。
+     *
+     * <p><b>站队与挂武器不答就是不参与</b> —— 那本身就是一个正当答案（规则里没有「宣布中立」这种状态）。
+     * 所以它们与行动一面同一条：窗口刚开（或被重置）时弹一次，收起来之后不再自己冒出来，按行动键随时能再开。
+     * 收不起来的话，站队那十几秒会被一个界面整个占掉 —— 而在世界里谈判正是这一段的全部意义。
+     */
+    private static boolean pollContest(MinecraftClient client, HudView view, boolean pressed) {
+        ContestView contest = view.contest();
+        if (!contest.waiting()) {
+            return false;                     // 没有这一场，或这一段没人要等（全是替身时由排程一步一步推）
+        }
+        long window = contest.deadlineMs();
+        boolean fresh = window != contestWindowShown;
+        Screen open = client.currentScreen;
+
+        if (view.myConsent()) {
+            if (fresh) {
+                contestWindowShown = window;
+                // 与语言无关的一行：GUI 回归靠它判「表态这一面真的问到了我」。
+                LOGGER.info("表态：{} 对我发起了 {}", contest.attacker(), contest.kind());
+            }
+            if (open instanceof ConsentScreen) {
+                return true;                  // 已经开着：窗口没重置过，这里不会走到，写着是为了不重开
+            }
+            if (fresh || pressed || open == null) {
+                client.setScreen(new ConsentScreen(view));
+            }
+            return true;
+        }
+
+        if (view.myStance()) {
+            if (fresh) {
+                contestWindowShown = window;
+                LOGGER.info("站队：打起来了 · 进攻 {} 人（体型和 {}） · 防守 {} 人（体型和 {}）",
+                        contest.attackSide().size(), contest.attackPower(),
+                        contest.defendSide().size(), contest.defendPower());
+            }
+            if (open instanceof StanceScreen) {
+                return true;                  // 有人加入把窗口重置了：界面照旧开着，它自己会读到新的投影
+            }
+            if (fresh || pressed) {
+                client.setScreen(new StanceScreen(view));
+            }
+            return true;
+        }
+
+        if (view.myWeaponChoice()) {
+            if (fresh) {
+                contestWindowShown = window;
+                // ❗只写张数，不写是哪几张 —— 暗牌（决策 ④），而开服的人往往也是玩家。
+                LOGGER.info("挂武器：轮到我 · 还押得出 {} 张 · 已押 {} 张",
+                        contest.myWeapons().size(), contest.myCommitted());
+            }
+            if (open instanceof WeaponScreen) {
+                return true;                  // 自己押下一张也会重置窗口：不重开，那会把「抬」打断
+            }
+            if (fresh || pressed) {
+                client.setScreen(new WeaponScreen(view));
+            }
+            return true;
+        }
+
+        if (view.myPick()) {
+            if (fresh) {
+                contestWindowShown = window;
+                LOGGER.info("挑牌：轮到我 · 他面前 {} 张 · 手上 {} 张",
+                        contest.victimFront().size(), contest.victimHand());
+            }
+            if (open instanceof PickScreen) {
+                return true;
+            }
+            if (fresh || pressed || open == null) {
+                client.setScreen(new PickScreen(view));
+            }
+            return true;
+        }
+        return false;                         // 这一场在等的是别人：HUD 上看得见，但什么也不弹
     }
 
     /**

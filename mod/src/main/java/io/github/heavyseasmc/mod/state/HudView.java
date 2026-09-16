@@ -1,7 +1,9 @@
 package io.github.heavyseasmc.mod.state;
 
+import io.github.heavyseasmc.engine.play.Contest;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 
 import java.util.List;
@@ -25,7 +27,8 @@ import java.util.Optional;
  * @param turn      第几回合
  * @param phase     当前阶段
  * @param gulls     已有几只海鸥
- * @param seats     座位顺序（角色 id，船头到船尾）· 公开
+ * @param seats     座位顺序（角色 id，船头到船尾）· 公开。❗<b>含被移出游戏的人</b>
+ * @param removed   被移出游戏的人（角色 id）· 公开（ADR-0022）
  * @param actor     行动阶段正轮到谁（角色 id）；不在行动阶段、或已经没人能动时是空串 · 公开
  * @param sea       航海这一段：划船堆 · 舵手 · 挑牌倒计时 · 执行的那张（公开），外加只进收件人那一包的两样
  * @param seated    收件人自己在不在局里（旁观者只看得到上面那几项）
@@ -34,6 +37,12 @@ import java.util.Optional;
  * @param maxHealth 体型
  * @param condition 清醒 / 昏迷 / 死亡
  * @param thirst    口渴标记数
+ * @param endgame   终局序列走到哪了 · 公开（已翻开的目标、计分阶段的合计；最后那张不翻的没有）
+ * @param contest   进行中的换座位 / 抢夺（ADR-0023）· 公开到「谁对谁 · 哪一段 · 两边阵营与体型和」；
+ *                  自己押得出的武器与被抢方面前那一区只进该收的人那一包
+ * @param love      收件人自己爱谁（角色 id）· <b>只有本人</b>；还没发爱恨时是空串
+ * @param hate      收件人自己恨谁 · <b>只有本人</b>
+ * @param myScore   计分阶段收件人自己的四项明细；不在计分阶段时为 {@link Score#NONE}
  * @param thirstPrompt 口渴结算正在问谁、还需化解几次、还剩多久 · <b>公开</b>（他手上有几张水不在这里）
  * @param yourTurn  行动阶段正轮到他、而且他没有划船抽到还没定完的牌 —— ❗只在行动阶段为真（见 GameComponent 的 writeView）
  * @param hand      收件人自己的手牌（物资 id，<b>可重复</b>：水有 16 张）。
@@ -42,24 +51,83 @@ import java.util.Optional;
  *                  要等头顶信息条（决策 ⑥）才有地方显示
  */
 public record HudView(boolean active, int turn, Phase phase, int gulls,
-                      List<String> seats, String actor, Sea sea, Thirst thirstPrompt,
-                      boolean seated, String character, int health, int maxHealth,
-                      Condition condition, int thirst, boolean yourTurn, List<String> hand,
-                      List<FrontCard> front) {
+                      List<String> seats, List<String> removed, String actor, Sea sea, Thirst thirstPrompt,
+                      Endgame endgame, ContestView contest, boolean seated, String character,
+                      int health, int maxHealth, Condition condition, int thirst, String love, String hate,
+                      boolean yourTurn, List<String> hand, List<FrontCard> front, Score myScore) {
 
     public HudView {
         seats = List.copyOf(Objects.requireNonNull(seats, "seats"));
+        removed = List.copyOf(Objects.requireNonNull(removed, "removed"));
         actor = Objects.requireNonNull(actor, "actor");
         sea = Objects.requireNonNull(sea, "sea");
         thirstPrompt = Objects.requireNonNull(thirstPrompt, "thirstPrompt");
+        endgame = Objects.requireNonNull(endgame, "endgame");
+        contest = Objects.requireNonNull(contest, "contest");
+        love = Objects.requireNonNull(love, "love");
+        hate = Objects.requireNonNull(hate, "hate");
+        myScore = Objects.requireNonNull(myScore, "myScore");
         hand = List.copyOf(Objects.requireNonNull(hand, "hand"));
         front = List.copyOf(Objects.requireNonNull(front, "front"));
     }
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
-            false, 0, Phase.PROVISION, 0, List.of(), "", Sea.NONE, Thirst.NONE,
-            false, "", 0, 0, Condition.CONSCIOUS, 0, false, List.of(), List.of());
+            false, 0, Phase.PROVISION, 0, List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
+            ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false,
+            List.of(), List.of(), Score.NONE);
+
+    /** 终局序列在进行，而且我在局里 —— 翻牌与计分两面开不开得起来只看这一条。 */
+    public boolean myEndgame() {
+        return active && seated && endgame.active();
+    }
+
+    /**
+     * 终局序列（ADR-0022）。<b>公开</b>：全船看的是同一场演出。
+     *
+     * @param outcome  这一局怎么结束的；不在终局时为 {@code null}
+     * @param alive    终局时还活着几个人
+     * @param stage    正在哪一段；不在终局时为 {@code null}
+     * @param flipped  这一轮已经翻开了几张
+     * @param withheld 这一轮已经停在最后一张（不翻）
+     * @param entries  按翻牌次序的每个人：这一轮翻开了的带着目标（没翻开的是空串），计分阶段带着合计（其余时候是 -1）
+     */
+    public record Endgame(GameState.Outcome outcome, int alive, EndgameProgress.Stage stage, int flipped,
+                          boolean withheld, List<Entry> entries) {
+
+        public Endgame {
+            entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
+        }
+
+        public static final Endgame NONE = new Endgame(null, 0, null, 0, false, List.of());
+
+        public boolean active() {
+            return stage != null;
+        }
+
+        /** 一个人：他是谁、这一轮翻开的目标（没翻开是空串）、计分阶段的合计（其余时候 -1）。 */
+        public record Entry(String who, String target, int total) {
+
+            public Entry {
+                Objects.requireNonNull(who, "who");
+                Objects.requireNonNull(target, "target");
+            }
+        }
+    }
+
+    /** 计分阶段自己的四项。{@link #NONE} 表示还没到计分阶段。 */
+    public record Score(int selfSurvival, int treasure, int loved, int hated) {
+
+        public static final Score NONE = new Score(-1, -1, -1, -1);
+
+        public boolean present() {
+            return selfSurvival >= 0;
+        }
+
+        public int total() {
+            return selfSurvival + treasure + loved + hated;
+        }
+    }
 
     /**
      * 亮在面前的一张。
@@ -121,6 +189,52 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
     public boolean myThirstChoice() {
         return active && seated && thirstPrompt.active() && thirstPrompt.deadlineMs() > 0
                 && thirstPrompt.who().equals(character);
+    }
+
+    /**
+     * 该我表态了：这一场指的是我，而且窗口开着。
+     *
+     * <p>不清醒的人规则上视为同意（规则 §9.1），引擎当场就把这一场办完了 —— 那种局面下根本不会有 CONSENT 这一段。
+     */
+    public boolean myConsent() {
+        return active && seated && contest.waiting()
+                && contest.stage() == Contest.Stage.CONSENT && contest.target().equals(character);
+    }
+
+    /**
+     * 该我决定站不站队了：站队段、我清醒、而且还没在场上。
+     *
+     * <p>进攻方与防守方本来就在场上，助拳者加入之后也不可退出（规则 §9.3）—— 所以这一面对他们没有可做的决定。
+     */
+    public boolean myStance() {
+        return active && seated && contest.waiting() && contest.stage() == Contest.Stage.STANCES
+                && condition == Condition.CONSCIOUS && !contest.isCombatant(character);
+    }
+
+    /**
+     * 该我押武器了：挂武器段、我参了战，而且手上或面前真有押得出的。
+     *
+     * <p>❗一张都押不出时不弹：只有一个选项的窗口只是在浪费所有人的时间（与「没水时不开口渴一面」同一条）。
+     */
+    public boolean myWeaponChoice() {
+        return active && seated && contest.waiting() && contest.stage() == Contest.Stage.WEAPONS
+                && contest.isCombatant(character) && !contest.myWeapons().isEmpty();
+    }
+
+    /**
+     * 这一场里有没有一面正等着我。
+     *
+     * <p>HUD 那行「按 %s 打开」认的是这一条 —— 站队与挂武器收起来之后不会自己弹回来，
+     * 不写那一行的话，收起来的人就再也找不回那个界面了（见 {@code HeavySeasClient#pollContest}）。
+     */
+    public boolean myContestChoice() {
+        return myConsent() || myStance() || myWeaponChoice() || myPick();
+    }
+
+    /** 该我挑牌了：抢赢了的那个是我。 */
+    public boolean myPick() {
+        return active && seated && contest.waiting() && contest.stage() == Contest.Stage.PICK
+                && contest.attacker().equals(character);
     }
 
     /**

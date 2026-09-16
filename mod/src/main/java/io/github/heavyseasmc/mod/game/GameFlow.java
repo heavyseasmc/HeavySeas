@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.game;
 
+import io.github.heavyseasmc.engine.model.Affinities;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
@@ -112,6 +113,9 @@ public final class GameFlow {
                 new NavigationDeck(data.navigation(), new Random(world.getRandom().nextLong())),
                 data.provisions(), new Random(world.getRandom().nextLong()));
         Session session = new Session("world=" + world.getRegistryKey().getValue(), roster, table);
+        // 开局发爱恨（ADR-0022）：两个独立置换，全程保密。
+        // ❗日志里不打谁爱谁、谁恨谁 —— 开服的人往往也是玩家。终局翻牌时才一张张写进日志。
+        session.dealAffinities(Affinities.random(roster, new Random(world.getRandom().nextLong())));
 
         GameComponent component = GameComponents.of(world);
         component.begin(session, occupants);
@@ -259,6 +263,14 @@ public final class GameFlow {
         if (!report.thirstSelected().isEmpty()) {
             broadcast(world, Text.translatable("heavyseas.game.thirst", names(report.thirstSelected())));
         }
+        // 死在水里的人连人带牌离场（ADR-0022）。说出来：座位条上他那一格空了，没人说的话看起来像是界面坏了。
+        for (CharacterId gone : report.removed()) {
+            broadcast(world, Text.translatable("heavyseas.game.removed", characterName(gone))
+                    .formatted(Formatting.DARK_AQUA));
+        }
+        if (!report.removed().isEmpty()) {
+            LOGGER.info("移出游戏：{}", ids(report.removed()));
+        }
         LOGGER.info("航海牌 {}：海鸥 {} · 落海 {} · 口渴 {}", card.id(), card.gull(),
                 ids(report.overboardSelected()), ids(report.thirstSelected()));
         sync(world);                          // 执行的那张进投影：HUD 这时才拿得到
@@ -321,20 +333,39 @@ public final class GameFlow {
     }
 
     private static void announceOutcome(ServerWorld world, GameComponent component) {
+        if (component.endgame().isPresent()) {
+            return;                       // 结束可能从好几条路先后到达；终局序列已经开始了，别再播一遍
+        }
         Session session = component.requireSession();
         GameState end = session.state();
         broadcast(world, Text.translatable(outcomeKey(end.outcome().orElseThrow()),
                 end.turn(), session.aliveCount()).formatted(Formatting.GOLD));
         for (CharacterId id : end.bySeat()) {
-            broadcast(world, Text.translatable("heavyseas.game.final_line", characterName(id),
-                    conditionName(end.conditionOf(id))));
+            broadcast(world, Text.translatable(end.isRemoved(id)
+                            ? "heavyseas.game.final_line_removed" : "heavyseas.game.final_line",
+                    characterName(id), conditionName(end.conditionOf(id))));
         }
-        // ❗M1 不计分：财宝、爱恨都还没建模，算出来的分会是假的。
-        broadcast(world, Text.translatable("heavyseas.game.no_score_yet").formatted(Formatting.DARK_GRAY));
         LOGGER.info("对局结束：{} · 第 {} 回合 · 存活 {} 人",
                 end.outcome().orElseThrow(), end.turn(), session.aliveCount());
-        component.end();
-        sync(world);                      // 对局结束也要推，否则 HUD 会一直挂着最后一帧
+        // ❗不再当场收起会话：终局序列（翻恨 → 翻爱 → 计分）走完才收（ADR-0022）。
+        //   原先这里是 component.end() —— 「本阶段不计分」那句占位也一起拿掉了。
+        sync(world);
+        EndgamePhase.begin(world, component);
+    }
+
+    /**
+     * <b>夹具</b>（{@code /seas land}）：海鸥直接置满，走正常的终局流程（ADR-0022 §7.7）。
+     *
+     * <p>各面的计时一并停掉：补给箱、舵手、口渴的窗口若还开着，它们的超时会在终局序列里再推一下已经结束的对局。
+     */
+    public static void landForFixture(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        session.landForFixture();
+        component.clearProvision();
+        component.clearHelm();
+        component.clearThirst();
+        LOGGER.info("夹具：直接靠岸（第 {} 回合）", session.state().turn());
+        announceOutcome(world, component);
     }
 
     /** 一行状态：回合、阶段、海鸥、每个人的伤势。纯文字 HUD 的服务端那一半。 */

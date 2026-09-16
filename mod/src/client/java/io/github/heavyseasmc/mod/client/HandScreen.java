@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
@@ -179,13 +180,23 @@ public final class HandScreen extends GameScreen {
         drawPublicBand(context, view, 12);
         // 大图那一带的下沿与原先一样停在手牌上方 20：那 20 里要放得下「抬」起来的牌与它的框 ——
         // 身份那一行原先就在这 20 里，被抬起的牌压住了一半（真实客户端上看到的）。
-        int statusY = drawExamined(context, TOP_BAND_H, handTop - 20);
+        // 爱恨那一行占一行字的高度：从大图那一带里让出来，不压到抬起来的手牌（ADR-0022）。
+        // 空手时也让 —— 身份那一行不能因为手上有没有牌就上下跳。
+        int affinityRoom = view.love().isEmpty() ? 0 : textRenderer.fontHeight + 4;
+        int statusY = drawExamined(context, TOP_BAND_H, handTop - 20 - affinityRoom);
+        // 爱恨：只有你看得到（全程保密，规则里也不许亮出来证明自己）。紧贴身份，键位那一行留在最靠近手牌的地方。
+        if (affinityRoom > 0) {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hand.affinity",
+                            Text.translatable("heavyseas.character." + view.love()),
+                            Text.translatable("heavyseas.character." + view.hate())),
+                    width / 2, statusY + textRenderer.fontHeight + 2, GuiLanguage.MUTED);
+        }
         drawIdentity(context, view, statusY);
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
         //   与 HUD 那一行「按 H 查看」同一条理由。
         if (!hand.isEmpty()) {
             context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hand.keys"),
-                    width / 2, statusY + textRenderer.fontHeight + 2, GuiLanguage.MUTED);
+                    width / 2, statusY + (affinityRoom > 0 ? 2 : 1) * (textRenderer.fontHeight + 2), GuiLanguage.MUTED);
         }
 
         if (hand.isEmpty()) {
@@ -268,7 +279,10 @@ public final class HandScreen extends GameScreen {
         List<String> hand = view.hand();
         if (hand.isEmpty()) {
             // 空手也留出大图的位置：身份那一行不能因为手上没牌就跳到别处去。
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hand.empty"),
+            // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按 H 进来的人，要的是「一张都没有」。
+            boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
+            context.drawCenteredTextWithShadow(textRenderer,
+                    Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
                     width / 2, y + h / 2 - text / 2, GuiLanguage.DIM);
             return statusY;
         }

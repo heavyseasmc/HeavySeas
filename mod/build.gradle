@@ -334,31 +334,46 @@ tasks.named('check') {
 //   ④ 比例不是 5:7 —— 版面按这个比例排，不对就被拉伸，拉伸同样不报错。
 def checkCardTextures = tasks.register('checkCardTextures') {
     group = 'verification'
-    description = '每一种物资都要有对应的 GUI 贴图：确实是张 PNG、够清楚、比例对'
+    description = '每一种物资、每一个角色都要有对应的 GUI 贴图，终局的秘密牌背也要有：确实是张 PNG、够清楚、比例对'
     def dataFile = rootProject.file('data/provisions/default.json')
-    // 做成任务属性而不是局部变量：红测要能把它指向一份造坏的目录，而不去改被跟踪的贴图。
+    def rosterFile = rootProject.file('data/roster/default.json')
+    // 做成任务属性而不是局部变量：红测要能把它们指向一份造坏的目录，而不去改被跟踪的贴图。
     ext.texDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/provision')
+    ext.charDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/character')
+    ext.backDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/back')
     def minW = 600
     def minH = 840
     inputs.file(dataFile)
+    inputs.file(rosterFile)
     inputs.dir(ext.texDir).optional()
+    inputs.dir(ext.charDir).optional()
+    inputs.dir(ext.backDir).optional()
     doLast {
-        File texDir = ext.texDir
-        def ids = (new groovy.json.JsonSlurper().parse(dataFile, 'UTF-8') as Map)
-                .cards.collect { it.id.toString() }
+        def slurper = new groovy.json.JsonSlurper()
+        def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
         if (ids.isEmpty()) {
             throw new GradleException('data/provisions 里一个 id 都没读到 —— 判据坏了，不是真的没有牌')
         }
+        // 角色卡：终局翻牌与手牌一面的爱恨都画它（ADR-0022）。id 取自 data/roster —— 与卡面、lang 共用一套主键。
+        def characters = (slurper.parse(rosterFile, 'UTF-8') as Map).characters.collect { it.id.toString() }
+        if (characters.isEmpty()) {
+            throw new GradleException('data/roster 里一个角色都没读到 —— 判据坏了，不是真的没有角色')
+        }
+        // 牌背：终局翻牌的暗牌只用 secret（爱恨卡的背面）。另两张没有界面在用，不拦 —— 拦一张没人读的贴图只会拦下正确的删除。
+        def backs = ['secret']
         def problems = []
         def sizes = [] as Set
-        ids.each { id ->
-            def f = new File(texDir, "${id}.png")
+        long bytes = 0
+        // prefix 为空的是物资：报错措辞与以前一字不差，既有的两条红测（太小 · 比例不对）不用改。
+        def checkOne = { File dir, String prefix, String id ->
+            def name = "${prefix}${id}.png"
+            def f = new File(dir, "${id}.png")
             if (!f.isFile()) {
-                problems << "缺贴图：${id}.png"
+                problems << "缺贴图：${name}"
                 return
             }
             if (f.length() == 0) {
-                problems << "${id}.png 是 0 字节 —— 烘制那一步失败了"
+                problems << "${name} 是 0 字节 —— 烘制那一步失败了"
                 return
             }
             // PNG 头：前 4 字节是签名 89 50 4E 47；IHDR 里宽在第 16–19 字节、高在 20–23（大端）。
@@ -367,7 +382,7 @@ def checkCardTextures = tasks.register('checkCardTextures') {
             int got = f.withInputStream { it.read(head) }
             if (!(got >= 4 && head[0] == (byte) 0x89 && head[1] == (byte) 0x50
                     && head[2] == (byte) 0x4E && head[3] == (byte) 0x47)) {
-                problems << "${id}.png 不是 PNG（签名对不上）"
+                problems << "${name} 不是 PNG（签名对不上）"
                 return
             }
             def be = { int at ->
@@ -376,18 +391,24 @@ def checkCardTextures = tasks.register('checkCardTextures') {
             int w = be(16)
             int h = be(20)
             if (w < minW || h < minH) {
-                problems << "${id}.png 只有 ${w}×${h}，低于 ${minW}×${minH} —— 烘制倍数不对，GUI 上会糊"
+                problems << "${name} 只有 ${w}×${h}，低于 ${minW}×${minH} —— 烘制倍数不对，GUI 上会糊"
             } else if (w * 7 != h * 5) {
-                problems << "${id}.png 是 ${w}×${h}，不是 5:7 —— 版面会把它拉伸"
+                problems << "${name} 是 ${w}×${h}，不是 5:7 —— 版面会把它拉伸"
             }
             sizes << "${w}×${h}".toString()
+            bytes += f.length()
         }
+        File texDir = ext.texDir
+        File charDir = ext.charDir
+        File backDir = ext.backDir
+        ids.each { checkOne(texDir, '', it) }
+        characters.each { checkOne(charDir, 'character/', it) }
+        backs.each { checkOne(backDir, 'back/', it) }
         if (problems) {
             throw new GradleException((['GUI 卡面贴图核对失败：']
                     + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
-        def bytes = ids.sum { new File(texDir, "${it}.png").length() }
-        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
+        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种 · 角色 ${characters.size()} 个 · 牌背 ${backs.size()} 张，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
     }
 }
 

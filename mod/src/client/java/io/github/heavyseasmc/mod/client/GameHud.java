@@ -1,10 +1,12 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.engine.play.Contest;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.game.NavCardText;
+import io.github.heavyseasmc.mod.state.ContestView;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.MinecraftClient;
@@ -64,14 +66,20 @@ public final class GameHud {
         }
 
         List<Text> lines = new ArrayList<>();
-        lines.add(Text.translatable("heavyseas.status.header", view.turn(), phaseName(view.phase()),
+        lines.add(Text.translatable("heavyseas.status.header", view.turn(), GameScreen.phaseLabel(view),
                 view.gulls(), GameState.GULLS_TO_LAND).formatted(Formatting.GOLD));
-        if (view.phase() == Phase.ACTION || view.phase() == Phase.NAVIGATION) {
+        // 终局进行中不画划船堆与口渴：对局已经结束，「划船堆 0 张 · 舵手 X」只是停下那一刻的残影（2026-09-16 实拍）。
+        boolean endgame = view.endgame().active();
+        if (!endgame && (view.phase() == Phase.ACTION || view.phase() == Phase.NAVIGATION)) {
             lines.add(seaLine(view));
         }
         // 口渴结算轮到谁，是**公开**的：全船都该看见在等谁（决策 ⑭ 的同一条 —— 等待要看得见）。
-        if (view.thirstPrompt().active()) {
+        if (!endgame && view.thirstPrompt().active()) {
             lines.add(thirstLine(view));
+        }
+        // 换座位 / 抢夺那一场同理：全船都在等它收场，屏幕上却什么都没有的话，看起来就像卡住了（ADR-0023）。
+        if (!endgame && view.contest().active()) {
+            lines.add(contestLine(view));
         }
         view.sea().revealed().ifPresent(card -> lines.add(Text.translatable("heavyseas.hud.revealed",
                 NavCardText.describe(card, view.seats())).formatted(Formatting.AQUA)));
@@ -80,6 +88,17 @@ public final class GameHud {
                     Text.translatable("heavyseas.character." + view.character()),
                     view.health(), view.maxHealth(),
                     conditionName(view.condition()), view.thirst()));
+            // 终局进行中：翻牌那一面被 Esc 收起之后，得告诉他怎么再开（ADR-0022）。
+            if (view.endgame().active()) {
+                lines.add(Text.translatable("heavyseas.hud.endgame",
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.GOLD));
+            }
+            // 站队与挂武器两面收起来之后不会自己弹回来（见 HeavySeasClient#pollContest）。
+            // ❗不写这一行，收起来的人就再也找不回那个界面了 —— 而窗口还在走。
+            if (view.myContestChoice()) {
+                lines.add(Text.translatable("heavyseas.hud.contest_you",
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW));
+            }
             if (view.myTurnToAct()) {
                 // 键同样显示实际绑定的那个，理由同下面手牌那一行。
                 lines.add(Text.translatable("heavyseas.hud.your_turn",
@@ -93,7 +112,8 @@ public final class GameHud {
             }
             // ❗手上有牌却没有任何提示，等于没有手牌 —— 玩家不会去猜某个键能开一个界面。
             //   显示的是**实际绑定的那个键**，不是写死的 H：改了键位还说 H 就是在说谎。
-            if (!view.hand().isEmpty()) {
+            // 空手也写：爱恨在手牌那一面里，不写出来就没人知道去哪看自己恨谁（ADR-0022）。
+            if (!view.hand().isEmpty() || !view.love().isEmpty()) {
                 lines.add(Text.translatable("heavyseas.hud.hand", view.hand().size(),
                         HeavySeasClient.handKey().getBoundKeyLocalizedText()));
             }
@@ -125,6 +145,29 @@ public final class GameHud {
                 (left + 999) / 1000).formatted(Formatting.AQUA);
     }
 
+    /**
+     * 「换座位：X 对 Y · 站队 · N 秒」。
+     *
+     * <p>❗写的全是<b>公开</b>的那几项：谁对谁 · 哪一段 · 还剩几秒。两边站了谁、体型和多少留给站队那一面 ——
+     * HUD 铺不下，而且别人凑过来看屏幕就全知道了（与手牌那一行同一条）。押下的武器一个字都不提：暗牌。
+     */
+    private static Text contestLine(HudView view) {
+        ContestView contest = view.contest();
+        Text kind = Text.translatable(contest.kind() == Contest.Kind.STEAL
+                ? "heavyseas.contest.kind_steal" : "heavyseas.contest.kind_swap");
+        Text attacker = Text.translatable("heavyseas.character." + contest.attacker());
+        Text target = Text.translatable("heavyseas.character." + contest.target());
+        Text stage = stageName(contest.stage());
+        long left = contest.deadlineMs() - System.currentTimeMillis();
+        // 窗口没开的那几段（全是替身，由排程一步一步推）不写秒数：写个 0 秒会让人以为卡住了。
+        if (contest.waiting() && left > 0) {
+            return Text.translatable("heavyseas.hud.contest_countdown", kind, attacker, target, stage,
+                    (left + 999) / 1000).formatted(Formatting.RED);
+        }
+        return Text.translatable("heavyseas.hud.contest", kind, attacker, target, stage)
+                .formatted(Formatting.RED);
+    }
+
     /** 「划船堆 N 张 · 舵手 X」，舵手在挑牌时再加「· N 秒」。 */
     private static Text seaLine(HudView view) {
         HudView.Sea sea = view.sea();
@@ -138,6 +181,16 @@ public final class GameHud {
         return Text.translatable("heavyseas.hud.sea", sea.rowStack(), helm);
     }
 
+    // 同上一条：把键写全，别拼。
+    private static Text stageName(Contest.Stage stage) {
+        return Text.translatable(switch (stage) {
+            case CONSENT -> "heavyseas.contest.stage_consent";
+            case STANCES -> "heavyseas.contest.stage_stances";
+            case WEAPONS -> "heavyseas.contest.stage_weapons";
+            case PICK -> "heavyseas.contest.stage_pick";
+        });
+    }
+
     // 与服务端那三个 switch 同源同理由：拼出来的 lang 键静态扫不到，漏了也不报错。
     private static Text conditionName(Condition condition) {
         return Text.translatable(switch (condition) {
@@ -147,11 +200,4 @@ public final class GameHud {
         });
     }
 
-    private static Text phaseName(Phase phase) {
-        return Text.translatable(switch (phase) {
-            case PROVISION -> "heavyseas.phase.provision";
-            case ACTION -> "heavyseas.phase.action";
-            case NAVIGATION -> "heavyseas.phase.navigation";
-        });
-    }
 }

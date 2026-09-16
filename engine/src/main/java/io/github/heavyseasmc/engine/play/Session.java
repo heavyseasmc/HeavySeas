@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.engine.play;
 
 import io.github.heavyseasmc.engine.model.Ability;
+import io.github.heavyseasmc.engine.model.Affinities;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Provision;
 import io.github.heavyseasmc.engine.model.ProvisionEffect;
@@ -9,6 +10,10 @@ import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.scoring.FinalState;
+import io.github.heavyseasmc.engine.scoring.ScoreSheet;
+import io.github.heavyseasmc.engine.scoring.Scorer;
+import io.github.heavyseasmc.engine.scoring.TreasureScoring;
 import io.github.heavyseasmc.engine.scoring.Treasures;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Fight;
@@ -88,6 +93,7 @@ public final class Session {
     public void advancePhase() {
         requireNoRowInProgress("推进阶段");
         requireNoThirstInProgress("推进阶段");
+        requireNoContest("推进阶段");
         int was = state.turn();
         state = state.advancePhase();
         navigatedThisTurn = null;
@@ -224,6 +230,7 @@ public final class Session {
     /** 记下这个人本回合行动过了。行动阶段每人一次，必须写回，否则 nextActor 会一直返回同一个人。 */
     public void markActed(CharacterId actor) {
         requireNoRowInProgress("记下行动");
+        requireNoContest("记下行动");
         state = state.withState(actor, state.stateOf(actor).markActed());
         Invariants.requireValid(state, context, "行动后");
     }
@@ -304,6 +311,7 @@ public final class Session {
             throw new IllegalStateException("%s 划船是行动阶段的事，现在是 %s".formatted(context, state.phase()));
         }
         requireNoRowInProgress("再划一次船");
+        requireNoContest("划船");
         state.stateOf(rower);                          // 阵容里没有这个人就在这里抛，别等到领标记时才抛
         List<NavigationCard> drawn = new ArrayList<>();
         int draws = CARDS_DRAWN_WHEN_ROWING + rowExtraDraw(rower);
@@ -393,9 +401,263 @@ public final class Session {
         }
     }
 
-    /** 换座位：与任意角色交换，不限相邻。昏迷与死亡者不能拒绝。 */
+    // ---------------------------------------------------------------- 换座位与抢夺：拒绝才开打（ADR-0023）
+
+    /** 进行中的这一场；没有时为 {@code null}。 */
+    private Contest contest;
+
+    /** 进行中的换座位或抢夺；没有时为空。❗其中押下的武器是暗牌，投影只能发给押的人自己。 */
+    public Optional<Contest> contest() {
+        return Optional.ofNullable(contest);
+    }
+
+    /**
+     * 宣告换座位或抢夺。这一下就用掉了进攻方的行动，无论后面怎么收场（规则 §9.1）。
+     *
+     * <p>目标能不能拒绝由规则直接决定，不问任何人：
+     * <ul>
+     *   <li>目标不清醒（昏迷 · 死亡）→ 视为同意：换座位当场生效，抢夺直接进挑牌；</li>
+     *   <li>小孩的偷窃（{@link Ability.StealUncontested}，只偷手牌）→ 不可拒绝，直接进挑牌（决策 ⑦）；</li>
+     *   <li>其余 → 等目标表态（{@link #consent}）。</li>
+     * </ul>
+     *
+     * @throws IllegalStateException    不在行动阶段、没轮到他、上一场还没收场，或者划船抽到的牌还没定完
+     * @throws IllegalArgumentException 对自己，或者目标已经被移出游戏
+     */
+    public void declare(CharacterId actor, Contest.Kind kind, CharacterId target) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(target, "target");
+        if (state.phase() != Phase.ACTION) {
+            throw new IllegalStateException("%s %s是行动阶段的事，现在是 %s"
+                    .formatted(context, kindName(kind), state.phase()));
+        }
+        requireNoRowInProgress("宣告" + kindName(kind));
+        requireNoContest("再宣告一次");
+        if (!state.nextActor().map(actor::equals).orElse(false)) {
+            throw new IllegalStateException("%s 现在轮到的不是 %s（是 %s）".formatted(context, actor.value(),
+                    state.nextActor().map(CharacterId::value).orElse("没有人")));
+        }
+        if (actor.equals(target)) {
+            throw new IllegalArgumentException("%s %s 不能对自己%s".formatted(context, actor.value(), kindName(kind)));
+        }
+        if (state.isRemoved(target)) {
+            throw new IllegalArgumentException("%s %s 已经被移出游戏，不能对他%s"
+                    .formatted(context, target.value(), kindName(kind)));
+        }
+        boolean handOnly = kind == Contest.Kind.STEAL
+                && state.roster().get(actor).ability() instanceof Ability.StealUncontested steal
+                && "hand".equals(steal.zone());
+        contest = new Contest(kind, actor, target, Contest.Stage.CONSENT, Optional.empty(), handOnly, Map.of());
+        if (handOnly || !state.conditionOf(target).canAct()) {
+            agreed();
+        }
+    }
+
+    /**
+     * 被指定的人表态。
+     *
+     * @param fight true = 喊「战斗」；false = 同意
+     * @throws IllegalStateException 现在不是等表态的时候
+     */
+    public void consent(boolean fight) {
+        Contest c = requireStage(Contest.Stage.CONSENT, "表态");
+        if (!fight) {
+            agreed();
+            return;
+        }
+        contest = c.advance(Contest.Stage.STANCES, Optional.of(Fight.between(c.attacker(), c.target())));
+    }
+
+    /**
+     * 站队：加入进攻方或防守方。加入后不可退出（{@link Fight#join} 没有退出这回事）。
+     *
+     * @throws IllegalStateException    现在不是站队段
+     * @throws IllegalArgumentException 他不清醒、已经被移出游戏，或者已经在场上
+     */
+    public void join(CharacterId who, Fight.Side side) {
+        Contest c = requireStage(Contest.Stage.STANCES, "站队");
+        if (state.isRemoved(who) || !state.conditionOf(who).canAct()) {
+            throw new IllegalArgumentException("%s %s 不清醒，不能加入战斗（规则 §9.3）".formatted(context, who.value()));
+        }
+        contest = c.withFight(c.fight().orElseThrow().join(who, side));
+    }
+
+    /** 站队段结束，进挂武器段。 */
+    public void closeStances() {
+        Contest c = requireStage(Contest.Stage.STANCES, "结束站队");
+        contest = c.advance(Contest.Stage.WEAPONS, c.fight());
+    }
+
+    /**
+     * 挂武器段里押下一张武器。❗<b>暗牌</b>：只登记，不挪牌、不亮出 —— 结算那一刻才亮（决策 ④）。
+     *
+     * <p>同一个 id 最多押「手上 + 面前」那么多张（两支船桨能押两次）。
+     *
+     * @throws IllegalStateException    现在不是挂武器段
+     * @throws IllegalArgumentException 他没参战、这张不是武器，或者他没有那么多张
+     */
+    public void commitWeapon(CharacterId who, String cardId) {
+        Contest c = requireStage(Contest.Stage.WEAPONS, "押武器");
+        if (!c.fight().orElseThrow().combatants().contains(who)) {
+            throw new IllegalArgumentException("%s %s 没有参战，不能押武器（决策 ④：只开放给参战双方）"
+                    .formatted(context, who.value()));
+        }
+        if (table.provisions().get(cardId).weaponPower() <= 0) {
+            throw new IllegalArgumentException("%s %s 不是武器".formatted(context, cardId));
+        }
+        SurvivorState s = state.stateOf(who);
+        long already = c.committedBy(who).stream().filter(cardId::equals).count();
+        long owned = s.countInHand(cardId) + s.front().stream().filter(cardId::equals).count();
+        if (already >= owned) {
+            throw new IllegalArgumentException("%s %s 手上与面前一共 %d 张 %s，已经押了 %d 张"
+                    .formatted(context, who.value(), owned, cardId, already));
+        }
+        contest = c.withCommitted(who, cardId);
+    }
+
+    /**
+     * 挂武器段结束，结算这一场：押下的牌此刻才亮出、加上战力；胜负照 {@link Fight#resolve}，伤害与战斗标记照 {@link #applyFight}。
+     *
+     * <p>❗亮出时<b>先用面前已有的</b>，不够才从手上亮：面前本来就有一支船桨的人押一支，手里那支不该被翻出来。
+     *
+     * <p>进攻方胜 → 换座位当场生效；抢夺进挑牌（被抢方身上没有能挑的牌时直接收场）。防守方胜 → 这一场结束。
+     *
+     * @return 这一场的结果
+     */
+    public Fight.Outcome resolveContest() {
+        Contest c = requireStage(Contest.Stage.WEAPONS, "结算");
+        Fight fight = c.fight().orElseThrow();
+        contest = null;                    // 下面走的是这一场之外的结算入口，它们的守卫要看到这一场已经收起
+        for (Map.Entry<CharacterId, List<String>> entry : c.committed().entrySet()) {
+            CharacterId who = entry.getKey();
+            Map<String, Integer> wanted = new LinkedHashMap<>();
+            entry.getValue().forEach(id -> wanted.merge(id, 1, Integer::sum));
+            for (Map.Entry<String, Integer> w : wanted.entrySet()) {
+                String cardId = w.getKey();
+                long shown = state.stateOf(who).front().stream().filter(cardId::equals).count();
+                for (long i = shown; i < w.getValue(); i++) {
+                    state = state.withState(who, state.stateOf(who).reveal(cardId));
+                }
+                for (int i = 0; i < w.getValue(); i++) {
+                    weaponsPlayed.computeIfAbsent(who, k -> new ArrayList<>()).add(cardId);
+                    fight = fight.arm(who, table.provisions().get(cardId).weaponPower());
+                }
+            }
+        }
+        Fight.Outcome outcome = applyFight(fight);
+        if (outcome.attackerGetsWhatTheyWanted()) {
+            if (c.kind() == Contest.Kind.SWAP) {
+                swapSeats(c.attacker(), c.target());
+            } else {
+                enterPick(c);
+            }
+        }
+        return outcome;
+    }
+
+    /**
+     * 挑牌：拿被抢方面前亮出的一张，进抢夺方<b>面前</b>（亮出的牌换了主人照样亮着，与赠送同一条）。
+     *
+     * @throws IllegalStateException    现在不是挑牌的时候，或者这是小孩的偷窃（只能挑手牌）
+     * @throws IllegalArgumentException 被抢方面前没有这张
+     */
+    public void pickFromFront(String cardId) {
+        Contest c = requireStage(Contest.Stage.PICK, "挑面前的牌");
+        if (c.handOnly()) {
+            throw new IllegalStateException("%s %s 的偷窃只能拿手牌（决策 ⑦）".formatted(context, c.attacker().value()));
+        }
+        SurvivorState victim = state.stateOf(c.target());
+        if (!victim.hasInFront(cardId)) {
+            throw new IllegalArgumentException("%s %s 面前没有 %s".formatted(context, c.target().value(), cardId));
+        }
+        state = state.withState(c.target(), victim.withoutCardInFront(cardId));
+        state = state.withState(c.attacker(), state.stateOf(c.attacker()).withCardInFront(cardId));
+        contest = null;
+        requireNoProvisionLost("抢到面前的一张之后");
+    }
+
+    /**
+     * 挑牌：从被抢方手牌里<b>随机</b>抽一张，进抢夺方手牌。
+     *
+     * <p>❗下标由调用方给，而且<b>必须是均匀随机的</b>：{@code Session} 不持有随机源（爱恨也是驱动者发的）。
+     * 界面上不能让抢夺方看着牌挑 —— 手牌是暗的，这里只收一个下标。
+     *
+     * @param index 被抢方手牌的下标，从 0 起
+     */
+    public void pickFromHand(int index) {
+        Contest c = requireStage(Contest.Stage.PICK, "挑手牌");
+        SurvivorState victim = state.stateOf(c.target());
+        if (index < 0 || index >= victim.hand().size()) {
+            throw new IllegalArgumentException("%s %s 手上有 %d 张，没有第 %d 张"
+                    .formatted(context, c.target().value(), victim.hand().size(), index + 1));
+        }
+        String cardId = victim.hand().get(index);
+        state = state.withState(c.target(), victim.withoutCard(cardId));
+        state = state.withState(c.attacker(), state.stateOf(c.attacker()).withCard(cardId));
+        contest = null;
+        requireNoProvisionLost("抢到手牌里的一张之后");
+    }
+
+    /** 同意（或规则上视为同意）：换座位当场生效，抢夺进挑牌。 */
+    private void agreed() {
+        Contest c = contest;
+        contest = null;
+        if (c.kind() == Contest.Kind.SWAP) {
+            swapSeats(c.attacker(), c.target());
+        } else {
+            enterPick(c);
+        }
+    }
+
+    /** 进挑牌；被抢方身上（小孩的偷窃：手上）一张能挑的都没有时，这一场直接收场。 */
+    private void enterPick(Contest c) {
+        SurvivorState victim = state.stateOf(c.target());
+        boolean anything = !victim.hand().isEmpty() || (!c.handOnly() && !victim.front().isEmpty());
+        contest = anything ? c.advance(Contest.Stage.PICK, Optional.empty()) : null;
+    }
+
+    private Contest requireStage(Contest.Stage stage, String what) {
+        if (contest == null) {
+            throw new IllegalStateException("%s 现在没有进行中的换座位或抢夺，不能%s".formatted(context, what));
+        }
+        if (contest.stage() != stage) {
+            throw new IllegalStateException("%s 这一场在 %s，不能%s".formatted(context, contest.stage(), what));
+        }
+        return contest;
+    }
+
+    /**
+     * 换座位或抢夺还没收场时，不许做别的事（ADR-0023 §7.4 · §7.7）。
+     *
+     * <p>❗「战斗结束前任何卡不得易手」由这里守：交易、特殊行动、记下行动、推进阶段、划船都要先等这一场收场 ——
+     * 漏了收尾当场就红，不会让进攻方打完之后又轮到一次。
+     */
+    private void requireNoContest(String what) {
+        if (contest != null) {
+            throw new IllegalStateException("%s %s 对 %s 的%s还没收场（%s），不能%s".formatted(context,
+                    contest.attacker().value(), contest.target().value(), kindName(contest.kind()),
+                    contest.stage(), what));
+        }
+    }
+
+    private static String kindName(Contest.Kind kind) {
+        return kind == Contest.Kind.SWAP ? "换座位" : "抢夺";
+    }
+
+    /**
+     * 直接换座位，不问对方。
+     *
+     * <p>❗<b>这不是玩家路径</b>：规则上换座位要走 {@link #declare}（目标清醒就得问他）。留着它是给宣告之后的生效与测试夹具用 —— 这一场进行中时它照样抛。
+     */
     public void swapSeats(CharacterId actor, CharacterId target) {
         requireNoRowInProgress("换座位");
+        requireNoContest("直接换座位");
+        if (state.isRemoved(actor) || state.isRemoved(target)) {
+            // 规则允许与船上的尸体换座位；被冲走的人连座位牌一起退出了游戏，没有座位可换。
+            throw new IllegalArgumentException("%s 被移出游戏的人没有座位可换（%s ↔ %s）"
+                    .formatted(context, actor.value(), target.value()));
+        }
         int a = state.stateOf(actor).seat();
         int b = state.stateOf(target).seat();
         state = state.withState(actor, state.stateOf(actor).withSeat(b))
@@ -411,6 +673,7 @@ public final class Session {
      */
     public Fight.Outcome applyFight(Fight fight) {
         requireNoRowInProgress("结算战斗");
+        requireNoContest("直接结算一场战斗");
         // 体型按满值算，并加上本回合喝过的酒（{@code buff_size}，规则 §11.2：喝下后整个大回合有效）。
         Fight.Outcome outcome = fight.resolve(this::fightingSize);
         GameState next = state;
@@ -469,6 +732,7 @@ public final class Session {
      */
     public Fight playWeapon(Fight fight, CharacterId who, String cardId) {
         Objects.requireNonNull(fight, "fight");
+        requireNoContest("在这一场之外打武器");
         Provision card = table.provisions().get(cardId);
         if (card.weaponPower() <= 0) {
             throw new IllegalArgumentException("%s 不是武器，打不出加值".formatted(cardId));
@@ -614,11 +878,12 @@ public final class Session {
         state = state.withGulls(card.gull());
         Invariants.requireValid(state, context, "海鸥结算后");
         if (state.isOver()) {
-            return new NavigationReport(card, true, List.of(), List.of(), List.of(), List.of());
+            return new NavigationReport(card, true, List.of(), List.of(), List.of(), List.of(), List.of());
         }
 
-        // b) 落海。候选含尸体 —— 死者被冲下去会彻底退出游戏。
-        Set<CharacterId> overboardPool = new LinkedHashSet<>(state.bySeat());
+        // b) 落海。候选是船上的人，含尸体 —— 尸体被冲下去就连人带牌退出游戏；
+        //    已经被移出的人不在船上，「所有人」「除某人外」都不会再点到他。
+        Set<CharacterId> overboardPool = new LinkedHashSet<>(state.onBoatBySeat());
         // 分母：这一步真正执行时还活着的人。先记分母再点名，两者必须同一个时刻取。
         List<CharacterId> overboardCandidates = new ArrayList<>();
         for (CharacterId id : overboardPool) {
@@ -646,11 +911,22 @@ public final class Session {
         for (CharacterId id : inWater) {
             washAwayFront(id);
         }
+        // 水中判定（ADR-0022）：死在水里的人连人带牌移出游戏 —— 本来就是尸体的、在水里伤害超过体型的、
+        // 以及<b>恰好等于体型又没有救生圈</b>的（在船上这只是昏迷，在水里就是淹死）。
+        // ❗最后这一种 M0 就写好了（Condition.inWater），而结算一次都没调：M1 起淹死的人一直是昏迷着回到船上。
+        List<CharacterId> removedNow = new ArrayList<>();
+        for (CharacterId id : inWater) {
+            int size = state.roster().get(id).size();
+            if (Condition.inWater(state.stateOf(id).damage(), size, hasLifePreserverInFront(id)) == Condition.DEAD) {
+                removeFromGame(id);
+                removedNow.add(id);
+            }
+        }
         requireNoProvisionLost("落海结算后");
         Invariants.requireValid(state, context, "落海结算后");
         if (state.isOver()) {
             return new NavigationReport(card, false, overboardCandidates, overboardSelected,
-                    List.of(), List.of());
+                    List.of(), List.of(), removedNow);
         }
 
         // c) 口渴。候选不含死者，但含昏迷者 —— 他仍会口渴，只是不能自己打水。
@@ -683,7 +959,7 @@ public final class Session {
             thirstCard = null;
         }
         return new NavigationReport(card, false, overboardCandidates, overboardSelected,
-                thirstCandidates, thirstSelected);
+                thirstCandidates, thirstSelected, removedNow);
     }
 
     /**
@@ -1007,6 +1283,10 @@ public final class Session {
      * 亮了也就落水时会被冲走、并且看得见。
      */
     public void reveal(CharacterId who, String cardId) {
+        if (contest != null && contest.stage() == Contest.Stage.PICK && contest.target().equals(who)) {
+            // 被抢方在战斗里照常能亮牌，但不能在抢夺结算那一刻把手牌亮出来躲掉这一抢（规则 §5 抢夺）。
+            throw new IllegalStateException("%s %s 正在挨抢，挑牌那一刻不能亮牌".formatted(context, who.value()));
+        }
         table.provisions().get(cardId);           // 目录不认识这张就在这里抛
         state = state.withState(who, state.stateOf(who).reveal(cardId));
         requireNoProvisionLost("亮出后");
@@ -1048,12 +1328,16 @@ public final class Session {
      * @throws IllegalArgumentException 他手上与面前都没有这张
      */
     public void giveCard(CharacterId from, CharacterId to, String cardId) {
+        requireNoContest("交易（规则 §9.1：战斗结束前任何卡不得易手）");
         if (state.phase() != Phase.ACTION) {
             throw new IllegalStateException(
                     "%s 只有行动阶段能交易，现在是 %s".formatted(context, state.phase()));
         }
         if (from.equals(to)) {
             throw new IllegalArgumentException("%s 送给自己没有意义".formatted(context));
+        }
+        if (state.isRemoved(from) || state.isRemoved(to)) {
+            throw new IllegalArgumentException("%s 被移出游戏的人不能交易".formatted(context));
         }
         table.provisions().get(cardId);
         SurvivorState giver = state.stateOf(from);
@@ -1080,6 +1364,7 @@ public final class Session {
      * @throws IllegalArgumentException 手上没有医疗箱，或者目标没受伤
      */
     public void useMedicalKit(CharacterId user, CharacterId target, String cardId) {
+        requireNoContest("打出医疗箱");
         Provision card = requireHeld(user, cardId);
         if (!(card.effect() instanceof ProvisionEffect.Heal heal)) {
             throw new IllegalArgumentException("%s 不是治疗用的物资".formatted(cardId));
@@ -1105,6 +1390,7 @@ public final class Session {
      * 手上那张会先亮出来再撑开 —— 撑着的伞不可能还在手里。
      */
     public void openParasol(CharacterId who, String cardId) {
+        requireNoContest("撑伞");
         Provision card = table.provisions().get(cardId);
         if (!(card.effect() instanceof ProvisionEffect.PreventThirst cover) || !cover.requiresOpen()) {
             throw new IllegalArgumentException("%s 不是要撑开才生效的物资".formatted(cardId));
@@ -1131,11 +1417,12 @@ public final class Session {
      * @throws IllegalStateException 船上没有尸体
      */
     public List<CharacterId> useRation(CharacterId user, String cardId) {
+        requireNoContest("打出绝境");
         Provision card = requireHeld(user, cardId);
         if (!(card.effect() instanceof ProvisionEffect.HealAll heal)) {
             throw new IllegalArgumentException("%s 不是全体回血的物资".formatted(cardId));
         }
-        if (heal.requiresCorpse() && state.bySeat().stream()
+        if (heal.requiresCorpse() && state.onBoatBySeat().stream()
                 .noneMatch(id -> state.conditionOf(id) == Condition.DEAD)) {
             throw new IllegalStateException("%s 船上没有尸体，%s 用不了".formatted(context, cardId));
         }
@@ -1163,6 +1450,7 @@ public final class Session {
      * @return 抽到的那几张，按抽出顺序
      */
     public List<NavigationCard> fireSignal(CharacterId user, String cardId) {
+        requireNoContest("打出信号枪");
         Provision card = requireHeld(user, cardId);
         if (!(card.effect() instanceof ProvisionEffect.WeaponOrSpecial weapon)) {
             throw new IllegalArgumentException("%s 没有「当信号用」这种用法".formatted(cardId));
@@ -1416,13 +1704,105 @@ public final class Session {
             inFront += state.stateOf(id).front().size();
         }
         int accounted = table.provisionsLeft() + provisionOffer.size() + inHands + inFront
-                + table.provisionDiscard().size();
+                + table.provisionDiscard().size() + table.removedProvisions().size();
         if (accounted != table.provisionTotal()) {
             throw new IllegalStateException(
-                    "%s %s：物资对不上，牌堆 %d + 补给箱 %d + 手牌 %d + 面前 %d + 弃牌 %d ≠ 共 %d 张"
+                    "%s %s：物资对不上，牌堆 %d + 补给箱 %d + 手牌 %d + 面前 %d + 弃牌 %d + 随人离场 %d ≠ 共 %d 张"
                             .formatted(context, where, table.provisionsLeft(), provisionOffer.size(),
-                                    inHands, inFront, table.provisionDiscard().size(), table.provisionTotal()));
+                                    inHands, inFront, table.provisionDiscard().size(),
+                                    table.removedProvisions().size(), table.provisionTotal()));
         }
+    }
+
+    // ---------------------------------------------------------------- 爱恨与终局（ADR-0022）
+
+    private Affinities affinities;
+
+    /**
+     * 发爱恨牌。开局发一次（规则：设置阶段每人各抽一张喜爱、一张憎恨，全程保密）。
+     *
+     * @throws IllegalStateException    已经发过
+     * @throws IllegalArgumentException 爱恨牌发给的人与这一局的阵容对不上
+     */
+    public void dealAffinities(Affinities dealt) {
+        Objects.requireNonNull(dealt, "dealt");
+        if (affinities != null) {
+            throw new IllegalStateException("%s 爱恨牌已经发过了 —— 一局只发一次".formatted(context));
+        }
+        dealt.requireCovers(state.roster());
+        affinities = dealt;
+    }
+
+    /** 这一局的爱恨牌；还没发时为空。❗<b>每个人只该看到自己那两张</b> —— 按人裁剪是调用方的事。 */
+    public Optional<Affinities> affinities() {
+        return Optional.ofNullable(affinities);
+    }
+
+    /**
+     * 终局状态：计分的全部输入。
+     *
+     * <p>{@code alive} 看生死，{@code onBoat} 看有没有被移出游戏 —— 两者只在「死在水里」这一种情形下分叉，
+     * 而那正是 {@link FinalState} 把它们分开存的原因。财宝取手牌加面前（终局时全部亮出）。
+     *
+     * @throws IllegalStateException 爱恨牌还没发 —— 不猜，猜出来的分是假的
+     */
+    public Map<CharacterId, FinalState> finalStates() {
+        if (affinities == null) {
+            throw new IllegalStateException("%s 爱恨牌还没发，算不出终局".formatted(context));
+        }
+        Map<CharacterId, FinalState> out = new LinkedHashMap<>();
+        for (CharacterId id : state.bySeat()) {
+            boolean onBoat = !state.isRemoved(id);
+            out.put(id, new FinalState(state.conditionOf(id) != Condition.DEAD, onBoat,
+                    onBoat ? treasuresOf(id) : Treasures.NONE, affinities.loveOf(id), affinities.hateOf(id)));
+        }
+        return out;
+    }
+
+    /**
+     * 四项计分（{@link Scorer}，M0 起就在，这里只是把真实终局交给它）。
+     *
+     * @param scoring 分值表，来自 {@code data/roster} 的 {@code treasure_scoring} —— 引擎里不另写一份
+     */
+    public Map<CharacterId, ScoreSheet> scores(TreasureScoring scoring) {
+        Objects.requireNonNull(scoring, "scoring");
+        return Scorer.scoreAll(state.roster(), finalStates(), scoring);
+    }
+
+    /**
+     * <b>夹具</b>：把海鸥直接置满，让这一局当场以靠岸结束（ADR-0022 §7.7）。
+     *
+     * <p>与 {@link #dealFromPile} 同一族：终局不摆出来就验不了，而等一局自然打完是时灵时不灵的验收。
+     *
+     * @throws IllegalStateException 这一局已经结束，或者还有划船 / 口渴没定完
+     */
+    public void landForFixture() {
+        requireNoRowInProgress("直接靠岸");
+        requireNoThirstInProgress("直接靠岸");
+        if (state.isOver()) {
+            throw new IllegalStateException("%s 这一局已经结束了".formatted(context));
+        }
+        state = state.withGulls(GameState.GULLS_TO_LAND - state.gulls());
+        Invariants.requireValid(state, context, "夹具靠岸后");
+    }
+
+    /** 连人带牌移出游戏：手牌与面前的牌随他离场（不进弃牌堆），他从船上消失（ADR-0022）。 */
+    private void removeFromGame(CharacterId id) {
+        SurvivorState s = state.stateOf(id);
+        List<String> cards = new ArrayList<>(s.hand());
+        cards.addAll(s.front());
+        table.removeWithCharacter(cards);
+        state = state.withState(id, s.withoutAllCards()).withRemoved(id);
+    }
+
+    /** 面前亮着救生圈吗。水中判定只认这一件 —— 水手的免伤管的是扣不扣血，不管淹不淹死。 */
+    private boolean hasLifePreserverInFront(CharacterId id) {
+        for (String cardId : state.stateOf(id).front()) {
+            if (table.provisions().get(cardId).effect() instanceof ProvisionEffect.PreventOverboardDamage) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** 划船时对每一张抽到的牌：留进划船堆（true）还是塞回牌堆底部（false）。 */

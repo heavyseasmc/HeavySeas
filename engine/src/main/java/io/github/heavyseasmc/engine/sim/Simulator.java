@@ -2,8 +2,10 @@ package io.github.heavyseasmc.engine.sim;
 
 import io.github.heavyseasmc.engine.play.Invariants;
 import io.github.heavyseasmc.engine.play.NavigationReport;
+import io.github.heavyseasmc.engine.play.Contest;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.play.Table;
+import io.github.heavyseasmc.engine.model.Affinities;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Provision;
 import io.github.heavyseasmc.engine.model.ProvisionEffect;
@@ -11,6 +13,8 @@ import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.NavigationDeck;
+import io.github.heavyseasmc.engine.scoring.ScoreSheet;
+import io.github.heavyseasmc.engine.scoring.TreasureScoring;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.GameState;
@@ -56,6 +60,9 @@ public final class Simulator {
     private final Provisions provisions;
     private final NavigationPolicy policy;
 
+    /** 终局计分用的分值表；{@code null} 表示这一台模拟器不计分。 */
+    private final TreasureScoring scoring;
+
     /** 默认用对照组策略（留不留、挑哪张全看运气）。 */
     public Simulator(Roster roster, List<NavigationCard> deck, Provisions provisions) {
         this(roster, deck, provisions, NavigationPolicy.INDIFFERENT);
@@ -63,6 +70,17 @@ public final class Simulator {
 
     public Simulator(Roster roster, List<NavigationCard> deck, Provisions provisions,
                      NavigationPolicy policy) {
+        this(roster, deck, provisions, policy, null);
+    }
+
+    /**
+     * @param scoring 终局计分用的分值表；{@code null} 表示不计分。
+     *                ❗计分要分得清现金与美术品，而那靠阵容里有船长与收藏家（{@code Session#treasuresOf}）——
+     *                合成的小阵容里没有他们，所以默认不计分，真实阵容的测量台才传它
+     */
+    public Simulator(Roster roster, List<NavigationCard> deck, Provisions provisions,
+                     NavigationPolicy policy, TreasureScoring scoring) {
+        this.scoring = scoring;
         this.roster = Objects.requireNonNull(roster, "roster");
         this.deck = List.copyOf(Objects.requireNonNull(deck, "deck"));
         this.provisions = Objects.requireNonNull(provisions, "provisions");
@@ -88,6 +106,8 @@ public final class Simulator {
         String context = "seed=%d".formatted(seed);
         Session session = new Session(context, roster,
                 new Table(new NavigationDeck(deck, rng), provisions, rng));
+        // 开局发爱恨（ADR-0022）。❗在任何决策之前、用同一条随机流 —— 次序是可复现性的一部分。
+        session.dealAffinities(Affinities.random(roster, rng));
         ExposureTally exposure = new ExposureTally();
 
         int fights = 0;
@@ -108,11 +128,19 @@ public final class Simulator {
             if (session.state().isOver()) {
                 break;
             }
+            // ❗推进阶段这一步也要核对。原先的窗口是「阶段开头 → 阶段做完」，而 advancePhase 恰好夹在
+            //   上一个窗口的结尾与下一个窗口的开头之间 —— 回合结束时的清理从来不在任何一个核对窗口里。
+            //   2026-09-16 变异测试（让回合推进丢掉移出标记）照出来的：模拟器红了，却红在别处（ADR-0022 §9）。
+            GameState beforeAdvance = session.state();
             session.advancePhase();
+            Invariants.requireValidTransition(beforeAdvance, session.state(), seed,
+                    "推进阶段 " + beforeAdvance.phase(), 0);
         }
         GameState end = session.state();
+        // 每一局都算一次分：终局状态有一处对不上（珠宝超过全局张数、美术品面值超过总和），计分器会当场抛。
+        Map<CharacterId, ScoreSheet> scores = scoring == null ? Map.of() : session.scores(scoring);
         return new Result(seed, end.turn(), end.outcome().orElseThrow(), session.aliveCount(), fights,
-                exposure.toMap());
+                exposure.toMap(), scores);
     }
 
     /**
@@ -157,14 +185,18 @@ public final class Simulator {
                 case 0 -> { }                                        // 什么都不做
                 case 1 -> session.row(actor,
                         (card, state, rower) -> policy.keepWhenRowing(card, state, rower, rng));
-                case 2 -> swapSeats(session, actor, rng);
+                case 2 -> {
+                    if (contest(session, actor, Contest.Kind.SWAP, rng)) {
+                        fights++;
+                    }
+                }
                 case 3 -> {
-                    if (!maybeSpecial(session, actor, rng) && maybeFight(session, actor, rng)) {
-                        fights++;           // 没有特殊行动可做就改打架，别白白浪费这一格
+                    if (!maybeSpecial(session, actor, rng) && contest(session, actor, Contest.Kind.STEAL, rng)) {
+                        fights++;           // 没有特殊行动可做就改抢夺，别白白浪费这一格
                     }
                 }
                 default -> {
-                    if (maybeFight(session, actor, rng)) {
+                    if (contest(session, actor, Contest.Kind.STEAL, rng)) {
                         fights++;
                     }
                 }
@@ -241,7 +273,7 @@ public final class Simulator {
             return true;
         }
         if (effect instanceof ProvisionEffect.HealAll heal) {
-            boolean corpse = g.bySeat().stream().anyMatch(id -> g.conditionOf(id) == Condition.DEAD);
+            boolean corpse = g.onBoatBySeat().stream().anyMatch(id -> g.conditionOf(id) == Condition.DEAD);
             if (heal.requiresCorpse() && !corpse) {
                 return false;
             }
@@ -297,48 +329,61 @@ public final class Simulator {
         return all;
     }
 
-    /** 换座位：与任意角色交换，不限相邻。❗没有可换的人时<b>不消耗随机数</b>。 */
-    private void swapSeats(Session session, CharacterId actor, Random rng) {
-        List<CharacterId> others = new ArrayList<>(session.state().bySeat());
-        others.remove(actor);
-        if (others.isEmpty()) {
-            return;
-        }
-        session.swapSeats(actor, others.get(rng.nextInt(others.size())));
-    }
-
     /**
-     * 抢夺被拒 → 打一架。
+     * 换座位或抢夺（ADR-0023）：宣告 → 目标随机表态 → 拒绝就随机站队、随机押武器 → 结算 → 抢到了就随机挑一张。
      *
-     * @return 是否真的打了（没有清醒的对手时打不起来）
+     * <p>❗对象包括昏迷者与船上的尸体：规则允许和尸体换座位、搜刮昏迷者，而他们不会拒绝。
+     * 此前换座位从不问人、打架不从拒绝里来、抢赢了什么也不拿 —— 打架次数被高估，而物资从来没有被抢走过。
+     * ❗没有对象时<b>不消耗随机数</b>。
+     *
+     * @return 这一次是否真的打了一架
      */
-    private boolean maybeFight(Session session, CharacterId actor, Random rng) {
-        List<CharacterId> targets = session.fightTargets(actor);
+    private boolean contest(Session session, CharacterId actor, Contest.Kind kind, Random rng) {
+        List<CharacterId> targets = new ArrayList<>(session.state().onBoatBySeat());
+        targets.remove(actor);
         if (targets.isEmpty()) {
             return false;
         }
-        CharacterId defender = targets.get(rng.nextInt(targets.size()));
-        Fight fight = Fight.between(actor, defender);
-
-        // 随机助拳。加入后不得反悔，所以只在这里一次性决定。
-        for (CharacterId helper : targets) {
-            if (helper.equals(defender) || rng.nextInt(3) != 0) {
-                continue;
-            }
-            fight = fight.join(helper, rng.nextBoolean() ? Fight.Side.ATTACK : Fight.Side.DEFEND);
+        session.declare(actor, kind, targets.get(rng.nextInt(targets.size())));
+        boolean fought = false;
+        if (stageIs(session, Contest.Stage.CONSENT)) {
+            session.consent(rng.nextBoolean());
         }
-        // 打武器：❗<b>只打手上或面前真的有的那几张</b>。
-        //   此前这里是 `fight.arm(c, 1 + rng.nextInt(8))` —— 凭空造出一把武器，
-        //   与「喝不存在的水」是同一种失真，而战力分布直接决定谁输谁死。
-        for (CharacterId c : fight.combatants()) {
-            for (String cardId : available(session, c)) {
-                if (session.provisions().get(cardId).weaponPower() > 0 && rng.nextInt(3) == 0) {
-                    fight = session.playWeapon(fight, c, cardId);
+        if (stageIs(session, Contest.Stage.STANCES)) {
+            fought = true;
+            Fight opened = session.contest().orElseThrow().fight().orElseThrow();
+            // 随机助拳。加入后不得反悔，所以只在这里一次性决定。
+            for (CharacterId helper : session.state().consciousBySeat()) {
+                if (opened.combatants().contains(helper) || rng.nextInt(3) != 0) {
+                    continue;
+                }
+                session.join(helper, rng.nextBoolean() ? Fight.Side.ATTACK : Fight.Side.DEFEND);
+            }
+            session.closeStances();
+            // 押武器：只押手上或面前真有的那几张（引擎会拦多押的），每张三分之一。
+            for (CharacterId who : session.contest().orElseThrow().fight().orElseThrow().combatants()) {
+                for (String cardId : available(session, who)) {
+                    if (session.provisions().get(cardId).weaponPower() > 0 && rng.nextInt(3) == 0) {
+                        session.commitWeapon(who, cardId);
+                    }
                 }
             }
+            session.resolveContest();
         }
-        session.applyFight(fight);
-        return true;
+        if (stageIs(session, Contest.Stage.PICK)) {
+            Contest c = session.contest().orElseThrow();
+            var victim = session.state().stateOf(c.target());
+            if (!c.handOnly() && !victim.front().isEmpty() && (victim.hand().isEmpty() || rng.nextBoolean())) {
+                session.pickFromFront(victim.front().get(rng.nextInt(victim.front().size())));
+            } else {
+                session.pickFromHand(rng.nextInt(victim.hand().size()));
+            }
+        }
+        return fought;
+    }
+
+    private static boolean stageIs(Session session, Contest.Stage stage) {
+        return session.contest().map(c -> c.stage() == stage).orElse(false);
     }
 
     /** 航海阶段：舵手从划船堆里挑一张（没人划船或全员昏迷就翻顶牌），结算后累计曝光。 */
@@ -373,10 +418,11 @@ public final class Simulator {
      *                 所以那一回合两边都不计
      */
     public record Result(long seed, int turns, GameState.Outcome outcome, int alive, int fights,
-                         Map<CharacterId, Exposure> exposure) {
+                         Map<CharacterId, Exposure> exposure, Map<CharacterId, ScoreSheet> scores) {
 
         public Result {
             exposure = Map.copyOf(Objects.requireNonNull(exposure, "exposure"));
+            scores = Map.copyOf(Objects.requireNonNull(scores, "scores"));   // 不计分时是空表
         }
     }
 

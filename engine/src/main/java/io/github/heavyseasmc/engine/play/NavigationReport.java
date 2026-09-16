@@ -27,12 +27,14 @@ import java.util.Objects;
  * @param overboardSelected   牌面点到、且当时还活着的人
  * @param thirstCandidates    口渴的分母（会口渴的人，含昏迷者，不含死者）
  * @param thirstSelected      牌面点名口渴的人（不含划船与战斗带来的口渴）
+ * @param removed             这一步被移出游戏的人：死在水里，连人带牌离场（ADR-0022）
  */
 public record NavigationReport(NavigationCard card, boolean endedOnGulls,
                                List<CharacterId> overboardCandidates,
                                List<CharacterId> overboardSelected,
                                List<CharacterId> thirstCandidates,
-                               List<CharacterId> thirstSelected) {
+                               List<CharacterId> thirstSelected,
+                               List<CharacterId> removed) {
 
     public NavigationReport {
         Objects.requireNonNull(card, "card");
@@ -40,5 +42,6 @@ public record NavigationReport(NavigationCard card, boolean endedOnGulls,
         overboardSelected = List.copyOf(overboardSelected);
         thirstCandidates = List.copyOf(thirstCandidates);
         thirstSelected = List.copyOf(thirstSelected);
+        removed = List.copyOf(removed);
     }
 }

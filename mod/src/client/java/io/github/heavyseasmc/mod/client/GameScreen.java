@@ -9,8 +9,12 @@ import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 对局里的界面（补给箱、手牌……）共用的底子。
@@ -126,12 +130,131 @@ public abstract class GameScreen extends Screen {
         return (int) Math.floor(SHARP_CARD_PX_H / Math.max(1.0, scale));
     }
 
+    /** 倒计时那条细横杠有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。 */
+    protected static final int BAR_H = 3;
+
+    /** 按钮的内边距与两侧留白。按钮长什么样也是「必须一致」的那一类，所以同样放在这里。 */
+    protected static final int BTN_PAD_X = 10;
+    protected static final int BTN_PAD_Y = 6;
+    protected static final int BTN_SIDE = 20;
+
+    /** 一个按钮排在哪。 */
+    protected record Box(int x, int y, int w, int h) {
+
+        public boolean contains(int mx, int my) {
+            return mx >= x && mx < x + w && my >= y && my < y + h;
+        }
+    }
+
+    /**
+     * 倒计时：一条细横杠加一行秒数。
+     *
+     * <p>❗<b>总长由调用方给，而且要给「这一段本来有多长」</b>，不是某个常量：站队段有人加入会把
+     * 15 秒重置成 8 秒，照 15 秒画的杠会从一半开始走 —— 而它看起来完全正常。
+     *
+     * <p>「什么时候算紧迫」取自 {@link GuiLanguage#urgencyThreshold}：朱砂只给最后一段，
+     * 一直红着就喊不动了。
+     */
+    protected void drawCountdown(DrawContext context, long now, long deadlineMs, long totalMs,
+                                 int barX, int barY, int barW, int textY) {
+        long left = Math.max(0L, deadlineMs - now);
+        long total = Math.max(1L, totalMs);
+        float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
+        boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
+        context.fill(barX, barY, barX + barW, barY + BAR_H, GuiLanguage.GROUND);
+        context.fill(barX, barY, barX + Math.round(barW * frac), barY + BAR_H,
+                urgent ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
+        context.drawCenteredTextWithShadow(textRenderer, Text.literal(String.format("%.1fs", left / 1000f)),
+                width / 2, textY, urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
+    }
+
+    /**
+     * 一排按钮排在哪：一行放得下就并排居中，放不下就一行一个。
+     *
+     * <p>❗宽度按 {@code textRenderer} 量出来的字宽算，不写死 —— 译名长度各语言不同，
+     * 写死的那一版只在中文下看着是居中的（英文的「Join the defending side」在窄窗口里一行放不下三个）。
+     */
+    protected java.util.List<Box> layoutButtonRow(java.util.List<Text> labels, int top, int gap) {
+        int h = textRenderer.fontHeight + 2 * BTN_PAD_Y;
+        int[] w = new int[labels.size()];
+        int total = -gap;
+        for (int i = 0; i < labels.size(); i++) {
+            w[i] = textRenderer.getWidth(labels.get(i)) + 2 * BTN_PAD_X;
+            total += w[i] + gap;
+        }
+        java.util.List<Box> out = new ArrayList<>(labels.size());
+        if (total <= width - 2 * BTN_SIDE) {
+            int x = (width - total) / 2;
+            for (int i = 0; i < labels.size(); i++) {
+                out.add(new Box(x, top, w[i], h));
+                x += w[i] + gap;
+            }
+            return out;
+        }
+        int y = top;
+        for (int i = 0; i < labels.size(); i++) {
+            out.add(new Box((width - w[i]) / 2, y, w[i], h));
+            y += h + gap;
+        }
+        return out;
+    }
+
+    /**
+     * 指针落在第几个按钮上；都不在时 {@code -1}。
+     *
+     * <p>上边界把「抬」起来的那几像素算进去：抬起来的按钮，指针停在它顶上那一截时仍然算指着它。
+     */
+    protected static int indexAt(java.util.List<Box> boxes, int mouseX, int mouseY) {
+        for (int i = 0; i < boxes.size(); i++) {
+            Box b = boxes.get(i);
+            if (mouseX >= b.x() && mouseX < b.x() + b.w()
+                    && mouseY >= b.y() - GuiLanguage.LIFT_PX && mouseY < b.y() + b.h()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** 这一排按钮总共占多高。版面按它往下排，免得下一行压上来。 */
+    protected static int rowHeight(java.util.List<Box> boxes) {
+        int bottom = 0;
+        int top = Integer.MAX_VALUE;
+        for (Box b : boxes) {
+            top = Math.min(top, b.y());
+            bottom = Math.max(bottom, b.y() + b.h());
+        }
+        return boxes.isEmpty() ? 0 : bottom - top;
+    }
+
+    /** 一个按钮：底 · 金框（选中 =「你选的那个」）· 居中的字。与行动一面同一个样子。 */
+    protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color, float lift) {
+        context.getMatrices().push();
+        context.getMatrices().translate(0, -lift, 0);
+        context.fill(b.x(), b.y(), b.x() + b.w(), b.y() + b.h(), GuiLanguage.GROUND);
+        if (focused) {
+            context.drawBorder(b.x() - 1, b.y() - 1, b.w() + 2, b.h() + 2, GuiLanguage.GOLD);
+        }
+        context.drawCenteredTextWithShadow(textRenderer, label, b.x() + b.w() / 2,
+                b.y() + (b.h() - textRenderer.fontHeight) / 2 + 1, color);
+        context.getMatrices().pop();
+    }
+
+    /**
+     * 角色名。
+     *
+     * <p>❗这是唯一一处<b>拼出来</b>的 lang 键（角色 id 来自数据，代码里没有那张表），
+     * 所以构建期的 {@code checkLangKeys} 单独按 {@code data/roster} 核对这一族。
+     */
+    protected static Text nameOf(String characterId) {
+        return characterId.isEmpty() ? Text.literal("—") : Text.translatable("heavyseas.character." + characterId);
+    }
+
     /**
      * 上带：回合 · 阶段 · 海鸥。全船都知道的东西 —— 每一面都要、而且必须长得一样，所以放在这里。
      */
     protected void drawPublicBand(DrawContext context, HudView view, int y) {
         context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.status.header", view.turn(), phaseName(view.phase()),
+                Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
                         view.gulls(), GameState.GULLS_TO_LAND),
                 width / 2, y, GuiLanguage.MUTED);
         // 海鸥画成格子而不是数字：够不够 4 只是一眼的事，不该让人去读。
@@ -168,6 +291,15 @@ public abstract class GameScreen extends Screen {
         context.drawTextWithShadow(textRenderer, vitals, x + wWho + wSep, y,
                 view.health() <= 1 || view.condition() != Condition.CONSCIOUS
                         ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
+    }
+
+    /**
+     * 上带与 HUD 里的「阶段」：终局进行中写「终局」（ADR-0022）。
+     *
+     * <p>对局停在哪个阶段结束的，终局一开始就没有意义了 —— 2026-09-16 实拍：翻牌那一面顶上写着「行动阶段」。
+     */
+    static Text phaseLabel(HudView view) {
+        return view.endgame().active() ? Text.translatable("heavyseas.phase.endgame") : phaseName(view.phase());
     }
 
     // 下面两个用 switch 而不是拼字符串：拼出来的 lang 键静态扫不到，漏了也不报错。
