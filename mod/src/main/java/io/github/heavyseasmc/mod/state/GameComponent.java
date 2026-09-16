@@ -177,6 +177,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeVarInt(prompt.covered());
             buf.writeVarInt(prompt.shared());
             buf.writeVarInt(prompt.remaining());
+            buf.writeVarInt(thirstDonors.size());
             buf.writeVarLong(thirstDeadline);
         }
         // 终局（ADR-0022）：这一轮已经翻开的目标对全船公开；最后那张不翻的谁都不发；计分阶段只发合计。
@@ -255,10 +256,24 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         //   而它发出的包会被服务端当作「已经在指定模式里了」静默丢掉 —— 屏幕上只是「按了没反应」。
         buf.writeBoolean(g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false)
                 && session.rower().isEmpty() && session.contest().isEmpty()
-                && designating().isEmpty());
+                && designating().isEmpty() && provisionTargeter().isEmpty());
         // 我正举着拳头找人吗（ADR-0025）· 还剩多久。只写给他自己 —— 别人看的是世界里那个发光的人。
         buf.writeBoolean(designating().map(id::equals).orElse(false));
         buf.writeVarLong(designating().map(id::equals).orElse(false) ? designationDeadline : 0L);
+        // 医疗箱挑目标：待用的牌与候选人只写给发起者。别人不需要知道他在菜单里指着谁。
+        boolean pickingProvisionTarget = provisionTargeter().map(id::equals).orElse(false);
+        buf.writeString(pickingProvisionTarget ? provisionTargetCard : "");
+        List<HudView.MedicalTarget> medicalTargets = pickingProvisionTarget
+                ? medicalTargets(session) : List.of();
+        buf.writeVarInt(medicalTargets.size());
+        for (HudView.MedicalTarget target : medicalTargets) {
+            buf.writeString(target.id());
+            buf.writeVarInt(target.health());
+            buf.writeVarInt(target.maxHealth());
+            buf.writeEnumConstant(target.condition());
+        }
+        // 这位玩家在当前口渴窗口里已经承诺了几张。手里的牌到结算时才一起扣，所以必须单独告诉客户端。
+        buf.writeVarInt((int) thirstDonors.stream().filter(id::equals).count());
         // 手牌只写这一份 —— 别人的包里没有这些字节，不是「发了再藏」。
         List<String> hand = g.stateOf(id).hand();
         buf.writeVarInt(hand.size());
@@ -356,6 +371,25 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return out;
     }
 
+    /**
+     * 医疗箱此刻能指向谁：仍在局里、没有死亡、而且真有伤害。顺序沿用座位顺序，界面不会另造一套排序。
+     */
+    private static List<HudView.MedicalTarget> medicalTargets(Session session) {
+        GameState g = session.state();
+        List<HudView.MedicalTarget> out = new ArrayList<>();
+        for (CharacterId id : g.bySeat()) {
+            Survivor survivor = g.roster().get(id);
+            SurvivorState state = g.stateOf(id);
+            Condition condition = g.conditionOf(id);
+            if (g.isRemoved(id) || condition == Condition.DEAD || state.damage() == 0) {
+                continue;
+            }
+            out.add(new HudView.MedicalTarget(id.value(), survivor.size() - state.damage(),
+                    survivor.size(), condition));
+        }
+        return List.copyOf(out);
+    }
+
     @Override
     public void applySyncPacket(RegistryByteBuf buf) {
         HudView next = readView(buf);
@@ -394,7 +428,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         HudView.Thirst thirstPrompt = HudView.Thirst.NONE;
         if (buf.readBoolean()) {
             thirstPrompt = new HudView.Thirst(buf.readString(), buf.readVarInt(), buf.readVarInt(),
-                    buf.readVarInt(), buf.readVarInt(), buf.readVarLong());
+                    buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarLong());
         }
         HudView.Endgame endgame = HudView.Endgame.NONE;
         if (buf.readBoolean()) {
@@ -441,7 +475,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             return new HudView(true, turn, phase, gulls, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
-                    false, false, 0L, List.of(), List.of(), HudView.Score.NONE);
+                    false, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
         }
         String character = buf.readString();
         int health = buf.readVarInt();
@@ -457,6 +491,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         boolean yourTurn = buf.readBoolean();
         boolean designating = buf.readBoolean();
         long designateUntil = buf.readVarLong();
+        String provisionTargetCard = buf.readString();
+        int targetCount = buf.readVarInt();
+        List<HudView.MedicalTarget> provisionTargets = new ArrayList<>(targetCount);
+        for (int i = 0; i < targetCount; i++) {
+            provisionTargets.add(new HudView.MedicalTarget(buf.readString(), buf.readVarInt(), buf.readVarInt(),
+                    buf.readEnumConstant(Condition.class)));
+        }
+        int myDonatedWater = buf.readVarInt();
         int cards = buf.readVarInt();
         List<String> hand = new ArrayList<>(cards);
         for (int i = 0; i < cards; i++) {
@@ -492,6 +534,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
                 love, hate, yourTurn, designating, designateUntil,
+                provisionTargetCard, provisionTargets, myDonatedWater,
                 List.copyOf(hand), List.copyOf(front), myScore);
     }
 
@@ -742,6 +785,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void begin(Session started, Map<CharacterId, Occupant> seats) {
         clearDesignation();
+        clearProvisionTarget();
         this.session = started;
         this.occupants.clear();
         this.occupants.putAll(seats);
@@ -806,9 +850,35 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.designationDeadline = 0L;
     }
 
+    /**
+     * 特殊物资的两步选择：谁正在替哪张牌挑目标。现在只有医疗箱需要这一步。
+     * 与指定模式分开存：医疗箱是私有菜单，没有预告、发光与超时。
+     */
+    private CharacterId provisionTargeter;
+    private String provisionTargetCard = "";
+
+    public Optional<CharacterId> provisionTargeter() {
+        return Optional.ofNullable(provisionTargeter);
+    }
+
+    public String provisionTargetCard() {
+        return provisionTargetCard;
+    }
+
+    public void beginProvisionTarget(CharacterId who, String card) {
+        this.provisionTargeter = who;
+        this.provisionTargetCard = card;
+    }
+
+    public void clearProvisionTarget() {
+        this.provisionTargeter = null;
+        this.provisionTargetCard = "";
+    }
+
     public void end() {
         occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
         clearDesignation();
+        clearProvisionTarget();
         this.session = null;
         this.occupants.clear();
         clearProvision();

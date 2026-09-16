@@ -2,9 +2,11 @@ package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.net.UseProvisionC2S;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -357,9 +359,7 @@ public final class HandScreen extends GameScreen {
     /**
      * 打出正在看的那一张（特殊行动）。
      *
-     * <p>❗<b>目标还不能挑</b>：医疗箱默认治伤得最重的那个（服务端定的便利），
-     * 真正的「挑一个人」要等指定模式（O23）。这一点记在 CURRENT_STATUS 的开放项里，
-     * 不假装这一面已经完整。
+     * <p>不再借聊天指令：服务端确认牌的效果。医疗箱会进入目标一面，其余特殊行动一键完成。
      */
     private void use() {
         List<String> hand = view.hand();
@@ -368,7 +368,7 @@ public final class HandScreen extends GameScreen {
         }
         String card = hand.get(selected);
         LOGGER.info("手牌：打出 {}", card);
-        client.player.networkHandler.sendChatCommand("seas use " + card);
+        ClientPlayNetworking.send(UseProvisionC2S.play(card));
     }
 
     private void select(int index) {

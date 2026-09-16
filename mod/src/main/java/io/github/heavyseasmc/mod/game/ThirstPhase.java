@@ -5,6 +5,7 @@ import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.ThirstActionC2S;
+import io.github.heavyseasmc.mod.net.WaterDonationC2S;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.minecraft.server.MinecraftServer;
@@ -27,14 +28,14 @@ import java.util.Optional;
  * 并行收集所有人的决定会把这条规则抹掉，而抹掉之后没有任何断言会红 ——
  * 她照样能蹭到水，只是蹭的是「同时发生的那一轮」而不是「她之前发生的那些」。
  *
- * <h2>不该问的就不问</h2>
- * 三种情况直接按「不喝」结算，不开窗口：
+ * <h2>自己没得选，不等于全船没得选</h2>
+ * 三种情况里只有前一种直接结算；后两种若船上有清醒真人拿得出水，仍开同一个窗口让旁人救他：
  * <ul>
  *   <li>这个人这一回合一点都不渴（引擎排队时就已经剔除）；</li>
- *   <li>他自己拿不出水 —— 没有可做的决定；</li>
- *   <li>他不清醒 —— <b>昏迷者不能自己打水</b>（规则 §9.3）。别人替他打要走 {@code /seas water}。</li>
+ *   <li>他自己拿不出水 —— 本人没有决定，但别人可以替他打；</li>
+ *   <li>他不清醒 —— <b>昏迷者不能自己打水</b>（规则 §9.3），旁人的水正是唯一救法。</li>
  * </ul>
- * 8 人局的航海阶段本来就够长了，弹一个只有一个选项的窗口只是在浪费所有人的时间。
+ * 只有全船确实没人能帮时才立即按不喝结算，避免无意义地等满 12 秒。
  *
  * <h2>超时认当前高亮，而高亮的默认值是「喝够」</h2>
  * 与另外三面同一条规则（用户 2026-09-15 定）。区别在于<b>默认答案取什么</b>：
@@ -92,12 +93,13 @@ public final class ThirstPhase {
             return;
         }
         boolean canDecide = own > 0 && session.state().conditionOf(who).canAct();
-        if (!canDecide) {
+        boolean canReceiveDonation = hasHumanDonor(session, component, who);
+        if (!canDecide && !canReceiveDonation) {
             // 没有可做的决定。说一句为什么，不然屏幕上只会看到血无缘无故掉了。
             GameFlow.broadcast(world, Text.translatable(own == 0
                             ? "heavyseas.game.thirst_no_water" : "heavyseas.game.thirst_unconscious",
                     GameFlow.characterName(who), prompt.remaining()).formatted(Formatting.DARK_GRAY));
-            LOGGER.info("口渴：{} 无从决定（水 {} 张 · {}），按不喝结算 {} 次", who.value(), own,
+            LOGGER.info("口渴：{} 无从决定也没人能代打（水 {} 张 · {}），按不喝结算 {} 次", who.value(), own,
                     session.state().conditionOf(who), prompt.remaining());
             resolve(world, component, 0);
             return;
@@ -108,10 +110,11 @@ public final class ThirstPhase {
             resolve(world, component, drink);
             return;
         }
-        int suggested = Math.min(prompt.remaining(), own);
+        int suggested = canDecide ? Math.min(prompt.remaining(), own) : 0;
         component.setThirstDeadline(System.currentTimeMillis() + CHOOSE_MILLIS);
         component.setThirstHighlight(suggested);
-        GameFlow.broadcast(world, Text.translatable("heavyseas.game.thirst_choose",
+        GameFlow.broadcast(world, Text.translatable(canDecide
+                        ? "heavyseas.game.thirst_choose" : "heavyseas.game.thirst_ask_donors",
                 GameFlow.characterName(who), prompt.remaining()).formatted(Formatting.AQUA));
         LOGGER.info("口渴选择：{}（{}）· 还需化解 {} 次 · 手上 {} 张 · {} 秒",
                 who.value(), occupant.isDummy() ? "替身" : "真人", prompt.remaining(), own,
@@ -144,11 +147,28 @@ public final class ThirstPhase {
         }
     }
 
+    /** 旁人的捐水一面：一次只承诺 1 张，真正扣牌与当前角色自己的选择一起在 {@link #resolve} 完成。 */
+    public static void onDonation(ServerPlayerEntity player, WaterDonationC2S action) {
+        if (action.waters() != 1) {
+            return;
+        }
+        ServerWorld world = player.getServerWorld();
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty() || component.thirstDeadline() <= 0) {
+            return;
+        }
+        Optional<CharacterId> donor = component.seatOf(player.getUuid());
+        if (donor.isEmpty()) {
+            return;
+        }
+        donate(world, component, donor.get());
+    }
+
     /** 指令那条路（dev）：{@code /seas water <张数>}。 */
     public static void chooseByCommand(ServerWorld world, GameComponent component, int waters) {
         Session session = component.requireSession();
         Session.ThirstPrompt prompt = session.thirstPending().orElseThrow();
-        int drink = clamp(session, prompt, waters);
+        int drink = clamp(session, prompt, waters, component.thirstDonors().size());
         LOGGER.info("口渴（指令）：{} 喝 {} 张", prompt.who().value(), drink);
         resolve(world, component, drink);
     }
@@ -161,26 +181,39 @@ public final class ThirstPhase {
      * @return 真的打出去了吗
      */
     public static boolean donateByCommand(ServerWorld world, GameComponent component, CharacterId donor) {
+        return donate(world, component, donor);
+    }
+
+    private static boolean donate(ServerWorld world, GameComponent component, CharacterId donor) {
         Session session = component.requireSession();
         Optional<Session.ThirstPrompt> pending = session.thirstPending();
-        if (pending.isEmpty()) {
+        if (pending.isEmpty() || component.thirstDeadline() <= 0
+                || session.state().phase() != Phase.NAVIGATION) {
             return false;
         }
         Session.ThirstPrompt prompt = pending.get();
-        // ❗攒着，不当场结算：当场结算会把他还没说话的那几次口渴直接变成伤害。
+        if (donor.equals(prompt.who()) || !session.state().conditionOf(donor).canAct()) {
+            return false;                     // 本人走喝水选择；昏迷者不能替别人打牌
+        }
+        // ❗攒着，不因第一张就结算：那会把他还没说话的其余口渴直接变成伤害。
         int already = component.thirstDonors().size();
-        if (already + component.thirstHighlight() >= prompt.remaining()) {
+        if (already >= prompt.remaining()) {
             return false;                     // 已经够了，再打就是白白扔掉一张水
         }
-        if (session.watersOf(donor) <= 0) {
+        if (availableDonationWater(session, component, donor) <= 0) {
             return false;
         }
         component.addThirstDonor(donor);
+        component.setThirstHighlight(clamp(session, prompt, component.thirstHighlight(), already + 1));
         GameFlow.broadcast(world, Text.translatable("heavyseas.game.thirst_donated",
                 GameFlow.characterName(donor), GameFlow.characterName(prompt.who())));
         LOGGER.info("口渴：{} 替 {} 打了一张水（这一轮共 {} 张）",
                 donor.value(), prompt.who().value(), already + 1);
-        GameComponents.sync(world);
+        if (already + 1 >= prompt.remaining()) {
+            resolve(world, component, 0);      // 全部被代打化解了，不再让全船空等倒计时
+        } else {
+            GameComponents.sync(world);
+        }
         return true;
     }
 
@@ -198,7 +231,8 @@ public final class ThirstPhase {
                 component.clearThirst();
                 continue;
             }
-            int waters = clamp(session, pending.get(), component.thirstHighlight());
+            int waters = clamp(session, pending.get(), component.thirstHighlight(),
+                    component.thirstDonors().size());
             LOGGER.info("口渴超时：替 {} 喝了 {} 张（当前高亮）", pending.get().who().value(), waters);
             resolve(world, component, waters);
         }
@@ -209,14 +243,25 @@ public final class ThirstPhase {
      *
      * <p>别人已经替他打进来的那几张要先扣掉：他自己最多再喝「还差的那些」。
      */
-    private static int clamp(Session session, Session.ThirstPrompt prompt, int waters) {
-        return clamp(session, prompt, waters, 0);
-    }
-
     private static int clamp(Session session, Session.ThirstPrompt prompt, int waters, int donated) {
         int own = session.watersOf(prompt.who());
         int need = Math.max(0, prompt.remaining() - donated);
         return Math.max(0, Math.min(waters, Math.min(need, own)));
+    }
+
+    /** 某人还真正拿得出几张水：已承诺的尚未从手里扣，必须在这里逐张减掉。 */
+    private static int availableDonationWater(Session session, GameComponent component, CharacterId donor) {
+        long promised = component.thirstDonors().stream().filter(donor::equals).count();
+        return Math.max(0, session.watersOf(donor) - (int) promised);
+    }
+
+    /** 只为真人开等待窗口；替身不会操作捐水界面，不能让全替身局平白多等 12 秒。 */
+    private static boolean hasHumanDonor(Session session, GameComponent component, CharacterId recipient) {
+        return component.occupants().entrySet().stream().anyMatch(entry ->
+                !entry.getKey().equals(recipient)
+                        && !entry.getValue().isDummy()
+                        && session.state().conditionOf(entry.getKey()).canAct()
+                        && availableDonationWater(session, component, entry.getKey()) > 0);
     }
 
     private static void resolve(ServerWorld world, GameComponent component, int waters) {

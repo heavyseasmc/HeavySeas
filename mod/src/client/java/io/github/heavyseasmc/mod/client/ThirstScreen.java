@@ -26,8 +26,9 @@ import org.slf4j.LoggerFactory;
  * <b>口渴的伤害是必然的，而水的唯一用途就是挡它</b>。所以一进来就预选「刚好够」，
  * 想省水的人自己往下调。默认 0 的话，挂机的人会一边攥着水一边掉血，那不是他的默认答案。
  *
- * <h2>没得选的时候这一面不出现</h2>
- * 一张水都没有、或者昏迷着（自己打不出水），服务端根本不开窗口 —— 与「没人划船时不开舵手一面」同一条。
+ * <h2>本人没得选时不弹这一面</h2>
+ * 一张水都没有、或者昏迷着（自己打不出水）时，本人不看喝水面；若船上有人能帮，旁人的捐水面仍会打开。
+ * 全船确实没人能出水时，服务端才直接结算伤害。
  */
 public final class ThirstScreen extends GameScreen {
 
@@ -64,7 +65,7 @@ public final class ThirstScreen extends GameScreen {
         this.remaining = view.thirstPrompt().remaining();
         this.deadlineMs = view.thirstPrompt().deadlineMs();
         this.lift = new float[Math.max(1, waters)];
-        this.chosen = Math.min(remaining, waters);
+        this.chosen = Math.min(Math.max(0, remaining - view.thirstPrompt().donated()), waters);
         this.dealAt = System.currentTimeMillis();
         this.lastFrameMs = dealAt;
     }
@@ -80,7 +81,11 @@ public final class ThirstScreen extends GameScreen {
         if (!view.active() || !view.myThirstChoice()
                 || view.thirstPrompt().deadlineMs() != deadlineMs) {
             close();
+            return;
         }
+        // 别人刚替我打了一张，自己的预选就从右边收一张；服务端同一刻也做了同样的夹取。
+        chosen = Math.min(chosen, Math.min(waters,
+                Math.max(0, remaining - view.thirstPrompt().donated())));
     }
 
     /** 一帧的版面，全部以 GUI 单位计。 */
@@ -125,13 +130,14 @@ public final class ThirstScreen extends GameScreen {
 
         drawCountdown(context, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS,
                 l.barX(), l.barY(), l.barW(), l.countdownY());
-        int hurt = Math.max(0, remaining - chosen);
+        HudView.Thirst prompt = view.thirstPrompt();
+        int hurt = Math.max(0, remaining - prompt.donated() - chosen);
         context.drawCenteredTextWithShadow(textRenderer,
                 Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
                 GuiLanguage.INK);
-        HudView.Thirst prompt = view.thirstPrompt();
         context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.thirst.detail", prompt.sources(), prompt.covered(), prompt.shared()),
+                Text.translatable("heavyseas.thirst.detail", prompt.sources(), prompt.covered(),
+                        prompt.shared(), prompt.donated()),
                 width / 2, l.detailY(), GuiLanguage.MUTED);
         context.drawCenteredTextWithShadow(textRenderer, chosen == 0
                         ? Text.translatable("heavyseas.thirst.none")
@@ -174,7 +180,8 @@ public final class ThirstScreen extends GameScreen {
 
     /** 改张数并上报：超时认的是它，服务端不知道的话只能按开窗时那个默认值算。 */
     private void setChosen(int next) {
-        int clamped = MathHelper.clamp(next, 0, Math.min(remaining, waters));
+        int need = Math.max(0, remaining - view.thirstPrompt().donated());
+        int clamped = MathHelper.clamp(next, 0, Math.min(need, waters));
         if (clamped == chosen) {
             return;
         }

@@ -215,6 +215,14 @@ public final class HeavySeasClient implements ClientModInitializer {
         }
         endgameStageShown = null;
 
+        // 医疗箱的目标一面：它由手牌一面的 U 触发，服务端确认效果与持牌后才会出现在投影里。
+        if (view.myProvisionTarget()) {
+            if (!(client.currentScreen instanceof ProvisionTargetScreen)) {
+                client.setScreen(new ProvisionTargetScreen(view));
+            }
+            return;
+        }
+
         // 举着拳头找人时（ADR-0025）：行动一面不该弹（投影里 yourTurn 已经排掉了），
         // 按行动键是**取消**，退回行动一面 —— 决策 ⑦ 的「退回 GUI 重选」由它提供。
         if (view.myDesignating()) {
@@ -247,6 +255,24 @@ public final class HeavySeasClient implements ClientModInitializer {
             }
             if (fresh || client.currentScreen == null) {
                 client.setScreen(new ThirstScreen(view));
+            }
+            return;
+        }
+
+        // 不是我口渴，但我能替他打水。第一次自动弹；Esc 收起后不纠缠，按行动键还能再打开。
+        if (view.myWaterDonation()) {
+            long window = view.thirstPrompt().deadlineMs();
+            boolean fresh = window != thirstWindowShown;
+            if (fresh) {
+                thirstWindowShown = window;
+                LOGGER.info("口渴：我能替 {} 打水 · 可用 {} 张",
+                        view.thirstPrompt().who(), view.myWaters() - view.myDonatedWater());
+            }
+            if (client.currentScreen instanceof WaterDonationScreen) {
+                return;
+            }
+            if (fresh || (pressed && client.currentScreen == null)) {
+                client.setScreen(new WaterDonationScreen(view));
             }
             return;
         }

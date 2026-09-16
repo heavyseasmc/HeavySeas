@@ -145,6 +145,11 @@ public final class GameHud {
             return Text.translatable("heavyseas.hud.thirst_choose",
                     HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW);
         }
+        if (view.myWaterDonation()) {
+            return Text.translatable("heavyseas.hud.thirst_donate",
+                    Text.translatable("heavyseas.character." + prompt.who()),
+                    HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW);
+        }
         long left = Math.max(0L, prompt.deadlineMs() - System.currentTimeMillis());
         return Text.translatable("heavyseas.hud.thirst_waiting",
                 Text.translatable("heavyseas.character." + prompt.who()),

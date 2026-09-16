@@ -34,14 +34,12 @@ import java.util.List;
  * 稿子第三步：确认 —— 面板收起，交给世界。与补给箱里的「顿」同一个动词、同一组数（{@link GuiLanguage}）。
  * 补给箱里它说「替你定了」，这里说「你定了」—— 两处说的都是「定了」。
  *
- * <h2>这一版按得动的只有两件</h2>
- * 换座位与抢夺要进「指定模式」：回到世界里看着那个人右键（决策 ⑦）。替身没有实体可看，这一版验不了。
- * 用物资要先给物资效果建模（O19）。三件照样摆在原位、焦点照样落得上去，下面一行字说为什么按不动 ——
- * 藏起来的话，这一面看起来就像船上只有两件事可做。
+ * <h2>用物资打开手牌</h2>
+ * 这一格不是当场猜一张牌：它打开手牌一面，让玩家看到卡面再按 U。医疗箱随后还会进入目标一面。
  */
 public final class ActionScreen extends GameScreen {
 
-    /** 交互稿里的五件事，次序照稿子。{@code kind} 为空的就是这一版按不动的。 */
+    /** 交互稿里的五件事，次序照稿子。用物资没有 {@link ActionChoiceC2S.Kind}，因为它先打开手牌。 */
     private enum Choice {
         ROW("heavyseas.action.row", "heavyseas.action.row_hint", ActionChoiceC2S.Kind.ROW, false),
         SWAP("heavyseas.action.swap", "heavyseas.action.swap_hint", ActionChoiceC2S.Kind.SWAP, false),
@@ -63,7 +61,7 @@ public final class ActionScreen extends GameScreen {
         }
 
         boolean enabled() {
-            return kind != null;
+            return kind != null || this == USE;
         }
     }
 
@@ -364,6 +362,13 @@ public final class ActionScreen extends GameScreen {
         Choice c = CHOICES[focus];
         if (!c.enabled()) {
             return;                           // 按不动的那几件：下面那行字已经在说为什么，不发包、不「顿」
+        }
+        if (c == Choice.USE) {
+            if (client != null) {
+                client.setScreen(new HandScreen());
+                LOGGER.info("行动：打开手牌挑特殊物资");
+            }
+            return;
         }
         ClientPlayNetworking.send(ActionChoiceC2S.of(c.kind));
         snapIndex = focus;

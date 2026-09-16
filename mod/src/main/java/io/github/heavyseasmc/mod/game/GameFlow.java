@@ -234,6 +234,7 @@ public final class GameFlow {
     /** 一个人行动结束：记标记，然后看还有没有下一个。 */
     public static void finishAction(ServerWorld world, GameComponent component, CharacterId actor) {
         Session session = component.requireSession();
+        component.clearProvisionTarget();
         session.markActed(actor);
         sync(world);
         if (session.state().isOver()) {
@@ -366,6 +367,7 @@ public final class GameFlow {
     public static void landForFixture(ServerWorld world, GameComponent component) {
         Session session = component.requireSession();
         session.landForFixture();
+        component.clearProvisionTarget();
         component.clearProvision();
         component.clearHelm();
         component.clearThirst();

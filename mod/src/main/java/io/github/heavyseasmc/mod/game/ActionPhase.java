@@ -1,18 +1,23 @@
 package io.github.heavyseasmc.mod.game;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Provision;
+import io.github.heavyseasmc.engine.model.ProvisionEffect;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.play.Contest;
 import io.github.heavyseasmc.engine.play.Session;
+import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
+import io.github.heavyseasmc.mod.net.UseProvisionC2S;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +65,9 @@ public final class ActionPhase {
         if (session.rower().isPresent()) {
             return;                       // 划船抽到的牌还没定完：行动一面上再按一次不作数（改过的客户端发得出来）
         }
+        if (component.provisionTargeter().isPresent()) {
+            return;                       // 医疗箱正在挑目标；旧界面或改过的客户端不能趁机再做一个行动
+        }
         if (component.designating().isPresent()) {
             // 举着拳头时只认「取消」这一下；别的一律当作没按（改过的客户端发得出任何东西）。
             Optional<CharacterId> raised = component.seatOf(player.getUuid());
@@ -97,6 +105,148 @@ public final class ActionPhase {
             case SWAP -> DesignationPhase.begin(world, component, who, Contest.Kind.SWAP);
             case STEAL -> DesignationPhase.begin(world, component, who, Contest.Kind.STEAL);
         }
+    }
+
+    /**
+     * 手牌一面上的「打出」，以及医疗箱目标一面的第二步。
+     *
+     * <p>这条路不再借聊天指令：客户端只说「我按了什么」，服务端重新核对阶段、行动者、持牌与效果。
+     * 医疗箱先进入一个只投影给本人的目标菜单；其余特殊行动仍是一键完成。
+     */
+    public static void onUseProvision(ServerPlayerEntity player, UseProvisionC2S action) {
+        Optional<UseProvisionC2S.Kind> kind = action.kind();
+        ServerWorld world = player.getServerWorld();
+        GameComponent component = GameComponents.of(world);
+        if (kind.isEmpty() || component.session().isEmpty()) {
+            return;
+        }
+        Optional<CharacterId> seat = component.seatOf(player.getUuid());
+        if (seat.isEmpty()) {
+            return;
+        }
+        CharacterId actor = seat.get();
+        if (kind.get() == UseProvisionC2S.Kind.CANCEL) {
+            if (component.provisionTargeter().map(actor::equals).orElse(false)) {
+                component.clearProvisionTarget();
+                GameComponents.sync(world);
+            }
+            return;
+        }
+
+        Session session = component.requireSession();
+        if (session.state().phase() != Phase.ACTION || session.rower().isPresent()
+                || session.contest().isPresent() || component.designating().isPresent()
+                || !session.nextActor().map(actor::equals).orElse(false)) {
+            return;
+        }
+
+        try {
+            switch (kind.get()) {
+                case PLAY -> beginOrUse(world, component, player, actor, action.card());
+                case TARGET -> finishTargetedUse(world, component, player, actor, action.card(), action.target());
+                case CANCEL -> { /* handled above */ }
+            }
+        } catch (RuntimeException e) {
+            // 与指令层同一条：规则拒绝要让真人知道，不把一次无效点击伪装成「包没到」。
+            LOGGER.info("特殊物资（界面）：{} 的操作被拒绝：{}", actor.value(), e.getMessage());
+            player.sendMessage(Text.literal(String.valueOf(e.getMessage())).formatted(Formatting.RED), false);
+            if (component.provisionTargeter().map(actor::equals).orElse(false)) {
+                component.clearProvisionTarget();
+            }
+            GameComponents.sync(world);
+        }
+    }
+
+    private static void beginOrUse(ServerWorld world, GameComponent component, ServerPlayerEntity player,
+                                   CharacterId actor, String cardId) {
+        Session session = component.requireSession();
+        if (component.provisionTargeter().isPresent()) {
+            return;                           // 已经在挑目标；第一步的重包不能把它改成另一张牌
+        }
+        Provision card = session.provisions().get(cardId);
+        if (!card.isSpecialAction()) {
+            player.sendMessage(Text.translatable("heavyseas.command.not_special", provisionName(cardId))
+                    .formatted(Formatting.RED), false);
+            return;
+        }
+        if (!holds(session, actor, cardId)) {
+            return;                           // 改过的客户端报了一张并不属于自己的牌
+        }
+        if (card.effect() instanceof ProvisionEffect.Heal) {
+            boolean anyone = session.state().bySeat().stream().anyMatch(id ->
+                    !session.state().isRemoved(id)
+                            && session.state().conditionOf(id) != Condition.DEAD
+                            && session.state().stateOf(id).damage() > 0);
+            if (!anyone) {
+                player.sendMessage(Text.translatable("heavyseas.command.nobody_wounded")
+                        .formatted(Formatting.GRAY), false);
+                return;
+            }
+            component.beginProvisionTarget(actor, cardId);
+            LOGGER.info("特殊物资（界面）：{} 用 {}，等他挑治疗目标", actor.value(), cardId);
+            GameComponents.sync(world);
+            return;
+        }
+        useUntargeted(world, component, actor, cardId, card.effect());
+    }
+
+    private static void finishTargetedUse(ServerWorld world, GameComponent component, ServerPlayerEntity player,
+                                          CharacterId actor, String cardId, String targetId) {
+        if (!component.provisionTargeter().map(actor::equals).orElse(false)
+                || !component.provisionTargetCard().equals(cardId)) {
+            return;
+        }
+        Session session = component.requireSession();
+        CharacterId target = CharacterId.of(targetId);
+        boolean legal = session.state().bySeat().contains(target)
+                && !session.state().isRemoved(target)
+                && session.state().conditionOf(target) != Condition.DEAD
+                && session.state().stateOf(target).damage() > 0;
+        if (!legal) {
+            component.clearProvisionTarget();
+            player.sendMessage(Text.translatable("heavyseas.target.no_longer_valid")
+                    .formatted(Formatting.GRAY), false);
+            GameComponents.sync(world);
+            return;
+        }
+        session.useMedicalKit(actor, target, cardId);
+        component.clearProvisionTarget();
+        GameFlow.broadcast(world, Text.translatable("heavyseas.command.healed",
+                GameFlow.characterName(actor), GameFlow.characterName(target)));
+        LOGGER.info("特殊物资（界面）：{} 用 {} 治了 {}", actor.value(), cardId, target.value());
+        GameFlow.finishAction(world, component, actor);
+    }
+
+    private static void useUntargeted(ServerWorld world, GameComponent component, CharacterId actor,
+                                      String cardId, ProvisionEffect effect) {
+        Session session = component.requireSession();
+        if (effect instanceof ProvisionEffect.PreventThirst) {
+            session.openParasol(actor, cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.opened",
+                    GameFlow.characterName(actor), provisionName(cardId)));
+        } else if (effect instanceof ProvisionEffect.HealAll) {
+            List<CharacterId> healed = session.useRation(actor, cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.rationed",
+                    GameFlow.characterName(actor), healed.size()));
+        } else if (effect instanceof ProvisionEffect.WeaponOrSpecial) {
+            int before = session.state().gulls();
+            session.fireSignal(actor, cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.signalled",
+                    GameFlow.characterName(actor), session.state().gulls() - before));
+        } else {
+            throw new IllegalArgumentException("这张特殊物资还没有行动阶段处理器: " + cardId);
+        }
+        LOGGER.info("特殊物资（界面）：{} 打出 {}", actor.value(), cardId);
+        GameFlow.finishAction(world, component, actor);
+    }
+
+    private static boolean holds(Session session, CharacterId actor, String cardId) {
+        return session.state().stateOf(actor).hasInHand(cardId)
+                || session.state().stateOf(actor).hasInFront(cardId);
+    }
+
+    private static Text provisionName(String cardId) {
+        return Text.translatable("heavyseas.provision." + cardId);
     }
 
     /**

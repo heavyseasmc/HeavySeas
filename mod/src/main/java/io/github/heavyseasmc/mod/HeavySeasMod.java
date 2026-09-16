@@ -19,6 +19,8 @@ import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
 import io.github.heavyseasmc.mod.net.ThirstActionC2S;
+import io.github.heavyseasmc.mod.net.UseProvisionC2S;
+import io.github.heavyseasmc.mod.net.WaterDonationC2S;
 import io.github.heavyseasmc.mod.world.SeatEntity;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.Seats;
@@ -83,6 +85,11 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(ActionChoiceC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> ActionPhase.onChoice(context.player(), payload)));
+        // 手牌里打出特殊物资；医疗箱会用同一个包走第二步挑目标。
+        PayloadTypeRegistry.playC2S().register(UseProvisionC2S.ID, UseProvisionC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(UseProvisionC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> ActionPhase.onUseProvision(context.player(), payload)));
         // 划船一面上定下的一张。同样不计时。
         PayloadTypeRegistry.playC2S().register(RowDecisionC2S.ID, RowDecisionC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(RowDecisionC2S.ID,
@@ -99,6 +106,11 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(ThirstActionC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> ThirstPhase.onAction(context.player(), payload)));
+        // 旁人在同一个口渴窗口里替当前角色打一张水。
+        PayloadTypeRegistry.playC2S().register(WaterDonationC2S.ID, WaterDonationC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(WaterDonationC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> ThirstPhase.onDonation(context.player(), payload)));
 
         // 这一场进行中的四面：表态 · 站队 · 挂武器 · 挑牌（ADR-0023）。四面一个包，按 Kind 分路。
         PayloadTypeRegistry.playC2S().register(ContestActionC2S.ID, ContestActionC2S.CODEC);
