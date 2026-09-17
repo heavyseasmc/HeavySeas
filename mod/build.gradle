@@ -187,6 +187,93 @@ tasks.named('check') {
     dependsOn checkLangKeys
 }
 
+// 通知侧栏有两条容易“看起来代码都在、实机却完全看不见”的约束：
+//   ① HudRenderCallback 比 Screen 先画，GameScreen 打开的那一帧必须改由 afterRender 画；
+//   ② GameScreen 的 width 必须在绘制和输入前收窄，否则牌与按钮仍会钻进侧栏下面。
+// 这两条是 Fabric/Minecraft 回调接线，普通 JVM 单测触不到；几何由 NotificationSidebarLayoutTest 测，
+// 这里把接线本身做成源码闸门，防止以后“整理回调”时安静地退回错误层级。
+def checkNotificationSidebarIntegration = tasks.register('checkNotificationSidebarIntegration') {
+    group = 'verification'
+    description = 'GameScreen 必须先为通知侧栏留宽度，并在 Screen 完成后才绘制侧栏'
+    def entryFile = file('src/client/java/io/github/heavyseasmc/mod/client/HeavySeasClient.java')
+    def hookFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreenSidebar.java')
+    def hudFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameHud.java')
+    def screenFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreen.java')
+    def gameScreenSources = fileTree('src/client/java/io/github/heavyseasmc/mod/client') {
+        include '*Screen.java'
+    }
+    inputs.files(entryFile, hookFile, hudFile, screenFile, gameScreenSources)
+    doLast {
+        def entry = entryFile.getText('UTF-8')
+        def hook = hookFile.getText('UTF-8')
+        def hud = hudFile.getText('UTF-8')
+        def screen = screenFile.getText('UTF-8')
+        def problems = []
+
+        if (!entry.contains('GameScreenSidebar.register();')) {
+            problems << '客户端入口没有注册 GameScreenSidebar'
+        }
+        if (!hook.contains('ScreenEvents.beforeRender(screen).register')) {
+            problems << 'GameScreen 绘制前没有刷新内容区宽度'
+        }
+        if (!hook.contains('gameScreen.reserveNotificationSidebar(context.getScaledWindowWidth())')) {
+            problems << 'beforeRender 没有按完整窗口宽度预留侧栏（可能会逐帧越减越窄）'
+        }
+        if (!hook.contains('ScreenEvents.afterRender(screen).register')
+                || !hook.contains('GameHud.renderSidebar(context, client)')) {
+            problems << '通知侧栏不是在 GameScreen 完成后绘制'
+        }
+        def skipsHudLayer = java.util.regex.Pattern.compile(
+                'if \\(client\\.currentScreen instanceof GameScreen\\) \\{\\s*return;\\s*\\}',
+                java.util.regex.Pattern.DOTALL).matcher(hud).find()
+        if (!skipsHudLayer) {
+            problems << '普通 HudRenderCallback 没有跳过 GameScreen，会在错误层级重复绘制'
+        }
+        if (!screen.contains('width = GameHud.sidebarLayout(screenWidth, projection()).contentWidth();')) {
+            problems << 'GameScreen 没有把所有子类共用的 width 收进侧栏左边'
+        }
+        if (!screen.contains('reserveNotificationSidebar(client == null ? width : client.getWindow().getScaledWidth());')) {
+            problems << 'GameScreen.init 没有在子类创建控件前预留侧栏'
+        }
+        if (!screen.contains('context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(),')) {
+            problems << 'GameScreen 主内容收窄后，公共底色没有继续覆盖完整窗口'
+        }
+
+        int subclasses = 0
+        int initOverrides = 0
+        gameScreenSources.each { source ->
+            def text = source.getText('UTF-8')
+            if (!text.contains('extends GameScreen')) {
+                return
+            }
+            subclasses++
+            if (text.contains('protected void init()')) {
+                initOverrides++
+                def superFirst = java.util.regex.Pattern.compile(
+                        'protected void init\\(\\) \\{\\s*super\\.init\\(\\);',
+                        java.util.regex.Pattern.DOTALL).matcher(text).find()
+                if (!superFirst) {
+                    problems << "${source.name} 的 init 没有先调用 super.init()，控件可能按完整宽度缓存"
+                }
+            }
+        }
+        if (subclasses == 0 || initOverrides == 0) {
+            problems << "GameScreen 子类扫描没有命中（子类 ${subclasses}，init 覆写 ${initOverrides}）"
+        }
+
+        if (problems) {
+            throw new GradleException((['通知侧栏接线核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("通知侧栏接线核对通过：${subclasses} 个 GameScreen 子类（${initOverrides} 个覆写 init）" +
+                '先预留内容区，afterRender 绘制侧栏，HUD 层不重复画')
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkNotificationSidebarIntegration
+}
+
 // 物资的中文名必须与卡面 SVG 的 <title> 完全一致。
 //
 // 为什么单独一道闸：checkLangKeys 只认**字面量**键，而物资名在界面上是

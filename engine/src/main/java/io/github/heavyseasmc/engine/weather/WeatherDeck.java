@@ -13,6 +13,7 @@ public final class WeatherDeck {
     private final List<WeatherCard> pile;
     private final List<WeatherCard> discard = new ArrayList<>();
     private WeatherCard current;
+    private WeatherCard currentOverride;
 
     public WeatherDeck(List<WeatherCard> cards, Random rng) {
         if (cards == null || cards.isEmpty()) {
@@ -25,6 +26,8 @@ public final class WeatherDeck {
 
     /** 翻开今天的牌；昨天的牌先进入弃牌堆。 */
     public WeatherCard draw() {
+        // 开发验收覆盖只活到下一次正式抽牌。它不进入弃牌堆，也不改变牌堆顺序。
+        currentOverride = null;
         if (current != null) {
             discard.add(current);
         }
@@ -46,7 +49,17 @@ public final class WeatherDeck {
     }
 
     public Optional<WeatherCard> current() {
-        return Optional.ofNullable(current);
+        return Optional.ofNullable(currentOverride != null ? currentOverride : current);
+    }
+
+    /**
+     * 临时覆盖桌面上的天候，供开发环境做客户端视觉验收。
+     *
+     * <p>覆盖牌不从牌堆取、不进弃牌堆；下一次 {@link #draw()} 自动清除覆盖并继续原来的随机序列。
+     * 这样规则查询与 HUD 都能看到同一张牌，但验收夹具不会污染正式洗牌状态。
+     */
+    public void overrideCurrentUntilNextDraw(WeatherCard card) {
+        currentOverride = Objects.requireNonNull(card, "card");
     }
 
     public int remaining() {

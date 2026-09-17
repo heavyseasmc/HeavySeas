@@ -104,6 +104,7 @@ public final class HeavySeasClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         HudRenderCallback.EVENT.register(GameHud::render);
+        GameScreenSidebar.register();
 
         // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
         EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);

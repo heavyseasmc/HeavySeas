@@ -1,7 +1,6 @@
 package io.github.heavyseasmc.mod.world;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
-import io.github.heavyseasmc.mod.data.GameData;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.net.StartVoyageC2S;
@@ -59,11 +58,8 @@ public final class LobbyBoat {
                 player.sendMessage(Text.translatable("heavyseas.lobby.need_players", registered.size()), true);
                 return ActionResult.FAIL;
             }
-            GameData data = GameDataLoader.require();
-            ServerPlayNetworking.send(player, new RosterConfigS2C(pos.asLong(), registered.size(),
-                    data.roster().characters().stream().map(survivor -> survivor.id().value()).toList(),
-                    ids(data.roster().presets().get(6)), ids(data.roster().presets().get(7)),
-                    ids(data.roster().presets().get(8))));
+            ServerPlayNetworking.send(player, RosterConfigS2C.from(pos.asLong(), registered.size(),
+                    GameDataLoader.require().roster()));
             return ActionResult.SUCCESS;
         }
 
@@ -124,10 +120,6 @@ public final class LobbyBoat {
         } catch (RuntimeException failure) {
             player.sendMessage(Text.literal(String.valueOf(failure.getMessage())), true);
         }
-    }
-
-    private static List<String> ids(List<CharacterId> ids) {
-        return ids == null ? List.of() : ids.stream().map(CharacterId::value).toList();
     }
 
     public static void clear(World rawWorld, BlockPos pos) {

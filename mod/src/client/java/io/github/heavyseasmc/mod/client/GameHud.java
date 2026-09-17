@@ -9,6 +9,7 @@ import io.github.heavyseasmc.mod.game.NavCardText;
 import io.github.heavyseasmc.mod.state.ContestView;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.ui.NotificationSidebarLayout;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
@@ -43,8 +44,12 @@ import java.util.List;
  */
 public final class GameHud {
 
-    private static final int MARGIN = 6;
+    private static final int MARGIN = NotificationSidebarLayout.MARGIN;
     private static final int LINE_HEIGHT = 10;
+    /** 普通 HUD 底部留给热栏；对局 Screen 没有热栏，可以用到窗口底。 */
+    private static final int HUD_BOTTOM_SAFE = 48;
+    /** 世界和第一人称手模不能透过历史文字抢可读性。 */
+    private static final int SIDEBAR_BACKGROUND = 0xE40B1620;
 
     private GameHud() {
     }
@@ -54,20 +59,15 @@ public final class GameHud {
         if (client.world == null || client.player == null || client.options.hudHidden) {
             return;
         }
-        boolean gameScreen = client.currentScreen instanceof GameScreen;
+        // HudRenderCallback 发生在 Screen.renderWithTooltip 之前。对局界面自己的底色会盖住这里画的东西，
+        // 所以它们的侧栏交给 GameScreenSidebar 的 afterRender；这里必须彻底跳过，不能画一份在背后。
+        if (client.currentScreen instanceof GameScreen) {
+            return;
+        }
         HudView view = GameComponents.of(client.world).hudView();
         if (!view.active()) {
             return;                          // 没有对局就什么都不画，不留一个空框
         }
-        if (gameScreen) {
-            // 对局界面自带上带（回合 · 阶段 · 海鸥）。两份一起画，HUD 的字会从界面的底色后面透出来、
-            // 跟座位轨叠在一起；但右侧航海日志是用户指定的独立信息区，界面打开时也保留。
-            int sidebarWidth = view.notifications().isEmpty() && view.weather().isEmpty() ? 0
-                    : Math.min(240, Math.max(140, context.getScaledWindowWidth() / 3));
-            drawNotifications(context, client, view.weather(), view.notifications(), sidebarWidth);
-            return;
-        }
-
         List<Text> lines = new ArrayList<>();
         lines.add(Text.translatable("heavyseas.status.header", view.turn(), GameScreen.phaseLabel(view),
                 view.gulls(), GameState.GULLS_TO_LAND).formatted(Formatting.GOLD));
@@ -135,9 +135,9 @@ public final class GameHud {
         }
 
         // 折行：结算那一行（执行的航海牌）可能比窗口还宽，画出屏幕与没画长得一样。
-        int sidebarWidth = view.notifications().isEmpty() && view.weather().isEmpty() ? 0
-                : Math.min(240, Math.max(140, context.getScaledWindowWidth() / 3));
-        int maxWidth = Math.max(80, context.getScaledWindowWidth() - sidebarWidth - 3 * MARGIN);
+        NotificationSidebarLayout sidebar = sidebarLayout(context.getScaledWindowWidth(), view);
+        int maxWidth = Math.max(80,
+                context.getScaledWindowWidth() - sidebar.sidebarWidth() - 3 * MARGIN);
         int y = MARGIN;
         for (Text line : lines) {
             for (OrderedText part : client.textRenderer.wrapLines(line, maxWidth)) {
@@ -145,16 +145,41 @@ public final class GameHud {
                 y += LINE_HEIGHT;
             }
         }
-        drawNotifications(context, client, view.weather(), view.notifications(), sidebarWidth);
+        drawNotifications(context, client, view.weather(), view.notifications(), sidebar);
+    }
+
+    /**
+     * 对局界面最后一层的通知侧栏。只由 {@link GameScreenSidebar} 的 afterRender 调用；
+     * 放回普通 HUD 回调会被 Screen 的底色盖住。
+     */
+    static void renderSidebar(DrawContext context, MinecraftClient client) {
+        if (client.world == null || client.player == null || client.options.hudHidden
+                || !(client.currentScreen instanceof GameScreen)) {
+            return;
+        }
+        HudView view = GameComponents.of(client.world).hudView();
+        if (!view.active()) {
+            return;
+        }
+        drawNotifications(context, client, view.weather(), view.notifications(),
+                sidebarLayout(context.getScaledWindowWidth(), view));
+    }
+
+    /** GameScreen 与实际绘制共用这一份几何；两边各算一遍仍会得到完全相同的边界。 */
+    static NotificationSidebarLayout sidebarLayout(int screenWidth, HudView view) {
+        boolean visible = view.active() && (!view.notifications().isEmpty() || !view.weather().isEmpty());
+        return NotificationSidebarLayout.of(screenWidth, visible);
     }
 
     /** 系统播报的固定侧栏：最新事件在最上面，保留最多八条，不污染聊天历史。 */
     private static void drawNotifications(DrawContext context, MinecraftClient client,
-                                          String weather, List<Text> notifications, int width) {
+                                          String weather, List<Text> notifications,
+                                          NotificationSidebarLayout layout) {
+        int width = layout.sidebarWidth();
         if ((notifications.isEmpty() && weather.isEmpty()) || width <= 0) {
             return;
         }
-        int x = context.getScaledWindowWidth() - width - MARGIN;
+        int x = layout.sidebarX();
         int y = MARGIN;
         if (!weather.isEmpty()) {
             int cardW = Math.min(width, 168);
@@ -173,8 +198,9 @@ public final class GameHud {
         }
         // 天候卡已经占掉上半截；按剩余高度裁，而不是按整屏高度裁。否则低分辨率下
         // 八条长通知会把侧栏画出屏幕底边。
+        int bottomSafe = client.currentScreen == null ? HUD_BOTTOM_SAFE : 2 * MARGIN;
         int maxLines = Math.max(0,
-                (context.getScaledWindowHeight() - y - 2 * MARGIN) / LINE_HEIGHT);
+                (context.getScaledWindowHeight() - y - bottomSafe) / LINE_HEIGHT);
         if (maxLines == 0) {
             return;
         }
@@ -182,7 +208,7 @@ public final class GameHud {
             rendered = new ArrayList<>(rendered.subList(0, maxLines));
         }
         int height = rendered.size() * LINE_HEIGHT + 2 * MARGIN;
-        context.fill(x, y, x + width, y + height, 0x990B1620);
+        context.fill(x, y, x + width, y + height, SIDEBAR_BACKGROUND);
         int textY = y + MARGIN;
         for (OrderedText line : rendered) {
             context.drawTextWithShadow(client.textRenderer, line, x + MARGIN, textY, 0xFFFFFF);

@@ -42,13 +42,18 @@ public final class RosterScreen extends Screen {
             characterButtons.put(id, addDrawableChild(button));
         }
         int presetsY = top + 4 * 24 + 8;
-        int small = 72;
+        List<Text> presetLabels = List.of(
+                Text.translatable("heavyseas.roster.preset", 6),
+                Text.translatable("heavyseas.roster.preset", 7),
+                Text.translatable("heavyseas.roster.preset", 8));
+        int widestPreset = presetLabels.stream().mapToInt(textRenderer::getWidth).max().orElse(0);
+        int small = Math.min(widestPreset + 20, (width - 16) / 3);
         int presetsLeft = (width - small * 3 - 8) / 2;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("heavyseas.roster.preset", 6),
+        addDrawableChild(ButtonWidget.builder(presetLabels.get(0),
                 ignored -> applyPreset(config.preset6())).dimensions(presetsLeft, presetsY, small, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("heavyseas.roster.preset", 7),
+        addDrawableChild(ButtonWidget.builder(presetLabels.get(1),
                 ignored -> applyPreset(config.preset7())).dimensions(presetsLeft + small + 4, presetsY, small, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("heavyseas.roster.preset", 8),
+        addDrawableChild(ButtonWidget.builder(presetLabels.get(2),
                 ignored -> applyPreset(config.preset8())).dimensions(presetsLeft + 2 * (small + 4), presetsY, small, 20).build());
         int actionsY = presetsY + 28;
         start = addDrawableChild(ButtonWidget.builder(Text.translatable("heavyseas.roster.start"), ignored -> start())
@@ -103,11 +108,12 @@ public final class RosterScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+        // 原版 Screen 会先画背景再画控件；标题必须最后画，否则真客户端上会被背景的
+        // 模糊 pass 一起处理，按钮清楚而标题看不清。不要另调 renderBackground，会重复模糊整帧。
+        super.render(context, mouseX, mouseY, delta);
         context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 16, 0xFFFFFF);
         context.drawCenteredTextWithShadow(textRenderer,
                 Text.translatable("heavyseas.roster.detail", config.players(), selected.size()),
                 width / 2, 30, 0xA0A0A0);
-        super.render(context, mouseX, mouseY, delta);
     }
 }

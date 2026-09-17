@@ -1,5 +1,7 @@
 package io.github.heavyseasmc.mod.net;
 
+import io.github.heavyseasmc.engine.data.RosterData;
+import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.RegistryByteBuf;
@@ -9,6 +11,7 @@ import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
 import java.util.List;
+import java.util.Objects;
 
 /** 大厅船上玩家打开阵容面板所需的公开目录与三套预设。 */
 public record RosterConfigS2C(long anchor, int players, List<String> characters,
@@ -33,6 +36,26 @@ public record RosterConfigS2C(long anchor, int players, List<String> characters,
         preset6 = List.copyOf(preset6);
         preset7 = List.copyOf(preset7);
         preset8 = List.copyOf(preset8);
+    }
+
+    /**
+     * 从正式角色数据构造大厅面板包。大厅交互与开发验收共用这一条，避免两边字段漂移。
+     */
+    public static RosterConfigS2C from(long anchor, int players, RosterData roster) {
+        if (players < 6 || players > 8) {
+            throw new IllegalArgumentException("阵容面板只支持 6–8 人，实际是 " + players);
+        }
+        Objects.requireNonNull(roster, "roster");
+        return new RosterConfigS2C(anchor, players,
+                roster.characters().stream().map(survivor -> survivor.id().value()).toList(),
+                ids(roster.presets().get(6)), ids(roster.presets().get(7)), ids(roster.presets().get(8)));
+    }
+
+    private static List<String> ids(List<CharacterId> ids) {
+        if (ids == null) {
+            throw new IllegalArgumentException("角色数据缺少 6、7 或 8 人预设");
+        }
+        return ids.stream().map(CharacterId::value).toList();
     }
 
     @Override

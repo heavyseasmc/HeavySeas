@@ -57,6 +57,10 @@ public abstract class GameScreen extends Screen {
      */
     @Override
     protected void init() {
+        // Fabric 的 AFTER_INIT 要等整个子类 init 返回才发生。先在公共 init 里收窄，
+        // 以后某一面即使在 super.init() 之后创建原生 Widget，也会直接拿到内容区宽度。
+        // 取窗口宽而不是当前字段：clearAndInit 时 width 可能已经收窄，不能再减一遍。
+        reserveNotificationSidebar(client == null ? width : client.getWindow().getScaledWidth());
         mouseSeen = false;
         if (!announced) {
             announced = true;
@@ -67,6 +71,16 @@ public abstract class GameScreen extends Screen {
     /** 当前世界的对局投影；没有世界时是 {@link HudView#IDLE}。 */
     protected HudView projection() {
         return client == null || client.world == null ? HudView.IDLE : GameComponents.of(client.world).hudView();
+    }
+
+    /**
+     * 把 Screen 的横向布局宽度收进通知栏左边；所有子类现有的 {@code width} 计算会一起重排，
+     * 鼠标命中也继续使用同一份坐标，不需要让十四个界面各自记一套侧栏规则。
+     *
+     * <p>调用方每帧传完整窗口宽度，不能拿已经缩过的 {@link #width} 再减一次。
+     */
+    final void reserveNotificationSidebar(int screenWidth) {
+        width = GameHud.sidebarLayout(screenWidth, projection()).contentWidth();
     }
 
     /**
@@ -114,8 +128,16 @@ public abstract class GameScreen extends Screen {
 
     /** 模糊背景加同一层底色（ADR-0018 §7.3：GUI 与牌面必须是同一个世界）。 */
     protected void renderBackdrop(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
-        context.fill(0, 0, width, height, GuiLanguage.BACKDROP);
+        // Screen.renderBackground 会读取字段 width 来铺暗纹。主内容的 width 已为侧栏收窄，
+        // 这里只在背景调用期间还原完整宽度，否则侧栏下半截会直接露出比左边亮的世界画面。
+        int contentWidth = width;
+        width = context.getScaledWindowWidth();
+        try {
+            renderBackground(context, mouseX, mouseY, delta);
+        } finally {
+            width = contentWidth;
+        }
+        context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), GuiLanguage.BACKDROP);
     }
 
     /**
