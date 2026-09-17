@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:oak_boat" },
+    { "item": "minecraft:bell" }
+  ],
+  "result": { "id": "heavyseas:lobby_boat", "count": 1 }
+}

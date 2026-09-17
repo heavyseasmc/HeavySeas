@@ -14,9 +14,13 @@ import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.state.SurvivorState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.Component;
 import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
 import org.slf4j.Logger;
@@ -55,8 +59,16 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     private static final String KEY_INTERRUPTED_TURN = "interrupted_turn";
+    private static final String KEY_ESCROWS = "voyage_escrows";
+
+    /** Owning world, used to include same-dimension spectators in the public projection. */
+    private final World owner;
 
     private Session session;
+
+    public GameComponent(World owner) {
+        this.owner = owner;
+    }
 
     /** 座位归谁：角色 id → 占位者。座位顺序由角色决定，与谁来占无关。 */
     private final Map<CharacterId, Occupant> occupants = new LinkedHashMap<>();
@@ -113,7 +125,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         if (session == null) {
             return endedFor.contains(player.getUuid());   // 结束那一帧（「没有对局」）也得送到
         }
-        return seatOf(player.getUuid()).isPresent();
+        // M4: the finale is a world performance. Same-dimension spectators receive only the
+        // public fields below; their per-player secrets remain empty because they have no seat.
+        return player.getWorld().getRegistryKey().equals(owner.getRegistryKey());
     }
 
     /**
@@ -191,11 +205,13 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeBoolean(endgame.withheld());
             Affinities aff = session.affinities().orElseThrow();
             boolean scoring = endgame.stage() == EndgameProgress.Stage.SCORES;
+            boolean revealing = endgame.stage() == EndgameProgress.Stage.HATE
+                    || endgame.stage() == EndgameProgress.Stage.LOVE;
             buf.writeVarInt(endgame.order().size());
             for (int i = 0; i < endgame.order().size(); i++) {
                 CharacterId who = endgame.order().get(i);
                 buf.writeString(who.value());
-                boolean open = !scoring && i < endgame.flipped();
+                boolean open = revealing && i < endgame.flipped();
                 CharacterId target = endgame.stage() == EndgameProgress.Stage.HATE ? aff.hateOf(who) : aff.loveOf(who);
                 buf.writeString(open ? target.value() : "");
                 buf.writeVarInt(scoring ? endgame.scores().get(who).total() : -1);
@@ -751,6 +767,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     /**
+     * 丢掉当前阶段尚未执行的动作。终局接管流程时调用，避免同一 tick 里已经排好的替身动作
+     * 在终局第一幕期间继续改变已经结算的对局。
+     */
+    public void clearScheduledSteps() {
+        steps.clear();
+    }
+
+    /**
      * 到期的下一步；属于别的对局的一律丢掉。
      *
      * <p>每 tick 至多取一步：一步推进一个人，客户端的投影才一格一格地跟得上。
@@ -796,6 +820,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearHelm();
         clearThirst();
         endgame = null;
+        fogCleared = false;
         steps.clear();
     }
 
@@ -808,12 +833,43 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      */
     private List<UUID> seatIds = List.of();
 
+    /** Visible hull pieces and gulls are runtime projections, just like seats; they are not persisted. */
+    private List<UUID> boatDisplayIds = List.of();
+    private List<UUID> gullIds = List.of();
+
+    /** Dense Mist Sea fog clears when the fourth gull starts the shore approach. */
+    private boolean fogCleared;
+
     public List<UUID> seatIds() {
         return seatIds;
     }
 
     public void setSeatIds(List<UUID> ids) {
         this.seatIds = List.copyOf(ids);
+    }
+
+    public List<UUID> boatDisplayIds() {
+        return boatDisplayIds;
+    }
+
+    public void setBoatDisplayIds(List<UUID> ids) {
+        this.boatDisplayIds = List.copyOf(ids);
+    }
+
+    public List<UUID> gullIds() {
+        return gullIds;
+    }
+
+    public void setGullIds(List<UUID> ids) {
+        this.gullIds = List.copyOf(ids);
+    }
+
+    public boolean fogCleared() {
+        return fogCleared;
+    }
+
+    public void clearFog() {
+        fogCleared = true;
     }
 
     /**
@@ -877,6 +933,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void end() {
         occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
+        if (owner instanceof ServerWorld serverWorld) {
+            serverWorld.getPlayers().stream().map(ServerPlayerEntity::getUuid).forEach(endedFor::add);
+        }
         clearDesignation();
         clearProvisionTarget();
         this.session = null;
@@ -885,6 +944,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearHelm();
         clearThirst();
         endgame = null;
+        seatIds = List.of();
+        boatDisplayIds = List.of();
+        gullIds = List.of();
+        fogCleared = false;
         steps.clear();
     }
 
@@ -914,12 +977,57 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return interruptedTurn;
     }
 
+    /**
+     * A player's real inventory and return point while their game body is isolated in the Mist Sea.
+     * Unlike the rule session this record is persisted: it is the recovery contract after a crash/restart.
+     */
+    public record VoyageEscrow(UUID player, String dimension, double x, double y, double z,
+                               float yaw, float pitch, NbtList inventory) {
+        public VoyageEscrow {
+            inventory = inventory.copy();
+        }
+    }
+
+    private final Map<UUID, VoyageEscrow> voyageEscrows = new LinkedHashMap<>();
+
+    public boolean hasVoyageEscrow(UUID player) {
+        return voyageEscrows.containsKey(player);
+    }
+
+    public void putVoyageEscrow(VoyageEscrow escrow) {
+        voyageEscrows.put(escrow.player(), escrow);
+    }
+
+    public Optional<VoyageEscrow> removeVoyageEscrow(UUID player) {
+        return Optional.ofNullable(voyageEscrows.remove(player));
+    }
+
+    public Set<UUID> voyageEscrowPlayers() {
+        return Set.copyOf(voyageEscrows.keySet());
+    }
+
     @Override
     public void readFromNbt(NbtCompound tag, RegistryWrapper.WrapperLookup registryLookup) {
         interruptedTurn = tag.getInt(KEY_INTERRUPTED_TURN);
+        voyageEscrows.clear();
+        NbtList escrows = tag.getList(KEY_ESCROWS, NbtElement.COMPOUND_TYPE);
+        for (int i = 0; i < escrows.size(); i++) {
+            NbtCompound saved = escrows.getCompound(i);
+            if (!saved.containsUuid("player")) {
+                continue;
+            }
+            VoyageEscrow escrow = new VoyageEscrow(saved.getUuid("player"), saved.getString("dimension"),
+                    saved.getDouble("x"), saved.getDouble("y"), saved.getDouble("z"),
+                    saved.getFloat("yaw"), saved.getFloat("pitch"),
+                    saved.getList("inventory", NbtElement.COMPOUND_TYPE));
+            voyageEscrows.put(escrow.player(), escrow);
+        }
         if (interruptedTurn > 0) {
             LOGGER.warn("上一局没有保存（存档时进行到第 {} 回合）—— M1 不持久化对局，"
                     + "用 /seas start 重开一局。", interruptedTurn);
+        }
+        if (!voyageEscrows.isEmpty()) {
+            LOGGER.warn("发现 {} 份未完成的雾海托管：玩家上线时将恢复物品与返回位置。", voyageEscrows.size());
         }
     }
 
@@ -928,6 +1036,20 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         // 存的是墓碑不是状态：让「重启丢了一局」与「本来就没开局」在下次加载时分得开。
         int turn = session == null ? 0 : session.state().turn();
         tag.putInt(KEY_INTERRUPTED_TURN, turn);
+        NbtList escrows = new NbtList();
+        for (VoyageEscrow escrow : voyageEscrows.values()) {
+            NbtCompound saved = new NbtCompound();
+            saved.putUuid("player", escrow.player());
+            saved.putString("dimension", escrow.dimension());
+            saved.putDouble("x", escrow.x());
+            saved.putDouble("y", escrow.y());
+            saved.putDouble("z", escrow.z());
+            saved.putFloat("yaw", escrow.yaw());
+            saved.putFloat("pitch", escrow.pitch());
+            saved.put("inventory", escrow.inventory().copy());
+            escrows.add(saved);
+        }
+        tag.put(KEY_ESCROWS, escrows);
         if (turn > 0) {
             LOGGER.warn("存档时有一局进行到第 {} 回合，**不会被保存** —— M1 不持久化对局。", turn);
         }

@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "heavyseas:block/lobby_boat" },
+    "facing=east":  { "model": "heavyseas:block/lobby_boat", "y": 90 },
+    "facing=south": { "model": "heavyseas:block/lobby_boat", "y": 180 },
+    "facing=west":  { "model": "heavyseas:block/lobby_boat", "y": 270 }
+  }
+}

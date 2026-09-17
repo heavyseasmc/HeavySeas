@@ -81,9 +81,12 @@ public final class ScoreScreen extends GameScreen {
         HudView.Score s = view.myScore();
         int identityY = height - Math.max(8, Math.round(height * 0.05f)) - fh;
         if (!s.present()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.score.waiting"),
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable(
+                            view.seated() ? "heavyseas.score.waiting" : "heavyseas.endgame.spectating"),
                     width / 2, (totalsBottom + identityY) / 2, GuiLanguage.MUTED);
-            drawIdentity(context, view, identityY);
+            if (view.seated()) {
+                drawIdentity(context, view, identityY);
+            }
             return;
         }
         if (!logged) {

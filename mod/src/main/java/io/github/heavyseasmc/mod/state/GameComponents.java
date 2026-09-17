@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod.state;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.Seats;
+import io.github.heavyseasmc.mod.world.Gulls;
 
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
@@ -31,7 +32,7 @@ public final class GameComponents implements WorldComponentInitializer {
 
     @Override
     public void registerWorldComponentFactories(WorldComponentFactoryRegistry registry) {
-        registry.register(GAME, world -> new GameComponent());
+        registry.register(GAME, GameComponent::new);
         // 正向对照：CCA 没能加载 / 入口点名字写错时，这一行不会出现，而模组照样启动成功。
         // 组件用不上与组件没注册，在别处表现完全相同 —— 只有这一行分得开。
         LOGGER.info("对局组件已注册：{}（World 级，决策 ⑫）", GAME.getId());
@@ -62,6 +63,7 @@ public final class GameComponents implements WorldComponentInitializer {
         world.syncComponent(GAME);
         if (world instanceof ServerWorld server) {
             Seats.refresh(server, of(world));
+            Gulls.refresh(server, of(world));
             Nameplates.refresh(server, of(world));   // 头顶信息条同理：投影，不是状态（决策 ⑥）
         }
     }

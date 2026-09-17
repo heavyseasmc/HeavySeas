@@ -11,7 +11,13 @@
 
 set -uo pipefail
 
-check="$(git rev-parse --show-toplevel)/docs/tools/prepush.sh"
+root="$(git rev-parse --show-toplevel)"
+private_root="${HEAVYSEAS_WIKI:-$root/docs}"
+if [[ ! -f "$private_root/tools/prepush.sh" ]]; then
+  sibling="$(cd "$root/.." && pwd)/VibeCodingWiki"
+  [[ -f "$sibling/tools/prepush.sh" ]] && private_root="$sibling"
+fi
+check="$private_root/tools/prepush.sh"
 
 if [[ -f "$check" ]]; then
   bash "$check" || {

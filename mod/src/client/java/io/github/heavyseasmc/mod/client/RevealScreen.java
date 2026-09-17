@@ -155,9 +155,14 @@ public final class RevealScreen extends GameScreen {
         int sayY = ownY - fh - 8;
         drawStage(context, now, e, hate, railBottom + 8, sayY - 8);
         drawSay(context, now, e, hate, sayY);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.reveal.yours",
-                nameOf(view.hate()), nameOf(view.love())), width / 2, ownY, GuiLanguage.MUTED);
-        drawIdentity(context, view, identityY);
+        if (view.seated()) {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.reveal.yours",
+                    nameOf(view.hate()), nameOf(view.love())), width / 2, ownY, GuiLanguage.MUTED);
+            drawIdentity(context, view, identityY);
+        } else {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.endgame.spectating"),
+                    width / 2, identityY, GuiLanguage.MUTED);
+        }
     }
 
     /**

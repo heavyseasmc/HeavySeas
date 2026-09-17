@@ -5,6 +5,9 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.decoration.DisplayEntity.BlockDisplayEntity;
+import net.minecraft.block.Blocks;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.MathHelper;
@@ -36,6 +39,7 @@ import java.util.UUID;
 public final class Seats {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+    private static final String HULL_TAG = "heavyseas_hull";
 
     /** 船头到船尾，相邻两个座位隔多远（格）。一格：坐满八个人正好是一条小艇的长度。 */
     private static final double SPACING = 1.0;
@@ -72,6 +76,20 @@ public final class Seats {
             ids.add(seat.getUuid());
         }
         component.setSeatIds(ids);
+        List<BlockDisplayEntity> hull = new ArrayList<>();
+        List<UUID> hullIds = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            Vec3d at = origin.add(forward.multiply(i * SPACING)).add(0, -0.3, 0);
+            BlockDisplayEntity part = new BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
+            part.setBlockState(Blocks.DARK_OAK_SLAB.getDefaultState());
+            part.addCommandTag(HULL_TAG);
+            part.setTeleportDuration(5);
+            part.refreshPositionAndAngles(at.x, at.y, at.z, facing, 0f);
+            hull.add(part);
+            hullIds.add(part.getUuid());
+        }
+        // Same load-event ordering rule as seats: publish ids before entities enter the world.
+        component.setBoatDisplayIds(hullIds);
         ids = new ArrayList<>();
         for (SeatEntity seat : seats) {
             if (!world.spawnEntity(seat)) {
@@ -83,6 +101,13 @@ public final class Seats {
             ids.add(seat.getUuid());
         }
         component.setSeatIds(ids);
+        hullIds = new ArrayList<>();
+        for (BlockDisplayEntity part : hull) {
+            if (world.spawnEntity(part)) {
+                hullIds.add(part.getUuid());
+            }
+        }
+        component.setBoatDisplayIds(hullIds);
         // 与语言无关的一行：验收靠它判「船真的摆出来了」。
         LOGGER.info("座位已摆好：{} 个 · 船头 {} {} {} · 朝向 {}",
                 ids.size(), fmt(origin.x), fmt(origin.y), fmt(origin.z), Math.round(facing));
@@ -134,6 +159,13 @@ public final class Seats {
             }
         }
         component.setSeatIds(List.of());
+        for (UUID id : component.boatDisplayIds()) {
+            Entity entity = world.getEntity(id);
+            if (entity != null) {
+                entity.discard();
+            }
+        }
+        component.setBoatDisplayIds(List.of());
         if (gone > 0) {
             LOGGER.info("座位已收摊：清掉 {} 个", gone);
         }
@@ -151,7 +183,23 @@ public final class Seats {
      * 实体加载事件是在它<b>真的进世界那一刻</b>触发的：起服、区块重载、玩家走过去，全都算。
      */
     public static void onSeatLoaded(Entity entity, ServerWorld world) {
+        if (entity.getCommandTags().contains(HULL_TAG)) {
+            if (!GameComponents.of(world).boatDisplayIds().contains(entity.getUuid())) {
+                entity.discard();
+                LOGGER.info("船体：清掉一个孤儿投影");
+            }
+            return;
+        }
         if (!(entity instanceof SeatEntity seat) || !seat.ours()) {
+            return;
+        }
+        if (seat.lobby()) {
+            if (world.getBlockState(seat.lobbyAnchor()).isOf(LobbyBoatBlock.BLOCK)) {
+                return;
+            }
+            seat.removeAllPassengers();
+            seat.discard();
+            LOGGER.info("大厅座位：锚点救生艇已不在，清掉孤儿");
             return;
         }
         if (GameComponents.of(world).seatIds().contains(seat.getUuid())) {
@@ -161,6 +209,22 @@ public final class Seats {
         seat.discard();
         // 与语言无关的一行：验收靠它判「孤儿真的被清了」。一个一行 —— 孤儿本来就该是罕见的。
         LOGGER.info("座位：清掉一个孤儿（存档里留下的）");
+    }
+
+    /** One interpolation step of the M4 shore approach; passengers remain mounted throughout. */
+    public static void move(ServerWorld world, GameComponent component, Vec3d delta) {
+        for (UUID id : component.seatIds()) {
+            Entity entity = world.getEntity(id);
+            if (entity != null) {
+                entity.setPosition(entity.getPos().add(delta));
+            }
+        }
+        for (UUID id : component.boatDisplayIds()) {
+            Entity entity = world.getEntity(id);
+            if (entity != null) {
+                entity.setPosition(entity.getPos().add(delta));
+            }
+        }
     }
 
     private static SeatEntity seatAt(ServerWorld world, GameComponent component, int index) {

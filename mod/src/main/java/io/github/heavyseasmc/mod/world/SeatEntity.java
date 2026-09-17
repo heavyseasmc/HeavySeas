@@ -9,6 +9,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 /**
@@ -19,8 +20,8 @@ import net.minecraft.world.World;
  * 这里只要一个有坐标、能载人、不动的东西 —— 所以没有 AI、没有物理、不受重力、不会被推。
  *
  * <h2>它不渲染</h2>
- * 稿子里座位是船的一部分，而船属 M4。现在画一个临时模型，M4 一定会推翻它 ——
- * <b>看得见的只有坐在上面的人</b>（客户端那一半在 {@code SeatEntityRenderer}）。
+ * M4 的船体由一组可移动的 block display 绘制；座位仍只是乘坐和位次投影，
+ * 不另画一个重叠模型（客户端那一半在 {@code SeatEntityRenderer}）。
  *
  * <h2>位次的事实源不是它</h2>
  * ❗谁坐第几位由引擎的 {@code GameState#bySeat()} 说了算；世界里的位置是**投影**。
@@ -44,6 +45,8 @@ public final class SeatEntity extends Entity {
 
     /** 这个座位是船头数过来第几个（0 起）。只用于日志与排错，规则一侧不读它。 */
     private int index;
+    private boolean lobby;
+    private BlockPos lobbyAnchor = BlockPos.ORIGIN;
 
     public static final EntityType<SeatEntity> TYPE = EntityType.Builder
             .<SeatEntity>create(SeatEntity::new, SpawnGroup.MISC)
@@ -52,7 +55,8 @@ public final class SeatEntity extends Entity {
             // ❗必须让客户端一直看得见：默认追踪距离对一个不动的小东西来说够，
             //   但坐在上面的玩家一旦超出范围，客户端那边会以为自己没坐着。
             .maxTrackingRange(16)
-            .trackingTickInterval(Integer.MAX_VALUE)   // 它不动，不必每 tick 推位置
+            // M4's shore approach moves the entire occupied boat; riders must receive every interpolation step.
+            .trackingTickInterval(1)
             .build(ID.toString());
 
     public SeatEntity(EntityType<? extends SeatEntity> type, World world) {
@@ -84,6 +88,20 @@ public final class SeatEntity extends Entity {
         addCommandTag(GAME_TAG);
     }
 
+    public boolean lobby() {
+        return lobby;
+    }
+
+    public BlockPos lobbyAnchor() {
+        return lobbyAnchor;
+    }
+
+    public void markLobby(BlockPos anchor) {
+        markOurs();
+        lobby = true;
+        lobbyAnchor = anchor.toImmutable();
+    }
+
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
         // 没有要同步的字段：座位本身看不见，客户端只需要知道它在哪、自己骑没骑着。
@@ -92,11 +110,19 @@ public final class SeatEntity extends Entity {
     @Override
     protected void readCustomDataFromNbt(NbtCompound nbt) {
         index = nbt.getInt("Index");
+        lobby = nbt.getBoolean("Lobby");
+        if (lobby) {
+            lobbyAnchor = BlockPos.fromLong(nbt.getLong("LobbyAnchor"));
+        }
     }
 
     @Override
     protected void writeCustomDataToNbt(NbtCompound nbt) {
         nbt.putInt("Index", index);
+        nbt.putBoolean("Lobby", lobby);
+        if (lobby) {
+            nbt.putLong("LobbyAnchor", lobbyAnchor.asLong());
+        }
     }
 
     /**

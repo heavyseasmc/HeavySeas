@@ -10,6 +10,7 @@ import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import io.github.heavyseasmc.mod.world.SeatEntity;
+import io.github.heavyseasmc.mod.world.GullEntity;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -17,6 +18,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.minecraft.client.render.entity.ParrotEntityRenderer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.option.KeyBinding;
@@ -104,6 +106,7 @@ public final class HeavySeasClient implements ClientModInitializer {
 
         // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
         EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);
+        EntityRendererRegistry.register(GullEntity.TYPE, ParrotEntityRenderer::new);
 
         handKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_H,
@@ -197,6 +200,13 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 终局排在所有决策面前面：对局已经结束，决策面开着也没有东西可选了。
         if (view.myEndgame()) {
             EndgameProgress.Stage stage = view.endgame().stage();
+            if (stage == EndgameProgress.Stage.ARRIVAL) {
+                if (client.currentScreen instanceof GameScreen && !(client.currentScreen instanceof HandScreen)) {
+                    client.setScreen(null); // the first act belongs to the world, not an overlay
+                }
+                endgameStageShown = stage;
+                return;
+            }
             boolean scores = stage == EndgameProgress.Stage.SCORES;
             Screen current = client.currentScreen;
             if (scores ? current instanceof ScoreScreen : current instanceof RevealScreen) {

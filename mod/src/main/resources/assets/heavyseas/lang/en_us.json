@@ -271,5 +271,13 @@
   "heavyseas.plate.preserver": " ◯",
   "heavyseas.plate.treasure": " $%s",
   "heavyseas.plate.hand": " ♠%s",
-  "heavyseas.plate.designating": " rising"
+  "heavyseas.plate.designating": " rising",
+  "block.heavyseas.lobby_boat": "Lobby Boat",
+  "heavyseas.lobby.overworld_only": "The lobby boat can only operate in the Overworld.",
+  "heavyseas.lobby.need_players": "%s registered; with 6–8 aboard, right-click again to ring the bell and start.",
+  "heavyseas.lobby.full": "All eight seats are occupied.",
+  "heavyseas.lobby.registered": "Registered by sitting down (%s/8); dismount to cancel.",
+  "heavyseas.mist_sea.recovered": "Your previous Mist Sea voyage ended unexpectedly. Your inventory and return position were restored.",
+  "heavyseas.endgame.arrived": "The fourth gull parts the fog; the occupied boat glides toward shore.",
+  "heavyseas.endgame.spectating": "Spectating the finale · private cards and score details remain hidden"
 }

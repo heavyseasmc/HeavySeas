@@ -87,9 +87,9 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
             ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, false, 0L,
             "", List.of(), 0, List.of(), List.of(), Score.NONE);
 
-    /** 终局序列在进行，而且我在局里 —— 翻牌与计分两面开不开得起来只看这一条。 */
+    /** The finale is public to everyone in the Mist Sea, including lobby spectators without a role. */
     public boolean myEndgame() {
-        return active && seated && endgame.active();
+        return active && endgame.active();
     }
 
     /**

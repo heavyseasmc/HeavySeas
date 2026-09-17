@@ -12,6 +12,8 @@ import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.Seats;
+import io.github.heavyseasmc.mod.world.Gulls;
+import io.github.heavyseasmc.mod.world.MistSea;
 
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -48,6 +50,8 @@ public final class EndgamePhase {
 
     /** 计分面板停多久再收起会话。{@code /seas end} 随时照样能提前结束。 */
     public static final long SCORE_HOLD_MS = 45_000L;
+    public static final long ARRIVAL_STEP_MS = 500L;
+    public static final int ARRIVAL_STEPS = 8;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -63,17 +67,29 @@ public final class EndgamePhase {
         if (component.endgame().isPresent()) {
             return;
         }
+        // 终局从这里起独占排程。上一阶段可能在同一 tick 已经排下一步替身动作；
+        // 若不清掉，它会在靠岸演出期间继续碰一局已经结算完的状态。
+        component.clearScheduledSteps();
         Session session = component.requireSession();
         GameState end = session.state();
         Map<CharacterId, ScoreSheet> scores = session.scores(GameDataLoader.require().roster().treasureScoring());
-        EndgameProgress progress = new EndgameProgress(end.outcome().orElseThrow(), end.turn(),
-                session.aliveCount(), end.bySeat(), EndgameProgress.Stage.HATE, 0, false, scores);
+        GameState.Outcome outcome = end.outcome().orElseThrow();
+        EndgameProgress.Stage first = outcome == GameState.Outcome.LANDED
+                ? EndgameProgress.Stage.ARRIVAL : EndgameProgress.Stage.HATE;
+        EndgameProgress progress = new EndgameProgress(outcome, end.turn(),
+                session.aliveCount(), end.bySeat(), first, 0, false, scores);
         component.setEndgame(progress);
+        if (first == EndgameProgress.Stage.ARRIVAL) {
+            component.clearFog();
+        }
         // 与语言无关的一行：验收脚本从这一行起数「终局揭示」。
-        LOGGER.info("终局开始：{} · 翻牌 {} 人 · 先恨后爱", progress.outcome(), progress.order().size());
+        LOGGER.info("终局开始：{} · 翻牌 {} 人 · {}", progress.outcome(), progress.order().size(),
+                first == EndgameProgress.Stage.ARRIVAL ? "先向岸航行，再恨后爱" : "先恨后爱");
         GameFlow.broadcast(world, Text.translatable("heavyseas.endgame.begin").formatted(Formatting.GOLD));
         GameComponents.sync(world);
-        GameFlow.schedule(component, hold(component, FLIP_HOLD_MS), "终局：点名第一个",
+        GameFlow.schedule(component, hold(component,
+                        first == EndgameProgress.Stage.ARRIVAL ? ARRIVAL_STEP_MS : FLIP_HOLD_MS),
+                first == EndgameProgress.Stage.ARRIVAL ? "终局：雾散向岸" : "终局：点名第一个",
                 () -> step(world, component));
     }
 
@@ -81,6 +97,23 @@ public final class EndgamePhase {
     static void step(ServerWorld world, GameComponent component) {
         EndgameProgress progress = component.endgame().orElseThrow(
                 () -> new IllegalStateException("终局序列在排程里，组件上却没有终局状态"));
+        if (progress.stage() == EndgameProgress.Stage.ARRIVAL) {
+            if (progress.flipped() < ARRIVAL_STEPS) {
+                Seats.move(world, component, MistSea.SHORE_DIRECTION.multiply(4.0));
+                component.setEndgame(progress.withFlipped(progress.flipped() + 1));
+                GameComponents.sync(world);
+                GameFlow.schedule(component, hold(component, ARRIVAL_STEP_MS), "终局：救生艇向岸前进",
+                        () -> step(world, component));
+                return;
+            }
+            LOGGER.info("终局第一幕：第四只海鸥引航 · 浓雾散去 · 岸边出现 · 船上人员保持乘坐");
+            GameFlow.broadcast(world, Text.translatable("heavyseas.endgame.arrived").formatted(Formatting.GOLD));
+            component.setEndgame(progress.nextStage());
+            GameComponents.sync(world);
+            GameFlow.schedule(component, hold(component, FLIP_HOLD_MS), "终局：靠岸后翻恨",
+                    () -> step(world, component));
+            return;
+        }
         if (progress.stage() == EndgameProgress.Stage.SCORES) {
             finish(world, component);
             return;
@@ -158,9 +191,11 @@ public final class EndgamePhase {
         LOGGER.info("终局结束：会话收起");
         DesignationPhase.clear(world, component);   // 还举着拳头的那一位要熄灯
         Nameplates.clear(world);             // 队伍进存档：不删的话下一局名牌上还挂着上一局的数
+        Gulls.clear(world, component);
         Seats.clear(world, component);       // 先收座位再收会话：clear 要读组件里那份名单
         component.end();
         GameComponents.sync(world);          // 结束那一帧也要推到（endedFor），否则计分面板一直挂着
+        MistSea.restoreAll(world, component); // idle frame first; cross-dimension teleport comes last
     }
 
     private static long hold(GameComponent component, long millis) {

@@ -30,8 +30,10 @@ import java.util.Objects;
 public record EndgameProgress(GameState.Outcome outcome, int turn, int alive, List<CharacterId> order,
                               Stage stage, int flipped, boolean withheld, Map<CharacterId, ScoreSheet> scores) {
 
-    /** 终局的三段。 */
+    /** M4's shore approach, followed by the two reveal rounds and scores. */
     public enum Stage {
+        /** The fourth gull leads the occupied boat toward the newly visible shore. */
+        ARRIVAL,
         /** 第一轮：揭「恨」。 */
         HATE,
         /** 第二轮：揭「爱」。两个置换各自独立，悬念完整重置。 */
@@ -48,8 +50,9 @@ public record EndgameProgress(GameState.Outcome outcome, int turn, int alive, Li
         if (order.isEmpty()) {
             throw new IllegalArgumentException("终局没有人可翻");
         }
-        // 最多翻到倒数第二张：最后一张永远不翻。
-        if (flipped < 0 || flipped > order.size() - 1) {
+        // During ARRIVAL this field is an animation step (0..8); during reveals it is a card count.
+        int maximum = stage == Stage.ARRIVAL ? 8 : order.size() - 1;
+        if (flipped < 0 || flipped > maximum) {
             throw new IllegalArgumentException("翻开张数越界：%d（共 %d 人，最后一张不翻）".formatted(flipped, order.size()));
         }
         if (!scores.keySet().containsAll(order)) {
@@ -73,6 +76,7 @@ public record EndgameProgress(GameState.Outcome outcome, int turn, int alive, Li
     /** 下一段：恨 → 爱 → 计分。翻开张数与「不翻」一起清零。 */
     public EndgameProgress nextStage() {
         Stage next = switch (stage) {
+            case ARRIVAL -> Stage.HATE;
             case HATE -> Stage.LOVE;
             case LOVE, SCORES -> Stage.SCORES;
         };

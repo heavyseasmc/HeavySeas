@@ -1,0 +1,17 @@
+{
+  "type": "heavyseas:mist_sea",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "minecraft:deep_ocean",
+      "features": false,
+      "lakes": false,
+      "layers": [
+        { "block": "minecraft:bedrock", "height": 1 },
+        { "block": "minecraft:stone", "height": 47 },
+        { "block": "minecraft:water", "height": 16 }
+      ],
+      "structure_overrides": []
+    }
+  }
+}

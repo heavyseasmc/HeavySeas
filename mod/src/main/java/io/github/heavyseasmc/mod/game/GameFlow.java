@@ -19,6 +19,9 @@ import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.NavCardView;
 import io.github.heavyseasmc.mod.world.Seats;
+import io.github.heavyseasmc.mod.world.Gulls;
+import io.github.heavyseasmc.mod.world.MistSea;
+import io.github.heavyseasmc.mod.world.Nameplates;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -331,9 +334,14 @@ public final class GameFlow {
                 // ❗排程里的一步抛了，局面就停在那儿 —— 不会再有下一步来推它。
                 //   与其留一局永远不动的对局，不如当场结束并点名：日志里有这一行，验收脚本才判得出来。
                 LOGGER.error("对局推进出错（{}），这一局到此为止", due.get().what(), e);
+                DesignationPhase.clear(world, component);
+                Nameplates.clear(world);
+                Gulls.clear(world, component);
+                Seats.clear(world, component);
                 component.end();
                 sync(world);
                 broadcast(world, Text.translatable("heavyseas.game.crashed").formatted(Formatting.RED));
+                MistSea.restoreAll(world, component);
             }
         }
     }

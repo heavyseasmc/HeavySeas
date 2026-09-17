@@ -18,7 +18,9 @@ import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.world.Nameplates;
+import io.github.heavyseasmc.mod.world.MistSea;
 import io.github.heavyseasmc.mod.world.Seats;
+import io.github.heavyseasmc.mod.world.Gulls;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
@@ -31,7 +33,6 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +81,7 @@ public final class SeasCommand {
 
     /** 角色 id 的补全：只补当前这一局里真的存在的角色，避免补出一个 7 人局才有的名字。 */
     private static final SuggestionProvider<ServerCommandSource> CHARACTERS = (context, builder) -> {
-        GameComponent component = GameComponents.of(context.getSource().getWorld());
+        GameComponent component = GameComponents.of(gameWorld(context));
         component.session().ifPresentOrElse(
                 session -> session.state().bySeat().forEach(id -> builder.suggest(id.value())),
                 () -> GameDataLoader.require().roster().characters()
@@ -219,19 +220,21 @@ public final class SeasCommand {
     }
 
     private static int start(CommandContext<ServerCommandSource> context, int players) {
-        ServerWorld world = context.getSource().getWorld();
-        GameComponent component = GameComponents.of(world);
-        if (component.session().isPresent()) {
+        ServerWorld lobby = context.getSource().getWorld();
+        GameComponent lobbyComponent = GameComponents.of(lobby);
+        ServerWorld sea = MistSea.world(lobby.getServer());
+        if (sea == null) {
+            context.getSource().sendError(Text.literal("heavyseas:mist_sea 维度未加载"));
+            return 0;
+        }
+        if (GameComponents.of(sea).session().isPresent()) {
             context.getSource().sendError(Text.translatable("heavyseas.command.already_running"));
             return 0;
         }
-        List<ServerPlayerEntity> humans = new ArrayList<>(world.getServer().getPlayerManager().getPlayerList());
-        // 船摆在调用者脚下、朝他面朝的方向（ADR-0024 §7.5）。控制台没有身体，那就用世界出生点。
-        ServerPlayerEntity caller = context.getSource().getPlayer();
-        Vec3d boatAt = caller != null ? caller.getPos() : Vec3d.ofBottomCenter(world.getSpawnPos());
-        float boatYaw = caller != null ? caller.getYaw() : 0f;
+        List<ServerPlayerEntity> humans = new ArrayList<>(lobby.getServer().getPlayerManager().getPlayerList());
         try {
-            GameFlow.start(world, players, humans, component.pendingDummies(), boatAt, boatYaw);
+            MistSea.startVoyage(lobby.getServer(), players, humans, lobbyComponent.pendingDummies());
+            lobbyComponent.clearPendingDummies();
         } catch (RuntimeException e) {
             context.getSource().sendError(Text.literal(String.valueOf(e.getMessage())));
             return 0;
@@ -240,22 +243,25 @@ public final class SeasCommand {
     }
 
     private static int end(CommandContext<ServerCommandSource> context) {
-        GameComponent component = GameComponents.of(context.getSource().getWorld());
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
         if (component.session().isEmpty()) {
             context.getSource().sendError(Text.translatable("heavyseas.command.no_game"));
             return 0;
         }
-        DesignationPhase.clear(context.getSource().getWorld(), component);
-        Nameplates.clear(context.getSource().getWorld());
-        Seats.clear(context.getSource().getWorld(), component);
+        DesignationPhase.clear(world, component);
+        Nameplates.clear(world);
+        Gulls.clear(world, component);
+        Seats.clear(world, component);
         component.end();
-        GameComponents.sync(context.getSource().getWorld());
+        GameComponents.sync(world);
+        MistSea.restoreAll(world, component);
         context.getSource().sendFeedback(() -> Text.translatable("heavyseas.command.ended"), true);
         return 1;
     }
 
     private static int dummyAdd(CommandContext<ServerCommandSource> context) {
-        GameComponent component = GameComponents.of(context.getSource().getWorld());
+        GameComponent component = GameComponents.of(gameWorld(context));
         if (component.session().isPresent()) {
             context.getSource().sendError(Text.translatable("heavyseas.command.already_running"));
             return 0;
@@ -285,7 +291,7 @@ public final class SeasCommand {
      * 那一行日志是 {@code playthrough-check.sh} 分开两局的界线，别改措辞。
      */
     private static int dummyAuto(CommandContext<ServerCommandSource> context, Boolean on) {
-        GameComponent component = GameComponents.of(context.getSource().getWorld());
+        GameComponent component = GameComponents.of(gameWorld(context));
         if (on != null) {
             component.setDummyAutoplay(on);
             LOGGER.info("替身自动推进：{}", on ? "开" : "关");
@@ -298,7 +304,7 @@ public final class SeasCommand {
     }
 
     private static int status(CommandContext<ServerCommandSource> context) {
-        GameComponent component = GameComponents.of(context.getSource().getWorld());
+        GameComponent component = GameComponents.of(gameWorld(context));
         if (component.session().isEmpty()) {
             int interrupted = component.interruptedTurn();
             context.getSource().sendFeedback(() -> interrupted > 0
@@ -500,7 +506,7 @@ public final class SeasCommand {
     private static int inContest(CommandContext<ServerCommandSource> context, Contest.Stage stage,
                                  ContestAction action) {
         ServerCommandSource source = context.getSource();
-        ServerWorld world = source.getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (component.session().isEmpty()) {
             source.sendError(Text.translatable("heavyseas.command.no_game"));
@@ -512,6 +518,15 @@ public final class SeasCommand {
             return 0;
         }
         return action.run(world, component) ? 1 : 0;
+    }
+
+    /** Console commands still originate in the overworld after players cross into M4's match dimension. */
+    private static ServerWorld gameWorld(CommandContext<ServerCommandSource> context) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        if (sea != null && GameComponents.of(sea).session().isPresent()) {
+            return sea;
+        }
+        return context.getSource().getWorld();
     }
 
     @FunctionalInterface
@@ -527,7 +542,7 @@ public final class SeasCommand {
      * 其余情况开 12 秒窗口、超时认高亮。这条指令只在窗口开着时有用。
      */
     private static int navigate(CommandContext<ServerCommandSource> context, String cardId) {
-        ServerWorld world = context.getSource().getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (component.session().isEmpty()) {
             context.getSource().sendError(Text.translatable("heavyseas.command.no_game"));
@@ -570,7 +585,7 @@ public final class SeasCommand {
 
     /** 物资 id 的补全：只补这一局里真的在谁手上/面前的牌。补出一张没人有的牌毫无用处。 */
     private static final SuggestionProvider<ServerCommandSource> HELD_CARDS = (context, builder) -> {
-        GameComponent component = GameComponents.of(context.getSource().getWorld());
+        GameComponent component = GameComponents.of(gameWorld(context));
         component.session().ifPresent(session -> session.state().bySeat().forEach(id -> {
             session.state().stateOf(id).hand().forEach(builder::suggest);
             session.state().stateOf(id).front().forEach(builder::suggest);
@@ -666,7 +681,7 @@ public final class SeasCommand {
 
     /** <b>夹具</b>（2 级权限）：海鸥直接置满，走正常的终局流程 —— 终局不摆出来就验不了（ADR-0022 §7.7）。 */
     private static int land(CommandContext<ServerCommandSource> context) {
-        ServerWorld world = context.getSource().getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (component.session().isEmpty()) {
             context.getSource().sendError(Text.translatable("heavyseas.command.no_game"));
@@ -688,7 +703,7 @@ public final class SeasCommand {
      * 牌真的从牌堆里少一张，对账照样成立。
      */
     private static int grant(CommandContext<ServerCommandSource> context) {
-        ServerWorld world = context.getSource().getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (component.session().isEmpty()) {
             context.getSource().sendError(Text.translatable("heavyseas.command.no_game"));
@@ -735,7 +750,7 @@ public final class SeasCommand {
 
     /** 口渴窗口里替自己定：喝几张。 */
     private static int water(CommandContext<ServerCommandSource> context, int cups) {
-        ServerWorld world = context.getSource().getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (!thirstWindowOpen(context, component)) {
             return 0;
@@ -746,7 +761,7 @@ public final class SeasCommand {
 
     /** 别人替他打一张水（规则 §5.2 的例外）。❗<b>昏迷者唯一的水源。</b> */
     private static int waterFrom(CommandContext<ServerCommandSource> context) {
-        ServerWorld world = context.getSource().getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (!thirstWindowOpen(context, component)) {
             return 0;
@@ -785,7 +800,7 @@ public final class SeasCommand {
      */
     private static int onSeat(CommandContext<ServerCommandSource> context, String what, Action action) {
         ServerCommandSource source = context.getSource();
-        ServerWorld world = source.getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (component.session().isEmpty()) {
             source.sendError(Text.translatable("heavyseas.command.no_game"));
@@ -844,7 +859,7 @@ public final class SeasCommand {
      */
     private static int act(CommandContext<ServerCommandSource> context, String what, Action action, boolean finish) {
         ServerCommandSource source = context.getSource();
-        ServerWorld world = source.getWorld();
+        ServerWorld world = gameWorld(context);
         GameComponent component = GameComponents.of(world);
         if (component.session().isEmpty()) {
             source.sendError(Text.translatable("heavyseas.command.no_game"));

@@ -5,7 +5,13 @@
 #
 set -uo pipefail
 
-check="$(git rev-parse --show-toplevel)/docs/tools/precommit.sh"
+root="$(git rev-parse --show-toplevel)"
+private_root="${HEAVYSEAS_WIKI:-$root/docs}"
+if [[ ! -f "$private_root/tools/precommit.sh" ]]; then
+  sibling="$(cd "$root/.." && pwd)/VibeCodingWiki"
+  [[ -f "$sibling/tools/precommit.sh" ]] && private_root="$sibling"
+fi
+check="$private_root/tools/precommit.sh"
 
 if [[ -f "$check" ]]; then
   bash "$check" || {
