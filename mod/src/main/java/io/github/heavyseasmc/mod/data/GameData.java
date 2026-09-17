@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod.data;
 import io.github.heavyseasmc.engine.data.RosterData;
 import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.weather.WeatherCard;
 
 import java.util.List;
 import java.util.Objects;
@@ -22,12 +23,13 @@ import java.util.Objects;
  * @param navigation 航海牌堆
  */
 public record GameData(String variant, RosterData roster, Provisions provisions,
-                       List<NavigationCard> navigation) {
+                       List<NavigationCard> navigation, List<WeatherCard> weather) {
 
     public GameData {
         Objects.requireNonNull(variant, "variant");
         Objects.requireNonNull(roster, "roster");
         Objects.requireNonNull(provisions, "provisions");
         navigation = List.copyOf(navigation);
+        weather = List.copyOf(weather);
     }
 }

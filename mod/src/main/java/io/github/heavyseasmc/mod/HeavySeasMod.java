@@ -18,6 +18,8 @@ import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
+import io.github.heavyseasmc.mod.net.RosterConfigS2C;
+import io.github.heavyseasmc.mod.net.StartVoyageC2S;
 import io.github.heavyseasmc.mod.net.ThirstActionC2S;
 import io.github.heavyseasmc.mod.net.UseProvisionC2S;
 import io.github.heavyseasmc.mod.net.WaterDonationC2S;
@@ -27,6 +29,7 @@ import io.github.heavyseasmc.mod.world.MistSea;
 import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
+import io.github.heavyseasmc.mod.world.LobbyBoat;
 import io.github.heavyseasmc.mod.world.Seats;
 
 import net.fabricmc.api.ModInitializer;
@@ -88,6 +91,11 @@ public final class HeavySeasMod implements ModInitializer {
         // 表现是安静地丢包而不是报错。客户端那一半在 HeavySeasClient。
         PayloadTypeRegistry.playS2C().register(ProvisionUpdateS2C.ID, ProvisionUpdateS2C.CODEC);
         PayloadTypeRegistry.playS2C().register(ProvisionAutoPickS2C.ID, ProvisionAutoPickS2C.CODEC);
+        PayloadTypeRegistry.playS2C().register(RosterConfigS2C.ID, RosterConfigS2C.CODEC);
+        PayloadTypeRegistry.playC2S().register(StartVoyageC2S.ID, StartVoyageC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(StartVoyageC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> LobbyBoat.launch(context.player(), payload)));
         PayloadTypeRegistry.playC2S().register(ProvisionActionC2S.ID, ProvisionActionC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(ProvisionActionC2S.ID,
                 (payload, context) -> context.player().server.execute(

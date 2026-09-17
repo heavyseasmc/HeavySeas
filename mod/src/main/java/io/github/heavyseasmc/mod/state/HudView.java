@@ -6,6 +6,7 @@ import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.game.ThirstEligibility;
+import net.minecraft.text.Text;
 
 import java.util.List;
 import java.util.Objects;
@@ -56,7 +57,7 @@ import java.util.Optional;
  * @param front     收件人自己<b>亮在面前</b>的牌。规则上这一区是公开的，但别人的那份这一版还没发 ——
  *                  要等头顶信息条（决策 ⑥）才有地方显示
  */
-public record HudView(boolean active, int turn, Phase phase, int gulls,
+public record HudView(boolean active, int turn, Phase phase, int gulls, String weather, List<Text> notifications,
                       List<String> seats, List<String> removed, String actor, Sea sea, Thirst thirstPrompt,
                       Endgame endgame, ContestView contest, boolean seated, String character,
                       int health, int maxHealth, Condition condition, int thirst, String love, String hate,
@@ -66,6 +67,8 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
 
     public HudView {
         seats = List.copyOf(Objects.requireNonNull(seats, "seats"));
+        weather = Objects.requireNonNull(weather, "weather");
+        notifications = List.copyOf(Objects.requireNonNull(notifications, "notifications"));
         removed = List.copyOf(Objects.requireNonNull(removed, "removed"));
         actor = Objects.requireNonNull(actor, "actor");
         sea = Objects.requireNonNull(sea, "sea");
@@ -83,7 +86,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
-            false, 0, Phase.PROVISION, 0, List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
+            false, 0, Phase.PROVISION, 0, "", List.of(), List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
             ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, false, 0L,
             "", List.of(), 0, List.of(), List.of(), Score.NONE);
 
@@ -156,7 +159,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
      * 口渴结算正在问谁。**公开**：全船都看得见轮到谁、还剩多久。
      *
      * @param who        正被问的角色 id；空串表示没人在被问
-     * @param sources    他这一回合实际有几次口渴（划船 / 战斗 / 点名 / 喝酒）
+     * @param sources    他这一回合实际有几次口渴（划船 / 战斗 / 点名 / 喝酒 / 天候）
      * @param covered    撑开的阳伞替他抵掉几次
      * @param shared     蹭别人喝的水抵掉几次（陪酒女）
      * @param remaining  还需要化解几次 —— 每一次要么喝 1 张水，要么挨 1 点
@@ -164,13 +167,14 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
      * @param deadlineMs 超时时刻（服务端时钟）；0 = 没开窗口
      */
     public record Thirst(String who, int sources, int covered, int shared, int remaining, int donated,
+                         int waterPerSource,
                          long deadlineMs) {
 
         public Thirst {
             who = Objects.requireNonNull(who, "who");
         }
 
-        public static final Thirst NONE = new Thirst("", 0, 0, 0, 0, 0, 0L);
+        public static final Thirst NONE = new Thirst("", 0, 0, 0, 0, 0, 1, 0L);
 
         public boolean active() {
             return !who.isEmpty();
@@ -233,7 +237,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls,
         return active && seated && phase == Phase.NAVIGATION && thirstPrompt.active()
                 && thirstPrompt.deadlineMs() > 0 && !thirstPrompt.who().equals(character)
                 && condition == Condition.CONSCIOUS && myWaters() > myDonatedWater
-                && thirstPrompt.donated() < thirstPrompt.remaining();
+                && thirstPrompt.donated() < thirstPrompt.remaining() * thirstPrompt.waterPerSource();
     }
 
     /**

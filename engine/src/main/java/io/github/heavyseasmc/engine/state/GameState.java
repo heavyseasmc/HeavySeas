@@ -65,6 +65,12 @@ public final class GameState {
         return new GameState(roster, initial, Phase.PROVISION, 1, 0, Set.of());
     }
 
+    /** 带天候扩充的开局：第 1 天从翻天候开始。 */
+    public static GameState startWithWeather(Roster roster) {
+        GameState base = start(roster);
+        return new GameState(base.roster, base.states, Phase.WEATHER, base.turn, base.gulls, base.removed);
+    }
+
     public Roster roster() {
         return roster;
     }

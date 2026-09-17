@@ -22,5 +22,8 @@
     "fabric-api": ">=${fabric_api_version}",
     "cardinal-components-base": ">=${cca_version}",
     "cardinal-components-world": ">=${cca_version}"
+  },
+  "suggests": {
+    "voicechat": "*"
   }
 }

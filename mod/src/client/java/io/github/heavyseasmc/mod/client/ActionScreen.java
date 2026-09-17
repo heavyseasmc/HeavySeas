@@ -60,8 +60,13 @@ public final class ActionScreen extends GameScreen {
             this.harmful = harmful;
         }
 
-        boolean enabled() {
-            return kind != null || this == USE;
+        boolean enabled(HudView view) {
+            return (kind != null || this == USE) && !(this == ROW && "becalmed".equals(view.weather()));
+        }
+
+        String hint(HudView view) {
+            return this == ROW && "becalmed".equals(view.weather())
+                    ? "heavyseas.action.row_becalmed_hint" : hint;
         }
     }
 
@@ -182,7 +187,7 @@ public final class ActionScreen extends GameScreen {
             drawButton(context, b, CHOICES[i], i == focus, rise, scale);
         }
         // 说明只跟焦点走一行：按不动的那几件，这一行说为什么。
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable(CHOICES[focus].hint),
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable(CHOICES[focus].hint(view)),
                 width / 2, bottom + HINT_GAP, GuiLanguage.MUTED);
         drawIdentity(context, view, identityY);
     }
@@ -289,7 +294,7 @@ public final class ActionScreen extends GameScreen {
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-b.w() / 2f, -b.h(), 0);
         context.fill(0, 0, b.w(), b.h(),
-                c.enabled() ? GuiLanguage.GROUND : withAlpha(GuiLanguage.GROUND, DISABLED_FILL_ALPHA));
+                c.enabled(view) ? GuiLanguage.GROUND : withAlpha(GuiLanguage.GROUND, DISABLED_FILL_ALPHA));
         if (focused) {
             // 金 =「你 · 你选的那个」，与补给箱、手牌同一个用法。框画在同一个矩阵里，跟着按钮一起升、一起缩放。
             context.drawBorder(-1, -1, b.w() + 2, b.h() + 2, GuiLanguage.GOLD);
@@ -299,9 +304,9 @@ public final class ActionScreen extends GameScreen {
         context.getMatrices().pop();
     }
 
-    private static int labelColor(Choice c) {
+    private int labelColor(Choice c) {
         int base = c.harmful ? GuiLanguage.CINNABAR : (c == Choice.PASS ? GuiLanguage.MUTED : GuiLanguage.INK);
-        return c.enabled() ? base : withAlpha(base, DISABLED_TEXT_ALPHA);
+        return c.enabled(view) ? base : withAlpha(base, DISABLED_TEXT_ALPHA);
     }
 
     private static int withAlpha(int argb, int alpha) {
@@ -360,7 +365,7 @@ public final class ActionScreen extends GameScreen {
 
     private void confirm() {
         Choice c = CHOICES[focus];
-        if (!c.enabled()) {
+        if (!c.enabled(view)) {
             return;                           // 按不动的那几件：下面那行字已经在说为什么，不发包、不「顿」
         }
         if (c == Choice.USE) {

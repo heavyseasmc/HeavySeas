@@ -29,6 +29,10 @@ repositories {
         name = 'Ladysnake'
         url = 'https://maven.ladysnake.org/releases'
     }
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+    }
 }
 
 dependencies {
@@ -43,6 +47,10 @@ dependencies {
     modImplementation "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
     include "org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}"
     include "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
+
+    // M5 只需要 Simple Voice Chat 自带的距离衰减，不注册会改变频道/窃听规则的 API 插件。
+    // 只进开发运行时：生产 metadata 用 suggests 保持真正的软依赖。
+    modRuntimeOnly "maven.modrinth:simple-voice-chat:${voicechat_version}"
 
     // 引擎不是 Fabric 模组，只是一个普通 jar：编译期直接依赖，打包时嵌进本模组的 jar。
     // ❗不嵌的话开发环境照样能跑（引擎就在类路径上），玩家那边却是 NoClassDefFoundError ——
@@ -87,8 +95,8 @@ processResources {
 // 三份数值缺任何一份，模组在运行时才炸；这里让它在构建期就炸。
 def checkBundledData = tasks.register('checkBundledData') {
     group = 'verification'
-    description = '三份数值数据必须都进了 jar 的内置数据包'
-    def expected = ['roster', 'provisions', 'navigation'].collect { "data/heavyseas/${it}/default.json" }
+    description = '四份数值数据必须都进了 jar 的内置数据包'
+    def expected = ['roster', 'provisions', 'navigation', 'weather'].collect { "data/heavyseas/${it}/default.json" }
     // ❗destinationDir 是 File 不是 Provider，用 flatMap 会在执行期炸「cannot be cast to Provider」。
     def resourceDir = tasks.named('processResources').map { it.destinationDir }
     inputs.files(tasks.named('processResources'))
@@ -258,6 +266,69 @@ tasks.named('check') {
     dependsOn checkProvisionNames
 }
 
+// 天候的 id 来自数据，中文名来自横版 SVG 卡面的 <title>；两边必须一一对应。
+def checkWeatherNames = tasks.register('checkWeatherNames') {
+    group = 'verification'
+    description = '十张天候卡的数据 id、SVG 与中英文名称必须一一对应'
+    def dataFile = rootProject.file('data/weather/default.json')
+    // 做成任务属性：红测能换成造坏的副本，不改被跟踪的卡面与 lang。
+    ext.cardDir = rootProject.file('art/cards')
+    ext.langDir = file('src/main/resources/assets/heavyseas/lang')
+    inputs.file(dataFile)
+    inputs.dir(ext.cardDir).optional()
+    inputs.dir(ext.langDir).optional()
+    doLast {
+        File cardDir = ext.cardDir
+        File langDir = ext.langDir
+        def slurper = new groovy.json.JsonSlurper()
+        def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
+        def zh = slurper.parse(new File(langDir, 'zh_cn.json'), 'UTF-8') as Map
+        def en = slurper.parse(new File(langDir, 'en_us.json'), 'UTF-8') as Map
+        def title = java.util.regex.Pattern.compile('<title>([^<]*)</title>')
+        def problems = []
+        ids.each { id ->
+            def svg = new File(cardDir, "weather.${id}.svg")
+            def key = "heavyseas.weather.${id}".toString()
+            if (!svg.isFile()) {
+                problems << "data/weather 有 ${id}，但卡面 ${svg.name} 不在"
+                return
+            }
+            def match = title.matcher(svg.getText('UTF-8'))
+            if (!match.find()) {
+                problems << "${svg.name} 里没有 <title>"
+                return
+            }
+            def parts = match.group(1).split(' · ')
+            def authoritative = parts[parts.length - 1].trim()
+            if (zh[key] != authoritative) {
+                problems << "${id}：zh_cn 为「${zh[key]}」，SVG 里为「${authoritative}」"
+            }
+            if (!en.containsKey(key) || !en[key].toString().trim()) {
+                problems << "${id}：en_us 缺少非空的 ${key}"
+            }
+        }
+        (cardDir.listFiles({ f -> f.name.startsWith('weather.') && f.name.endsWith('.svg') } as FileFilter) ?: [])
+                .each { svg ->
+                    def id = svg.name.substring('weather.'.length(), svg.name.length() - '.svg'.length())
+                    if (!ids.contains(id)) {
+                        problems << "${svg.name} 有卡面，但 data/weather 没有 ${id}"
+                    }
+                }
+        if (ids.size() != 10) {
+            problems << "天候应有 10 张，数据里是 ${ids.size()} 张"
+        }
+        if (problems) {
+            throw new GradleException((['天候名与卡面核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("天候名核对通过：${ids.size()} 张数据、SVG 与中英文名一一对应")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkWeatherNames
+}
+
 // 航海牌的 31 张卡面必须与 data/navigation 一一对应（adr/0020）。
 //
 // 为什么要一道闸：卡面由内部管线生成、产物入库，而**数据在这边**。数据加一张牌、改一个 id，
@@ -341,17 +412,21 @@ def checkCardTextures = tasks.register('checkCardTextures') {
     description = '每一种物资、每一个角色都要有对应的 GUI 贴图，终局的秘密牌背也要有：确实是张 PNG、够清楚、比例对'
     def dataFile = rootProject.file('data/provisions/default.json')
     def rosterFile = rootProject.file('data/roster/default.json')
+    def weatherFile = rootProject.file('data/weather/default.json')
     // 做成任务属性而不是局部变量：红测要能把它们指向一份造坏的目录，而不去改被跟踪的贴图。
     ext.texDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/provision')
     ext.charDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/character')
     ext.backDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/back')
+    ext.weatherDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/weather')
     def minW = 600
     def minH = 840
     inputs.file(dataFile)
     inputs.file(rosterFile)
+    inputs.file(weatherFile)
     inputs.dir(ext.texDir).optional()
     inputs.dir(ext.charDir).optional()
     inputs.dir(ext.backDir).optional()
+    inputs.dir(ext.weatherDir).optional()
     doLast {
         def slurper = new groovy.json.JsonSlurper()
         def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
@@ -365,11 +440,15 @@ def checkCardTextures = tasks.register('checkCardTextures') {
         }
         // 牌背：终局翻牌的暗牌只用 secret（爱恨卡的背面）。另两张没有界面在用，不拦 —— 拦一张没人读的贴图只会拦下正确的删除。
         def backs = ['secret']
+        def weather = (slurper.parse(weatherFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
+        if (weather.isEmpty()) {
+            throw new GradleException('data/weather 里一个 id 都没读到 —— 判据坏了，不是真的没有天候牌')
+        }
         def problems = []
         def sizes = [] as Set
         long bytes = 0
         // prefix 为空的是物资：报错措辞与以前一字不差，既有的两条红测（太小 · 比例不对）不用改。
-        def checkOne = { File dir, String prefix, String id ->
+        def checkOne = { File dir, String prefix, String id, int requiredW, int requiredH, int ratioW, int ratioH ->
             def name = "${prefix}${id}.png"
             def f = new File(dir, "${id}.png")
             if (!f.isFile()) {
@@ -394,10 +473,10 @@ def checkCardTextures = tasks.register('checkCardTextures') {
             }
             int w = be(16)
             int h = be(20)
-            if (w < minW || h < minH) {
-                problems << "${name} 只有 ${w}×${h}，低于 ${minW}×${minH} —— 烘制倍数不对，GUI 上会糊"
-            } else if (w * 7 != h * 5) {
-                problems << "${name} 是 ${w}×${h}，不是 5:7 —— 版面会把它拉伸"
+            if (w < requiredW || h < requiredH) {
+                problems << "${name} 只有 ${w}×${h}，低于 ${requiredW}×${requiredH} —— 烘制倍数不对，GUI 上会糊"
+            } else if (w * ratioH != h * ratioW) {
+                problems << "${name} 是 ${w}×${h}，不是 ${ratioW}:${ratioH} —— 版面会把它拉伸"
             }
             sizes << "${w}×${h}".toString()
             bytes += f.length()
@@ -405,14 +484,16 @@ def checkCardTextures = tasks.register('checkCardTextures') {
         File texDir = ext.texDir
         File charDir = ext.charDir
         File backDir = ext.backDir
-        ids.each { checkOne(texDir, '', it) }
-        characters.each { checkOne(charDir, 'character/', it) }
-        backs.each { checkOne(backDir, 'back/', it) }
+        File weatherDir = ext.weatherDir
+        ids.each { checkOne(texDir, '', it, minW, minH, 5, 7) }
+        characters.each { checkOne(charDir, 'character/', it, minW, minH, 5, 7) }
+        backs.each { checkOne(backDir, 'back/', it, minW, minH, 5, 7) }
+        weather.each { checkOne(weatherDir, 'weather/', it, 840, 600, 7, 5) }
         if (problems) {
             throw new GradleException((['GUI 卡面贴图核对失败：']
                     + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
-        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种 · 角色 ${characters.size()} 个 · 牌背 ${backs.size()} 张，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
+        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种 · 角色 ${characters.size()} 个 · 牌背 ${backs.size()} 张 · 天候 ${weather.size()} 张，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
     }
 }
 

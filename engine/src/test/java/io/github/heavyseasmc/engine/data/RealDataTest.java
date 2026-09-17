@@ -21,6 +21,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 拿真实 {@code data/} 跑加载器。
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>角色表与物资表<b>已落库</b>，这几条在 CI 上照跑 —— 它们同时是加载器的正向对照：
  * 合成数据全绿只证明解析器自洽，真实数据全绿才证明它读得懂导出器写出来的东西。
  *
- * <p>三份数据现在都已落库，所以整个类在 CI 上照跑；缺任何一份都是失败，见 {@link LocalData}。
+ * <p>四份数据现在都已落库，所以整个类在 CI 上照跑；缺任何一份都是失败，见 {@link LocalData}。
  */
 class RealDataTest {
 
@@ -64,6 +65,21 @@ class RealDataTest {
         assertEquals(1, scoring.cashFaceValue());
         assertEquals(List.of(2, 3, 3), scoring.fineArtFaceValues());
         assertEquals(List.of(1, 4, 8), scoring.jewelrySetTotals());
+    }
+
+    @Test
+    @DisplayName("房主自定义阵容：6–8 个、已知且唯一，最终按固定座位排序")
+    void customRosterSelection() {
+        RosterData data = RosterLoader.load(LocalData.dir().file("roster/default.json"));
+        List<CharacterId> reversed = data.presets().get(6).reversed();
+        Roster selected = data.select(reversed);
+        assertEquals(data.presets().get(6), selected.survivors().stream().map(Survivor::id).toList());
+        assertThrows(IllegalArgumentException.class, () -> data.select(reversed.subList(0, 5)));
+        assertThrows(IllegalArgumentException.class, () -> data.select(List.of(
+                reversed.get(0), reversed.get(0), reversed.get(1), reversed.get(2), reversed.get(3), reversed.get(4))));
+        assertThrows(IllegalArgumentException.class, () -> data.select(List.of(
+                CharacterId.of("unknown"), reversed.get(0), reversed.get(1), reversed.get(2),
+                reversed.get(3), reversed.get(4))));
     }
 
     @Test
@@ -118,12 +134,13 @@ class RealDataTest {
     }
 
     @Test
-    @DisplayName("❗三份数据自称同一个 id —— 单看每一份都合法，只有比对才发现换了半套")
-    void allThreeDeclareTheSameVariant() throws IOException {
+    @DisplayName("❗四份数据自称同一个 id —— 单看每一份都合法，只有比对才发现换了半套")
+    void allFourDeclareTheSameVariant() throws IOException {
         DataDir dir = LocalData.dir();
         String roster;
         String provisions;
         String navigation;
+        String weather;
         try (Reader r = Files.newBufferedReader(dir.file("roster/default.json"), StandardCharsets.UTF_8)) {
             roster = RosterLoader.loadDocument("heavyseas:roster/default", r).id();
         }
@@ -134,8 +151,12 @@ class RealDataTest {
             navigation = NavigationLoader.loadDocument("heavyseas:navigation/default", r,
                     LocalData.roster().ids(), LocalData.provisionIds()).id();
         }
+        try (Reader r = Files.newBufferedReader(dir.file("weather/default.json"), StandardCharsets.UTF_8)) {
+            weather = WeatherLoader.loadDocument("heavyseas:weather/default", r).id();
+        }
         assertEquals("heavyseas:default", roster, "角色表自称的变体");
         assertEquals(roster, provisions, "物资表与角色表不是同一个变体");
         assertEquals(roster, navigation, "航海牌与角色表不是同一个变体");
+        assertEquals(roster, weather, "天候牌与角色表不是同一个变体");
     }
 }

@@ -5,6 +5,7 @@ import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
+import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.state.ContestView;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponents;
@@ -132,6 +133,8 @@ public final class HeavySeasClient implements ClientModInitializer {
                         screen.autoPicked(payload.index());
                     }
                 }));
+        ClientPlayNetworking.registerGlobalReceiver(RosterConfigS2C.ID, (payload, context) ->
+                context.client().execute(() -> context.client().setScreen(new RosterScreen(payload))));
         // 「这张是替你挑的」（舵手超时）。次序的道理与上面相同：先到，结算后的那一次投影后到。
         ClientPlayNetworking.registerGlobalReceiver(HelmAutoPickS2C.ID, (payload, context) ->
                 context.client().execute(() -> {

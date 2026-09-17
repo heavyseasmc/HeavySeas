@@ -46,11 +46,12 @@ class GameStateTest {
     class Phases {
 
         @Test
-        @DisplayName("三阶段循环，航海之后回到物资")
+        @DisplayName("四阶段循环，航海之后进入下一天的天候")
         void cycle() {
+            assertEquals(Phase.PROVISION, Phase.WEATHER.next());
             assertEquals(Phase.ACTION, Phase.PROVISION.next());
             assertEquals(Phase.NAVIGATION, Phase.ACTION.next());
-            assertEquals(Phase.PROVISION, Phase.NAVIGATION.next());
+            assertEquals(Phase.WEATHER, Phase.NAVIGATION.next());
         }
 
         @Test
@@ -58,6 +59,7 @@ class GameStateTest {
         void onlyNavigationEndsTurn() {
             assertFalse(Phase.PROVISION.endsTurn());
             assertFalse(Phase.ACTION.endsTurn());
+            assertFalse(Phase.WEATHER.endsTurn());
             assertTrue(Phase.NAVIGATION.endsTurn());
         }
 
@@ -68,6 +70,7 @@ class GameStateTest {
             assertFalse(Phase.ACTION.allowsFreeTrade(true), "战斗结束前任何卡不得易手");
             assertFalse(Phase.PROVISION.allowsFreeTrade(false));
             assertFalse(Phase.NAVIGATION.allowsFreeTrade(false));
+            assertFalse(Phase.WEATHER.allowsFreeTrade(false));
         }
 
         @Test
@@ -82,8 +85,8 @@ class GameStateTest {
             assertEquals(1, g.turn(), "还没走完航海阶段，回合数不该变");
             assertEquals(1, g.stateOf(KID).thirst().count(), "标记要到航海阶段结束才清");
 
-            g = g.advancePhase();                      // 航海 → 物资，回合 +1
-            assertEquals(Phase.PROVISION, g.phase());
+            g = g.advancePhase();                      // 航海 → 天候，回合 +1
+            assertEquals(Phase.WEATHER, g.phase());
             assertEquals(2, g.turn());
             assertTrue(g.stateOf(KID).thirst().isEmpty());
             assertFalse(g.stateOf(KID).actedThisTurn());

@@ -58,7 +58,7 @@ public final class WaterDonationScreen extends GameScreen {
         drawSeaLine(context, view, SEA_LINE_Y);
 
         HudView.Thirst prompt = view.thirstPrompt();
-        int still = Math.max(0, prompt.remaining() - prompt.donated());
+        int still = Math.max(0, prompt.remaining() * prompt.waterPerSource() - prompt.donated());
         int available = Math.max(0, view.myWaters() - view.myDonatedWater());
         int fh = textRenderer.fontHeight;
         int titleY = 62;

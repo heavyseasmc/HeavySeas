@@ -50,6 +50,7 @@ public final class ThirstScreen extends GameScreen {
     private final int waters;
     /** 还需要化解几次。 */
     private final int remaining;
+    private final int waterPerSource;
     private final long deadlineMs;
     private final long dealAt;
     private long lastFrameMs;
@@ -63,9 +64,11 @@ public final class ThirstScreen extends GameScreen {
         this.view = view;
         this.waters = view.myWaters();
         this.remaining = view.thirstPrompt().remaining();
+        this.waterPerSource = view.thirstPrompt().waterPerSource();
         this.deadlineMs = view.thirstPrompt().deadlineMs();
         this.lift = new float[Math.max(1, waters)];
-        this.chosen = Math.min(Math.max(0, remaining - view.thirstPrompt().donated()), waters);
+        this.chosen = normalized(Math.min(Math.max(0,
+                remaining * waterPerSource - view.thirstPrompt().donated()), waters), true);
         this.dealAt = System.currentTimeMillis();
         this.lastFrameMs = dealAt;
     }
@@ -85,7 +88,8 @@ public final class ThirstScreen extends GameScreen {
         }
         // 别人刚替我打了一张，自己的预选就从右边收一张；服务端同一刻也做了同样的夹取。
         chosen = Math.min(chosen, Math.min(waters,
-                Math.max(0, remaining - view.thirstPrompt().donated())));
+                Math.max(0, remaining * waterPerSource - view.thirstPrompt().donated())));
+        chosen = normalized(chosen, false);
     }
 
     /** 一帧的版面，全部以 GUI 单位计。 */
@@ -131,7 +135,7 @@ public final class ThirstScreen extends GameScreen {
         drawCountdown(context, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS,
                 l.barX(), l.barY(), l.barW(), l.countdownY());
         HudView.Thirst prompt = view.thirstPrompt();
-        int hurt = Math.max(0, remaining - prompt.donated() - chosen);
+        int hurt = Math.max(0, remaining - (prompt.donated() + chosen) / waterPerSource);
         context.drawCenteredTextWithShadow(textRenderer,
                 Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
                 GuiLanguage.INK);
@@ -180,13 +184,30 @@ public final class ThirstScreen extends GameScreen {
 
     /** 改张数并上报：超时认的是它，服务端不知道的话只能按开窗时那个默认值算。 */
     private void setChosen(int next) {
-        int need = Math.max(0, remaining - view.thirstPrompt().donated());
+        int need = Math.max(0, remaining * waterPerSource - view.thirstPrompt().donated());
         int clamped = MathHelper.clamp(next, 0, Math.min(need, waters));
+        clamped = normalized(clamped, clamped > chosen);
         if (clamped == chosen) {
             return;
         }
         chosen = clamped;
         ClientPlayNetworking.send(new ThirstActionC2S(chosen, false));
+    }
+
+    private int normalized(int amount, boolean upward) {
+        int donated = view.thirstPrompt().donated();
+        int limit = Math.min(waters, Math.max(0, remaining * waterPerSource - donated));
+        int value = MathHelper.clamp(amount, 0, limit);
+        while ((donated + value) % waterPerSource != 0) {
+            if (upward && value < limit) {
+                value++;
+            } else if (value > 0) {
+                value--;
+            } else {
+                break;
+            }
+        }
+        return value;
     }
 
     private void commit() {

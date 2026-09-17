@@ -291,7 +291,11 @@ public final class SeasCommand {
      * 那一行日志是 {@code playthrough-check.sh} 分开两局的界线，别改措辞。
      */
     private static int dummyAuto(CommandContext<ServerCommandSource> context, Boolean on) {
-        GameComponent component = GameComponents.of(gameWorld(context));
+        // M4 以后对局固定在雾海。两局之间雾海没有 session，gameWorld() 会退回主世界；
+        // 若把开关写到主世界，下一局读到的仍是雾海组件默认值 true，出口验收的 B 局就会假装关着、
+        // 实际仍由替身自动走。这个 dev 配置控制的是下一局，始终写到实际承载对局的世界。
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        GameComponent component = GameComponents.of(sea != null ? sea : context.getSource().getWorld());
         if (on != null) {
             component.setDummyAutoplay(on);
             LOGGER.info("替身自动推进：{}", on ? "开" : "关");

@@ -6,8 +6,10 @@ import io.github.heavyseasmc.engine.data.NavigationLoader;
 import io.github.heavyseasmc.engine.data.ProvisionLoader;
 import io.github.heavyseasmc.engine.data.RosterData;
 import io.github.heavyseasmc.engine.data.RosterLoader;
+import io.github.heavyseasmc.engine.data.WeatherLoader;
 import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.weather.WeatherCard;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
@@ -29,7 +31,7 @@ import java.util.function.BiFunction;
  * 把数值数据送进模组：走 Minecraft 的资源管理器，当作服务端数据包读。
  *
  * <h2>为什么走资源管理器，而不是读 jar 里的文件</h2>
- * 这三份数据是<b>配平</b>，注定要改。走资源管理器意味着数据包能覆盖它们：
+ * 这四份数据是<b>配平</b>，注定要改。走资源管理器意味着数据包能覆盖它们：
  * 调平衡不必重新打包模组，服主也能自己改。代价是「数据可能是别人写的」，
  * 所以引擎那四层校验从可有可无变成了必需 —— 它们现在面对的是玩家写的文件。
  *
@@ -38,9 +40,9 @@ import java.util.function.BiFunction;
  * （{@code DataDir} 那条教训的同一形态）。所以任何一份读不出来就抛：
  * 开服时表现为启动失败，{@code /reload} 时表现为指令报错、<b>旧数据原样留着</b>。
  *
- * <h2>三份一起换</h2>
- * 三份全读成功才 {@link #current} 换新。半套配平（角色换了、航海牌没换）单看每一份都合法，
- * 四层校验一层都不会红 —— 只有比对三份自称的 id 才发现。那条比对在 {@link #reload} 里。
+ * <h2>四份一起换</h2>
+ * 四份全读成功才 {@link #current} 换新。半套配平（角色换了、航海牌没换）单看每一份都合法，
+ * 四层校验一层都不会红 —— 只有比对四份自称的 id 才发现。那条比对在 {@link #reload} 里。
  */
 public final class GameDataLoader implements SimpleSynchronousResourceReloadListener {
 
@@ -66,7 +68,7 @@ public final class GameDataLoader implements SimpleSynchronousResourceReloadList
         if (data == null) {
             throw new IllegalStateException(
                     "数值数据尚未加载成功 —— 服务端数据包里应当有 " + resource("roster")
-                            + " 等三份；若刚才 /reload 报过错，先修数据包");
+                            + " 等四份；若刚才 /reload 报过错，先修数据包");
         }
         return data;
     }
@@ -94,32 +96,34 @@ public final class GameDataLoader implements SimpleSynchronousResourceReloadList
         DataDocument<List<NavigationCard>> navigation =
                 read(manager, "navigation", (source, reader) -> NavigationLoader.loadDocument(
                         source, reader, roster.value().ids(), provisions.value().ids()));
+        DataDocument<List<WeatherCard>> weather =
+                read(manager, "weather", WeatherLoader::loadDocument);
 
-        requireSameVariant(roster, provisions, navigation);
+        requireSameVariant(roster, provisions, navigation, weather);
         // ❗跨文件核对：角色表与物资表互相点名的地方（诱饵穿透水手的免伤、医生的医疗箱不弃、
         //   陪酒女蹭什么、哪个角色让哪种财宝翻倍）两边说的必须是同一件事。
         //   单份校验永远发现不了 —— 两份文件各自都合法。
         DataConsistency.require(resource("provisions").toString(), roster.value(), provisions.value());
 
-        current = new GameData(roster.id(), roster.value(), provisions.value(), navigation.value());
-        LOGGER.info("数值数据已加载：变体 {} · 角色 {} 个 · 物资 {} 种 {} 张 · 航海牌 {} 张",
+        current = new GameData(roster.id(), roster.value(), provisions.value(), navigation.value(), weather.value());
+        LOGGER.info("数值数据已加载：变体 {} · 角色 {} 个 · 物资 {} 种 {} 张 · 航海牌 {} 张 · 天候牌 {} 张",
                 roster.id(), roster.value().characters().size(),
                 provisions.value().ids().size(), provisions.value().total(),
-                navigation.value().size());
+                navigation.value().size(), weather.value().size());
     }
 
     /**
-     * 三份必须自称同一个变体。
+     * 四份必须自称同一个变体。
      *
-     * <p>这条检查的判据与内容正交：它不看数值对不对，只看三份是不是一套。数据包只覆盖了
-     * 其中一份时，那一份自己完全合法，另外两份也完全合法 —— 单份校验永远发现不了。
+     * <p>这条检查的判据与内容正交：它不看数值对不对，只看四份是不是一套。数据包只覆盖了
+     * 其中一份时，每一份单看都完全合法 —— 单份校验永远发现不了。
      */
     private static void requireSameVariant(DataDocument<?>... documents) {
         String first = documents[0].id();
         for (DataDocument<?> document : documents) {
             if (!first.equals(document.id())) {
                 throw new IllegalStateException(
-                        "三份数值数据不是同一套配平：读到了 %s 与 %s。数据包大概只覆盖了其中一部分 —— "
+                        "四份数值数据不是同一套配平：读到了 %s 与 %s。数据包大概只覆盖了其中一部分 —— "
                                 .formatted(first, document.id())
                                 + "它们互相点名，混用会让点名落空");
             }

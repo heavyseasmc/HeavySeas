@@ -54,20 +54,27 @@ public final class GameHud {
         if (client.world == null || client.player == null || client.options.hudHidden) {
             return;
         }
-        if (client.currentScreen instanceof GameScreen) {
-            // 对局界面自带上带（回合 · 阶段 · 海鸥）。两份一起画，HUD 的字会从界面的底色后面透出来、
-            // 跟座位轨叠在一起（2026-09-15 真实客户端上看到的）。聊天框等别的界面开着时照常画：
-            // 谈判就在聊天里，那时正需要看「轮到谁」。
-            return;
-        }
+        boolean gameScreen = client.currentScreen instanceof GameScreen;
         HudView view = GameComponents.of(client.world).hudView();
         if (!view.active()) {
             return;                          // 没有对局就什么都不画，不留一个空框
+        }
+        if (gameScreen) {
+            // 对局界面自带上带（回合 · 阶段 · 海鸥）。两份一起画，HUD 的字会从界面的底色后面透出来、
+            // 跟座位轨叠在一起；但右侧航海日志是用户指定的独立信息区，界面打开时也保留。
+            int sidebarWidth = view.notifications().isEmpty() && view.weather().isEmpty() ? 0
+                    : Math.min(240, Math.max(140, context.getScaledWindowWidth() / 3));
+            drawNotifications(context, client, view.weather(), view.notifications(), sidebarWidth);
+            return;
         }
 
         List<Text> lines = new ArrayList<>();
         lines.add(Text.translatable("heavyseas.status.header", view.turn(), GameScreen.phaseLabel(view),
                 view.gulls(), GameState.GULLS_TO_LAND).formatted(Formatting.GOLD));
+        if (!view.weather().isEmpty()) {
+            lines.add(Text.translatable("heavyseas.hud.weather", weatherName(view.weather()))
+                    .formatted(Formatting.AQUA));
+        }
         // 终局进行中不画划船堆与口渴：对局已经结束，「划船堆 0 张 · 舵手 X」只是停下那一刻的残影（2026-09-16 实拍）。
         boolean endgame = view.endgame().active();
         if (!endgame && (view.phase() == Phase.ACTION || view.phase() == Phase.NAVIGATION)) {
@@ -128,7 +135,9 @@ public final class GameHud {
         }
 
         // 折行：结算那一行（执行的航海牌）可能比窗口还宽，画出屏幕与没画长得一样。
-        int maxWidth = Math.max(80, context.getScaledWindowWidth() - 2 * MARGIN);
+        int sidebarWidth = view.notifications().isEmpty() && view.weather().isEmpty() ? 0
+                : Math.min(240, Math.max(140, context.getScaledWindowWidth() / 3));
+        int maxWidth = Math.max(80, context.getScaledWindowWidth() - sidebarWidth - 3 * MARGIN);
         int y = MARGIN;
         for (Text line : lines) {
             for (OrderedText part : client.textRenderer.wrapLines(line, maxWidth)) {
@@ -136,6 +145,65 @@ public final class GameHud {
                 y += LINE_HEIGHT;
             }
         }
+        drawNotifications(context, client, view.weather(), view.notifications(), sidebarWidth);
+    }
+
+    /** 系统播报的固定侧栏：最新事件在最上面，保留最多八条，不污染聊天历史。 */
+    private static void drawNotifications(DrawContext context, MinecraftClient client,
+                                          String weather, List<Text> notifications, int width) {
+        if ((notifications.isEmpty() && weather.isEmpty()) || width <= 0) {
+            return;
+        }
+        int x = context.getScaledWindowWidth() - width - MARGIN;
+        int y = MARGIN;
+        if (!weather.isEmpty()) {
+            int cardW = Math.min(width, 168);
+            int cardH = cardW * 5 / 7;
+            CardTexture.drawWeather(context, weather, x + (width - cardW) / 2, y, cardW, cardH);
+            y += cardH + MARGIN;
+        }
+        if (notifications.isEmpty()) {
+            return;
+        }
+        int inner = width - 2 * MARGIN;
+        List<OrderedText> rendered = new ArrayList<>();
+        rendered.add(Text.translatable("heavyseas.hud.notifications").formatted(Formatting.GOLD).asOrderedText());
+        for (int i = notifications.size() - 1; i >= 0; i--) {
+            rendered.addAll(client.textRenderer.wrapLines(notifications.get(i), inner));
+        }
+        // 天候卡已经占掉上半截；按剩余高度裁，而不是按整屏高度裁。否则低分辨率下
+        // 八条长通知会把侧栏画出屏幕底边。
+        int maxLines = Math.max(0,
+                (context.getScaledWindowHeight() - y - 2 * MARGIN) / LINE_HEIGHT);
+        if (maxLines == 0) {
+            return;
+        }
+        if (rendered.size() > maxLines) {
+            rendered = new ArrayList<>(rendered.subList(0, maxLines));
+        }
+        int height = rendered.size() * LINE_HEIGHT + 2 * MARGIN;
+        context.fill(x, y, x + width, y + height, 0x990B1620);
+        int textY = y + MARGIN;
+        for (OrderedText line : rendered) {
+            context.drawTextWithShadow(client.textRenderer, line, x + MARGIN, textY, 0xFFFFFF);
+            textY += LINE_HEIGHT;
+        }
+    }
+
+    private static Text weatherName(String id) {
+        return Text.translatable(switch (id) {
+            case "huge_wave" -> "heavyseas.weather.huge_wave";
+            case "sweltering" -> "heavyseas.weather.sweltering";
+            case "becalmed" -> "heavyseas.weather.becalmed";
+            case "scorching_heat" -> "heavyseas.weather.scorching_heat";
+            case "clear_skies" -> "heavyseas.weather.clear_skies";
+            case "dense_fog" -> "heavyseas.weather.dense_fog";
+            case "storm" -> "heavyseas.weather.storm";
+            case "gale" -> "heavyseas.weather.gale";
+            case "rain" -> "heavyseas.weather.rain";
+            case "sunday" -> "heavyseas.weather.sunday";
+            default -> throw new IllegalArgumentException("没有天候译名: " + id);
+        });
     }
 
     /** 轮到我就说「按哪个键」，轮到别人就说在等谁、还剩几秒。 */

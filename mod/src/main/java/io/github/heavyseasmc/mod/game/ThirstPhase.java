@@ -105,12 +105,13 @@ public final class ThirstPhase {
             return;
         }
         if (occupant.isDummy() && component.dummyAutoplay()) {
-            int drink = Math.min(prompt.remaining(), own);
+            int drink = Math.min(prompt.waterNeeded(), own);
+            drink -= drink % prompt.waterPerSource();
             LOGGER.info("口渴（替身自动）：{} 喝 {} 张（还需化解 {} 次）", who.value(), drink, prompt.remaining());
             resolve(world, component, drink);
             return;
         }
-        int suggested = canDecide ? Math.min(prompt.remaining(), own) : 0;
+        int suggested = canDecide ? clamp(session, prompt, prompt.waterNeeded(), 0) : 0;
         component.setThirstDeadline(System.currentTimeMillis() + CHOOSE_MILLIS);
         component.setThirstHighlight(suggested);
         GameFlow.broadcast(world, Text.translatable(canDecide
@@ -201,7 +202,7 @@ public final class ThirstPhase {
         }
         // ❗攒着，不因第一张就结算：那会把他还没说话的其余口渴直接变成伤害。
         int already = component.thirstDonors().size();
-        if (already >= prompt.remaining()) {
+        if (already >= prompt.waterNeeded()) {
             return false;                     // 已经够了，再打就是白白扔掉一张水
         }
         if (availableDonationWater(session, component, donor) <= 0) {
@@ -213,7 +214,7 @@ public final class ThirstPhase {
                 GameFlow.characterName(donor), GameFlow.characterName(prompt.who())));
         LOGGER.info("口渴：{} 替 {} 打了一张水（这一轮共 {} 张）",
                 donor.value(), prompt.who().value(), already + 1);
-        if (already + 1 >= prompt.remaining()) {
+        if (already + 1 >= prompt.waterNeeded()) {
             resolve(world, component, 0);      // 全部被代打化解了，不再让全船空等倒计时
         } else {
             GameComponents.sync(world);
@@ -249,8 +250,12 @@ public final class ThirstPhase {
      */
     private static int clamp(Session session, Session.ThirstPrompt prompt, int waters, int donated) {
         int own = session.watersOf(prompt.who());
-        int need = Math.max(0, prompt.remaining() - donated);
-        return Math.max(0, Math.min(waters, Math.min(need, own)));
+        int need = Math.max(0, prompt.waterNeeded() - donated);
+        int chosen = Math.max(0, Math.min(waters, Math.min(need, own)));
+        while (chosen > 0 && (donated + chosen) % prompt.waterPerSource() != 0) {
+            chosen--;
+        }
+        return chosen;
     }
 
     /** 某人还真正拿得出几张水：已承诺的尚未从手里扣，必须在这里逐张减掉。 */
@@ -277,9 +282,12 @@ public final class ThirstPhase {
         for (int i = 0; i < own; i++) {
             donors.add(who);                  // 界面这条路只喝自己的；别人替他打走 /seas water from
         }
+        while (!donors.isEmpty() && donors.size() % prompt.waterPerSource() != 0) {
+            donors.removeLast();              // 不足一组的承诺不扣牌，也不能凭空化解口渴
+        }
         session.decideThirst(donors);
         waters = donors.size();
-        int damage = prompt.remaining() - waters;
+        int damage = prompt.remaining() - waters / prompt.waterPerSource();
         if (waters > 0) {
             GameFlow.broadcast(world, Text.translatable("heavyseas.game.thirst_drank",
                     GameFlow.characterName(who), waters));

@@ -1,5 +1,10 @@
 package io.github.heavyseasmc.mod.world;
 
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.mod.data.GameData;
+import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.net.RosterConfigS2C;
+import io.github.heavyseasmc.mod.net.StartVoyageC2S;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
@@ -15,6 +20,7 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -53,24 +59,12 @@ public final class LobbyBoat {
                 player.sendMessage(Text.translatable("heavyseas.lobby.need_players", registered.size()), true);
                 return ActionResult.FAIL;
             }
-            world.playSound(null, pos, SoundEvents.BLOCK_BELL_USE, SoundCategory.BLOCKS, 1f, 1f);
-            try {
-                // Registered players stay first: GameFlow assigns only the first N humans. Nearby lobby
-                // bystanders cross after them as spectators and therefore see the same finale without a role.
-                List<ServerPlayerEntity> audience = new ArrayList<>(registered);
-                Vec3d bell = Vec3d.ofCenter(pos);
-                for (ServerPlayerEntity nearby : world.getPlayers(
-                        candidate -> candidate.squaredDistanceTo(bell) <= 16.0 * 16.0)) {
-                    if (!audience.contains(nearby)) {
-                        audience.add(nearby);
-                    }
-                }
-                MistSea.startVoyage(world.getServer(), registered.size(), audience, Set.of());
-                return ActionResult.SUCCESS;
-            } catch (RuntimeException failure) {
-                player.sendMessage(Text.literal(String.valueOf(failure.getMessage())), false);
-                return ActionResult.FAIL;
-            }
+            GameData data = GameDataLoader.require();
+            ServerPlayNetworking.send(player, new RosterConfigS2C(pos.asLong(), registered.size(),
+                    data.roster().characters().stream().map(survivor -> survivor.id().value()).toList(),
+                    ids(data.roster().presets().get(6)), ids(data.roster().presets().get(7)),
+                    ids(data.roster().presets().get(8))));
+            return ActionResult.SUCCESS;
         }
 
         SeatEntity open = seats.stream().filter(seat -> !seat.hasPassengers()).findFirst().orElse(null);
@@ -86,6 +80,54 @@ public final class LobbyBoat {
         int count = registered(seats).size();
         player.sendMessage(Text.translatable("heavyseas.lobby.registered", count), true);
         return ActionResult.SUCCESS;
+    }
+
+    /** 收到面板确认包后重新核对船、座位、人数与阵容，再真正敲铃开局。 */
+    public static void launch(ServerPlayerEntity player, StartVoyageC2S request) {
+        if (!(player.getWorld() instanceof ServerWorld world) || !world.getRegistryKey().equals(World.OVERWORLD)) {
+            return;
+        }
+        BlockPos pos = BlockPos.fromLong(request.anchor());
+        BlockState state = world.getBlockState(pos);
+        if (!state.isOf(LobbyBoatBlock.BLOCK)) {
+            return;
+        }
+        List<SeatEntity> seats = ensureSeats(world, pos, state.get(LobbyBoatBlock.FACING));
+        boolean aboardHere = player.getVehicle() instanceof SeatEntity seat
+                && seat.lobby() && seat.lobbyAnchor().equals(pos);
+        List<ServerPlayerEntity> registered = registered(seats);
+        if (!aboardHere || registered.size() < 6 || registered.size() > 8) {
+            player.sendMessage(Text.translatable("heavyseas.lobby.need_players", registered.size()), true);
+            return;
+        }
+        List<CharacterId> selected;
+        try {
+            selected = request.characters().stream().map(CharacterId::of).toList();
+            GameDataLoader.require().roster().select(selected);
+            if (selected.size() != registered.size()) {
+                throw new IllegalArgumentException("阵容人数必须与已报名人数一致");
+            }
+            ServerWorld sea = MistSea.world(world.getServer());
+            if (sea == null || GameComponents.of(sea).session().isPresent()) {
+                throw new IllegalStateException("雾海不可用或已有一局进行中");
+            }
+            List<ServerPlayerEntity> audience = new ArrayList<>(registered);
+            Vec3d bell = Vec3d.ofCenter(pos);
+            for (ServerPlayerEntity nearby : world.getPlayers(
+                    candidate -> candidate.squaredDistanceTo(bell) <= 16.0 * 16.0)) {
+                if (!audience.contains(nearby)) {
+                    audience.add(nearby);
+                }
+            }
+            world.playSound(null, pos, SoundEvents.BLOCK_BELL_USE, SoundCategory.BLOCKS, 1f, 1f);
+            MistSea.startVoyage(world.getServer(), registered.size(), audience, Set.of(), selected);
+        } catch (RuntimeException failure) {
+            player.sendMessage(Text.literal(String.valueOf(failure.getMessage())), true);
+        }
+    }
+
+    private static List<String> ids(List<CharacterId> ids) {
+        return ids == null ? List.of() : ids.stream().map(CharacterId::value).toList();
     }
 
     public static void clear(World rawWorld, BlockPos pos) {

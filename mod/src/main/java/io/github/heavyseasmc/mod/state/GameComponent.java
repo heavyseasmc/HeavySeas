@@ -20,6 +20,7 @@ import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
 import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.Component;
 import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
@@ -33,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -65,6 +67,11 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     private final World owner;
 
     private Session session;
+
+    /** 系统事件改画在 HUD 侧边栏，不再写入玩家聊天记录。 */
+    private static final int MAX_NOTIFICATIONS = 8;
+    private final ArrayDeque<Text> notifications = new ArrayDeque<>();
+    private boolean extraProvisionPending;
 
     public GameComponent(World owner) {
         this.owner = owner;
@@ -159,6 +166,11 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(g.turn());
         buf.writeEnumConstant(g.phase());
         buf.writeVarInt(g.gulls());
+        buf.writeString(session.currentWeather().map(card -> card.id()).orElse(""));
+        buf.writeVarInt(notifications.size());
+        for (Text notification : notifications) {
+            buf.writeString(Text.Serialization.toJsonString(notification, buf.getRegistryManager()));
+        }
         // 座位轨：谁坐哪、轮到谁。**公开信息**，每人一份照发 —— 等别人行动时全船看的就是它。
         buf.writeVarInt(g.bySeat().size());
         for (CharacterId s : g.bySeat()) {
@@ -192,6 +204,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeVarInt(prompt.shared());
             buf.writeVarInt(prompt.remaining());
             buf.writeVarInt(thirstDonors.size());
+            buf.writeVarInt(prompt.waterPerSource());
             buf.writeVarLong(thirstDeadline);
         }
         // 终局（ADR-0022）：这一轮已经翻开的目标对全船公开；最后那张不翻的谁都不发；计分阶段只发合计。
@@ -426,6 +439,13 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         int turn = buf.readVarInt();
         Phase phase = buf.readEnumConstant(Phase.class);
         int gulls = buf.readVarInt();
+        String weather = buf.readString();
+        int notificationCount = buf.readVarInt();
+        List<Text> notifications = new ArrayList<>(notificationCount);
+        for (int i = 0; i < notificationCount; i++) {
+            Text message = Text.Serialization.fromJson(buf.readString(), buf.getRegistryManager());
+            notifications.add(Objects.requireNonNull(message, "通知文本不能是 null"));
+        }
         int seatCount = buf.readVarInt();
         List<String> seats = new ArrayList<>(seatCount);
         for (int i = 0; i < seatCount; i++) {
@@ -444,7 +464,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         HudView.Thirst thirstPrompt = HudView.Thirst.NONE;
         if (buf.readBoolean()) {
             thirstPrompt = new HudView.Thirst(buf.readString(), buf.readVarInt(), buf.readVarInt(),
-                    buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarLong());
+                    buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarLong());
         }
         HudView.Endgame endgame = HudView.Endgame.NONE;
         if (buf.readBoolean()) {
@@ -488,7 +508,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                         attackSide, defendSide, attackPower, defendPower, List.of(), 0, List.of(), 0)
                 : ContestView.NONE;
         if (!buf.readBoolean()) {
-            return new HudView(true, turn, phase, gulls, seats, removed, actor,
+            return new HudView(true, turn, phase, gulls, weather, notifications, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
                     false, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
@@ -546,7 +566,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     attackSide, defendSide, attackPower, defendPower, myWeapons, myCommitted,
                     victimFront, victimHand);
         }
-        return new HudView(true, turn, phase, gulls, seats, removed, actor,
+        return new HudView(true, turn, phase, gulls, weather, notifications, seats, removed, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
                 love, hate, yourTurn, designating, designateUntil,
@@ -819,6 +839,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearProvision();
         clearHelm();
         clearThirst();
+        notifications.clear();
+        extraProvisionPending = false;
         endgame = null;
         fogCleared = false;
         steps.clear();
@@ -943,12 +965,31 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearProvision();
         clearHelm();
         clearThirst();
+        notifications.clear();
+        extraProvisionPending = false;
         endgame = null;
         seatIds = List.of();
         boatDisplayIds = List.of();
         gullIds = List.of();
         fogCleared = false;
         steps.clear();
+    }
+
+    public void notify(Text message) {
+        notifications.addLast(Objects.requireNonNull(message, "message"));
+        while (notifications.size() > MAX_NOTIFICATIONS) {
+            notifications.removeFirst();
+        }
+    }
+
+    public void setExtraProvisionPending(boolean pending) {
+        extraProvisionPending = pending;
+    }
+
+    public boolean takeExtraProvisionPending() {
+        boolean pending = extraProvisionPending;
+        extraProvisionPending = false;
+        return pending;
     }
 
     public Map<CharacterId, Occupant> occupants() {

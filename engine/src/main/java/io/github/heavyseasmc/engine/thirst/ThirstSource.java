@@ -46,5 +46,8 @@ public enum ThirstSource {
      * 第四个来源提前到了 M2，形状与那时的预期相同：{@code count()} 的上限由常量数给出，
      * 不变量因此也不需要改成新的数字（{@code Invariants} 用的就是 {@code values().length}）。
      */
-    DRANK_RUM
+    DRANK_RUM,
+
+    /** 天候“炎热”让全员产生的一次口渴。 */
+    WEATHER
 }

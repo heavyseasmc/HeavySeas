@@ -149,7 +149,7 @@ public final class ActionPhase {
         } catch (RuntimeException e) {
             // 与指令层同一条：规则拒绝要让真人知道，不把一次无效点击伪装成「包没到」。
             LOGGER.info("特殊物资（界面）：{} 的操作被拒绝：{}", actor.value(), e.getMessage());
-            player.sendMessage(Text.literal(String.valueOf(e.getMessage())).formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal(String.valueOf(e.getMessage())).formatted(Formatting.RED), true);
             if (component.provisionTargeter().map(actor::equals).orElse(false)) {
                 component.clearProvisionTarget();
             }
@@ -166,7 +166,7 @@ public final class ActionPhase {
         Provision card = session.provisions().get(cardId);
         if (!card.isSpecialAction()) {
             player.sendMessage(Text.translatable("heavyseas.command.not_special", provisionName(cardId))
-                    .formatted(Formatting.RED), false);
+                    .formatted(Formatting.RED), true);
             return;
         }
         if (!holds(session, actor, cardId)) {
@@ -179,7 +179,7 @@ public final class ActionPhase {
                             && session.state().stateOf(id).damage() > 0);
             if (!anyone) {
                 player.sendMessage(Text.translatable("heavyseas.command.nobody_wounded")
-                        .formatted(Formatting.GRAY), false);
+                        .formatted(Formatting.GRAY), true);
                 return;
             }
             component.beginProvisionTarget(actor, cardId);
@@ -205,7 +205,7 @@ public final class ActionPhase {
         if (!legal) {
             component.clearProvisionTarget();
             player.sendMessage(Text.translatable("heavyseas.target.no_longer_valid")
-                    .formatted(Formatting.GRAY), false);
+                    .formatted(Formatting.GRAY), true);
             GameComponents.sync(world);
             return;
         }

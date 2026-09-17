@@ -1,11 +1,7 @@
 package io.github.heavyseasmc.engine.state;
 
 /**
- * 一个回合（一天）里的三个阶段，按固定次序推进。
- *
- * <p>天候是 M5 的扩充，它会在物资阶段<b>之前</b>再插一步。此刻不预留那个常量 ——
- * 预留的空位会被当成「已经想清楚了」，而 O7 恰恰说明还没想清楚（无风跳过航海阶段时，
- * 划船与战斗标记清不清尚未定案）。加一个枚举常量是加法，届时再加。
+ * 一个回合（一天）里的四个阶段，按固定次序推进。
  *
  * <h2>为什么阶段是枚举而不是 boolean 或整数</h2>
  * 因为每个阶段有各自的<b>禁令</b>，而禁令是这套规则里最容易漏实现的一类：
@@ -18,6 +14,9 @@ package io.github.heavyseasmc.engine.state;
  * 而不是散落在各处的 if。
  */
 public enum Phase {
+
+    /** 天候阶段。每日物资阶段之前翻开一张；“无风”仍以结束航海阶段的方式结束一天并清标记。 */
+    WEATHER,
 
     /**
      * 物资阶段。最靠船头的清醒角色抽「存活且清醒角色数」张牌，留 1 张，其余传给下一位。
@@ -33,12 +32,13 @@ public enum Phase {
     /** 航海阶段。舵手挑牌或翻顶牌，按 海鸥 → 落海 → 口渴 结算，然后清标记。 */
     NAVIGATION;
 
-    /** 本阶段结束后进入哪个阶段。航海阶段之后回到物资阶段，并推进回合数。 */
+    /** 本阶段结束后进入哪个阶段。航海阶段之后进入下一天的天候阶段，并推进回合数。 */
     public Phase next() {
         return switch (this) {
+            case WEATHER -> PROVISION;
             case PROVISION -> ACTION;
             case ACTION -> NAVIGATION;
-            case NAVIGATION -> PROVISION;
+            case NAVIGATION -> WEATHER;
         };
     }
 

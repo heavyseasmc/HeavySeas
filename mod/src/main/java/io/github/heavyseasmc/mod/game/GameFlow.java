@@ -12,6 +12,8 @@ import io.github.heavyseasmc.engine.play.Table;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.engine.weather.WeatherCard;
+import io.github.heavyseasmc.engine.weather.WeatherDeck;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameData;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
@@ -80,7 +82,25 @@ public final class GameFlow {
     public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
                              Set<CharacterId> reservedForDummies, Vec3d boatAt, float boatYaw) {
         GameData data = GameDataLoader.require();
-        Roster roster = data.roster().preset(players);
+        start(world, players, humans, reservedForDummies, boatAt, boatYaw, data.roster().preset(players));
+    }
+
+    /** 房主从大厅面板确认的自定义阵容。 */
+    public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
+                             Set<CharacterId> reservedForDummies, Vec3d boatAt, float boatYaw,
+                             List<CharacterId> selectedRoster) {
+        GameData data = GameDataLoader.require();
+        start(world, players, humans, reservedForDummies, boatAt, boatYaw,
+                data.roster().select(selectedRoster));
+    }
+
+    private static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
+                              Set<CharacterId> reservedForDummies, Vec3d boatAt, float boatYaw,
+                              Roster roster) {
+        GameData data = GameDataLoader.require();
+        if (roster.survivors().size() != players) {
+            throw new IllegalArgumentException("阵容人数与登船人数不一致");
+        }
 
         List<CharacterId> seats = roster.survivors().stream().map(Survivor::id).toList();
         for (CharacterId reserved : reservedForDummies) {
@@ -113,11 +133,13 @@ public final class GameFlow {
             occupants.put(shuffled.get(i), new GameComponent.Occupant(null, "dummy"));
         }
 
-        // ❗两副牌都要给。只给航海牌的话物资阶段会「牌堆已空」直接跳过 ——
-        //   而对局照样能打到终局，所以这个漏接在别处一点痕迹都没有。
+        // ❗三副牌都要给。漏掉物资会让物资阶段静默跳过，漏掉天候会让四阶段兼容路径
+        //   静默退回三阶段；两种局面都照样能打到终局，所以必须在这里一次接齐。
         Table table = new Table(
                 new NavigationDeck(data.navigation(), new Random(world.getRandom().nextLong())),
-                data.provisions(), new Random(world.getRandom().nextLong()));
+                data.provisions(),
+                new WeatherDeck(data.weather(), new Random(world.getRandom().nextLong())),
+                new Random(world.getRandom().nextLong()));
         Session session = new Session("world=" + world.getRegistryKey().getValue(), roster, table);
         // 开局发爱恨（ADR-0022）：两个独立置换，全程保密。
         // ❗日志里不打谁爱谁、谁恨谁 —— 开服的人往往也是玩家。终局翻牌时才一张张写进日志。
@@ -144,6 +166,24 @@ public final class GameFlow {
                 component.dummyAutoplay() ? "开" : "关");
         // 位次摆进世界（ADR-0024）。放在播报之后：摆船会再推一次投影，而开局那一帧已经推过了。
         Seats.place(world, component, boatAt, boatYaw, session.state().bySeat().size());
+        enterWeather(world, component);
+    }
+
+    /** 每日开头翻天候，立即结算“晴空”，并把“礼拜天”的额外物资阶段交给流程标志。 */
+    public static void enterWeather(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        if (session.state().phase() != Phase.WEATHER || session.state().isOver()) {
+            announceTurn(world, component);
+            return;
+        }
+        WeatherCard weather = session.beginWeather();
+        component.setExtraProvisionPending(weather.effect()
+                == io.github.heavyseasmc.engine.weather.WeatherEffect.EXTRA_PROVISION);
+        broadcast(world, Text.translatable("heavyseas.game.weather",
+                Text.translatable(weatherNameKey(weather)), Text.translatable(weatherEffectKey(weather)))
+                .formatted(Formatting.AQUA));
+        LOGGER.info("天候：{}（{}）", weather.id(), weather.effect().id());
+        session.advancePhase();
         enterProvision(world, component);
     }
 
@@ -181,6 +221,12 @@ public final class GameFlow {
         Session session = component.requireSession();
         if (session.state().isOver()) {
             announceOutcome(world, component);
+            return;
+        }
+        if (component.takeExtraProvisionPending()) {
+            broadcast(world, Text.translatable("heavyseas.game.weather_extra_provision")
+                    .formatted(Formatting.DARK_GRAY));
+            enterProvision(world, component);
             return;
         }
         session.advancePhase();
@@ -221,6 +267,10 @@ public final class GameFlow {
         }
         if (session.state().phase() == Phase.NAVIGATION) {
             NavigationPhase.begin(world, component);
+            return;
+        }
+        if (session.state().phase() == Phase.WEATHER) {
+            enterWeather(world, component);
         }
     }
 
@@ -258,6 +308,18 @@ public final class GameFlow {
     public static void navigate(ServerWorld world, GameComponent component, NavigationCard pick) {
         Session session = component.requireSession();
         NavigationCard card = session.takeCardForNavigation(pick);
+        resolveNavigation(world, component, card);
+    }
+
+    /** 狂风额外翻出的那一张。 */
+    public static void navigateWeather(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        NavigationCard card = session.takeWeatherNavigationCard();
+        resolveNavigation(world, component, card);
+    }
+
+    private static void resolveNavigation(ServerWorld world, GameComponent component, NavigationCard card) {
+        Session session = component.requireSession();
         component.clearHelm();
         // 海鸥与落海当场算完；口渴逐个问（ADR-0021）——「喝几张水」是决策，真人答不了同步的问题。
         NavigationReport report = session.beginNavigate(card);
@@ -301,16 +363,21 @@ public final class GameFlow {
         // ❗与语言无关的一行，而且是**这一回合真的走完了**的唯一标志：
         //   「航海牌 …」只说明牌结算到了口渴那一步，口渴要逐个问，问完才算完（ADR-0021）。
         //   演示脚本与验收脚本判「可以进下一步了」认的是这一行，不是那一行。
-        LOGGER.info("航海阶段结束：第 {} 回合（口渴已结算完）", session.state().turn());
         sync(world);
         if (session.state().isOver()) {
             announceOutcome(world, component);
             return;
         }
+        if (session.finishNavigationResolution()) {
+            schedule(component, component.anyHumanSeated() ? REVEAL_HOLD_MS : 0L,
+                    "狂风额外航海牌后进入标准航海", () -> NavigationPhase.begin(world, component));
+            return;
+        }
+        LOGGER.info("航海阶段结束：第 {} 回合（口渴已结算完）", session.state().turn());
         long hold = component.anyHumanSeated() ? REVEAL_HOLD_MS : 0L;
         schedule(component, hold, "航海结算后进下一回合", () -> {
             session.advancePhase();
-            enterProvision(world, component);
+            enterWeather(world, component);
         });
     }
 
@@ -338,9 +405,14 @@ public final class GameFlow {
                 Nameplates.clear(world);
                 Gulls.clear(world, component);
                 Seats.clear(world, component);
+                // 普通系统事件都进 HUD 侧栏；崩溃会立刻收起会话，侧栏也随之消失，
+                // 所以最后这一句只能走 action bar。它不写入聊天历史。
+                world.getServer().getPlayerManager().getPlayerList().stream()
+                        .filter(player -> player.getWorld().getRegistryKey().equals(world.getRegistryKey()))
+                        .forEach(player -> player.sendMessage(
+                                Text.translatable("heavyseas.game.crashed").formatted(Formatting.RED), true));
                 component.end();
                 sync(world);
-                broadcast(world, Text.translatable("heavyseas.game.crashed").formatted(Formatting.RED));
                 MistSea.restoreAll(world, component);
             }
         }
@@ -428,6 +500,7 @@ public final class GameFlow {
 
     private static Text phaseName(Phase phase) {
         return Text.translatable(switch (phase) {
+            case WEATHER -> "heavyseas.phase.weather";
             case PROVISION -> "heavyseas.phase.provision";
             case ACTION -> "heavyseas.phase.action";
             case NAVIGATION -> "heavyseas.phase.navigation";
@@ -464,7 +537,42 @@ public final class GameFlow {
 
     /** 播给全场。包内可见：{@link ActionPhase} 与 {@link NavigationPhase} 要播同样的话。 */
     static void broadcast(ServerWorld world, Text message) {
-        MinecraftServer server = world.getServer();
-        server.getPlayerManager().broadcast(message, false);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isPresent()) {
+            component.notify(message);
+            sync(world);
+        }
+    }
+
+    private static String weatherNameKey(WeatherCard card) {
+        return switch (card.id()) {
+            case "huge_wave" -> "heavyseas.weather.huge_wave";
+            case "sweltering" -> "heavyseas.weather.sweltering";
+            case "becalmed" -> "heavyseas.weather.becalmed";
+            case "scorching_heat" -> "heavyseas.weather.scorching_heat";
+            case "clear_skies" -> "heavyseas.weather.clear_skies";
+            case "dense_fog" -> "heavyseas.weather.dense_fog";
+            case "storm" -> "heavyseas.weather.storm";
+            case "gale" -> "heavyseas.weather.gale";
+            case "rain" -> "heavyseas.weather.rain";
+            case "sunday" -> "heavyseas.weather.sunday";
+            default -> throw new IllegalArgumentException("没有天候译名: " + card.id());
+        };
+    }
+
+    private static String weatherEffectKey(WeatherCard card) {
+        return switch (card.id()) {
+            case "huge_wave" -> "heavyseas.weather.effect.huge_wave";
+            case "sweltering" -> "heavyseas.weather.effect.sweltering";
+            case "becalmed" -> "heavyseas.weather.effect.becalmed";
+            case "scorching_heat" -> "heavyseas.weather.effect.scorching_heat";
+            case "clear_skies" -> "heavyseas.weather.effect.clear_skies";
+            case "dense_fog" -> "heavyseas.weather.effect.dense_fog";
+            case "storm" -> "heavyseas.weather.effect.storm";
+            case "gale" -> "heavyseas.weather.effect.gale";
+            case "rain" -> "heavyseas.weather.effect.rain";
+            case "sunday" -> "heavyseas.weather.effect.sunday";
+            default -> throw new IllegalArgumentException("没有天候效果译文: " + card.id());
+        };
     }
 }

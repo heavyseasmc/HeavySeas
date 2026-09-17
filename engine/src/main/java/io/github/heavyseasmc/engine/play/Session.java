@@ -18,6 +18,8 @@ import io.github.heavyseasmc.engine.scoring.Treasures;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.GameState;
+import io.github.heavyseasmc.engine.weather.WeatherCard;
+import io.github.heavyseasmc.engine.weather.WeatherEffect;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.state.SurvivorState;
 import io.github.heavyseasmc.engine.thirst.ThirstResolver;
@@ -66,6 +68,7 @@ public final class Session {
     private final String context;
     private final Table table;
     private GameState state;
+    private boolean weatherDrawnThisTurn;
 
     /**
      * @param context 出处，报错时靠它定位（模拟器给种子，模组给对局标识）
@@ -73,7 +76,7 @@ public final class Session {
     public Session(String context, Roster roster, Table table) {
         this.context = Objects.requireNonNull(context, "context");
         this.table = Objects.requireNonNull(table, "table");
-        this.state = GameState.start(roster);
+        this.state = table.weather().isPresent() ? GameState.startWithWeather(roster) : GameState.start(roster);
         Invariants.requireValid(state, context, "开局");
     }
 
@@ -101,14 +104,23 @@ public final class Session {
         return context;
     }
 
-    /** 推进到下一阶段（航海之后回到物资并推进回合数）。 */
+    /** 推进到下一阶段；未启用天候牌堆的兼容局会自动跳过 WEATHER。 */
     public void advancePhase() {
         requireNoRowInProgress("推进阶段");
         requireNoThirstInProgress("推进阶段");
         requireNoContest("推进阶段");
         int was = state.turn();
         state = state.advancePhase();
+        if (state.phase() == Phase.WEATHER && table.weather().isEmpty()) {
+            state = state.advancePhase();
+        }
+        if (state.phase() == Phase.WEATHER) {
+            weatherDrawnThisTurn = false;
+        }
         navigatedThisTurn = null;
+        standardNavigationTaken = false;
+        extraNavigationTaken = false;
+        resolvingExtraNavigation = false;
         rowStackPrepared = false;
         weaponsPlayed.clear();
         healedSincePhaseStart = 0;
@@ -117,6 +129,27 @@ public final class Session {
             sharedRum.clear();
         }
         Invariants.requireValid(state, context, "阶段推进后");
+    }
+
+    /** 翻开今天的天候；只允许在 WEATHER 阶段调用一次。 */
+    public WeatherCard beginWeather() {
+        if (state.phase() != Phase.WEATHER) {
+            throw new IllegalStateException("%s 天候只在天候阶段翻开，现在是 %s".formatted(context, state.phase()));
+        }
+        if (weatherDrawnThisTurn) {
+            throw new IllegalStateException("%s 第 %d 天的天候已经翻过".formatted(context, state.turn()));
+        }
+        var deck = table.weather().orElseThrow(() -> new IllegalStateException(context + " 没有天候牌堆"));
+        WeatherCard card = deck.draw();
+        weatherDrawnThisTurn = true;
+        if (card.effect() == WeatherEffect.RESHUFFLE_DISCARD) {
+            deck.reshuffleDiscard();
+        }
+        return card;
+    }
+
+    public Optional<WeatherCard> currentWeather() {
+        return table.weather().flatMap(io.github.heavyseasmc.engine.weather.WeatherDeck::current);
     }
 
     /** 物资的效果目录。 */
@@ -318,6 +351,9 @@ public final class Session {
      * @throws IllegalStateException 不在行动阶段，或者上一次划船抽到的牌还没定完
      */
     public List<NavigationCard> beginRow(CharacterId rower) {
+        if (currentWeatherEffect() == WeatherEffect.SKIP_NAVIGATION) {
+            throw new IllegalStateException(context + " 风平浪静时没有航海阶段，不能划船");
+        }
         Objects.requireNonNull(rower, "rower");
         if (state.phase() != Phase.ACTION) {
             throw new IllegalStateException("%s 划船是行动阶段的事，现在是 %s".formatted(context, state.phase()));
@@ -810,6 +846,9 @@ public final class Session {
 
     /** 这一回合执行的那张航海牌；还没结算时为 {@code null}。推进阶段时清掉。 */
     private NavigationCard navigatedThisTurn;
+    private boolean standardNavigationTaken;
+    private boolean extraNavigationTaken;
+    private boolean resolvingExtraNavigation;
 
     /**
      * 这一回合执行的航海牌，并把划船堆整堆收回。
@@ -833,9 +872,9 @@ public final class Session {
         if (state.phase() != Phase.NAVIGATION) {
             throw new IllegalStateException("%s 航海牌只在航海阶段结算，现在是 %s".formatted(context, state.phase()));
         }
-        if (navigatedThisTurn != null) {
+        if (standardNavigationTaken) {
             throw new IllegalStateException("%s 第 %d 回合已经结算过航海牌 %s —— 每回合只执行一张"
-                    .formatted(context, state.turn(), navigatedThisTurn.id()));
+                    .formatted(context, state.turn(), navigatedThisTurn == null ? "<跳过>" : navigatedThisTurn.id()));
         }
         if (!rowStackPrepared) {
             // ❗漏调 prepareRowStack 的表现不是报错，是指南针永远不生效。2026-09-16 核对时发现
@@ -858,7 +897,56 @@ public final class Session {
         table.pile().bottom(chosen);
         table.requireNoCardLost(context, "挑牌后");
         navigatedThisTurn = chosen;
+        standardNavigationTaken = true;
+        resolvingExtraNavigation = false;
         return chosen;
+    }
+
+    /** 狂风：标准航海之前从牌堆顶额外翻一张并结算，不动划船堆。 */
+    public NavigationCard takeWeatherNavigationCard() {
+        if (state.phase() != Phase.NAVIGATION || currentWeatherEffect() != WeatherEffect.EXTRA_NAVIGATION) {
+            throw new IllegalStateException(context + " 当前没有狂风的额外航海牌可翻");
+        }
+        if (extraNavigationTaken) {
+            throw new IllegalStateException(context + " 本回合的狂风额外航海牌已经翻过");
+        }
+        NavigationCard chosen = table.pile().draw();
+        table.pile().bottom(chosen);
+        table.requireNoCardLost(context, "狂风额外航海牌后");
+        extraNavigationTaken = true;
+        resolvingExtraNavigation = true;
+        navigatedThisTurn = chosen;
+        return chosen;
+    }
+
+    public boolean weatherNavigationPending() {
+        return currentWeatherEffect() == WeatherEffect.EXTRA_NAVIGATION && !extraNavigationTaken;
+    }
+
+    public boolean navigationComplete() {
+        return standardNavigationTaken;
+    }
+
+    /** 返回刚结算完的是不是狂风额外牌，并把标志清掉。 */
+    public boolean finishNavigationResolution() {
+        boolean extra = resolvingExtraNavigation;
+        resolvingExtraNavigation = false;
+        return extra;
+    }
+
+    /** 风平浪静：不翻航海牌，但回收划船堆；之后照常结束一天、清全部回合标记。 */
+    public void skipNavigation() {
+        if (state.phase() != Phase.NAVIGATION || currentWeatherEffect() != WeatherEffect.SKIP_NAVIGATION) {
+            throw new IllegalStateException(context + " 当前不能跳过航海阶段");
+        }
+        table.recycleRowStack();
+        table.requireNoCardLost(context, "风平浪静回收划船堆后");
+        standardNavigationTaken = true;
+        navigatedThisTurn = null;
+    }
+
+    private WeatherEffect currentWeatherEffect() {
+        return currentWeather().map(WeatherCard::effect).orElse(null);
     }
 
     /** 这一回合执行的那张航海牌。**公开信息** —— 结算后只公开被执行的那一张（决策 ⑭）。 */
@@ -904,17 +992,16 @@ public final class Session {
     public NavigationReport beginNavigate(NavigationCard card) {
         Objects.requireNonNull(card, "card");
         requireNoThirstInProgress("再结算一张航海牌");
-        // a) 海鸥。
-        state = state.withGulls(card.gull());
+        // a) 海鸥。浓雾让本回合所有海鸥图示失效。
+        int gull = currentWeatherEffect() == WeatherEffect.IGNORE_GULLS ? 0 : card.gull();
+        state = state.withGulls(gull);
         Invariants.requireValid(state, context, "海鸥结算后");
         if (state.isOver()) {
             return new NavigationReport(card, true, List.of(), List.of(), List.of(), List.of(), List.of());
         }
 
-        // b) 落海。候选是船上的人，含尸体 —— 尸体被冲下去就连人带牌退出游戏；
-        //    已经被移出的人不在船上，「所有人」「除某人外」都不会再点到他。
+        // b) 航海牌本身的落海阶段。
         Set<CharacterId> overboardPool = new LinkedHashSet<>(state.onBoatBySeat());
-        // 分母：这一步真正执行时还活着的人。先记分母再点名，两者必须同一个时刻取。
         List<CharacterId> overboardCandidates = new ArrayList<>();
         for (CharacterId id : overboardPool) {
             if (state.conditionOf(id) != Condition.DEAD) {
@@ -922,41 +1009,31 @@ public final class Session {
             }
         }
         List<CharacterId> inWater = List.copyOf(card.overboard().select(overboardPool, usedProvisionResolver()));
-        List<CharacterId> overboardSelected = new ArrayList<>();
-        for (CharacterId id : inWater) {
-            if (state.conditionOf(id) != Condition.DEAD) {
-                overboardSelected.add(id);       // 数的是下水，不是受伤：水手落水不受伤
-            }
-        }
-        // 诱饵先算：它决定每个下水的人挨几点，而扣血之后才轮到冲走面前的牌。
-        int shark = sharkDamage(inWater);
-        for (CharacterId id : inWater) {
-            int hurt = isOverboardImmune(state, id) ? 0 : 1;
-            hurt += shark;                       // 鲨鱼伤害穿透水手与救生圈，两者都挡不住
-            if (hurt > 0) {
-                state = state.withState(id, state.stateOf(id).hurt(hurt));
-            }
-        }
-        // 冲走面前的牌。救生圈留下（{@code survives_overboard}），其余全部进弃牌堆。
-        for (CharacterId id : inWater) {
-            washAwayFront(id);
-        }
-        // 水中判定（ADR-0022）：死在水里的人连人带牌移出游戏 —— 本来就是尸体的、在水里伤害超过体型的、
-        // 以及<b>恰好等于体型又没有救生圈</b>的（在船上这只是昏迷，在水里就是淹死）。
-        // ❗最后这一种 M0 就写好了（Condition.inWater），而结算一次都没调：M1 起淹死的人一直是昏迷着回到船上。
-        List<CharacterId> removedNow = new ArrayList<>();
-        for (CharacterId id : inWater) {
-            int size = state.roster().get(id).size();
-            if (Condition.inWater(state.stateOf(id).damage(), size, hasLifePreserverInFront(id)) == Condition.DEAD) {
-                removeFromGame(id);
-                removedNow.add(id);
-            }
-        }
-        requireNoProvisionLost("落海结算后");
-        Invariants.requireValid(state, context, "落海结算后");
+        OverboardOutcome baseOverboard = resolveOverboard(inWater);
+        List<CharacterId> overboardSelected = new ArrayList<>(baseOverboard.selected());
+        List<CharacterId> removedNow = new ArrayList<>(baseOverboard.removed());
         if (state.isOver()) {
             return new NavigationReport(card, false, overboardCandidates, overboardSelected,
                     List.of(), List.of(), removedNow);
+        }
+
+        // 巨浪 / 暴风雨各自开启一个独立落海阶段：诱饵也因此在每一阶段分别结算。
+        WeatherEffect weather = currentWeatherEffect();
+        ThirstSource converted = weather == WeatherEffect.FIGHTERS_OVERBOARD && card.thirstFighters()
+                ? ThirstSource.FOUGHT
+                : weather == WeatherEffect.ROWERS_OVERBOARD && card.thirstRowers()
+                ? ThirstSource.ROWED : null;
+        if (converted != null) {
+            List<CharacterId> marked = state.onBoatBySeat().stream()
+                    .filter(id -> state.stateOf(id).thirst().has(converted))
+                    .toList();
+            OverboardOutcome weatherOverboard = resolveOverboard(marked);
+            overboardSelected.addAll(weatherOverboard.selected());
+            removedNow.addAll(weatherOverboard.removed());
+            if (state.isOver()) {
+                return new NavigationReport(card, false, overboardCandidates, List.copyOf(overboardSelected),
+                        List.of(), List.of(), List.copyOf(removedNow));
+            }
         }
 
         // c) 口渴。候选不含死者，但含昏迷者 —— 他仍会口渴，只是不能自己打水。
@@ -968,6 +1045,15 @@ public final class Session {
         }
         List<CharacterId> thirstCandidates = List.copyOf(thirstPool);
         List<CharacterId> thirstSelected = new ArrayList<>();
+        if (weather == WeatherEffect.IGNORE_THIRST) {
+            return new NavigationReport(card, false, overboardCandidates, List.copyOf(overboardSelected),
+                    thirstCandidates, List.of(), List.copyOf(removedNow));
+        }
+        if (weather == WeatherEffect.ALL_THIRST) {
+            for (CharacterId id : thirstPool) {
+                state = state.withState(id, state.stateOf(id).thirstFrom(ThirstSource.WEATHER));
+            }
+        }
         for (CharacterId id : card.thirst().select(thirstPool, usedProvisionResolver())) {
             thirstSelected.add(id);              // 只数牌面点名，划船与战斗的口渴不在内
             state = state.withState(id, state.stateOf(id).thirstFrom(ThirstSource.NAMED));
@@ -1037,10 +1123,16 @@ public final class Session {
             throw new IllegalStateException("%s 现在没有人在等口渴的决定".formatted(context));
         }
         ThirstPrompt prompt = promptFor(thirstQueue.get(at));
-        if (donors.size() > prompt.remaining()) {
+        if (donors.size() > prompt.waterNeeded()) {
             throw new IllegalArgumentException(
-                    "%s %s 只还需化解 %d 次口渴，却要喝 %d 张水"
-                            .formatted(context, prompt.who().value(), prompt.remaining(), donors.size()));
+                    "%s %s 只还需化解 %d 次口渴（每次 %d 张水），却要喝 %d 张水"
+                            .formatted(context, prompt.who().value(), prompt.remaining(),
+                                    prompt.waterPerSource(), donors.size()));
+        }
+        if (donors.size() % prompt.waterPerSource() != 0) {
+            throw new IllegalArgumentException(
+                    "%s %s 在当前天候下每次口渴需要 %d 张水，不能只交 %d 张"
+                            .formatted(context, prompt.who().value(), prompt.waterPerSource(), donors.size()));
         }
         for (CharacterId donor : donors) {
             SurvivorState from = state.stateOf(donor);
@@ -1061,7 +1153,7 @@ public final class Session {
             table.discardProvision(WATER);
         }
         thirstWatersSpent += donors.size();
-        int damage = prompt.remaining() - donors.size();
+        int damage = prompt.remaining() - donors.size() / prompt.waterPerSource();
         if (damage > 0) {
             state = state.withState(prompt.who(), state.stateOf(prompt.who()).hurt(damage));
         }
@@ -1090,11 +1182,18 @@ public final class Session {
      *                  别人能不能给他打水，规则上没有限制，所以这里只报他自己的
      */
     public record ThirstPrompt(CharacterId who, ThirstTally effective, int covered, int shared,
-                               int remaining, int ownWaters) {
+                               int remaining, int ownWaters, int waterPerSource) {
 
         public ThirstPrompt {
             Objects.requireNonNull(who, "who");
             Objects.requireNonNull(effective, "effective");
+            if (waterPerSource < 1) {
+                throw new IllegalArgumentException("每次口渴至少需要一张水");
+            }
+        }
+
+        public int waterNeeded() {
+            return Math.multiplyExact(remaining, waterPerSource);
         }
     }
 
@@ -1109,12 +1208,13 @@ public final class Session {
     private ThirstPrompt promptFor(CharacterId id) {
         ThirstTally effective = effectiveThirst(id, thirstCard);
         int covered = coverCharges(id);
-        int shared = sharedWaterCancels(id);
+        int waterPerSource = currentWeatherEffect() == WeatherEffect.DOUBLE_WATER ? 2 : 1;
+        int shared = sharedWaterCancels(id) / waterPerSource;
         // 遮蔽与蹭到的水都是「不付代价就抵掉」，所以一起作为 ThirstResolver 的 coverCharges。
         var outcome = ThirstResolver.resolve(effective, Math.min(effective.count(), covered + shared), 0);
         return new ThirstPrompt(id, effective, Math.min(effective.count(), covered),
                 Math.min(Math.max(0, effective.count() - covered), shared),
-                outcome.damage(), watersOf(id));
+                outcome.damage(), watersOf(id), waterPerSource);
     }
 
     /** 他能拿出几张水：手上的加面前的。亮出来的水照样能喝（规则 §5.2）。 */
@@ -1132,7 +1232,48 @@ public final class Session {
         if (!card.thirstFighters()) {
             effective = withoutSource(effective, ThirstSource.FOUGHT);
         }
+        if (currentWeatherEffect() == WeatherEffect.IGNORE_THIRST) {
+            return ThirstTally.none();
+        }
+        if (currentWeatherEffect() == WeatherEffect.FIGHTERS_OVERBOARD && card.thirstFighters()) {
+            effective = withoutSource(effective, ThirstSource.FOUGHT);
+        }
+        if (currentWeatherEffect() == WeatherEffect.ROWERS_OVERBOARD && card.thirstRowers()) {
+            effective = withoutSource(effective, ThirstSource.ROWED);
+        }
         return effective;
+    }
+
+    /** 一个独立落海阶段；诱饵伤害、冲牌、水中死亡都只看这一阶段的名单。 */
+    private OverboardOutcome resolveOverboard(List<CharacterId> requested) {
+        List<CharacterId> inWater = requested.stream()
+                .filter(id -> !state.isRemoved(id))
+                .distinct().toList();
+        List<CharacterId> selected = inWater.stream()
+                .filter(id -> state.conditionOf(id) != Condition.DEAD).toList();
+        int shark = sharkDamage(inWater);
+        for (CharacterId id : inWater) {
+            int hurt = (isOverboardImmune(state, id) ? 0 : 1) + shark;
+            if (hurt > 0) {
+                state = state.withState(id, state.stateOf(id).hurt(hurt));
+            }
+        }
+        inWater.forEach(this::washAwayFront);
+        List<CharacterId> removed = new ArrayList<>();
+        for (CharacterId id : inWater) {
+            int size = state.roster().get(id).size();
+            if (Condition.inWater(state.stateOf(id).damage(), size,
+                    hasLifePreserverInFront(id)) == Condition.DEAD) {
+                removeFromGame(id);
+                removed.add(id);
+            }
+        }
+        requireNoProvisionLost("落海结算后");
+        Invariants.requireValid(state, context, "落海结算后");
+        return new OverboardOutcome(selected, List.copyOf(removed));
+    }
+
+    private record OverboardOutcome(List<CharacterId> selected, List<CharacterId> removed) {
     }
 
     /** 撑开的阳伞能抵几次。❗<b>要在落海之后才取值</b> —— 伞可能刚被冲走。 */
@@ -1527,7 +1668,8 @@ public final class Session {
         for (int i = 0; i < signal.draw() && !table.pile().isEmpty(); i++) {
             NavigationCard nav = table.pile().draw();
             drawn.add(nav);
-            int gull = signal.includesGullRemoval() ? nav.gull() : Math.max(0, nav.gull());
+            int gull = currentWeatherEffect() == WeatherEffect.IGNORE_GULLS ? 0
+                    : signal.includesGullRemoval() ? nav.gull() : Math.max(0, nav.gull());
             state = state.withGulls(gull);
         }
         drawn.forEach(nav -> table.pile().bottom(nav));

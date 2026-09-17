@@ -313,6 +313,7 @@ public abstract class GameScreen extends Screen {
 
     protected static Text phaseName(Phase phase) {
         return Text.translatable(switch (phase) {
+            case WEATHER -> "heavyseas.phase.weather";
             case PROVISION -> "heavyseas.phase.provision";
             case ACTION -> "heavyseas.phase.action";
             case NAVIGATION -> "heavyseas.phase.navigation";

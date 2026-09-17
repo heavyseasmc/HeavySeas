@@ -3,6 +3,7 @@ package io.github.heavyseasmc.engine.play;
 import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.NavigationDeck;
+import io.github.heavyseasmc.engine.weather.WeatherDeck;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Optional;
 
 /**
  * 桌面：两副牌堆、划船堆、物资弃牌堆，外加物资的效果目录。
@@ -40,6 +42,9 @@ public final class Table {
 
     private final NavigationDeck pile;
 
+    /** M5 天候扩充；空表示三阶段兼容局（引擎旧测试与不启用扩充的数据）。 */
+    private final WeatherDeck weather;
+
     /** 划船堆。面朝下，只有舵手看得到全部；结算完清空。 */
     private final List<NavigationCard> rowStack = new ArrayList<>();
 
@@ -64,6 +69,7 @@ public final class Table {
     public Table(NavigationDeck pile, Provisions provisions) {
         this.pile = Objects.requireNonNull(pile, "pile");
         this.provisions = Objects.requireNonNull(provisions, "provisions");
+        this.weather = null;
     }
 
     /**
@@ -77,6 +83,20 @@ public final class Table {
         List<String> shuffled = new ArrayList<>(provisions.deck());
         Collections.shuffle(shuffled, Objects.requireNonNull(rng, "rng"));
         provisionPile.addAll(shuffled);
+    }
+
+    /** 正式 M5 桌面：物资与天候都洗牌。 */
+    public Table(NavigationDeck pile, Provisions provisions, WeatherDeck weather, Random rng) {
+        this.pile = Objects.requireNonNull(pile, "pile");
+        this.provisions = Objects.requireNonNull(provisions, "provisions");
+        this.weather = Objects.requireNonNull(weather, "weather");
+        List<String> shuffled = new ArrayList<>(provisions.deck());
+        Collections.shuffle(shuffled, Objects.requireNonNull(rng, "rng"));
+        provisionPile.addAll(shuffled);
+    }
+
+    public Optional<WeatherDeck> weather() {
+        return Optional.ofNullable(weather);
     }
 
     /** 物资的效果目录。 */

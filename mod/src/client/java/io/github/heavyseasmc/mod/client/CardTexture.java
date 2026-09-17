@@ -41,6 +41,7 @@ public final class CardTexture extends AbstractTexture {
     private static final String PROVISION_DIR = "textures/gui/cards/provision";
     private static final String CHARACTER_DIR = "textures/gui/cards/character";
     private static final String BACK_DIR = "textures/gui/cards/back";
+    private static final String WEATHER_DIR = "textures/gui/cards/weather";
 
     /** 已经换成本类载入的标识。只在渲染线程上碰。 */
     private static final Set<Identifier> REGISTERED = new HashSet<>();
@@ -90,6 +91,12 @@ public final class CardTexture extends AbstractTexture {
                 x, y, w, h, 0f, 0f, 1, 1, 1, 1);
     }
 
+    /** 天候卡是横版 7:5；调用方负责按该比例排版。 */
+    public static void drawWeather(DrawContext context, String weatherId, int x, int y, int w, int h) {
+        context.drawTexture(ensure(Identifier.of(HeavySeasMod.MOD_ID, WEATHER_DIR + "/" + weatherId + ".png")),
+                x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+    }
+
     /**
      * 进服时把全部卡面（物资 · 角色 · 牌背）先载好。
      *
@@ -97,7 +104,7 @@ public final class CardTexture extends AbstractTexture {
      * 那一帧会卡一下，而「发」的动画按墙钟算，卡掉的那几十毫秒会直接跳过去。
      */
     public static void preload(MinecraftClient client) {
-        for (String dir : new String[]{PROVISION_DIR, CHARACTER_DIR, BACK_DIR}) {
+        for (String dir : new String[]{PROVISION_DIR, CHARACTER_DIR, BACK_DIR, WEATHER_DIR}) {
             client.getResourceManager()
                     .findResources(dir, id -> id.getPath().endsWith(".png"))
                     .keySet().stream()

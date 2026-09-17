@@ -55,6 +55,11 @@ public final class MistSea {
      */
     public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
                                    Set<CharacterId> reservedForDummies) {
+        startVoyage(server, players, humans, reservedForDummies, null);
+    }
+
+    public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
+                                   Set<CharacterId> reservedForDummies, List<CharacterId> selectedRoster) {
         ServerWorld sea = world(server);
         if (sea == null) {
             throw new IllegalStateException("heavyseas:mist_sea 维度未加载");
@@ -83,7 +88,11 @@ public final class MistSea {
                 player.teleport(sea, BOAT_ORIGIN.x, BOAT_ORIGIN.y + 1.0, BOAT_ORIGIN.z,
                         BOAT_YAW + 180f, 0f);
             }
-            GameFlow.start(sea, players, humans, reservedForDummies, BOAT_ORIGIN, BOAT_YAW);
+            if (selectedRoster == null) {
+                GameFlow.start(sea, players, humans, reservedForDummies, BOAT_ORIGIN, BOAT_YAW);
+            } else {
+                GameFlow.start(sea, players, humans, reservedForDummies, BOAT_ORIGIN, BOAT_YAW, selectedRoster);
+            }
             LOGGER.info("雾海：{} 名玩家已托管物品并进入独立维度", crossed.size());
         } catch (RuntimeException failure) {
             Gulls.clear(sea, component);
@@ -157,7 +166,7 @@ public final class MistSea {
         }
         if (restore(component, player)) {
             checkpoint(player.server, "雾海异常中断恢复");
-            player.sendMessage(Text.translatable("heavyseas.mist_sea.recovered"), false);
+            player.sendMessage(Text.translatable("heavyseas.mist_sea.recovered"), true);
             LOGGER.info("雾海恢复：{} 的物品与返回位置已恢复", player.getGameProfile().getName());
         }
     }

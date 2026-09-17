@@ -51,8 +51,24 @@ public final class NavigationPhase {
     /** 进入航海阶段时由 {@link GameFlow#announceTurn} 调用。 */
     public static void begin(ServerWorld world, GameComponent component) {
         Session session = component.requireSession();
-        if (session.navigatedThisTurn().isPresent() || component.helmDeadline() > 0) {
+        if (session.navigationComplete() || component.helmDeadline() > 0) {
             return;                           // 这一回合已经结算过，或者窗口已经开着：别再开一次
+        }
+        if (session.weatherNavigationPending()) {
+            GameFlow.broadcast(world, Text.translatable("heavyseas.game.weather_extra_navigation")
+                    .formatted(Formatting.AQUA));
+            LOGGER.info("狂风：标准航海前额外翻一张航海牌");
+            GameFlow.navigateWeather(world, component);
+            return;
+        }
+        if (session.currentWeather().map(card -> card.effect()
+                == io.github.heavyseasmc.engine.weather.WeatherEffect.SKIP_NAVIGATION).orElse(false)) {
+            session.skipNavigation();
+            GameFlow.broadcast(world, Text.translatable("heavyseas.game.weather_skip_navigation")
+                    .formatted(Formatting.AQUA));
+            LOGGER.info("风平浪静：跳过航海阶段，照常结束一天并清标记");
+            GameFlow.afterNavigation(world, component);
+            return;
         }
         // 舵手握着指南针时，挑牌之前多抽一张进划船堆（设计决策 §8.1）。必须排在「能不能挑」之前 ——
         // ❗这一行原先没有：指南针在真实对局里从来不生效，而单测、出口验收、实拍全都是绿的（ADR-0021 §9）。

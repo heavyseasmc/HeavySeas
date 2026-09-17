@@ -103,4 +103,20 @@ public record RosterData(List<Survivor> characters, Map<Integer, List<CharacterI
         ids.forEach(id -> chosen.add(get(id)));
         return new Roster(List.copyOf(chosen));
     }
+
+    /** 房主自定义阵容。必须恰为 6–8 个已知且不重复的角色，最终仍按固定座位排序。 */
+    public Roster select(List<CharacterId> ids) {
+        Objects.requireNonNull(ids, "ids");
+        if (ids.size() < 6 || ids.size() > 8) {
+            throw new IllegalArgumentException("自定义阵容必须有 6–8 个角色，实际是 " + ids.size());
+        }
+        Set<CharacterId> unique = new LinkedHashSet<>(ids);
+        if (unique.size() != ids.size()) {
+            throw new IllegalArgumentException("自定义阵容里有重复角色");
+        }
+        List<Survivor> chosen = new ArrayList<>(ids.size());
+        unique.forEach(id -> chosen.add(get(id)));
+        chosen.sort(java.util.Comparator.comparingInt(Survivor::seat));
+        return new Roster(List.copyOf(chosen));
+    }
 }
