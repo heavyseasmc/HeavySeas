@@ -108,7 +108,7 @@ public final class RosterScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // 原版 Screen 会先画背景再画控件；标题必须最后画，否则真客户端上会被背景的
+        // Minecraft 的 Screen 会先画背景再画控件；标题必须最后画，否则真客户端上会被背景的
         // 模糊 pass 一起处理，按钮清楚而标题看不清。不要另调 renderBackground，会重复模糊整帧。
         super.render(context, mouseX, mouseY, delta);
         context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 16, 0xFFFFFF);

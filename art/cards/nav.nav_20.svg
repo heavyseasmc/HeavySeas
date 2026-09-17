@@ -60,15 +60,15 @@
       </g>
     </g>
     <g id="header">
-      <circle cx="28" cy="29.5" r="3.4" fill="#8A5A3C"/>
+      <circle class="lod2-hide" cx="28" cy="29.5" r="3.4" fill="#8A5A3C"/>
       <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">航海</text>
       <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 20</text>
-      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">水手落海</text>
+      <text class="cjk lod2-hide" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">水手落海</text>
       <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
       <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
     </g>
     <g id="overboard" clip-path="url(#cBand)">
-    <text class="cjk lod1-hide" x="28" y="94.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">落海</text>
+    <text class="cjk lod2-hide" x="28" y="94.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">落海</text>
       <rect x="16.0" y="180.0" width="268.0" height="46.0" fill="url(#seaFade)"/>
       <line x1="16.0" y1="180.0" x2="284.0" y2="180.0" stroke="#241E1A" stroke-width="1.5" opacity="0.8"/>
       <g transform="translate(150 152.0) scale(0.4821) translate(-150 -196)">
@@ -119,7 +119,7 @@
     <text class="cjk lod2-hide" x="150" y="246.0" font-size="19" font-weight="700" text-anchor="middle" fill="#241E1A">水手</text>
     <line class="lod1-hide" x1="40" y1="258.0" x2="260" y2="258.0" stroke="#241E1A" stroke-width="0.8" opacity="0.45"/>
     <g id="thirst" class="lod2-hide">
-    <text class="cjk lod1-hide" x="28" y="274.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">口渴</text>
+    <text class="cjk lod2-hide" x="28" y="274.0" font-size="9.5" font-weight="700" letter-spacing="2.2" fill="#55483B" opacity="0.85">口渴</text>
       <g>
         <rect x="59.0" y="282.0" width="42.0" height="26.0" rx="3" fill="#CBB995" opacity="0.5"/>
         <rect x="59.0" y="282.0" width="42.0" height="26.0" rx="3" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.55"/>
@@ -153,5 +153,6 @@
       </g>
     </g>
     <text class="cjk lod01-hide" x="150" y="368" font-size="30" font-weight="700" letter-spacing="3" text-anchor="middle" fill="#241E1A">水手落海</text>
+    <text class="cjk lod01-hide" x="150" y="300.0" font-size="14.44" font-weight="500" text-anchor="middle" fill="#241E1A">口渴：船长、大副、珠宝商、打过架的人</text>
   </g>
 </svg>

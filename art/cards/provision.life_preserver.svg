@@ -54,10 +54,10 @@
       </g>
     </g>
     <g id="header">
-      <circle cx="28" cy="29.5" r="3.4" fill="#8A6A3C"/>
+      <circle class="lod2-hide" cx="28" cy="29.5" r="3.4" fill="#8A6A3C"/>
       <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">装备</text>
       <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 07</text>
-      <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">救生圈</text>
+      <text class="cjk lod2-hide" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">救生圈</text>
       <line class="lod2-hide" x1="24" y1="70.0" x2="276" y2="70.0" stroke="#241E1A" stroke-width="1.4" opacity="0.9"/>
       <line class="lod2-hide" x1="24" y1="73.0" x2="276" y2="73.0" stroke="#241E1A" stroke-width="0.6" opacity="0.6"/>
     </g>

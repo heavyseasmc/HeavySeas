@@ -15,7 +15,7 @@ final class GameScreenSidebar {
             }
 
             // GameScreen.init 已在子类创建控件前改过一次；这里仍要重申，因为 AFTER_INIT 也在
-            // Screen.resize 后触发，而原版 resize 不再调用 protected init。每帧再算一次，让
+            // Screen.resize 后触发，而 Minecraft 的 resize 不再调用 protected init。每帧再算一次，让
             // 天候/通知在界面开着时出现或消失也能即时重排。
             gameScreen.reserveNotificationSidebar(scaledWidth);
             ScreenEvents.beforeRender(screen).register((ignored, context, mouseX, mouseY, delta) ->

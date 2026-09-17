@@ -51,7 +51,7 @@
       </g>
     </g>
     <g id="header">
-      <circle cx="28" cy="29.5" r="3.4" fill="#3D6360"/>
+      <circle class="lod2-hide" cx="28" cy="29.5" r="3.4" fill="#3D6360"/>
       <text class="cjk lod2-hide" x="38" y="33.0" font-size="10" font-weight="700" letter-spacing="2.4" fill="#55483B">天候</text>
       <text class="latin lod2-hide" x="102" y="33.0" font-size="9.5" font-weight="700" letter-spacing="1.2" fill="#55483B" opacity="0.8">No. 09</text>
       <text class="cjk" x="28" y="58.0" font-size="24" font-weight="700" letter-spacing="2" fill="#241E1A">雨天</text>
