@@ -14,6 +14,7 @@ import io.github.heavyseasmc.mod.net.RowDecisionC2S;
 import io.github.heavyseasmc.mod.net.UseProvisionC2S;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -31,9 +32,9 @@ import java.util.Optional;
  * 谁能行动、划船抽几张、行动完轮到谁，全在引擎里 —— 与 {@link ProvisionPhase} 同一条分工。
  * 本类只做三件事：<b>认人、调用、播报</b>，然后交给 {@link GameFlow#finishAction} 推进。
  *
- * <h2>这两面都不计时</h2>
- * 交互稿：行动一面「本身不计时」；划船一面不计时是用户 2026-09-15 定的。所以这里没有 tick、没有超时代选。
- * 代价说出来：真人在轮到自己时掉线，局面会停住 —— 决策 ⑧ 的 {@code offline} 标志还没做（ADR-0019 §3）。
+ * <h2>掉线保底</h2>
+ * 行动选择给较长窗口，超时按「什么也不做」；划船给较短窗口，超时只把尚未决定的牌塞回牌堆底。
+ * 截止时间只在服务端判，客户端显示同一份投影，掉线或关界面都不会把整局永久卡住。
  *
  * <h2>划船分两步</h2>
  * 点「划船」时服务端抽 2 张，只写进划船者那一包（{@code GameComponent#writeView}）；他一张一张定，
@@ -44,6 +45,12 @@ import java.util.Optional;
  * 出口验收（{@code playthrough-check.sh}）关着开关打的那一局靠的就是它。
  */
 public final class ActionPhase {
+
+    /** 行动主界面：留一分钟谈判，超时按 Pass。 */
+    public static final long ACTION_MILLIS = 60_000L;
+
+    /** 划船逐张决定：牌已经看见，只给较短的保底窗口。 */
+    public static final long ROW_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -259,6 +266,9 @@ public final class ActionPhase {
         try {
             Session session = component.requireSession();
             List<NavigationCard> drawn = session.beginRow(who);
+            if (session.rower().isPresent()) {
+                component.openActionWindow(ROW_MILLIS);
+            }
             GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
             if (session.rower().isEmpty()) {
                 finishRow(world, component, who);
@@ -306,6 +316,67 @@ public final class ActionPhase {
         GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowed", GameFlow.characterName(who),
                 session.table().rowStack().size()));
         GameFlow.finishAction(world, component, who);
+    }
+
+    /** 每 tick 检查行动与划船窗口。0 表示没有窗口，不能被当成已超时。 */
+    public static void tick(MinecraftServer server) {
+        long now = System.currentTimeMillis();
+        for (ServerWorld world : server.getWorlds()) {
+            GameComponent component = GameComponents.of(world);
+            if (!windowExpired(component.actionDeadline(), now)) {
+                continue;
+            }
+            if (component.session().isEmpty()) {
+                component.clearActionWindow();
+                continue;
+            }
+            Session session = component.requireSession();
+            if (session.state().isOver() || session.state().phase() != Phase.ACTION) {
+                component.clearActionWindow();
+                continue;
+            }
+            if (component.designating().isPresent() || session.contest().isPresent()) {
+                component.clearActionWindow();
+                continue;
+            }
+            Optional<CharacterId> rower = session.rower();
+            if (rower.isPresent()) {
+                int returned = returnUndecided(session);
+                component.clearActionWindow();
+                LOGGER.info("划船超时：{} 有 {} 张未决定，全部塞回牌堆底", rower.get().value(), returned);
+                GameFlow.broadcast(world, Text.translatable("heavyseas.row.timed_out",
+                        GameFlow.characterName(rower.get()), returned).formatted(Formatting.GRAY));
+                finishRow(world, component, rower.get());
+                continue;
+            }
+            Optional<CharacterId> actor = session.nextActor();
+            component.clearActionWindow();
+            if (actor.isEmpty()) {
+                continue;
+            }
+            component.clearProvisionTarget();
+            LOGGER.info("行动超时：{} 什么也不做", actor.get().value());
+            GameFlow.broadcast(world, Text.translatable("heavyseas.action.timed_out",
+                    GameFlow.characterName(actor.get())).formatted(Formatting.GRAY));
+            GameFlow.finishAction(world, component, actor.get());
+        }
+    }
+
+    static boolean windowExpired(long deadline, long now) {
+        return deadline > 0L && now >= deadline;
+    }
+
+    /** 超时保留已经做出的选择，只替还悬着的牌选择「塞回牌堆底」。 */
+    static int returnUndecided(Session session) {
+        List<Session.RowCard> cards = session.rowing();
+        int returned = 0;
+        for (int i = 0; i < cards.size(); i++) {
+            if (cards.get(i).fate() == Session.RowFate.UNDECIDED) {
+                session.decideRow(i, false);
+                returned++;
+            }
+        }
+        return returned;
     }
 
     /**

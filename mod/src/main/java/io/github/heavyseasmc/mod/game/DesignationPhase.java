@@ -52,6 +52,7 @@ public final class DesignationPhase {
      */
     public static void begin(ServerWorld world, GameComponent component, CharacterId actor, Contest.Kind kind) {
         boolean quiet = quiet(component, actor);
+        component.clearActionWindow();
         component.beginDesignation(actor, kind, WINDOW_MILLIS);
         ServerPlayerEntity player = playerOf(world, component, actor);
         if (player != null && !quiet) {
@@ -116,6 +117,7 @@ public final class DesignationPhase {
     public static void cancel(ServerWorld world, GameComponent component, CharacterId actor) {
         LOGGER.info("指定模式：{} 取消了", actor.value());
         finish(world, component, actor);
+        component.openActionWindow(ActionPhase.ACTION_MILLIS);
         GameComponents.sync(world);
     }
 

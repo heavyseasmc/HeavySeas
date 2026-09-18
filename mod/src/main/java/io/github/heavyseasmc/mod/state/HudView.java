@@ -47,6 +47,8 @@ import java.util.Optional;
  * @param myScore   计分阶段收件人自己的四项明细；不在计分阶段时为 {@link Score#NONE}
  * @param thirstPrompt 口渴结算正在问谁、还需化解几次、已经有人替他打了几张、还剩多久 · <b>公开</b>
  * @param yourTurn  行动阶段正轮到他、而且他没有划船抽到还没定完的牌 —— ❗只在行动阶段为真（见 GameComponent 的 writeView）
+ * @param actionDeadlineMs 当前行动或划船决定的超时时刻；只投影给正在决定的人
+ * @param actionWindowMs 当前窗口原本有多长，用来画完整倒计时横杠
  * @param designating  他正举着拳头找人（ADR-0025）· <b>只有本人</b>；别人看的是世界里那个发光的人
  * @param designateUntil 举着拳头的超时时刻（服务端时钟）；0 = 没在举
  * @param provisionTargetCard 正等收件人替哪张特殊物资挑目标；空串 = 没在挑 · <b>只有本人</b>
@@ -61,7 +63,8 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
                       List<String> seats, List<String> removed, String actor, Sea sea, Thirst thirstPrompt,
                       Endgame endgame, ContestView contest, boolean seated, String character,
                       int health, int maxHealth, Condition condition, int thirst, String love, String hate,
-                      boolean yourTurn, boolean designating, long designateUntil,
+                      boolean yourTurn, long actionDeadlineMs, long actionWindowMs,
+                      boolean designating, long designateUntil,
                       String provisionTargetCard, List<MedicalTarget> provisionTargets, int myDonatedWater,
                       List<String> hand, List<FrontCard> front, Score myScore) {
 
@@ -87,7 +90,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
             false, 0, Phase.PROVISION, 0, "", List.of(), List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
-            ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, false, 0L,
+            ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, 0L, 0L, false, 0L,
             "", List.of(), 0, List.of(), List.of(), Score.NONE);
 
     /** The finale is public to everyone in the Mist Sea, including lobby spectators without a role. */

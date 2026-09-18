@@ -240,17 +240,17 @@ public final class GameFlow {
             announceOutcome(world, component);
             return;
         }
-        // ❗推投影要在分支**之前**。原先只有航海那一支推得到，于是物资→行动之后
-        //   HUD 与手牌界面停在「物资」阶段，直到有人行动才跟上 —— 不报错、不掉线，
-        //   只是看起来「这阶段怎么不变」。下面几条 return 各自补一行迟早会漏掉一条。
-        sync(world);
         if (session.state().phase() == Phase.ACTION) {
             Optional<CharacterId> actor = session.nextActor();
             if (actor.isEmpty()) {
+                component.clearActionWindow();
                 session.advancePhase();       // 没人能行动是合法状态，直接进航海
                 announceTurn(world, component);
                 return;
             }
+            component.openActionWindow(ActionPhase.ACTION_MILLIS);
+            // 投影要在播报与替身排程之前推出去，真人客户端才能在轮到他的第一帧拿到完整倒计时。
+            sync(world);
             GameComponent.Occupant who = component.occupantOf(actor.get()).orElseThrow();
             broadcast(world, Text.translatable("heavyseas.game.your_turn",
                     characterName(actor.get()), occupantName(component, actor.get())));
@@ -265,6 +265,10 @@ public final class GameFlow {
             }
             return;
         }
+        component.clearActionWindow();
+        // ❗推投影要在分支**之前**。原先只有航海那一支推得到，于是物资→行动之后
+        //   HUD 与手牌界面停在「物资」阶段，直到有人行动才跟上 —— 不报错、不掉线。
+        sync(world);
         if (session.state().phase() == Phase.NAVIGATION) {
             NavigationPhase.begin(world, component);
             return;
@@ -287,6 +291,7 @@ public final class GameFlow {
     /** 一个人行动结束：记标记，然后看还有没有下一个。 */
     public static void finishAction(ServerWorld world, GameComponent component, CharacterId actor) {
         Session session = component.requireSession();
+        component.clearActionWindow();
         component.clearProvisionTarget();
         session.markActed(actor);
         sync(world);
@@ -424,6 +429,7 @@ public final class GameFlow {
         }
         Session session = component.requireSession();
         GameState end = session.state();
+        component.clearActionWindow();
         broadcast(world, Text.translatable(outcomeKey(end.outcome().orElseThrow()),
                 end.turn(), session.aliveCount()).formatted(Formatting.GOLD));
         for (CharacterId id : end.bySeat()) {
@@ -442,11 +448,13 @@ public final class GameFlow {
     /**
      * <b>夹具</b>（{@code /seas land}）：海鸥直接置满，走正常的终局流程（ADR-0022 §7.7）。
      *
-     * <p>各面的计时一并停掉：补给箱、舵手、口渴的窗口若还开着，它们的超时会在终局序列里再推一下已经结束的对局。
+     * <p>各面的计时一并停掉：行动、补给箱、舵手、口渴的窗口若还开着，
+     * 它们的超时会在终局序列里再推一下已经结束的对局。
      */
     public static void landForFixture(ServerWorld world, GameComponent component) {
         Session session = component.requireSession();
         session.landForFixture();
+        component.clearActionWindow();
         component.clearProvisionTarget();
         component.clearProvision();
         component.clearHelm();

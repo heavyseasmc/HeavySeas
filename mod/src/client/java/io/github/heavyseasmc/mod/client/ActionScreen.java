@@ -25,10 +25,8 @@ import java.util.List;
  *   <li><b>下带（私有）</b>：你是谁、还剩多少。</li>
  * </ul>
  *
- * <h2>这一面不计时</h2>
- * 交互稿原话「这一面本身不计时」—— 所以舞台下方没有那条细横杠，也没有「超时替你选」。
- * 计时属于「指定模式」（15 秒不选人退回重选，再超时算 Pass），那一半还没做。
- * 也正因为不计时，Esc 可以把它收起来：玩家收起它是为了回到世界里谈判，按键再开。
+ * <h2>长倒计时</h2>
+ * 行动选择留一分钟谈判；超时按「什么也不做」。Esc 仍可收起，服务端倒计时继续走，按行动键可再开。
  *
  * <h2>「顿」在确认那一下</h2>
  * 稿子第三步：确认 —— 面板收起，交给世界。与补给箱里的「顿」同一个动词、同一组数（{@link GuiLanguage}）。
@@ -128,8 +126,12 @@ public final class ActionScreen extends GameScreen {
         drawPublicBand(context, view, TOP_BAND_Y);
         int railY = TOP_BAND_H + 4;
         int identityY = identityY();
+        int timeoutY = identityY - HINT_GAP - text;
+        int countdownY = timeoutY - HINT_GAP - text;
+        int barY = countdownY - BAR_TO_TEXT - BAR_H;
+        int hintY = barY - HINT_GAP - text;
         // 按钮连同下面那行说明，在座位轨与身份行之间居中。顶上留出「抬」与「顿」的高度，免得弹进轨里。
-        buttons = layoutButtons(railY + RAIL_H + topRoom(), identityY - BTN_GAP - text - HINT_GAP);
+        buttons = layoutButtons(railY + RAIL_H + topRoom(), hintY - BTN_GAP);
         drawRail(context, railY, rowWidth(buttons));
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
@@ -143,10 +145,8 @@ public final class ActionScreen extends GameScreen {
         }
 
         float snapP = GuiLanguage.snap(now, snapAt);
-        int bottom = 0;
         for (int i = 0; i < CHOICES.length; i++) {
             Box b = buttons.get(i);
-            bottom = Math.max(bottom, b.y() + b.h());
             lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
             float rise = -lift[i];
             float scale = 1f;
@@ -161,7 +161,12 @@ public final class ActionScreen extends GameScreen {
         }
         // 说明只跟焦点走一行：按不动的那几件，这一行说为什么。
         context.drawCenteredTextWithShadow(textRenderer, Text.translatable(CHOICES[focus].hint(view)),
-                width / 2, bottom + HINT_GAP, GuiLanguage.MUTED);
+                width / 2, hintY, GuiLanguage.MUTED);
+        int barW = countdownWidth(rowWidth(buttons));
+        drawCountdown(context, now, view.actionDeadlineMs(), view.actionWindowMs(),
+                (width - barW) / 2, barY, barW, countdownY);
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.action.timeout_hint"),
+                width / 2, timeoutY, GuiLanguage.DIM);
         drawIdentity(context, view, identityY);
     }
 

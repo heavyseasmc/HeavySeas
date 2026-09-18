@@ -27,8 +27,9 @@ import java.util.List;
  *   <li><b>下带（私有）</b>：高亮那张的完整说明（牌面上的字可能小到读不清），以及你是谁、还剩多少。</li>
  * </ul>
  *
- * <h2>不计时</h2>
- * 用户 2026-09-15 定。所以舞台下面没有那条细横杠；Esc 可以收起来回世界里谈，按行动键再开 —— 与行动一面同一个理由。
+ * <h2>短倒计时</h2>
+ * 划船决定给 20 秒；超时只把尚未决定的牌塞回牌堆底，已经定下的去向不反悔。
+ * Esc 可以收起来，服务端倒计时仍继续，按行动键可再开。
  *
  * <h2>两个去向：同一个动词，两个方向</h2>
  * ADR-0018 §7.4：留进划船堆往上「飞」（飞向上带那行划船堆的张数），塞回牌堆底往下「飞」出屏幕。
@@ -70,7 +71,9 @@ public final class RowScreen extends GameScreen {
     private Layout layout;
 
     /** 一帧的版面，全部以 GUI 单位计。 */
-    private record Layout(int w, int h, int left, int cardsTop, List<Box> buttons, int hintY, int identityY) {
+    private record Layout(int w, int h, int left, int cardsTop, List<Box> buttons,
+                          int barX, int barY, int barW, int countdownY,
+                          int hintY, int timeoutY, int identityY) {
 
         int cardX(int i) {
             return left + i * (w + CARD_GAP);
@@ -168,6 +171,10 @@ public final class RowScreen extends GameScreen {
             drawButtons(context, dt, l);
             drawHint(context, l);
         }
+        drawCountdown(context, now, view.actionDeadlineMs(), view.actionWindowMs(),
+                l.barX(), l.barY(), l.barW(), l.countdownY());
+        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.row.timeout_hint"),
+                width / 2, l.timeoutY(), GuiLanguage.DIM);
         drawIdentity(context, view, l.identityY());
     }
 
@@ -180,10 +187,13 @@ public final class RowScreen extends GameScreen {
         int fh = textRenderer.fontHeight;
         int lineH = fh + 1;
         int identityY = identityY();
-        int hintY = identityY - HINT_GAP - 2 * lineH;
+        int timeoutY = identityY - HINT_GAP - fh;
+        int hintY = timeoutY - HINT_GAP - 2 * lineH;
+        int countdownY = hintY - HINT_GAP - fh;
+        int barY = countdownY - BAR_TO_TEXT - BAR_H;
         int buttonH = buttonHeight();
         int top = SEA_LINE_Y + fh + liftRoom();          // 抬起来的牌连同金框不碰上带那一行
-        int bottomLimit = hintY - HINT_GAP;
+        int bottomLimit = barY - BELOW_CARDS;
         int n = Math.max(1, cards.size());
         int byHeight = bottomLimit - top - CARD_TO_BUTTONS - buttonH;
         int h = cardHeightFor(n, byHeight);
@@ -208,7 +218,9 @@ public final class RowScreen extends GameScreen {
             buttons.add(new Box(x, buttonsY, bw[b], buttonH));
             x += bw[b] + BTN_GAP;
         }
-        return new Layout(w, h, left, cardsTop, buttons, hintY, identityY);
+        int barW = countdownWidth(rowW);
+        return new Layout(w, h, left, cardsTop, buttons, (width - barW) / 2, barY, barW, countdownY,
+                hintY, timeoutY, identityY);
     }
 
     private void drawCard(DrawContext context, long now, long dt, Layout l, int i) {

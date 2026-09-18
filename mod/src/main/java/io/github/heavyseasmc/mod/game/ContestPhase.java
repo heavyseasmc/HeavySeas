@@ -72,6 +72,7 @@ public final class ContestPhase {
      */
     public static void declare(ServerWorld world, GameComponent component, CharacterId actor,
                                Contest.Kind kind, CharacterId target) {
+        component.clearActionWindow();
         Session session = component.requireSession();
         session.declare(actor, kind, target);
         boolean steal = kind == Contest.Kind.STEAL;
@@ -85,6 +86,7 @@ public final class ContestPhase {
 
     /** 打出绝境：无论有没有人反对都先弃牌；有反对资格的人按座位逐个表态。 */
     public static void beginRation(ServerWorld world, GameComponent component, CharacterId actor, String cardId) {
+        component.clearActionWindow();
         Session session = component.requireSession();
         Optional<List<CharacterId>> immediate = session.beginRation(actor, cardId);
         LOGGER.info("绝境：{} 打出 {}{}", actor.value(), cardId, immediate.isPresent() ? "，无人能反对" : "，等待反对");

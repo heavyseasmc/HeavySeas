@@ -284,9 +284,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         //   那是一句堆栈，不是一次被拒绝的操作。
         // ❗举着拳头时也不算「轮到你选一件事」：不排掉的话，按下「换座位」之后行动一面会当场弹回来，
         //   而它发出的包会被服务端当作「已经在指定模式里了」静默丢掉 —— 屏幕上只是「按了没反应」。
-        buf.writeBoolean(g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false)
+        boolean yourTurn = g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false)
                 && session.rower().isEmpty() && session.contest().isEmpty()
-                && designating().isEmpty() && provisionTargeter().isEmpty());
+                && designating().isEmpty() && provisionTargeter().isEmpty();
+        buf.writeBoolean(yourTurn);
+        boolean ownsActionWindow = g.phase() == Phase.ACTION && g.nextActor().map(id::equals).orElse(false)
+                && actionDeadline > 0L;
+        buf.writeVarLong(ownsActionWindow ? actionDeadline : 0L);
+        buf.writeVarLong(ownsActionWindow ? actionWindow : 0L);
         // 我正举着拳头找人吗（ADR-0025）· 还剩多久。只写给他自己 —— 别人看的是世界里那个发光的人。
         buf.writeBoolean(designating().map(id::equals).orElse(false));
         buf.writeVarLong(designating().map(id::equals).orElse(false) ? designationDeadline : 0L);
@@ -511,7 +516,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             return new HudView(true, turn, phase, gulls, weather, notifications, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
-                    false, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
+                    false, 0L, 0L, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
         }
         String character = buf.readString();
         int health = buf.readVarInt();
@@ -525,6 +530,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             myScore = new HudView.Score(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
         }
         boolean yourTurn = buf.readBoolean();
+        long actionDeadline = buf.readVarLong();
+        long actionWindow = buf.readVarLong();
         boolean designating = buf.readBoolean();
         long designateUntil = buf.readVarLong();
         String provisionTargetCard = buf.readString();
@@ -569,7 +576,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return new HudView(true, turn, phase, gulls, weather, notifications, seats, removed, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
-                love, hate, yourTurn, designating, designateUntil,
+                love, hate, yourTurn, actionDeadline, actionWindow, designating, designateUntil,
                 provisionTargetCard, provisionTargets, myDonatedWater,
                 List.copyOf(hand), List.copyOf(front), myScore);
     }
@@ -582,6 +589,31 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             out.add(buf.readString());
         }
         return out;
+    }
+
+    /**
+     * 行动选择与划船决定共用的运行时窗口。两者不会同时存在：按下划船后直接用较短窗口替换。
+     * 服务端持有截止时间，客户端只负责显示；掉线不会让整局永久停住。
+     */
+    private long actionDeadline;
+    private long actionWindow;
+
+    public long actionDeadline() {
+        return actionDeadline;
+    }
+
+    public long actionWindow() {
+        return actionWindow;
+    }
+
+    public void openActionWindow(long millis) {
+        this.actionDeadline = System.currentTimeMillis() + millis;
+        this.actionWindow = millis;
+    }
+
+    public void clearActionWindow() {
+        this.actionDeadline = 0L;
+        this.actionWindow = 0L;
     }
 
     /**
@@ -960,6 +992,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         }
         clearDesignation();
         clearProvisionTarget();
+        clearActionWindow();
         this.session = null;
         this.occupants.clear();
         clearProvision();

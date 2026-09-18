@@ -99,7 +99,7 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(ProvisionActionC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> ProvisionPhase.onAction(context.player(), payload)));
-        // 行动一面按下的那一下。这一面不计时，所以没有对应的 tick（见 ActionPhase）。
+        // 行动一面按下的那一下；掉线保底的服务端倒计时在下面的 ActionPhase.tick。
         PayloadTypeRegistry.playC2S().register(ActionChoiceC2S.ID, ActionChoiceC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(ActionChoiceC2S.ID,
                 (payload, context) -> context.player().server.execute(
@@ -109,7 +109,7 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(UseProvisionC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> ActionPhase.onUseProvision(context.player(), payload)));
-        // 划船一面上定下的一张。同样不计时。
+        // 划船一面上定下的一张。
         PayloadTypeRegistry.playC2S().register(RowDecisionC2S.ID, RowDecisionC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(RowDecisionC2S.ID,
                 (payload, context) -> context.player().server.execute(
@@ -140,6 +140,7 @@ public final class HeavySeasMod implements ModInitializer {
         // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
         ServerTickEvents.END_SERVER_TICK.register(Seats::tick);
         ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
+        ServerTickEvents.END_SERVER_TICK.register(ActionPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(NavigationPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ThirstPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ContestPhase::tick);
