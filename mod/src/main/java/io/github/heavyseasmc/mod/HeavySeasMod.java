@@ -68,9 +68,8 @@ public final class HeavySeasMod implements ModInitializer {
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。
         SeatEntity.register();
         GullEntity.register();
-        // ❗孤儿座位：对局不持久化，所以存档里留下的每一个座位都是上次没收干净的。
-        //   认的是「实体进世界」那一刻，不是起服那一刻 —— 起服时孤儿还躺在没加载的区块里，
-        //   第一版那样写实测永远报「清掉 0 个」，而世界里真有 7 个（ADR-0024 §9）。
+        // ❗孤儿座位：加载事件只登记，tick 末尾才清。加载回调仍在实体管理器的遍历里，
+        //   当场 discard 会让存档检查点抛 ConcurrentModificationException。
         ServerEntityEvents.ENTITY_LOAD.register(Seats::onSeatLoaded);
         // 队伍与座位同一个形状：它进 scoreboard.dat，上次没收干净的会原样留到下一次起服。
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
@@ -139,6 +138,7 @@ public final class HeavySeasMod implements ModInitializer {
                         () -> ContestPhase.onAction(context.player(), payload)));
 
         // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
+        ServerTickEvents.END_SERVER_TICK.register(Seats::tick);
         ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(NavigationPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ThirstPhase::tick);

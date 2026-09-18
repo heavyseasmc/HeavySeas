@@ -207,15 +207,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeVarInt(prompt.waterPerSource());
             buf.writeVarLong(thirstDeadline);
         }
-        // 终局（ADR-0022）：这一轮已经翻开的目标对全船公开；最后那张不翻的谁都不发；计分阶段只发合计。
-        // ❗四项明细不在这里 —— 明细会把没翻的那张泄出去（「所恨的人死了 7」就指明了是谁），下面只写给本人。
+        // 终局：这一轮已经翻开的目标对全船公开；计分阶段只发合计。
+        // ❗四项明细不在这里，下面只写给本人。
         buf.writeBoolean(endgame != null);
         if (endgame != null) {
             buf.writeEnumConstant(endgame.outcome());
             buf.writeVarInt(endgame.alive());
             buf.writeEnumConstant(endgame.stage());
             buf.writeVarInt(endgame.flipped());
-            buf.writeBoolean(endgame.withheld());
             Affinities aff = session.affinities().orElseThrow();
             boolean scoring = endgame.stage() == EndgameProgress.Stage.SCORES;
             boolean revealing = endgame.stage() == EndgameProgress.Stage.HATE
@@ -228,6 +227,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                 CharacterId target = endgame.stage() == EndgameProgress.Stage.HATE ? aff.hateOf(who) : aff.loveOf(who);
                 buf.writeString(open ? target.value() : "");
                 buf.writeVarInt(scoring ? endgame.scores().get(who).total() : -1);
+                buf.writeBoolean(endgame.isWinner(who));
             }
         }
 
@@ -472,13 +472,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             int alive = buf.readVarInt();
             EndgameProgress.Stage stage = buf.readEnumConstant(EndgameProgress.Stage.class);
             int flipped = buf.readVarInt();
-            boolean withheld = buf.readBoolean();
             int entryCount = buf.readVarInt();
             List<HudView.Endgame.Entry> entries = new ArrayList<>(entryCount);
             for (int i = 0; i < entryCount; i++) {
-                entries.add(new HudView.Endgame.Entry(buf.readString(), buf.readString(), buf.readVarInt()));
+                entries.add(new HudView.Endgame.Entry(buf.readString(), buf.readString(), buf.readVarInt(), buf.readBoolean()));
             }
-            endgame = new HudView.Endgame(outcome, alive, stage, flipped, withheld, entries);
+            endgame = new HudView.Endgame(outcome, alive, stage, flipped, entries);
         }
         boolean hasContest = buf.readBoolean();
         Contest.Kind contestKind = Contest.Kind.SWAP;
@@ -851,7 +850,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      *
      * <p>❗<b>不写进 NBT，也不该写</b>：对局本身就不持久化（存档时服务端会说「这一局不会被保存」），
      * 而实体是要存盘的 —— 存了它，重启之后就会有一份指着一局并不存在的对局的座位名单。
-     * 起服时那些座位一律当孤儿清掉（{@code Seats#sweep}）。
+     * 起服时那些座位会在实体加载后当作孤儿清掉（{@code Seats#onSeatLoaded} → {@code Seats#tick}）。
      */
     private List<UUID> seatIds = List.of();
 

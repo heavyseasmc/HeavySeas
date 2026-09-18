@@ -8,17 +8,22 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.decoration.DisplayEntity.BlockDisplayEntity;
 import net.minecraft.block.Blocks;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * 把「位次」摆进世界（ADR-0024）。船头到船尾一排座位，人真的坐在上面。
@@ -34,12 +39,14 @@ import java.util.UUID;
  *
  * <h2>座位不跨重启</h2>
  * 对局本身就不持久化（存档时服务端会打一行「有一局进行到第 N 回合，不会被保存」），
- * 所以<b>起服时看到的每一个座位都是孤儿</b>，{@link #sweep} 一律清掉 —— 不必去分辨哪些还有用。
+ * 所以<b>起服时从存档载入的对局座位都是孤儿</b>：{@link #onSeatLoaded} 先登记，{@link #tick}
+ * 在实体加载遍历结束后统一清掉。大厅座位仍以锚点救生艇是否存在为准。
  */
 public final class Seats {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
     private static final String HULL_TAG = "heavyseas_hull";
+    private static final Queue<LoadedEntity> LOADED_ENTITIES = new ConcurrentLinkedQueue<>();
 
     /** 船头到船尾，相邻两个座位隔多远（格）。一格：坐满八个人正好是一条小艇的长度。 */
     private static final double SPACING = 1.0;
@@ -183,6 +190,32 @@ public final class Seats {
      * 实体加载事件是在它<b>真的进世界那一刻</b>触发的：起服、区块重载、玩家走过去，全都算。
      */
     public static void onSeatLoaded(Entity entity, ServerWorld world) {
+        if (!entity.getCommandTags().contains(HULL_TAG)
+                && (!(entity instanceof SeatEntity seat) || !seat.ours())) {
+            return;
+        }
+        // ENTITY_LOAD fires while Minecraft's entity manager may be iterating its backing collection.
+        // Removing here makes a save/checkpoint fail with ConcurrentModificationException. Keep only
+        // stable identifiers and resolve the entity again after that work has finished.
+        LOADED_ENTITIES.add(new LoadedEntity(world.getRegistryKey(), entity.getUuid()));
+    }
+
+    /** Cleans entities observed during loading after the entity manager has finished its iteration. */
+    public static void tick(MinecraftServer server) {
+        LoadedEntity loaded;
+        while ((loaded = LOADED_ENTITIES.poll()) != null) {
+            ServerWorld world = server.getWorld(loaded.world());
+            if (world == null) {
+                continue;
+            }
+            Entity entity = world.getEntity(loaded.entity());
+            if (entity != null) {
+                removeIfOrphan(entity, world);
+            }
+        }
+    }
+
+    private static void removeIfOrphan(Entity entity, ServerWorld world) {
         if (entity.getCommandTags().contains(HULL_TAG)) {
             if (!GameComponents.of(world).boatDisplayIds().contains(entity.getUuid())) {
                 entity.discard();
@@ -209,6 +242,9 @@ public final class Seats {
         seat.discard();
         // 与语言无关的一行：验收靠它判「孤儿真的被清了」。一个一行 —— 孤儿本来就该是罕见的。
         LOGGER.info("座位：清掉一个孤儿（存档里留下的）");
+    }
+
+    private record LoadedEntity(RegistryKey<World> world, UUID entity) {
     }
 
     /** One interpolation step of the M4 shore approach; passengers remain mounted throughout. */

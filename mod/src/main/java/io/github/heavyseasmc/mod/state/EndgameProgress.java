@@ -14,21 +14,18 @@ import java.util.Objects;
  * 终局序列走到哪了（ADR-0022）。服务端的运行时状态，<b>不持久化</b> —— 理由同补给箱与舵手那几项。
  *
  * <h2>三段</h2>
- * 翻恨一轮 → 翻爱一轮 → 计分面板。每一轮按 {@link #order} 逐个翻，<b>最后一张不翻</b>（决策 ⑪ 补丁二）：
- * 翻到只剩最后一人时停下，{@link #withheld} 置位，停一会儿再进下一段。
+ * 翻恨一轮 → 翻爱一轮 → 计分面板。每一轮按 {@link #order} 逐个翻完全部角色。
  *
  * @param outcome  这一局怎么结束的
  * @param turn     结束在第几回合
  * @param alive    终局时还活着几个人
- * @param order    翻牌次序：终局那一刻的座位序（船头 → 船尾），<b>含被移出游戏的人</b> ——
- *                 少翻一个，「最后一张靠置换推出来」就不成立了
+ * @param order    翻牌次序：最终总分从低到高；同分保持终局座位序，<b>含被移出游戏的人</b>
  * @param stage    正在哪一段
  * @param flipped  这一轮已经翻开了几张（翻的是 {@code order} 的前 {@code flipped} 个）
- * @param withheld 这一轮已经走到最后一张、而且决定了不翻
  * @param scores   四项计分，终局一开始就算好 —— 翻牌不改变任何人的分
  */
 public record EndgameProgress(GameState.Outcome outcome, int turn, int alive, List<CharacterId> order,
-                              Stage stage, int flipped, boolean withheld, Map<CharacterId, ScoreSheet> scores) {
+                              Stage stage, int flipped, Map<CharacterId, ScoreSheet> scores) {
 
     /** M4's shore approach, followed by the two reveal rounds and scores. */
     public enum Stage {
@@ -51,35 +48,33 @@ public record EndgameProgress(GameState.Outcome outcome, int turn, int alive, Li
             throw new IllegalArgumentException("终局没有人可翻");
         }
         // During ARRIVAL this field is an animation step (0..8); during reveals it is a card count.
-        int maximum = stage == Stage.ARRIVAL ? 8 : order.size() - 1;
+        int maximum = stage == Stage.ARRIVAL ? 8 : order.size();
         if (flipped < 0 || flipped > maximum) {
-            throw new IllegalArgumentException("翻开张数越界：%d（共 %d 人，最后一张不翻）".formatted(flipped, order.size()));
+            throw new IllegalArgumentException("翻开张数越界：%d（共 %d 人）".formatted(flipped, order.size()));
         }
         if (!scores.keySet().containsAll(order)) {
             throw new IllegalArgumentException("有人没有算分：翻牌 %s，计分 %s".formatted(order, scores.keySet()));
         }
     }
 
-    /** 这一轮的最后一个人（他的牌不翻）。 */
-    public CharacterId last() {
-        return order.get(order.size() - 1);
-    }
-
     public EndgameProgress withFlipped(int n) {
-        return new EndgameProgress(outcome, turn, alive, order, stage, n, withheld, scores);
+        return new EndgameProgress(outcome, turn, alive, order, stage, n, scores);
     }
 
-    public EndgameProgress withWithheld() {
-        return new EndgameProgress(outcome, turn, alive, order, stage, flipped, true, scores);
+    /** 最高分可以并列；并列者都使用胜者揭牌演出。 */
+    public boolean isWinner(CharacterId id) {
+        int best = order.stream().map(scores::get).mapToInt(ScoreSheet::total).max().orElseThrow();
+        ScoreSheet score = scores.get(Objects.requireNonNull(id, "id"));
+        return score != null && score.total() == best;
     }
 
-    /** 下一段：恨 → 爱 → 计分。翻开张数与「不翻」一起清零。 */
+    /** 下一段：恨 → 爱 → 计分。翻开张数清零。 */
     public EndgameProgress nextStage() {
         Stage next = switch (stage) {
             case ARRIVAL -> Stage.HATE;
             case HATE -> Stage.LOVE;
             case LOVE, SCORES -> Stage.SCORES;
         };
-        return new EndgameProgress(outcome, turn, alive, order, next, 0, false, scores);
+        return new EndgameProgress(outcome, turn, alive, order, next, 0, scores);
     }
 }

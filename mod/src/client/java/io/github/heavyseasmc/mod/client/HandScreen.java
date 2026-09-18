@@ -195,7 +195,7 @@ public final class HandScreen extends GameScreen {
         }
         drawIdentity(context, view, statusY);
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
-        //   与 HUD 那一行「按 H 查看」同一条理由。
+        //   与 HUD 那一行「按绑定键查看」同一条理由。
         if (!hand.isEmpty()) {
             context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hand.keys"),
                     width / 2, statusY + (affinityRoom > 0 ? 2 : 1) * (textRenderer.fontHeight + 2), GuiLanguage.MUTED);
@@ -281,7 +281,7 @@ public final class HandScreen extends GameScreen {
         List<String> hand = view.hand();
         if (hand.isEmpty()) {
             // 空手也留出大图的位置：身份那一行不能因为手上没牌就跳到别处去。
-            // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按 H 进来的人，要的是「一张都没有」。
+            // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按绑定键进来的人，要的是「一张都没有」。
             boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
             context.drawCenteredTextWithShadow(textRenderer,
                     Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
@@ -397,7 +397,7 @@ public final class HandScreen extends GameScreen {
             use();
             return true;
         }
-        // 用哪个键开的，就用哪个键收起来。写死 H 的话玩家改了键位就收不起来了。
+        // 用哪个键开的，就用哪个键收起来。写死 R 的话玩家改了键位就收不起来了。
         if (HeavySeasClient.handKey().matchesKey(keyCode, scanCode)) {
             close();
             return true;

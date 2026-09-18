@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -32,12 +33,12 @@ import java.util.Map;
  * 没有任何人要做选择，所以没有倒计时、没有超时代选；节奏由排程推进（{@code GameComponent#schedule}），
  * 一步一个 tick 起跳 —— 与替身自动推进同一个理由：当场递归的话，没有真人时整段会在一次调用里演完，客户端一帧都看不到。
  *
- * <h2>每轮最后一张不翻</h2>
- * 爱恨是置换，翻到只剩一人时全船已经推得出来 —— 就停在那儿，让人自己喊（决策 ⑪ 补丁二）。
- * 所以那一张<b>谁都不发</b>：服务端日志也只写「最后一张不翻（谁）」，不写他指着谁。
+ * <h2>低分先翻，胜者最后</h2>
+ * 两轮都按最终总分从低到高揭完全部角色；同分保持终局座位序。最高分可以并列，并列胜者都走较慢的胜者揭牌演出。
  *
  * <h2>节奏</h2>
- * 有真人在座时每翻一张停 {@link #FLIP_HOLD_MS}、最后一张停 {@link #WITHHELD_HOLD_MS}、计分面板停 {@link #SCORE_HOLD_MS}；
+ * 有真人在座时普通角色每翻一张停 {@link #FLIP_HOLD_MS}、胜者停 {@link #WINNER_FLIP_HOLD_MS}、
+ * 计分面板停 {@link #SCORE_HOLD_MS}；
  * <b>没有真人时一律不停</b> —— 出口验收里没人要看。这几个数属 ADR-0018 §8「实现中打磨」那一列。
  */
 public final class EndgamePhase {
@@ -45,8 +46,8 @@ public final class EndgamePhase {
     /** 翻开一张之后停多久再点名下一个：翻 400ms + 看清 1.6s + 滑 550ms。 */
     public static final long FLIP_HOLD_MS = 2600L;
 
-    /** 每轮最后一张不翻，停多久让全船自己喊出来。 */
-    public static final long WITHHELD_HOLD_MS = 6000L;
+    /** 胜者翻牌 1.4s + 看清 1.6s + 滑 550ms，再留少量网络余量。 */
+    public static final long WINNER_FLIP_HOLD_MS = 3700L;
 
     /** 计分面板停多久再收起会话。{@code /seas end} 随时照样能提前结束。 */
     public static final long SCORE_HOLD_MS = 45_000L;
@@ -77,7 +78,7 @@ public final class EndgamePhase {
         EndgameProgress.Stage first = outcome == GameState.Outcome.LANDED
                 ? EndgameProgress.Stage.ARRIVAL : EndgameProgress.Stage.HATE;
         EndgameProgress progress = new EndgameProgress(outcome, end.turn(),
-                session.aliveCount(), end.bySeat(), first, 0, false, scores);
+                session.aliveCount(), revealOrder(end.bySeat(), scores), first, 0, scores);
         component.setEndgame(progress);
         if (first == EndgameProgress.Stage.ARRIVAL) {
             component.clearFog();
@@ -93,7 +94,7 @@ public final class EndgamePhase {
                 () -> step(world, component));
     }
 
-    /** 走一步：翻开当前这一张；或者宣布最后一张不翻；或者进下一段。 */
+    /** 走一步：翻开当前这一张，或者进下一段。 */
     static void step(ServerWorld world, GameComponent component) {
         EndgameProgress progress = component.endgame().orElseThrow(
                 () -> new IllegalStateException("终局序列在排程里，组件上却没有终局状态"));
@@ -119,7 +120,7 @@ public final class EndgamePhase {
             return;
         }
         boolean hate = progress.stage() == EndgameProgress.Stage.HATE;
-        if (progress.withheld()) {
+        if (progress.flipped() == progress.order().size()) {
             EndgameProgress next = progress.nextStage();
             component.setEndgame(next);
             if (next.stage() == EndgameProgress.Stage.SCORES) {
@@ -137,29 +138,24 @@ public final class EndgamePhase {
             return;
         }
         Affinities affinities = component.requireSession().affinities().orElseThrow();
-        int lastIndex = progress.order().size() - 1;
-        if (progress.flipped() < lastIndex) {
-            CharacterId who = progress.order().get(progress.flipped());
-            CharacterId target = hate ? affinities.hateOf(who) : affinities.loveOf(who);
-            LOGGER.info("终局揭示：{} · {} → {}（第 {}/{} 张）", hate ? "恨" : "爱", who.value(), target.value(),
-                    progress.flipped() + 1, progress.order().size());
-            GameFlow.broadcast(world, Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
-                    GameFlow.characterName(who), GameFlow.characterName(target)));
-            component.setEndgame(progress.withFlipped(progress.flipped() + 1));
-            GameComponents.sync(world);
-            GameFlow.schedule(component, hold(component, FLIP_HOLD_MS), "终局：点名下一个",
-                    () -> step(world, component));
-            return;
-        }
-        CharacterId last = progress.last();
-        // ❗只写他是谁，不写他指着谁：这一张谁都不发，日志也一样（开服的人往往也是玩家）。
-        LOGGER.info("终局揭示：{} · 最后一张不翻（{}）", hate ? "恨" : "爱", last.value());
-        GameFlow.broadcast(world, Text.translatable(hate ? "heavyseas.endgame.withheld_hate" : "heavyseas.endgame.withheld_love",
-                GameFlow.characterName(last)).formatted(Formatting.GRAY));
-        component.setEndgame(progress.withWithheld());
+        CharacterId who = progress.order().get(progress.flipped());
+        CharacterId target = hate ? affinities.hateOf(who) : affinities.loveOf(who);
+        LOGGER.info("终局揭示：{} · {} → {}（第 {}/{} 张）", hate ? "恨" : "爱", who.value(), target.value(),
+                progress.flipped() + 1, progress.order().size());
+        GameFlow.broadcast(world, Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
+                GameFlow.characterName(who), GameFlow.characterName(target)));
+        component.setEndgame(progress.withFlipped(progress.flipped() + 1));
         GameComponents.sync(world);
-        GameFlow.schedule(component, hold(component, WITHHELD_HOLD_MS), "终局：最后一张不翻",
+        long delay = progress.isWinner(who) ? WINNER_FLIP_HOLD_MS : FLIP_HOLD_MS;
+        GameFlow.schedule(component, hold(component, delay), "终局：点名下一个",
                 () -> step(world, component));
+    }
+
+    /** 分数升序；对象排序是稳定的，所以同分自动保留传入的终局座位序。 */
+    static List<CharacterId> revealOrder(List<CharacterId> seatOrder, Map<CharacterId, ScoreSheet> scores) {
+        List<CharacterId> order = new ArrayList<>(seatOrder);
+        order.sort(Comparator.comparingInt(id -> scores.get(id).total()));
+        return List.copyOf(order);
     }
 
     /** 全员合计播给全场，最高分点名；四项明细只在各自的计分面板上（投影按人裁剪）。 */

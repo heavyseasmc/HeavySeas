@@ -124,7 +124,7 @@ public final class GameHud {
                         HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW));
             }
             // ❗手上有牌却没有任何提示，等于没有手牌 —— 玩家不会去猜某个键能开一个界面。
-            //   显示的是**实际绑定的那个键**，不是写死的 H：改了键位还说 H 就是在说谎。
+            //   显示的是**实际绑定的那个键**，不是写死的 R：改了键位还说 R 就是在说谎。
             // 空手也写：爱恨在手牌那一面里，不写出来就没人知道去哪看自己恨谁（ADR-0022）。
             if (!view.hand().isEmpty() || !view.love().isEmpty()) {
                 lines.add(Text.translatable("heavyseas.hud.hand", view.hand().size(),

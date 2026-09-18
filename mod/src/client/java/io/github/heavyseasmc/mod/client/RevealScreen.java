@@ -31,7 +31,8 @@ import java.util.List;
  *
  * <h2>客户端只跟着投影走</h2>
  * 服务端每翻一张就把 {@code flipped} 加一；这一面看到它变大，就「翻」开刚才那一张，看清之后再「滑」到下一个人。
- * 投影里没翻开的目标<b>根本不在包里</b>（最后那张不翻的更是谁都不发），所以这一面想提前露也露不出来。
+ * 投影里没翻开的目标<b>根本不在包里</b>，所以这一面想提前露也露不出来。
+ * 并列最高分的胜者使用 1.4 秒的蓄势翻牌；服务端显式投影胜者标记，不由客户端猜最后几位。
  */
 public final class RevealScreen extends GameScreen {
 
@@ -56,7 +57,6 @@ public final class RevealScreen extends GameScreen {
     private HudView view = HudView.IDLE;
     private EndgameProgress.Stage shownStage;
     private int shownFlipped = -1;
-    private boolean shownWithheld;
     /** 台上是第几个人（翻牌次序里的下标）。 */
     private int stageWho;
     /** 台上这个人的牌翻开了没有。 */
@@ -100,11 +100,10 @@ public final class RevealScreen extends GameScreen {
         if (e.stage() != shownStage) {
             shownStage = e.stage();
             shownFlipped = e.flipped();
-            shownWithheld = e.withheld();
-            stageWho = e.withheld() ? last : Math.min(e.flipped(), last);
-            stageRevealed = false;
+            stageWho = Math.min(e.flipped(), last);
+            stageRevealed = e.flipped() == e.entries().size();
             pendingNext = -1;
-            flipAt = 0L;
+            flipAt = stageRevealed ? now - flipMillis(e.entries().get(stageWho)) : 0L;
             slideAt = now;                   // 这一轮的第一个人「滑」上台
             return;
         }
@@ -114,15 +113,12 @@ public final class RevealScreen extends GameScreen {
             stageRevealed = true;
             flipAt = now;
             slideAt = 0L;
-            pendingNext = e.flipped();
+            pendingNext = e.flipped() < e.entries().size() ? e.flipped() : -1;
             // 与语言无关的一行：GUI 回归靠它数「客户端真的翻了几张」。
             LOGGER.info("终局：翻开第 {} 张（{}）", e.flipped(), e.stage());
         }
-        if (e.withheld() && !shownWithheld) {
-            shownWithheld = true;
-            LOGGER.info("终局：最后一张不翻（{}）", e.stage());
-        }
-        if (stageRevealed && pendingNext >= 0 && now - flipAt >= GuiLanguage.FLIP_MS + VIEW_MS) {
+        if (stageRevealed && pendingNext >= 0
+                && now - flipAt >= flipMillis(e.entries().get(stageWho)) + VIEW_MS) {
             stageWho = Math.min(pendingNext, last);
             stageRevealed = false;
             pendingNext = -1;
@@ -186,7 +182,7 @@ public final class RevealScreen extends GameScreen {
         for (int i = 0; i < n; i++) {
             HudView.Endgame.Entry en = entries.get(i);
             int x = left + i * cell;
-            boolean midFlip = i == stageWho && stageRevealed && !GuiLanguage.flipShowsFront(now, flipAt);
+            boolean midFlip = i == stageWho && stageRevealed && !showsFront(now, en);
             boolean done = !en.target().isEmpty() && !midFlip;
             boolean here = i == stageWho && !done;
             int nameColor = here ? GuiLanguage.GOLD : done ? GuiLanguage.MUTED : GuiLanguage.DIM;
@@ -220,6 +216,9 @@ public final class RevealScreen extends GameScreen {
         int y = top + Math.max(0, (avail - h) / 2);
 
         CardTexture.drawCharacter(context, en.who(), left, y, w, h);
+        if (en.winner() && stageRevealed && showsFront(now, en)) {
+            context.drawBorder(left - 2, y - 2, w + 4, h + 4, GuiLanguage.GOLD);
+        }
 
         // 「恨」用朱砂 —— 它只给伤害与紧迫；「爱」不占语义色（ADR-0018 §7.3：多了就不成语义）。
         context.getMatrices().push();
@@ -229,8 +228,8 @@ public final class RevealScreen extends GameScreen {
         context.getMatrices().pop();
 
         int tx = left + w + labelW + 2 * GAP;
-        boolean front = stageRevealed && !en.target().isEmpty() && GuiLanguage.flipShowsFront(now, flipAt);
-        float sx = stageRevealed ? GuiLanguage.flipScaleX(now, flipAt) : 1f;
+        boolean front = stageRevealed && !en.target().isEmpty() && showsFront(now, en);
+        float sx = stageRevealed ? flipScaleX(now, en) : 1f;
         context.getMatrices().push();
         context.getMatrices().translate(tx + w / 2f, y, 0);
         context.getMatrices().scale(sx, 1f, 1f);
@@ -243,7 +242,7 @@ public final class RevealScreen extends GameScreen {
         context.getMatrices().pop();
     }
 
-    /** 舞台下面一行：问谁、揭晓了什么，或者「最后一张不翻」。 */
+    /** 舞台下面一行：问谁，或者揭晓了什么。 */
     private void drawSay(DrawContext context, long now, HudView.Endgame e, boolean hate, int y) {
         List<HudView.Endgame.Entry> entries = e.entries();
         if (stageWho < 0 || stageWho >= entries.size()) {
@@ -252,19 +251,29 @@ public final class RevealScreen extends GameScreen {
         HudView.Endgame.Entry en = entries.get(stageWho);
         Text line;
         int color = GuiLanguage.MUTED;
-        if (stageRevealed && !en.target().isEmpty() && GuiLanguage.flipShowsFront(now, flipAt)) {
+        if (stageRevealed && !en.target().isEmpty() && showsFront(now, en)) {
             line = Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
                     nameOf(en.who()), nameOf(en.target()));
-            color = GuiLanguage.INK;
-        } else if (e.withheld() && stageWho == entries.size() - 1) {
-            line = Text.translatable(hate ? "heavyseas.endgame.withheld_hate" : "heavyseas.endgame.withheld_love",
-                    nameOf(en.who()));
             color = GuiLanguage.INK;
         } else {
             line = Text.translatable(hate ? "heavyseas.reveal.asking_hate" : "heavyseas.reveal.asking_love",
                     nameOf(en.who()));
         }
         context.drawCenteredTextWithShadow(textRenderer, line, width / 2, y, color);
+    }
+
+    private static long flipMillis(HudView.Endgame.Entry entry) {
+        return entry.winner() ? GuiLanguage.WINNER_FLIP_MS : GuiLanguage.FLIP_MS;
+    }
+
+    private boolean showsFront(long now, HudView.Endgame.Entry entry) {
+        return entry.winner() ? GuiLanguage.winnerFlipShowsFront(now, flipAt)
+                : GuiLanguage.flipShowsFront(now, flipAt);
+    }
+
+    private float flipScaleX(long now, HudView.Endgame.Entry entry) {
+        return entry.winner() ? GuiLanguage.winnerFlipScaleX(now, flipAt)
+                : GuiLanguage.flipScaleX(now, flipAt);
     }
 
     @Override

@@ -240,6 +240,9 @@ public final class GuiLanguage {
     /** 翻：暗牌变明牌。全局唯一的「信息状态改变」，400ms，中点换面。 */
     public static final long FLIP_MS = 400L;
 
+    /** 胜者揭牌：先蓄势、再翻转、最后回弹，整段 1.4 秒。 */
+    public static final long WINNER_FLIP_MS = 1400L;
+
     /** 「翻」的缓动：CSS 的 {@code ease-in-out}，即 {@code cubic-bezier(.42,0,.58,1)}（交互稿的 {@code M.flip.ease}）。 */
     private static final float FLIP_X1 = .42f;
     private static final float FLIP_Y1 = 0f;
@@ -272,6 +275,37 @@ public final class GuiLanguage {
      */
     public static boolean flipShowsFront(long now, long startedAt) {
         return startedAt > 0L && now - startedAt >= FLIP_MS / 2;
+    }
+
+    /**
+     * 胜者揭牌的横向缩放。前 18% 向外蓄势，中间 64% 翻面，最后 18% 从 1.08 倍收回原尺寸。
+     * 这不是把普通翻牌简单放慢：胜者会先展开再回弹，连续并列时每个人都能独立走完整段。
+     */
+    public static float winnerFlipScaleX(long now, long startedAt) {
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) WINNER_FLIP_MS, 0f, 1f);
+        if (x < .18f) {
+            return 1f + .08f * smoothStep(x / .18f);
+        }
+        if (x > .82f) {
+            return 1f + .08f * (1f - smoothStep((x - .82f) / .18f));
+        }
+        float turn = (x - .18f) / .64f;
+        float eased = cubicBezier(turn, FLIP_X1, FLIP_Y1, FLIP_X2, FLIP_Y2);
+        float quarter = eased < .5f ? eased / .5f : (1f - eased) / .5f;
+        return Math.max(0.02f, 1.08f * (float) Math.abs(Math.cos(quarter * Math.PI / 2)));
+    }
+
+    /** 胜者揭牌在整段动画中点换到正面。 */
+    public static boolean winnerFlipShowsFront(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt >= WINNER_FLIP_MS / 2;
+    }
+
+    private static float smoothStep(float x) {
+        float clamped = MathHelper.clamp(x, 0f, 1f);
+        return clamped * clamped * (3f - 2f * clamped);
     }
 
     // ---------------------------------------------------------------- 顿 Snap

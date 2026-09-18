@@ -102,24 +102,23 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
      * @param alive    终局时还活着几个人
      * @param stage    正在哪一段；不在终局时为 {@code null}
      * @param flipped  这一轮已经翻开了几张
-     * @param withheld 这一轮已经停在最后一张（不翻）
      * @param entries  按翻牌次序的每个人：这一轮翻开了的带着目标（没翻开的是空串），计分阶段带着合计（其余时候是 -1）
      */
     public record Endgame(GameState.Outcome outcome, int alive, EndgameProgress.Stage stage, int flipped,
-                          boolean withheld, List<Entry> entries) {
+                          List<Entry> entries) {
 
         public Endgame {
             entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
         }
 
-        public static final Endgame NONE = new Endgame(null, 0, null, 0, false, List.of());
+        public static final Endgame NONE = new Endgame(null, 0, null, 0, List.of());
 
         public boolean active() {
             return stage != null;
         }
 
-        /** 一个人：他是谁、这一轮翻开的目标（没翻开是空串）、计分阶段的合计（其余时候 -1）。 */
-        public record Entry(String who, String target, int total) {
+        /** 一个人：他是谁、这一轮翻开的目标、计分合计，以及是否并列最高分。 */
+        public record Entry(String who, String target, int total, boolean winner) {
 
             public Entry {
                 Objects.requireNonNull(who, "who");

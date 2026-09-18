@@ -14,6 +14,7 @@ import io.github.heavyseasmc.mod.world.SeatEntity;
 import io.github.heavyseasmc.mod.world.GullEntity;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -47,7 +48,7 @@ public final class HeavySeasClient implements ClientModInitializer {
      * ADR-0017 定了 GUI 第一位、指令退出玩家路径。手牌是玩家整局最常回头看的东西
      * （「我还有没有水」决定敢不敢答应别人），让它挂在一条要打字的指令上等于没做。
      *
-     * <p>❗默认给 H，但界面里<b>不写死 H</b>：显示与关界面都走
+     * <p>❗默认给 R，但界面里<b>不写死 R</b>：显示与关界面都走
      * {@link KeyBinding#getBoundKeyLocalizedText()} 与 {@link KeyBinding#matchesKey}，
      * 否则玩家改了键位，提示就开始说谎。
      */
@@ -111,8 +112,9 @@ public final class HeavySeasClient implements ClientModInitializer {
         EntityRendererRegistry.register(GullEntity.TYPE, ParrotEntityRenderer::new);
 
         handKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_H,
+                "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R,
                 "key.categories.heavyseas"));
+        ClientLifecycleEvents.CLIENT_STARTED.register(HeavySeasClient::migrateLegacyHandKey);
         ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollHandKey);
         actKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.act", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G,
@@ -143,6 +145,27 @@ public final class HeavySeasClient implements ClientModInitializer {
                         screen.autoPicked(payload.index());
                     }
                 }));
+    }
+
+    /** Moves the former H default only when another action still occupies H. */
+    private static void migrateLegacyHandKey(MinecraftClient client) {
+        if (!handKey.getBoundKeyTranslationKey().equals("key.keyboard.h")) {
+            return;                           // 玩家已经改过，尊重他的设置
+        }
+        KeyBinding conflict = null;
+        for (KeyBinding binding : client.options.allKeys) {
+            if (binding != handKey && binding.getBoundKeyTranslationKey().equals("key.keyboard.h")) {
+                conflict = binding;
+                break;
+            }
+        }
+        if (conflict == null) {
+            return;                           // 没装占用 H 的模组时，旧绑定仍可继续用
+        }
+        client.options.setKeyCode(handKey, InputUtil.Type.KEYSYM.createFromCode(GLFW.GLFW_KEY_R));
+        KeyBinding.updateKeysByCode();
+        client.options.write();
+        LOGGER.info("键位：手牌旧默认 H 与 {} 冲突，已迁移到 R", conflict.getTranslationKey());
     }
 
     /**
