@@ -15,7 +15,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +40,11 @@ import java.util.List;
  * <h2>识别词只有一套：职业</h2>
  * 方案 §4.1：HUD 与卡面用同一个词，称呼层已取消。所以这里显示的是「珠宝商」，
  * 不是名字，也不是数值 —— 数值分不开人（陪酒女与小孩两项全同）。
+ *
+ * <h2>色只从 {@link GuiLanguage} 取</h2>
+ * 这些字与通知侧栏画在对局界面同一帧里（侧栏是每一面的最后一层）。原先用 Minecraft 自带的 {@code Formatting}
+ * 与纯白，于是同一帧上两种金（{@code #FFAA00} 与 {@code #C9A227}）、两种纸色 —— 2026-09-18 审查抓到的。
+ * 现在：轮到你 / 你 = 金 · 紧迫 = 朱砂 · 其余 = 纸与次要色，与各面同一张表（ADR-0018 §7.3）。
  */
 public final class GameHud {
 
@@ -48,8 +52,10 @@ public final class GameHud {
     private static final int LINE_HEIGHT = 10;
     /** 普通 HUD 底部留给热栏；对局 Screen 没有热栏，可以用到窗口底。 */
     private static final int HUD_BOTTOM_SAFE = 48;
-    /** 世界和第一人称手模不能透过历史文字抢可读性。 */
-    private static final int SIDEBAR_BACKGROUND = 0xE40B1620;
+
+    /** 一行字与它的颜色。颜色来自 {@link GuiLanguage}，不写进文本的样式里 —— 折行之后每一段照样拿得到。 */
+    private record Line(Text text, int color) {
+    }
 
     private GameHud() {
     }
@@ -68,17 +74,17 @@ public final class GameHud {
         if (!view.active()) {
             return;                          // 没有对局就什么都不画，不留一个空框
         }
-        List<Text> lines = new ArrayList<>();
-        lines.add(Text.translatable("heavyseas.status.header", view.turn(), GameScreen.phaseLabel(view),
-                view.gulls(), GameState.GULLS_TO_LAND).formatted(Formatting.GOLD));
+        List<Line> lines = new ArrayList<>();
+        lines.add(new Line(Text.translatable("heavyseas.status.header", view.turn(), GameScreen.phaseLabel(view),
+                view.gulls(), GameState.GULLS_TO_LAND), GuiLanguage.INK));
         if (!view.weather().isEmpty()) {
-            lines.add(Text.translatable("heavyseas.hud.weather", weatherName(view.weather()))
-                    .formatted(Formatting.AQUA));
+            lines.add(new Line(Text.translatable("heavyseas.hud.weather", weatherName(view.weather())),
+                    GuiLanguage.MUTED));
         }
         // 终局进行中不画划船堆与口渴：对局已经结束，「划船堆 0 张 · 舵手 X」只是停下那一刻的残影（2026-09-16 实拍）。
         boolean endgame = view.endgame().active();
         if (!endgame && (view.phase() == Phase.ACTION || view.phase() == Phase.NAVIGATION)) {
-            lines.add(seaLine(view));
+            lines.add(new Line(seaLine(view), GuiLanguage.INK));
         }
         // 口渴结算轮到谁，是**公开**的：全船都该看见在等谁（决策 ⑭ 的同一条 —— 等待要看得见）。
         if (!endgame && view.thirstPrompt().active()) {
@@ -88,50 +94,52 @@ public final class GameHud {
         if (!endgame && view.contest().active()) {
             lines.add(contestLine(view));
         }
-        view.sea().revealed().ifPresent(card -> lines.add(Text.translatable("heavyseas.hud.revealed",
-                NavCardText.describe(card, view.seats())).formatted(Formatting.AQUA)));
+        view.sea().revealed().ifPresent(card -> lines.add(new Line(Text.translatable("heavyseas.hud.revealed",
+                NavCardText.describe(card, view.seats())), GuiLanguage.INK)));
         if (view.seated()) {
-            lines.add(Text.translatable("heavyseas.hud.you",
+            // 「你」是金（ADR-0018 §7.3），与各面身份那一行同一个用法。
+            lines.add(new Line(Text.translatable("heavyseas.hud.you",
                     Text.translatable("heavyseas.character." + view.character()),
                     view.health(), view.maxHealth(),
-                    conditionName(view.condition()), view.thirst()));
+                    conditionName(view.condition()), view.thirst()), GuiLanguage.GOLD));
             // 终局进行中：翻牌那一面被 Esc 收起之后，得告诉他怎么再开（ADR-0022）。
             if (view.endgame().active()) {
-                lines.add(Text.translatable("heavyseas.hud.endgame",
-                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.GOLD));
+                lines.add(new Line(Text.translatable("heavyseas.hud.endgame",
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()), GuiLanguage.GOLD));
             }
             // 站队与挂武器两面收起来之后不会自己弹回来（见 HeavySeasClient#pollContest）。
             // ❗不写这一行，收起来的人就再也找不回那个界面了 —— 而窗口还在走。
             if (view.myContestChoice()) {
-                lines.add(Text.translatable("heavyseas.hud.contest_you",
-                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW));
+                lines.add(new Line(Text.translatable("heavyseas.hud.contest_you",
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()), GuiLanguage.GOLD));
             }
             // 举着拳头找人（ADR-0025）：不写这一行，玩家按下「换座位」之后界面一关，就不知道该干什么了。
+            // 有倒计时，到点就退回 —— 紧迫，朱砂。
             if (view.myDesignating()) {
                 long left = Math.max(0L, view.designateUntil() - System.currentTimeMillis());
-                lines.add(Text.translatable("heavyseas.hud.designating", (left + 999) / 1000,
-                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.RED));
+                lines.add(new Line(Text.translatable("heavyseas.hud.designating", (left + 999) / 1000,
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()), GuiLanguage.CINNABAR));
             }
             if (view.myTurnToAct()) {
                 // 键同样显示实际绑定的那个，理由同下面手牌那一行。
-                lines.add(Text.translatable("heavyseas.hud.your_turn",
-                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW));
+                lines.add(new Line(Text.translatable("heavyseas.hud.your_turn",
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()), GuiLanguage.GOLD));
             }
             if (view.myRowPending()) {
                 long left = view.sea().rowing().stream()
                         .filter(r -> r.fate() == Session.RowFate.UNDECIDED).count();
-                lines.add(Text.translatable("heavyseas.hud.rowing", left,
-                        HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW));
+                lines.add(new Line(Text.translatable("heavyseas.hud.rowing", left,
+                        HeavySeasClient.actKey().getBoundKeyLocalizedText()), GuiLanguage.GOLD));
             }
             // ❗手上有牌却没有任何提示，等于没有手牌 —— 玩家不会去猜某个键能开一个界面。
             //   显示的是**实际绑定的那个键**，不是写死的 R：改了键位还说 R 就是在说谎。
             // 空手也写：爱恨在手牌那一面里，不写出来就没人知道去哪看自己恨谁（ADR-0022）。
             if (!view.hand().isEmpty() || !view.love().isEmpty()) {
-                lines.add(Text.translatable("heavyseas.hud.hand", view.hand().size(),
-                        HeavySeasClient.handKey().getBoundKeyLocalizedText()));
+                lines.add(new Line(Text.translatable("heavyseas.hud.hand", view.hand().size(),
+                        HeavySeasClient.handKey().getBoundKeyLocalizedText()), GuiLanguage.INK));
             }
         } else {
-            lines.add(Text.translatable("heavyseas.hud.watching").formatted(Formatting.GRAY));
+            lines.add(new Line(Text.translatable("heavyseas.hud.watching"), GuiLanguage.MUTED));
         }
 
         // 折行：结算那一行（执行的航海牌）可能比窗口还宽，画出屏幕与没画长得一样。
@@ -139,9 +147,9 @@ public final class GameHud {
         int maxWidth = Math.max(80,
                 context.getScaledWindowWidth() - sidebar.sidebarWidth() - 3 * MARGIN);
         int y = MARGIN;
-        for (Text line : lines) {
-            for (OrderedText part : client.textRenderer.wrapLines(line, maxWidth)) {
-                context.drawTextWithShadow(client.textRenderer, part, MARGIN, y, 0xFFFFFF);
+        for (Line line : lines) {
+            for (OrderedText part : client.textRenderer.wrapLines(line.text(), maxWidth)) {
+                context.drawTextWithShadow(client.textRenderer, part, MARGIN, y, line.color());
                 y += LINE_HEIGHT;
             }
         }
@@ -171,7 +179,12 @@ public final class GameHud {
         return NotificationSidebarLayout.of(screenWidth, visible);
     }
 
-    /** 系统播报的固定侧栏：最新事件在最上面，保留最多八条，不污染聊天历史。 */
+    /**
+     * 系统播报的固定侧栏：最新事件在最上面，保留最多八条，不污染聊天历史。
+     *
+     * <p>底色就是各面那层 {@link GuiLanguage#BACKDROP}：它画在对局界面之上，另起一个色就是同一帧两种暗色。
+     * 播报文本自带的样式（服务端给战斗结算标的红）照原样显示 —— 那是服务端的事。
+     */
     private static void drawNotifications(DrawContext context, MinecraftClient client,
                                           String weather, List<Text> notifications,
                                           NotificationSidebarLayout layout) {
@@ -192,7 +205,7 @@ public final class GameHud {
         }
         int inner = width - 2 * MARGIN;
         List<OrderedText> rendered = new ArrayList<>();
-        rendered.add(Text.translatable("heavyseas.hud.notifications").formatted(Formatting.GOLD).asOrderedText());
+        rendered.add(Text.translatable("heavyseas.hud.notifications").asOrderedText());
         for (int i = notifications.size() - 1; i >= 0; i--) {
             rendered.addAll(client.textRenderer.wrapLines(notifications.get(i), inner));
         }
@@ -208,46 +221,41 @@ public final class GameHud {
             rendered = new ArrayList<>(rendered.subList(0, maxLines));
         }
         int height = rendered.size() * LINE_HEIGHT + 2 * MARGIN;
-        context.fill(x, y, x + width, y + height, SIDEBAR_BACKGROUND);
+        context.fill(x, y, x + width, y + height, GuiLanguage.BACKDROP);
         int textY = y + MARGIN;
-        for (OrderedText line : rendered) {
-            context.drawTextWithShadow(client.textRenderer, line, x + MARGIN, textY, 0xFFFFFF);
+        for (int i = 0; i < rendered.size(); i++) {
+            // 第一行是栏名（次要色），下面才是播报（纸色）。
+            context.drawTextWithShadow(client.textRenderer, rendered.get(i), x + MARGIN, textY,
+                    i == 0 ? GuiLanguage.MUTED : GuiLanguage.INK);
             textY += LINE_HEIGHT;
         }
     }
 
+    /**
+     * 天候名。拼键：天候 id 来自数据（数据包可以覆盖），代码里没有那张表 ——
+     * 构建期的 {@code checkWeatherNames} 按 {@code data/weather} 逐个 id 核对 lang，静态扫描扫不到不要紧。
+     * 原先按十个 id 写死的 {@code switch} 在数据包换 id 时会在渲染回调里抛异常（ADR-0032 #2）。
+     */
     private static Text weatherName(String id) {
-        return Text.translatable(switch (id) {
-            case "huge_wave" -> "heavyseas.weather.huge_wave";
-            case "sweltering" -> "heavyseas.weather.sweltering";
-            case "becalmed" -> "heavyseas.weather.becalmed";
-            case "scorching_heat" -> "heavyseas.weather.scorching_heat";
-            case "clear_skies" -> "heavyseas.weather.clear_skies";
-            case "dense_fog" -> "heavyseas.weather.dense_fog";
-            case "storm" -> "heavyseas.weather.storm";
-            case "gale" -> "heavyseas.weather.gale";
-            case "rain" -> "heavyseas.weather.rain";
-            case "sunday" -> "heavyseas.weather.sunday";
-            default -> throw new IllegalArgumentException("没有天候译名: " + id);
-        });
+        return Text.translatable("heavyseas.weather." + id);
     }
 
-    /** 轮到我就说「按哪个键」，轮到别人就说在等谁、还剩几秒。 */
-    private static Text thirstLine(HudView view) {
+    /** 轮到我就说「按哪个键」（金），轮到别人就说在等谁、还剩几秒（次要色）。 */
+    private static Line thirstLine(HudView view) {
         HudView.Thirst prompt = view.thirstPrompt();
         if (view.myThirstChoice()) {
-            return Text.translatable("heavyseas.hud.thirst_choose",
-                    HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW);
+            return new Line(Text.translatable("heavyseas.hud.thirst_choose",
+                    HeavySeasClient.actKey().getBoundKeyLocalizedText()), GuiLanguage.GOLD);
         }
         if (view.myWaterDonation()) {
-            return Text.translatable("heavyseas.hud.thirst_donate",
+            return new Line(Text.translatable("heavyseas.hud.thirst_donate",
                     Text.translatable("heavyseas.character." + prompt.who()),
-                    HeavySeasClient.actKey().getBoundKeyLocalizedText()).formatted(Formatting.YELLOW);
+                    HeavySeasClient.actKey().getBoundKeyLocalizedText()), GuiLanguage.GOLD);
         }
         long left = Math.max(0L, prompt.deadlineMs() - System.currentTimeMillis());
-        return Text.translatable("heavyseas.hud.thirst_waiting",
+        return new Line(Text.translatable("heavyseas.hud.thirst_waiting",
                 Text.translatable("heavyseas.character." + prompt.who()),
-                (left + 999) / 1000).formatted(Formatting.AQUA);
+                (left + 999) / 1000), GuiLanguage.MUTED);
     }
 
     /**
@@ -255,8 +263,9 @@ public final class GameHud {
      *
      * <p>❗写的全是<b>公开</b>的那几项：谁对谁 · 哪一段 · 还剩几秒。两边站了谁、体型和多少留给站队那一面 ——
      * HUD 铺不下，而且别人凑过来看屏幕就全知道了（与手牌那一行同一条）。押下的武器一个字都不提：暗牌。
+     * 窗口在走时是朱砂（紧迫）；没窗口的那几段（全是替身，由排程推）只是陈述，纸色。
      */
-    private static Text contestLine(HudView view) {
+    private static Line contestLine(HudView view) {
         ContestView contest = view.contest();
         Text kind = Text.translatable(switch (contest.kind()) {
             case SWAP -> "heavyseas.contest.kind_swap";
@@ -269,11 +278,10 @@ public final class GameHud {
         long left = contest.deadlineMs() - System.currentTimeMillis();
         // 窗口没开的那几段（全是替身，由排程一步一步推）不写秒数：写个 0 秒会让人以为卡住了。
         if (contest.waiting() && left > 0) {
-            return Text.translatable("heavyseas.hud.contest_countdown", kind, attacker, target, stage,
-                    (left + 999) / 1000).formatted(Formatting.RED);
+            return new Line(Text.translatable("heavyseas.hud.contest_countdown", kind, attacker, target, stage,
+                    (left + 999) / 1000), GuiLanguage.CINNABAR);
         }
-        return Text.translatable("heavyseas.hud.contest", kind, attacker, target, stage)
-                .formatted(Formatting.RED);
+        return new Line(Text.translatable("heavyseas.hud.contest", kind, attacker, target, stage), GuiLanguage.INK);
     }
 
     /** 「划船堆 N 张 · 舵手 X」，舵手在挑牌时再加「· N 秒」。 */

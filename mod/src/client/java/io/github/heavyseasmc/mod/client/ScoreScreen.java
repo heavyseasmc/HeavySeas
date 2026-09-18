@@ -31,8 +31,7 @@ public final class ScoreScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int SIDE = 20;
-    private static final int TOP_BAND_Y = 12;
+    /** 你自己那四行最宽多少：一行一个标签一个数，太宽读起来要扫视。 */
     private static final int ROW_MAX_W = 240;
 
     private HudView view = HudView.IDLE;
@@ -79,7 +78,7 @@ public final class ScoreScreen extends GameScreen {
         int totalsBottom = drawTotals(context, e, TOP_BAND_Y + fh + 8);
 
         HudView.Score s = view.myScore();
-        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - fh;
+        int identityY = identityY();
         if (!s.present()) {
             context.drawCenteredTextWithShadow(textRenderer, Text.translatable(
                             view.seated() ? "heavyseas.score.waiting" : "heavyseas.endgame.spectating"),

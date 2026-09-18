@@ -67,9 +67,6 @@ public final class HandScreen extends GameScreen {
      */
     private static final int BIG_H_MIN = 64;
 
-    /** 上带占掉的高度：一行字加一排海鸥格。 */
-    private static final int TOP_BAND_H = 34;
-
     private static final int HAND_GAP = 8;
     private HudView view = HudView.IDLE;
 
@@ -82,9 +79,6 @@ public final class HandScreen extends GameScreen {
     /** 这一批「发」从第几张起、什么时候开始 —— 已经在手上的牌不重发。 */
     private int dealtFrom;
     private long dealtAt;
-
-    /** 上一帧的墙钟，用来按真实毫秒插值而不是按帧。 */
-    private long lastFrameMs;
 
     /** 打开过了。见 {@link #init()}。 */
     private boolean opened;
@@ -112,7 +106,6 @@ public final class HandScreen extends GameScreen {
         lift = new float[view.hand().size()];
         dealtFrom = 0;                       // 一进来整手都是「新到你面前」，整排发一次
         dealtAt = System.currentTimeMillis();
-        lastFrameMs = dealtAt;
     }
 
     private HudView currentView() {
@@ -169,8 +162,7 @@ public final class HandScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
 
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));   // 掉帧时别让插值一步跳到底
-        lastFrameMs = now;
+        long dt = frameDelta(now);
 
         List<String> hand = view.hand();
         // 三带从屏幕两头往里排：上带钉在顶上，手牌钉在底下，中带吃掉剩下的。
@@ -179,7 +171,7 @@ public final class HandScreen extends GameScreen {
         int handBottom = height - Math.max(8, Math.round(height * 0.05f));
         int handTop = handBottom - cardH;
 
-        drawPublicBand(context, view, 12);
+        drawPublicBand(context, view, TOP_BAND_Y);
         // 大图那一带的下沿与原先一样停在手牌上方 20：那 20 里要放得下「抬」起来的牌与它的框 ——
         // 身份那一行原先就在这 20 里，被抬起的牌压住了一半（真实客户端上看到的）。
         // 爱恨那一行占一行字的高度：从大图那一带里让出来，不压到抬起来的手牌（ADR-0022）。
@@ -260,9 +252,7 @@ public final class HandScreen extends GameScreen {
         context.getMatrices().translate(-w / 2f, -h, 0);
         CardTexture.drawProvision(context, hand.get(i), 0, 0, w, h);
         if (i == selected) {
-            // ❗框画在同一个矩阵里，跟着卡一起升起、一起缩放。画在矩阵外面的那一版，
-            //   发牌那 300ms 里框停在落点、卡还在下面往上走（2026-09-15 真实客户端上看到的）。
-            context.drawBorder(-1, -1, w + 2, h + 2, GuiLanguage.GOLD);
+            drawCardFrame(context, w, h);
         }
         context.getMatrices().pop();
     }

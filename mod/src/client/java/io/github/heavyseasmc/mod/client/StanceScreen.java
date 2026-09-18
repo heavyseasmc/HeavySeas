@@ -34,10 +34,6 @@ public final class StanceScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int TOP_BAND_Y = 12;
-    private static final int GAP = 8;
-    private static final int BAR_TO_TEXT = 3;
-    private static final int BAR_W_MAX = 240;
     /** 三个按钮：加入进攻 · 加入防守 · 旁观。旁观在最后，也是默认焦点。 */
     private static final int WATCH = 2;
 
@@ -50,7 +46,6 @@ public final class StanceScreen extends GameScreen {
     private int focus = WATCH;
     private boolean committed;
     private final float[] lift = new float[3];
-    private long lastFrameMs = System.currentTimeMillis();
     private List<Box> boxes = List.of();
 
     public StanceScreen(HudView view) {
@@ -74,8 +69,7 @@ public final class StanceScreen extends GameScreen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));
-        lastFrameMs = now;
+        long dt = frameDelta(now);
         int fh = textRenderer.fontHeight;
         ContestView c = view.contest();
 
@@ -89,7 +83,7 @@ public final class StanceScreen extends GameScreen {
                         },
                         nameOf(attacker), nameOf(target)), width / 2, headerY, GuiLanguage.INK);
         // 两边各一行：站了谁 · 体型和。朱砂留给倒计时见底那一段，这里两边一视同仁。
-        int attackY = headerY + fh + GAP;
+        int attackY = headerY + fh + BTN_GAP;
         int defendY = attackY + fh + 2;
         context.drawCenteredTextWithShadow(textRenderer,
                 Text.translatable("heavyseas.stance.attack_side", names(c.attackSide()), c.attackPower()),
@@ -101,8 +95,8 @@ public final class StanceScreen extends GameScreen {
         List<Text> labels = List.of(Text.translatable("heavyseas.stance.join_attack"),
                 Text.translatable("heavyseas.stance.join_defend"),
                 Text.translatable("heavyseas.stance.watch"));
-        int top = defendY + fh + 2 * GAP + (int) Math.ceil(GuiLanguage.LIFT_PX);
-        boxes = layoutButtonRow(labels, top, GAP);
+        int top = defendY + fh + 2 * BTN_GAP + buttonLiftRoom();
+        boxes = layoutButtonRow(labels, top, BTN_GAP);
 
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
         if (moved && !committed) {
@@ -117,13 +111,13 @@ public final class StanceScreen extends GameScreen {
                     i == WATCH ? GuiLanguage.MUTED : GuiLanguage.INK, lift[i]);
         }
 
-        int barW = Math.min(width - 2 * BTN_SIDE, BAR_W_MAX);
-        int barY = top + rowHeight(boxes) + 2 * GAP;
+        int barW = countdownWidth(rowWidth(boxes));
+        int barY = top + rowHeight(boxes) + 2 * BTN_GAP;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         drawCountdown(context, now, c.deadlineMs(), c.windowMs(), (width - barW) / 2, barY, barW, countdownY);
         context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.stance.hint"),
-                width / 2, countdownY + fh + GAP, GuiLanguage.MUTED);
-        drawIdentity(context, view, height - Math.max(8, Math.round(height * 0.05f)) - fh);
+                width / 2, countdownY + fh + HINT_GAP, GuiLanguage.MUTED);
+        drawIdentity(context, view, identityY());
     }
 
     /** 一边站了谁。一个人都没有时写一道破折号 —— 空白与「还没读到」长得一样。 */

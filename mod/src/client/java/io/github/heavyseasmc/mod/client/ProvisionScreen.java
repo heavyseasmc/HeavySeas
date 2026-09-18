@@ -33,8 +33,7 @@ import java.util.List;
  * 窗口多大、视频设置里的界面尺寸设成几，都会改变这一面有多少 GUI 单位可用。
  * 2026-09-15 第一次在真实客户端上看（1280×720、界面尺寸自动，可用 426×240）：
  * 卡宽写死 108 的那一版，下面两行字一行只剩半截、一行整个落到屏幕外。
- * 现在文字与横杠按行高排定，卡的高度取三者最小：竖着剩下的、横着一行放得下 N 张的、
- * 像素上限以内还清楚的（{@link GameScreen#sharpCardHeight()}）。
+ * 现在文字与横杠按行高排定，卡的高度由 {@link GameScreen#cardHeightFor} 取几者最小。
  *
  * <h2>动效的数不写在这里</h2>
  * 「发」「抬」的时长、距离、缓动与三个语义色全部取自 {@link GuiLanguage} ——
@@ -42,19 +41,10 @@ import java.util.List;
  */
 public final class ProvisionScreen extends GameScreen {
 
-    private static final int GAP = 6;
-    private static final int SIDE = 20;
+    /** 整面上下的留白（座位轨到顶、卡到底）。 */
     private static final int MARGIN = 6;
-    /** 座位轨：一行字，下面一条线。 */
-    private static final int RAIL_H = 12;
-    /** 金框画在卡外 2 像素（{@code drawBorder(-2, …)}），再留 4 像素余量。 */
-    private static final int BORDER_ROOM = 2 + 4;
-    private static final int BELOW_CARDS = 6;
-    private static final int BAR_TO_TEXT = 3;
-    private static final int HINT_GAP = 5;
+    /** 说明两行之间。 */
     private static final int LINE_GAP = 3;
-    /** 窗口小到离谱时卡也不能缩没了 —— 缩没了与「没有牌」长得一样。 */
-    private static final int MIN_CARD_H = 24;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -63,8 +53,6 @@ public final class ProvisionScreen extends GameScreen {
     private long dealAt;
     /** 每张牌当前的抬起量，向目标插值 —— 直接跳变会让悬停显得很硬。 */
     private float[] lift = new float[0];
-    /** 上一帧的墙钟。插值按真实毫秒推，不按帧 —— 否则高刷新率屏幕上「抬」会明显更快。 */
-    private long lastFrameMs = System.currentTimeMillis();
 
     /** 服务端替你选的那张；{@code -1} 表示这一轮没被替选（你自己点的，或还没到点）。 */
     private int snapIndex = -1;
@@ -143,7 +131,7 @@ public final class ProvisionScreen extends GameScreen {
                           int barY, int barX, int barW, int countdownY, int hintY, int keepY) {
 
         int cardX(int i) {
-            return left + i * (w + GAP);
+            return left + i * (w + CARD_GAP);
         }
     }
 
@@ -160,9 +148,9 @@ public final class ProvisionScreen extends GameScreen {
         // 卡顶要留多少空，取决于卡有多高（「顿」放大 7%，绕底边，长出来的那一截全在上面）；
         // 而卡有多高又取决于留了多少空。先按一个偏大的 h 算出空，再据此定 h ——
         // 空只会偏大一点点，卡因此略小一点点，绝不会反过来压上座位轨。
-        int room = topRoom(cardHeightFor(n, RAIL_H + topRoom(0) + below));
+        int room = snapRoom(cardHeightWithin(n, RAIL_H + snapRoom(0) + below));
         int fixed = RAIL_H + room + below;
-        int h = cardHeightFor(n, fixed);
+        int h = cardHeightWithin(n, fixed);
         int w = GuiLanguage.cardWidth(h);
 
         int railY = Math.max(MARGIN, (height - fixed - h) / 2);
@@ -170,37 +158,20 @@ public final class ProvisionScreen extends GameScreen {
         int barY = cardsTop + h + BELOW_CARDS;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         int hintY = countdownY + text + HINT_GAP;
-        int rowW = n * w + (n - 1) * GAP;
-        // 倒计时跟舞台一样宽：它是「这一排牌」的时间，不是屏幕上的装饰线。
-        int barW = Math.min(width - 2 * SIDE, Math.max(160, rowW));
+        int rowW = cardRowWidth(n, w);
+        int barW = countdownWidth(rowW);
         // 座位轨按「整条链都在」时的牌距排：船头那一位看到的正是整条链的牌，每一格压在一张牌上方。
         // ❗不跟着这一次的张数走 —— 箱子往后传、牌越来越少，轨却始终是整条链，不能一格一格地缩。
         // 原先写死每格最宽 96：界面尺寸设成 1 或 2 时，轨缩在屏幕中间一截，牌却铺满全宽（真实客户端上看到的）。
         int seats = Math.max(1, data.chain().size());
-        int railCell = GuiLanguage.cardWidth(cardHeightFor(seats, fixed)) + GAP;
+        int railCell = GuiLanguage.cardWidth(cardHeightWithin(seats, fixed)) + CARD_GAP;
         return new Layout(w, h, (width - rowW) / 2, railY, (width - seats * railCell) / 2, railCell,
                 cardsTop, barY, (width - barW) / 2, barW, countdownY, hintY, hintY + text + LINE_GAP);
     }
 
-    /**
-     * 卡顶上要留多少空，才让最高的那一帧碰不到座位轨的线。
-     *
-     * <p>三件事叠起来：「抬」9 像素 · 「顿」的位移 6 像素 · 「顿」放大 7% ——
-     * 卡是绕<b>底边</b>缩放的，所以长出来的那一截 {@code (scale-1)×h} 全在上面。
-     *
-     * <p>❗只算「抬」的那一版（本轮之前）在真实客户端上实拍到了：超时那一下弹起时，
-     * 金框的上边切进了座位轨上「珠宝商」那几个字。版面留空必须把动效算进去。
-     */
-    private static int topRoom(int cardHeight) {
-        return (int) Math.ceil(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE
-                + (GuiLanguage.SNAP_PEAK_SCALE - 1f) * cardHeight) + BORDER_ROOM;
-    }
-
-    /** N 张一排时卡能画多高：竖着剩下的、横着放得下的、像素上限以内还清楚的，三者取小。 */
-    private int cardHeightFor(int n, int fixed) {
-        int byHeight = height - 2 * MARGIN - fixed;
-        int byWidth = GuiLanguage.cardHeight((width - 2 * SIDE - (n - 1) * GAP) / n);
-        return Math.max(MIN_CARD_H, Math.min(Math.min(byHeight, byWidth), sharpCardHeight()));
+    /** N 张一排时卡能画多高，竖着只剩 {@code height - 2*MARGIN - fixed}。 */
+    private int cardHeightWithin(int n, int fixed) {
+        return cardHeightFor(n, height - 2 * MARGIN - fixed);
     }
 
     @Override
@@ -210,8 +181,7 @@ public final class ProvisionScreen extends GameScreen {
             return;
         }
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));   // 掉帧时别让插值一步跳到底
-        lastFrameMs = now;
+        long dt = frameDelta(now);
         Layout l = layout();
         float snapP = GuiLanguage.snap(now, snapAt);
 
@@ -253,11 +223,8 @@ public final class ProvisionScreen extends GameScreen {
             context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
             CardTexture.drawProvision(context, offer.get(i), 0, 0, l.w(), l.h());
             if (hi) {
-                // ❗框画在同一个矩阵里：它是这张卡的一部分，得跟着卡一起升起、一起缩放。
-                //   画在矩阵外面的那一版，发牌那 300ms 里框停在落点、卡还在下面往上走
-                //   （2026-09-15 真实客户端上看到的）。
                 // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
-                context.drawBorder(-2, -2, l.w() + 4, l.h() + 4, GuiLanguage.GOLD);
+                drawCardFrame(context, l.w(), l.h());
             }
             context.getMatrices().pop();
         }
@@ -328,16 +295,7 @@ public final class ProvisionScreen extends GameScreen {
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l) {
-        if (mouseY < l.cardsTop() - GuiLanguage.LIFT_PX || mouseY > l.cardsTop() + l.h()) {
-            return -1;
-        }
-        for (int i = 0; i < data.offer().size(); i++) {
-            int x = l.cardX(i);
-            if (mouseX >= x && mouseX < x + l.w()) {
-                return i;
-            }
-        }
-        return -1;
+        return cardIndexAt(mouseX, mouseY, l.left(), l.cardsTop(), l.w(), l.h(), data.offer().size());
     }
 
     private void setHighlight(int index) {

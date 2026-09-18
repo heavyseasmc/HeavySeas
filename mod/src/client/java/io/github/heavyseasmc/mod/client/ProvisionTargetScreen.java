@@ -17,14 +17,11 @@ import java.util.List;
 public final class ProvisionTargetScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
-    private static final int TOP_BAND_Y = 12;
-    private static final int GAP = 7;
 
     private HudView view;
     private int focus;
     private List<Box> boxes = List.of();
     private float[] lift;
-    private long lastFrameMs = System.currentTimeMillis();
     private boolean committed;
 
     public ProvisionTargetScreen(HudView view) {
@@ -55,8 +52,7 @@ public final class ProvisionTargetScreen extends GameScreen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));
-        lastFrameMs = now;
+        long dt = frameDelta(now);
 
         drawPublicBand(context, view, TOP_BAND_Y);
         int fh = textRenderer.fontHeight;
@@ -72,8 +68,8 @@ public final class ProvisionTargetScreen extends GameScreen {
             labels.add(Text.translatable("heavyseas.target.entry", nameOf(target.id()),
                     target.health(), target.maxHealth(), conditionName(target.condition())));
         }
-        int buttonsTop = titleY + 3 * (fh + 3) + (int) Math.ceil(GuiLanguage.LIFT_PX);
-        boxes = layoutButtonRow(labels, buttonsTop, GAP);
+        int buttonsTop = titleY + 3 * (fh + 3) + buttonLiftRoom();
+        boxes = layoutButtonRow(labels, buttonsTop, BTN_GAP);
         if (labels.isEmpty()) {
             context.drawCenteredTextWithShadow(textRenderer,
                     Text.translatable("heavyseas.command.nobody_wounded"),
@@ -92,10 +88,10 @@ public final class ProvisionTargetScreen extends GameScreen {
                     i == focus ? GuiLanguage.VERDIGRIS : GuiLanguage.INK, lift[i]);
         }
 
-        int hintY = buttonsTop + Math.max(fh, rowHeight(boxes)) + GAP;
+        int hintY = buttonsTop + Math.max(fh, rowHeight(boxes)) + BTN_GAP;
         context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.target.hint"),
                 width / 2, hintY, GuiLanguage.MUTED);
-        drawIdentity(context, view, height - Math.max(8, Math.round(height * 0.05f)) - fh);
+        drawIdentity(context, view, identityY());
     }
 
     @Override

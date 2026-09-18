@@ -74,45 +74,17 @@ public final class ActionScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int SIDE = 20;
-    /** 上带：一行字加一排海鸥格，与手牌一面同一个位置、同一个高度。 */
-    private static final int TOP_BAND_Y = 12;
-    private static final int TOP_BAND_H = 34;
-    /** 座位轨：一行字，下面一条线。 */
-    private static final int RAIL_H = 12;
-    private static final int PAD_X = 10;
-    private static final int PAD_Y = 6;
-    private static final int GAP = 6;
-    private static final int HINT_GAP = 8;
-    /**
-     * 按不动的那几件：底和字都只剩这么多不透明度。不另起一个颜色：语义色只有三个。
-     *
-     * <p>❗只淡字不够：「什么也不做」按稿子本来就是淡字（{@code MUTED}），第一次实拍时它和
-     * 按不动的「换座位」看上去一样灰，分不出哪几个按得动。按钮的底一起淡下去才分得开。
-     */
-    private static final int DISABLED_FILL_ALPHA = 0x55;
-    private static final int DISABLED_TEXT_ALPHA = 0x66;
-
     private HudView view = HudView.IDLE;
     /** 焦点。<b>一进来就在「划船」</b>，不等玩家先动一下。 */
     private int focus;
     /** 每个按钮当前的抬起量，向目标插值。 */
     private final float[] lift = new float[CHOICES.length];
-    /** 上一帧的墙钟。插值按真实毫秒推，不按帧。 */
-    private long lastFrameMs = System.currentTimeMillis();
     /** 上一帧排出来的按钮位置，点击与悬停按它判。 */
-    private List<Button> buttons = List.of();
+    private List<Box> buttons = List.of();
     /** 确认了哪一件；{@code -1} 表示还没确认。 */
     private int snapIndex = -1;
     /** 「顿」的起点，0 表示没在播。 */
     private long snapAt;
-
-    private record Button(int x, int y, int w, int h) {
-
-        boolean contains(int mx, int my) {
-            return mx >= x && mx < x + w && my >= y - GuiLanguage.LIFT_PX && my < y + h;
-        }
-    }
 
     public ActionScreen() {
         super(Text.translatable("heavyseas.action.title"));
@@ -151,22 +123,21 @@ public final class ActionScreen extends GameScreen {
         }
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));   // 掉帧时别让插值一步跳到底
-        lastFrameMs = now;
+        long dt = frameDelta(now);
 
         int text = textRenderer.fontHeight;
         drawPublicBand(context, view, TOP_BAND_Y);
         int railY = TOP_BAND_H + 4;
-        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - text;
+        int identityY = identityY();
         // 按钮连同下面那行说明，在座位轨与身份行之间居中。顶上留出「抬」与「顿」的高度，免得弹进轨里。
-        buttons = layoutButtons(railY + RAIL_H + topRoom(), identityY - GAP - text - HINT_GAP);
-        drawRail(context, railY, stageWidth());
+        buttons = layoutButtons(railY + RAIL_H + topRoom(), identityY - BTN_GAP - text - HINT_GAP);
+        drawRail(context, railY, rowWidth(buttons));
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         // ❗每帧都要调一次：它记的是上一帧指针在哪，停一帧就会漏掉一次移动。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
         if (moved && !decided()) {
-            int hovered = indexAt(mouseX, mouseY);
+            int hovered = indexAt(buttons, mouseX, mouseY);
             if (hovered >= 0) {
                 focus = hovered;
             }
@@ -175,7 +146,7 @@ public final class ActionScreen extends GameScreen {
         float snapP = GuiLanguage.snap(now, snapAt);
         int bottom = 0;
         for (int i = 0; i < CHOICES.length; i++) {
-            Button b = buttons.get(i);
+            Box b = buttons.get(i);
             bottom = Math.max(bottom, b.y() + b.h());
             lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
             float rise = -lift[i];
@@ -184,7 +155,10 @@ public final class ActionScreen extends GameScreen {
                 rise += GuiLanguage.snapRise(snapP);
                 scale = GuiLanguage.snapScale(snapP);
             }
-            drawButton(context, b, CHOICES[i], i == focus, rise, scale);
+            Choice c = CHOICES[i];
+            drawButton(context, b, Text.translatable(c.label), i == focus, labelColor(c),
+                    c.enabled(view) ? GuiLanguage.GROUND : withAlpha(GuiLanguage.GROUND, DISABLED_FILL_ALPHA),
+                    rise, scale);
         }
         // 说明只跟焦点走一行：按不动的那几件，这一行说为什么。
         context.drawCenteredTextWithShadow(textRenderer, Text.translatable(CHOICES[focus].hint(view)),
@@ -195,10 +169,10 @@ public final class ActionScreen extends GameScreen {
     /**
      * 按钮顶上要留多少空：「抬」· 「顿」的位移 · 「顿」放大长出来的那一截（绕底边缩放，全在上面）· 金框。
      *
-     * <p>与补给箱那一面同一个算法（{@code ProvisionScreen#topRoom}）—— 那边是实拍到金框切进座位轨之后才补上的。
+     * <p>与卡的 {@link #snapRoom} 同一个算法，只是框是按钮的 1 像素 —— 那边是实拍到金框切进座位轨之后才补上的。
      */
     private int topRoom() {
-        int h = textRenderer.fontHeight + 2 * PAD_Y;
+        int h = buttonHeight();
         return (int) Math.ceil(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE
                 + (GuiLanguage.SNAP_PEAK_SCALE - 1f) * h) + 1 + 2;
     }
@@ -209,55 +183,44 @@ public final class ActionScreen extends GameScreen {
      * <p>一行放不下就折行（交互稿里是 flex-wrap）：界面尺寸大、窗口窄的时候，
      * 英文的「Use a provision」一行放不下五个。折出去的那一行同样留出「抬」与「顿」的高度。
      */
-    private List<Button> layoutButtons(int top, int bottom) {
-        int h = textRenderer.fontHeight + 2 * PAD_Y;
+    private List<Box> layoutButtons(int top, int bottom) {
+        int h = buttonHeight();
         int avail = width - 2 * SIDE;
         int[] w = new int[CHOICES.length];
         for (int i = 0; i < CHOICES.length; i++) {
-            w[i] = textRenderer.getWidth(Text.translatable(CHOICES[i].label)) + 2 * PAD_X;
+            w[i] = buttonWidth(Text.translatable(CHOICES[i].label));
         }
         List<int[]> rows = new ArrayList<>();
         int from = 0;
         int rowW = w[0];
         for (int i = 1; i < CHOICES.length; i++) {
-            if (rowW + GAP + w[i] > avail) {
+            if (rowW + BTN_GAP + w[i] > avail) {
                 rows.add(new int[]{from, i});
                 from = i;
                 rowW = w[i];
             } else {
-                rowW += GAP + w[i];
+                rowW += BTN_GAP + w[i];
             }
         }
         rows.add(new int[]{from, CHOICES.length});
 
-        int rowStep = h + GAP + topRoom();
-        int blockH = rows.size() * h + (rows.size() - 1) * (GAP + topRoom());
+        int rowStep = h + BTN_GAP + topRoom();
+        int blockH = rows.size() * h + (rows.size() - 1) * (BTN_GAP + topRoom());
         int y = top + Math.max(0, (bottom - top - blockH) / 2);
-        List<Button> out = new ArrayList<>(CHOICES.length);
+        List<Box> out = new ArrayList<>(CHOICES.length);
         for (int[] row : rows) {
-            int total = -GAP;
+            int total = -BTN_GAP;
             for (int i = row[0]; i < row[1]; i++) {
-                total += w[i] + GAP;
+                total += w[i] + BTN_GAP;
             }
             int x = (width - total) / 2;
             for (int i = row[0]; i < row[1]; i++) {
-                out.add(new Button(x, y, w[i], h));
-                x += w[i] + GAP;
+                out.add(new Box(x, y, w[i], h));
+                x += w[i] + BTN_GAP;
             }
             y += rowStep;
         }
         return out;
-    }
-
-    /** 按钮那一片有多宽。座位轨跟着它排，别让轨铺满全屏、按钮缩在中间一小截。 */
-    private int stageWidth() {
-        int left = Integer.MAX_VALUE;
-        int right = 0;
-        for (Button b : buttons) {
-            left = Math.min(left, b.x());
-            right = Math.max(right, b.x() + b.w());
-        }
-        return buttons.isEmpty() ? 0 : right - left;
     }
 
     /**
@@ -287,45 +250,15 @@ public final class ActionScreen extends GameScreen {
         }
     }
 
-    private void drawButton(DrawContext context, Button b, Choice c, boolean focused, float rise, float scale) {
-        context.getMatrices().push();
-        // 绕底边缩放（与卡同一个做法）：「顿」长出来的那一截全在上面，版面留空才算得准。
-        context.getMatrices().translate(b.x() + b.w() / 2f, b.y() + b.h() + rise, 0);
-        context.getMatrices().scale(scale, scale, 1f);
-        context.getMatrices().translate(-b.w() / 2f, -b.h(), 0);
-        context.fill(0, 0, b.w(), b.h(),
-                c.enabled(view) ? GuiLanguage.GROUND : withAlpha(GuiLanguage.GROUND, DISABLED_FILL_ALPHA));
-        if (focused) {
-            // 金 =「你 · 你选的那个」，与补给箱、手牌同一个用法。框画在同一个矩阵里，跟着按钮一起升、一起缩放。
-            context.drawBorder(-1, -1, b.w() + 2, b.h() + 2, GuiLanguage.GOLD);
-        }
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable(c.label), b.w() / 2,
-                (b.h() - textRenderer.fontHeight) / 2 + 1, labelColor(c));
-        context.getMatrices().pop();
-    }
-
     private int labelColor(Choice c) {
         int base = c.harmful ? GuiLanguage.CINNABAR : (c == Choice.PASS ? GuiLanguage.MUTED : GuiLanguage.INK);
         return c.enabled(view) ? base : withAlpha(base, DISABLED_TEXT_ALPHA);
     }
 
-    private static int withAlpha(int argb, int alpha) {
-        return (alpha << 24) | (argb & 0xFFFFFF);
-    }
-
-    private int indexAt(int mouseX, int mouseY) {
-        for (int i = 0; i < buttons.size(); i++) {
-            if (buttons.get(i).contains(mouseX, mouseY)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!decided()) {
-            int i = indexAt((int) mouseX, (int) mouseY);
+            int i = indexAt(buttons, (int) mouseX, (int) mouseY);
             if (i >= 0) {
                 focus = i;
                 confirm();

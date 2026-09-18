@@ -34,17 +34,6 @@ public final class ThirstScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int SIDE = 20;
-    private static final int TOP_BAND_Y = 12;
-    private static final int SEA_LINE_Y = 38;
-    private static final int GAP = 6;
-    private static final int BELOW_CARDS = 6;
-    private static final int BAR_TO_TEXT = 3;
-    private static final int HINT_GAP = 5;
-    private static final int BORDER_ROOM = 2 + 4;
-    private static final int MIN_CARD_H = 24;
-    private static final float MAX_CARD_H_RATIO = 0.5f;
-
     private HudView view;
     /** 打开时手上有几张水。结算那一刻投影里牌就没了，而这一面还要画完最后一帧。 */
     private final int waters;
@@ -53,7 +42,6 @@ public final class ThirstScreen extends GameScreen {
     private final int waterPerSource;
     private final long deadlineMs;
     private final long dealAt;
-    private long lastFrameMs;
     private final float[] lift;
     /** 打算喝几张。一进来就是「刚好够」。 */
     private int chosen;
@@ -70,7 +58,6 @@ public final class ThirstScreen extends GameScreen {
         this.chosen = normalized(Math.min(Math.max(0,
                 remaining * waterPerSource - view.thirstPrompt().donated()), waters), true);
         this.dealAt = System.currentTimeMillis();
-        this.lastFrameMs = dealAt;
     }
 
     @Override
@@ -97,7 +84,7 @@ public final class ThirstScreen extends GameScreen {
                           int countdownY, int titleY, int detailY, int hintY, int keysY, int identityY) {
 
         int cardX(int i) {
-            return left + i * (w + GAP);
+            return left + i * (w + CARD_GAP);
         }
     }
 
@@ -105,8 +92,7 @@ public final class ThirstScreen extends GameScreen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));
-        lastFrameMs = now;
+        long dt = frameDelta(now);
         Layout l = layout();
 
         drawPublicBand(context, view, TOP_BAND_Y);
@@ -127,7 +113,7 @@ public final class ThirstScreen extends GameScreen {
             context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
             CardTexture.drawProvision(context, Session.WATER, 0, 0, l.w(), l.h());
             if (drinking) {
-                context.drawBorder(-2, -2, l.w() + 4, l.h() + 4, GuiLanguage.GOLD);
+                drawCardFrame(context, l.w(), l.h());
             }
             context.getMatrices().pop();
         }
@@ -156,30 +142,23 @@ public final class ThirstScreen extends GameScreen {
         int n = Math.max(1, waters);
         int fh = textRenderer.fontHeight;
         int lineH = fh + 2;
-        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - fh;
+        int identityY = identityY();
         // ❗倒计时之下有**四行**：还需化解几次 · 来源明细 · 喝几张挨几点 · 键位。
         //   1280x720 实拍：这里原先只留了三行，键位那一行画到了身份那一行上面，两行字叠在一起。
         int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 4 * lineH;
         int top = SEA_LINE_Y + fh;
         int avail = identityY - HINT_GAP - top - below;
-        int room = (int) Math.ceil(GuiLanguage.LIFT_PX) + BORDER_ROOM;
+        int room = liftRoom();
         int h = cardHeightFor(n, avail - room);
         int w = GuiLanguage.cardWidth(h);
         int cardsTop = top + room + Math.max(0, (avail - room - h) / 2);
         int barY = cardsTop + h + BELOW_CARDS;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         int titleY = countdownY + fh + HINT_GAP;
-        int rowW = n * w + (n - 1) * GAP;
-        int barW = Math.min(width - 2 * SIDE, Math.max(160, rowW));
+        int rowW = cardRowWidth(n, w);
+        int barW = countdownWidth(rowW);
         return new Layout(w, h, (width - rowW) / 2, cardsTop, barY, (width - barW) / 2, barW,
                 countdownY, titleY, titleY + lineH, titleY + 2 * lineH, titleY + 3 * lineH, identityY);
-    }
-
-    private int cardHeightFor(int n, int availH) {
-        int byWidth = GuiLanguage.cardHeight((width - 2 * SIDE - (n - 1) * GAP) / n);
-        int sharp = sharpCardHeight();
-        return Math.max(MIN_CARD_H, Math.min(Math.min(Math.min(availH, byWidth), sharp),
-                Math.round(height * MAX_CARD_H_RATIO)));
     }
 
     /** 改张数并上报：超时认的是它，服务端不知道的话只能按开窗时那个默认值算。 */
@@ -223,15 +202,11 @@ public final class ThirstScreen extends GameScreen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         Layout l = layout();
-        if (mouseY >= l.cardsTop() - GuiLanguage.LIFT_PX && mouseY <= l.cardsTop() + l.h()) {
-            for (int i = 0; i < waters; i++) {
-                int x = l.cardX(i);
-                if (mouseX >= x && mouseX < x + l.w()) {
-                    // 点第 i 张 = 「喝到这一张为止」。再点同一张就是取消它。
-                    setChosen(chosen == i + 1 ? i : i + 1);
-                    return true;
-                }
-            }
+        int i = cardIndexAt((int) mouseX, (int) mouseY, l.left(), l.cardsTop(), l.w(), l.h(), waters);
+        if (i >= 0) {
+            // 点第 i 张 = 「喝到这一张为止」。再点同一张就是取消它。
+            setChosen(chosen == i + 1 ? i : i + 1);
+            return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }

@@ -36,20 +36,10 @@ public final class WeaponScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int TOP_BAND_Y = 12;
-    private static final int GAP = 6;
-    private static final int SIDE = 20;
-    private static final int BAR_TO_TEXT = 3;
-    private static final int BELOW_CARDS = 6;
-    private static final int MIN_CARD_H = 24;
-    private static final float MAX_CARD_H_RATIO = 0.42f;
-    private static final int BORDER_ROOM = 2 + 4;
-
     private HudView view;
     /** 高亮。这一面的高亮只是个光标 —— 超时<b>不</b>按它押（不押就是不押）。 */
     private int highlight;
     private float[] lift = new float[0];
-    private long lastFrameMs = System.currentTimeMillis();
 
     public WeaponScreen(HudView view) {
         super(Text.translatable("heavyseas.weapon.title"));
@@ -70,7 +60,7 @@ public final class WeaponScreen extends GameScreen {
                           int countdownY, int headerY, int committedY, int hintY, int identityY) {
 
         int cardX(int i) {
-            return left + i * (w + GAP);
+            return left + i * (w + CARD_GAP);
         }
     }
 
@@ -78,22 +68,20 @@ public final class WeaponScreen extends GameScreen {
         int n = Math.max(1, count);
         int fh = textRenderer.fontHeight;
         int lineH = fh + 2;
-        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - fh;
+        int identityY = identityY();
         // 卡下面有：横杠 · 秒数 · 三行字（这一段是什么 · 已押几张 · 键位）。按行高从下往上留够。
-        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + GAP + 3 * lineH;
-        int top = TOP_BAND_Y + 34;
-        int avail = identityY - GAP - top - below;
-        int room = (int) Math.ceil(GuiLanguage.LIFT_PX) + BORDER_ROOM;
-        int byWidth = GuiLanguage.cardHeight((width - 2 * SIDE - (n - 1) * GAP) / n);
-        int h = Math.max(MIN_CARD_H, Math.min(Math.min(avail - room, byWidth),
-                Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO))));
+        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 3 * lineH;
+        int top = TOP_BAND_Y + TOP_BAND_H;
+        int avail = identityY - HINT_GAP - top - below;
+        int room = liftRoom();
+        int h = cardHeightFor(n, avail - room);
         int w = GuiLanguage.cardWidth(h);
         int cardsTop = top + room + Math.max(0, (avail - room - h) / 2);
         int barY = cardsTop + h + BELOW_CARDS;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
-        int headerY = countdownY + fh + GAP;
-        int rowW = n * w + (n - 1) * GAP;
-        int barW = Math.min(width - 2 * SIDE, Math.max(160, rowW));
+        int headerY = countdownY + fh + HINT_GAP;
+        int rowW = cardRowWidth(n, w);
+        int barW = countdownWidth(rowW);
         return new Layout(w, h, (width - rowW) / 2, cardsTop, barY, (width - barW) / 2, barW,
                 countdownY, headerY, headerY + lineH, headerY + 2 * lineH, identityY);
     }
@@ -102,8 +90,7 @@ public final class WeaponScreen extends GameScreen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));
-        lastFrameMs = now;
+        long dt = frameDelta(now);
         ContestView c = view.contest();
         List<String> weapons = c.myWeapons();
         if (weapons.isEmpty()) {
@@ -130,8 +117,7 @@ public final class WeaponScreen extends GameScreen {
             context.getMatrices().translate(l.cardX(i), l.cardsTop() - lift[i], 0);
             CardTexture.drawProvision(context, weapons.get(i), 0, 0, l.w(), l.h());
             if (i == highlight) {
-                // 金 =「你 · 你选的那张」。框画在同一个矩阵里，跟着卡一起升起。
-                context.drawBorder(-2, -2, l.w() + 4, l.h() + 4, GuiLanguage.GOLD);
+                drawCardFrame(context, l.w(), l.h());
             }
             context.getMatrices().pop();
         }
@@ -150,16 +136,7 @@ public final class WeaponScreen extends GameScreen {
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l, int count) {
-        if (mouseY < l.cardsTop() - GuiLanguage.LIFT_PX || mouseY > l.cardsTop() + l.h()) {
-            return -1;
-        }
-        for (int i = 0; i < count; i++) {
-            int x = l.cardX(i);
-            if (mouseX >= x && mouseX < x + l.w()) {
-                return i;
-            }
-        }
-        return -1;
+        return cardIndexAt(mouseX, mouseY, l.left(), l.cardsTop(), l.w(), l.h(), count);
     }
 
     /**

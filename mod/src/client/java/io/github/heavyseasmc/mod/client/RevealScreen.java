@@ -38,11 +38,8 @@ public final class RevealScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int SIDE = 20;
-    private static final int TOP_BAND_Y = 12;
-    private static final int GAP = 10;
-    private static final int MIN_CARD_H = 32;
-    private static final float MAX_CARD_H_RATIO = 0.42f;
+    /** 舞台上卡与「恨 / 爱」那个字之间。 */
+    private static final int STAGE_GAP = 10;
     private static final int LABEL_SCALE = 2;
 
     /**
@@ -146,7 +143,7 @@ public final class RevealScreen extends GameScreen {
                 width / 2, titleY, GuiLanguage.INK);
         int railBottom = drawRail(context, now, e, titleY + fh + 6);
 
-        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - fh;
+        int identityY = identityY();
         int ownY = identityY - fh - 3;
         int sayY = ownY - fh - 8;
         drawStage(context, now, e, hate, railBottom + 8, sayY - 8);
@@ -206,28 +203,29 @@ public final class RevealScreen extends GameScreen {
         Text label = Text.translatable(hate ? "heavyseas.reveal.hates" : "heavyseas.reveal.loves");
         int labelW = textRenderer.getWidth(label) * LABEL_SCALE;
         int avail = bottom - top;
-        int byWidth = GuiLanguage.cardHeight(Math.max(1, (width - 2 * SIDE - labelW - 2 * GAP) / 2));
+        int byWidth = GuiLanguage.cardHeight(Math.max(1, (width - 2 * SIDE - labelW - 2 * STAGE_GAP) / 2));
         int cap = Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO));
         int h = Math.max(MIN_CARD_H, Math.min(Math.min(avail, byWidth), cap));
         int w = GuiLanguage.cardWidth(h);
-        int rowW = 2 * w + labelW + 2 * GAP;
+        int rowW = 2 * w + labelW + 2 * STAGE_GAP;
         float dx = (1f - GuiLanguage.slide(now, slideAt)) * SLIDE_DX;
         int left = Math.round((width - rowW) / 2f + dx);
         int y = top + Math.max(0, (avail - h) / 2);
 
         CardTexture.drawCharacter(context, en.who(), left, y, w, h);
         if (en.winner() && stageRevealed && showsFront(now, en)) {
-            context.drawBorder(left - 2, y - 2, w + 4, h + 4, GuiLanguage.GOLD);
+            context.drawBorder(left - CARD_FRAME, y - CARD_FRAME, w + 2 * CARD_FRAME, h + 2 * CARD_FRAME,
+                    GuiLanguage.GOLD);
         }
 
         // 「恨」用朱砂 —— 它只给伤害与紧迫；「爱」不占语义色（ADR-0018 §7.3：多了就不成语义）。
         context.getMatrices().push();
-        context.getMatrices().translate(left + w + GAP, y + h / 2f - textRenderer.fontHeight * LABEL_SCALE / 2f, 0);
+        context.getMatrices().translate(left + w + STAGE_GAP, y + h / 2f - textRenderer.fontHeight * LABEL_SCALE / 2f, 0);
         context.getMatrices().scale(LABEL_SCALE, LABEL_SCALE, 1f);
         context.drawTextWithShadow(textRenderer, label, 0, 0, hate ? GuiLanguage.CINNABAR : GuiLanguage.INK);
         context.getMatrices().pop();
 
-        int tx = left + w + labelW + 2 * GAP;
+        int tx = left + w + labelW + 2 * STAGE_GAP;
         boolean front = stageRevealed && !en.target().isEmpty() && showsFront(now, en);
         float sx = stageRevealed ? flipScaleX(now, en) : 1f;
         context.getMatrices().push();

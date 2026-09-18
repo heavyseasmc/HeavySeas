@@ -500,20 +500,25 @@ def checkCardTextures = tasks.register('checkCardTextures') {
     def dataFile = rootProject.file('data/provisions/default.json')
     def rosterFile = rootProject.file('data/roster/default.json')
     def weatherFile = rootProject.file('data/weather/default.json')
+    def navFile = rootProject.file('data/navigation/default.json')
     // 做成任务属性而不是局部变量：红测要能把它们指向一份造坏的目录，而不去改被跟踪的贴图。
     ext.texDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/provision')
     ext.charDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/character')
     ext.backDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/back')
     ext.weatherDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/weather')
+    // 航海卡三档在同一个目录树下：根目录 LOD0，lod1/、lod2/ 两个子目录（ADR-0020 §8 · ADR-0031）。
+    ext.navDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/nav')
     def minW = 600
     def minH = 840
     inputs.file(dataFile)
     inputs.file(rosterFile)
     inputs.file(weatherFile)
+    inputs.file(navFile)
     inputs.dir(ext.texDir).optional()
     inputs.dir(ext.charDir).optional()
     inputs.dir(ext.backDir).optional()
     inputs.dir(ext.weatherDir).optional()
+    inputs.dir(ext.navDir).optional()
     doLast {
         def slurper = new groovy.json.JsonSlurper()
         def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
@@ -530,6 +535,11 @@ def checkCardTextures = tasks.register('checkCardTextures') {
         def weather = (slurper.parse(weatherFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
         if (weather.isEmpty()) {
             throw new GradleException('data/weather 里一个 id 都没读到 —— 判据坏了，不是真的没有天候牌')
+        }
+        // 航海卡：划船与舵手两面画它（ADR-0033 接进 GUI 之后，字画的那条路已删 —— 贴图缺一张就是紫黑格子）。
+        def nav = (slurper.parse(navFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
+        if (nav.isEmpty()) {
+            throw new GradleException('data/navigation 里一个 id 都没读到 —— 判据坏了，不是真的没有航海牌')
         }
         def problems = []
         def sizes = [] as Set
@@ -572,15 +582,20 @@ def checkCardTextures = tasks.register('checkCardTextures') {
         File charDir = ext.charDir
         File backDir = ext.backDir
         File weatherDir = ext.weatherDir
+        File navDir = ext.navDir
         ids.each { checkOne(texDir, '', it, minW, minH, 5, 7) }
         characters.each { checkOne(charDir, 'character/', it, minW, minH, 5, 7) }
         backs.each { checkOne(backDir, 'back/', it, minW, minH, 5, 7) }
         weather.each { checkOne(weatherDir, 'weather/', it, 840, 600, 7, 5) }
+        // 三档各是一张独立烘的贴图，各有各的下限：LOD0 600×840 · LOD1 480×672 · LOD2 240×336。
+        nav.each { checkOne(navDir, 'nav/', it, minW, minH, 5, 7) }
+        nav.each { checkOne(new File(navDir, 'lod1'), 'nav/lod1/', it, 480, 672, 5, 7) }
+        nav.each { checkOne(new File(navDir, 'lod2'), 'nav/lod2/', it, 240, 336, 5, 7) }
         if (problems) {
             throw new GradleException((['GUI 卡面贴图核对失败：']
                     + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
-        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种 · 角色 ${characters.size()} 个 · 牌背 ${backs.size()} 张 · 天候 ${weather.size()} 张，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
+        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种 · 角色 ${characters.size()} 个 · 牌背 ${backs.size()} 张 · 天候 ${weather.size()} 张 · 航海 ${nav.size()} 张 × 3 档，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
     }
 }
 

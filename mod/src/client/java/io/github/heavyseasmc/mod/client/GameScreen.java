@@ -23,6 +23,12 @@ import java.util.List;
  * 2026-09-15 第一次在真实客户端上看，有几处毛病都出在「每一面各自处理」上：
  * HUD 那几行字从界面后面透出来、跟座位轨叠在一起；两面各铺一次底色；两面各算一次卡面能画多大。
  * 这些是每一面都要、而且必须一致的东西，放一处。HUD 认的也是这个类型（见 {@link GameHud}）。
+ *
+ * <h2>版面的数只在这里写一次</h2>
+ * 2026-09-18 一次风格审查抓到：{@code TOP_BAND_Y = 12} 在 10 个界面各写一遍，卡高上限三种值、
+ * 金框两种粗细、倒计时条两份实现 —— 没有一处报错，只是已经各自漂开了。
+ * {@link GuiLanguage} 为动词与色做过的事，这里为带位、卡的留空与命中、按钮与倒计时再做一次：
+ * <b>各面只许引用，不许再声明</b>。{@code GuiConsistencyTest} 扫源码，又写一份就红（ADR-0033）。
  */
 public abstract class GameScreen extends Screen {
 
@@ -34,10 +40,52 @@ public abstract class GameScreen extends Screen {
      */
     private static final double SHARP_CARD_PX_H = 840 * 1.1;
 
+    // ---------------------------------------------------------------- 带位（ADR-0018 §7.1：各面同一套）
+
+    /** 上带（回合 · 阶段 · 海鸥）画在哪一行。 */
+    protected static final int TOP_BAND_Y = 12;
+    /** 上带占掉的高度：一行字加一排海鸥格。 */
+    protected static final int TOP_BAND_H = 34;
+    /** 上带下面那一行（划船堆 · 舵手，或座位轨）画在哪一行。 */
+    protected static final int SEA_LINE_Y = 38;
+    /** 两侧留白。 */
+    protected static final int SIDE = 20;
+    /** 一排卡里相邻两张之间。 */
+    protected static final int CARD_GAP = 6;
+    /** 一排按钮里相邻两个之间。 */
+    protected static final int BTN_GAP = 6;
+    /** 舞台（那一排卡）到倒计时横杠。 */
+    protected static final int BELOW_CARDS = 6;
+    /** 横杠到秒数。 */
+    protected static final int BAR_TO_TEXT = 3;
+    /** 秒数到下面第一行说明。 */
+    protected static final int HINT_GAP = 5;
+    /** 倒计时那条细横杠有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。 */
+    protected static final int BAR_H = 3;
+    /** 座位轨：一行字，下面一条线。行动一面与补给箱都画它。 */
+    protected static final int RAIL_H = 12;
+
+    /** 选中金框画在卡外几像素。手牌与补给箱曾一个 1、一个 2 —— 同一个标记两种粗细（审查抓到的）。 */
+    protected static final int CARD_FRAME = 2;
+    /** 卡顶要留的空里，金框加余量占多少。 */
+    protected static final int BORDER_ROOM = CARD_FRAME + 4;
+    /** 窗口小到离谱时卡也不能缩没了 —— 缩没了与「没有牌」长得一样。 */
+    protected static final int MIN_CARD_H = 24;
+    /** 卡最高占屏幕高的这个比例：再高就把上下带挤没了。可调（ADR-0018 §8 右列），但只此一处。 */
+    protected static final float MAX_CARD_H_RATIO = 0.5f;
+
+    /** 按钮的内边距与两侧留白。按钮长什么样也是「必须一致」的那一类，所以同样放在这里。 */
+    protected static final int BTN_PAD_X = 10;
+    protected static final int BTN_PAD_Y = 6;
+    protected static final int BTN_SIDE = 20;
+
     /** 上一帧的鼠标位置。见 {@link #mouseActuallyMoved}。 */
     private boolean mouseSeen;
     private int lastMouseX;
     private int lastMouseY;
+
+    /** 上一帧的墙钟。见 {@link #frameDelta}。 */
+    private long lastFrameMs = System.currentTimeMillis();
 
     /** 这一面打开过了没有。见 {@link #init()}。 */
     private boolean announced;
@@ -121,6 +169,18 @@ public abstract class GameScreen extends Screen {
         return moved;
     }
 
+    /**
+     * 两帧之间真实过了多少毫秒，夹在 0–200。
+     *
+     * <p>插值按真实毫秒推，不按帧 —— 否则高刷新率屏幕上「抬」会明显更快（{@link GuiLanguage#approach}）。
+     * 上限 200：掉帧时别让插值一步跳到底。每一面原先各记一份 {@code lastFrameMs}，现在只在这里记。
+     */
+    protected long frameDelta(long now) {
+        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));
+        lastFrameMs = now;
+        return dt;
+    }
+
     @Override
     public boolean shouldPause() {
         return false;                  // 多人游戏里暂停毫无意义：别人还在等你，服务端的计时也不会停
@@ -152,13 +212,72 @@ public abstract class GameScreen extends Screen {
         return (int) Math.floor(SHARP_CARD_PX_H / Math.max(1.0, scale));
     }
 
-    /** 倒计时那条细横杠有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。 */
-    protected static final int BAR_H = 3;
+    /**
+     * N 张一排时卡能画多高：竖着剩下的、横着一行放得下 N 张的、像素上限以内还清楚的、
+     * 不超过屏幕高的 {@link #MAX_CARD_H_RATIO} —— 四者取小，再不低于 {@link #MIN_CARD_H}。
+     *
+     * @param availH 竖着剩给这一排卡的高度（调用方已经减掉上下各行与留空）
+     */
+    protected int cardHeightFor(int n, int availH) {
+        int count = Math.max(1, n);
+        int byWidth = GuiLanguage.cardHeight((width - 2 * SIDE - (count - 1) * CARD_GAP) / count);
+        int cap = Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO));
+        return Math.max(MIN_CARD_H, Math.min(Math.min(availH, byWidth), cap));
+    }
 
-    /** 按钮的内边距与两侧留白。按钮长什么样也是「必须一致」的那一类，所以同样放在这里。 */
-    protected static final int BTN_PAD_X = 10;
-    protected static final int BTN_PAD_Y = 6;
-    protected static final int BTN_SIDE = 20;
+    /** 一排 N 张、每张 w 宽时整排多宽。 */
+    protected static int cardRowWidth(int n, int w) {
+        return n * w + (n - 1) * CARD_GAP;
+    }
+
+    /** 一排卡里，指针落在第几张上；都不在时 {@code -1}。上边界把「抬」起来的那几像素算进去。 */
+    protected static int cardIndexAt(int mouseX, int mouseY, int left, int top, int w, int h, int count) {
+        if (mouseY < top - GuiLanguage.LIFT_PX || mouseY > top + h) {
+            return -1;
+        }
+        for (int i = 0; i < count; i++) {
+            int x = left + i * (w + CARD_GAP);
+            if (mouseX >= x && mouseX < x + w) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** 只会「抬」的卡，顶上要留多少空：抬起的距离加金框与余量。 */
+    protected static int liftRoom() {
+        return (int) Math.ceil(GuiLanguage.LIFT_PX) + BORDER_ROOM;
+    }
+
+    /** 只会「抬」的按钮，顶上要留多少空：抬起的距离加 1 像素的框与余量。抬起来的金框不能切进上面那一行字。 */
+    protected static int buttonLiftRoom() {
+        return (int) Math.ceil(GuiLanguage.LIFT_PX) + 1 + 2;
+    }
+
+    /**
+     * 会「顿」的卡，顶上要留多少空，才让最高的那一帧碰不到上面那一行。
+     *
+     * <p>三件事叠起来：「抬」9 像素 · 「顿」的位移 · 「顿」放大那一截 —— 卡是绕<b>底边</b>缩放的，
+     * 所以长出来的 {@code (scale-1)×h} 全在上面。只算「抬」的那一版在真实客户端上实拍到了：
+     * 超时那一下弹起时，金框的上边切进了座位轨上「珠宝商」那几个字。
+     */
+    protected static int snapRoom(int cardHeight) {
+        return (int) Math.ceil(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE
+                + (GuiLanguage.SNAP_PEAK_SCALE - 1f) * cardHeight) + BORDER_ROOM;
+    }
+
+    /**
+     * 选中金框（金 =「你 · 你选的那张」）。在卡自己的矩阵里画：它是这张卡的一部分，得跟着卡一起升起、一起缩放
+     * —— 画在矩阵外面的那一版，发牌那 300ms 里框停在落点、卡还在下面往上走（2026-09-15 真实客户端上看到的）。
+     */
+    protected static void drawCardFrame(DrawContext context, int w, int h) {
+        context.drawBorder(-CARD_FRAME, -CARD_FRAME, w + 2 * CARD_FRAME, h + 2 * CARD_FRAME, GuiLanguage.GOLD);
+    }
+
+    /** 身份那一行画在哪：贴底，留出屏幕高的 5%（至少 8 单位）。 */
+    protected int identityY() {
+        return height - Math.max(8, Math.round(height * 0.05f)) - textRenderer.fontHeight;
+    }
 
     /** 一个按钮排在哪。 */
     protected record Box(int x, int y, int w, int h) {
@@ -190,6 +309,11 @@ public abstract class GameScreen extends Screen {
                 width / 2, textY, urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
     }
 
+    /** 倒计时跟舞台一样宽：它是「这一排牌」的时间，不是屏幕上的装饰线。至少 160，绝不出屏。 */
+    protected int countdownWidth(int stageW) {
+        return Math.min(width - 2 * SIDE, Math.max(160, stageW));
+    }
+
     /**
      * 一排按钮排在哪：一行放得下就并排居中，放不下就一行一个。
      *
@@ -197,11 +321,11 @@ public abstract class GameScreen extends Screen {
      * 写死的那一版只在中文下看着是居中的（英文的「Join the defending side」在窄窗口里一行放不下三个）。
      */
     protected java.util.List<Box> layoutButtonRow(java.util.List<Text> labels, int top, int gap) {
-        int h = textRenderer.fontHeight + 2 * BTN_PAD_Y;
+        int h = buttonHeight();
         int[] w = new int[labels.size()];
         int total = -gap;
         for (int i = 0; i < labels.size(); i++) {
-            w[i] = textRenderer.getWidth(labels.get(i)) + 2 * BTN_PAD_X;
+            w[i] = buttonWidth(labels.get(i));
             total += w[i] + gap;
         }
         java.util.List<Box> out = new ArrayList<>(labels.size());
@@ -222,6 +346,42 @@ public abstract class GameScreen extends Screen {
     }
 
     /**
+     * 一片等宽的按钮排成几列：阵容页那种「八个角色勾选」用它。
+     *
+     * <p>每个按钮取最宽的那个标签的宽度，列数放不下时减到放得下为止（最少一列）。
+     * 行与行之间多留 {@link #buttonLiftRoom()}：抬起来的金框不能切进上一行。
+     */
+    protected java.util.List<Box> layoutButtonGrid(java.util.List<Text> labels, int top, int gap, int columns) {
+        int h = buttonHeight();
+        int w = 0;
+        for (Text label : labels) {
+            w = Math.max(w, buttonWidth(label));
+        }
+        int cols = Math.max(1, Math.min(columns, labels.size()));
+        while (cols > 1 && cols * w + (cols - 1) * gap > width - 2 * BTN_SIDE) {
+            cols--;
+        }
+        int rowW = cols * w + (cols - 1) * gap;
+        int left = (width - rowW) / 2;
+        int rowStep = h + gap + buttonLiftRoom();
+        java.util.List<Box> out = new ArrayList<>(labels.size());
+        for (int i = 0; i < labels.size(); i++) {
+            out.add(new Box(left + (i % cols) * (w + gap), top + (i / cols) * rowStep, w, h));
+        }
+        return out;
+    }
+
+    /** 一个按钮多高：一行字加上下内边距。 */
+    protected int buttonHeight() {
+        return textRenderer.fontHeight + 2 * BTN_PAD_Y;
+    }
+
+    /** 一个按钮多宽：字宽加左右内边距。 */
+    protected int buttonWidth(Text label) {
+        return textRenderer.getWidth(label) + 2 * BTN_PAD_X;
+    }
+
+    /**
      * 指针落在第几个按钮上；都不在时 {@code -1}。
      *
      * <p>上边界把「抬」起来的那几像素算进去：抬起来的按钮，指针停在它顶上那一截时仍然算指着它。
@@ -237,7 +397,18 @@ public abstract class GameScreen extends Screen {
         return -1;
     }
 
-    /** 这一排按钮总共占多高。版面按它往下排，免得下一行压上来。 */
+    /** 这一排按钮从最左到最右多宽。座位轨与倒计时跟着它排，别让轨铺满全屏、按钮缩在中间一小截。 */
+    protected static int rowWidth(java.util.List<Box> boxes) {
+        int left = Integer.MAX_VALUE;
+        int right = 0;
+        for (Box b : boxes) {
+            left = Math.min(left, b.x());
+            right = Math.max(right, b.x() + b.w());
+        }
+        return boxes.isEmpty() ? 0 : right - left;
+    }
+
+    /** 这一排（或这一片）按钮总共占多高。版面按它往下排，免得下一行压上来。 */
     protected static int rowHeight(java.util.List<Box> boxes) {
         int bottom = 0;
         int top = Integer.MAX_VALUE;
@@ -250,16 +421,40 @@ public abstract class GameScreen extends Screen {
 
     /** 一个按钮：底 · 金框（选中 =「你选的那个」）· 居中的字。与行动一面同一个样子。 */
     protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color, float lift) {
+        drawButton(context, b, label, focused, color, GuiLanguage.GROUND, -lift, 1f);
+    }
+
+    /**
+     * 同上，但底色、位移与缩放由调用方给：行动一面用它画「顿」（绕底边放大）与按不动的淡底。
+     *
+     * @param fill  底色。按不动的按钮把底一起淡下去 —— 只淡字的话与本来就淡字的「什么也不做」分不开（实拍过）
+     * @param rise  竖向位移，负号向上（「抬」就是 {@code -lift}）
+     * @param scale 绕底边中点缩放：「顿」长出来的那一截全在上面，版面留空才算得准
+     */
+    protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color,
+                              int fill, float rise, float scale) {
         context.getMatrices().push();
-        context.getMatrices().translate(0, -lift, 0);
-        context.fill(b.x(), b.y(), b.x() + b.w(), b.y() + b.h(), GuiLanguage.GROUND);
+        context.getMatrices().translate(b.x() + b.w() / 2f, b.y() + b.h() + rise, 0);
+        context.getMatrices().scale(scale, scale, 1f);
+        context.getMatrices().translate(-b.w() / 2f, -b.h(), 0);
+        context.fill(0, 0, b.w(), b.h(), fill);
         if (focused) {
-            context.drawBorder(b.x() - 1, b.y() - 1, b.w() + 2, b.h() + 2, GuiLanguage.GOLD);
+            // 金 =「你 · 你选的那个」。按钮的框是 1 像素，卡的框是 2 像素（CARD_FRAME）—— 两种元素，各只此一处。
+            context.drawBorder(-1, -1, b.w() + 2, b.h() + 2, GuiLanguage.GOLD);
         }
-        context.drawCenteredTextWithShadow(textRenderer, label, b.x() + b.w() / 2,
-                b.y() + (b.h() - textRenderer.fontHeight) / 2 + 1, color);
+        context.drawCenteredTextWithShadow(textRenderer, label, b.w() / 2,
+                (b.h() - textRenderer.fontHeight) / 2 + 1, color);
         context.getMatrices().pop();
     }
+
+    /** 把一个 ARGB 色换成另一个不透明度。按不动的东西靠它淡下去，不另起颜色：语义色只有三个。 */
+    protected static int withAlpha(int argb, int alpha) {
+        return (alpha << 24) | (argb & 0xFFFFFF);
+    }
+
+    /** 按不动的按钮：底与字都只剩这么多不透明度。 */
+    protected static final int DISABLED_FILL_ALPHA = 0x55;
+    protected static final int DISABLED_TEXT_ALPHA = 0x66;
 
     /**
      * 角色名。

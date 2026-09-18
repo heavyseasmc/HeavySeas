@@ -29,6 +29,12 @@ import java.util.Set;
  * 载入时生成 4 级缩小版，画多大由显卡在相邻两级之间插值。于是同一张卡在 854×480 的小窗口里、
  * 界面尺寸设成 1 的大窗口里都清楚，发牌时那点 0.94→1 的缩放也不会让字闪。
  *
+ * <h2>航海卡分三档，按物理像素选</h2>
+ * 航海卡上的字比物资卡多得多（谁落海 · 谁口渴 · 规则条），缩小之后不是「糊」而是「没了」。
+ * 所以它不靠多级纹理缩，而是三档各烘一张：LOD0 全部内容、LOD1 去掉规则文本、LOD2 只留摘要与一行口渴
+ * （ADR-0020 §8 按实测可读性分档，ADR-0031 让 LOD2 分得开）。选哪一档只看这张牌在屏幕上占多少<b>物理像素</b>，
+ * 不看 GUI 单位 —— 界面尺寸设成 1 与 4 时同样的单位数差四倍像素。
+ *
  * <h2>卡面只能经这里画</h2>
  * 直接拿标识去 {@code drawTexture}，找不到已注册的贴图时 Minecraft 会按默认方式自己载一份 ——
  * 照样有图，只是又糊回去了，而且不报错。所以标识不外露，对外只有这几个 {@code draw*}。
@@ -42,6 +48,16 @@ public final class CardTexture extends AbstractTexture {
     private static final String CHARACTER_DIR = "textures/gui/cards/character";
     private static final String BACK_DIR = "textures/gui/cards/back";
     private static final String WEATHER_DIR = "textures/gui/cards/weather";
+    /** 航海卡三档：根目录是 LOD0（600×840），{@code lod1/} 480×672，{@code lod2/} 240×336。 */
+    private static final String NAV_DIR = "textures/gui/cards/nav";
+    private static final String[] NAV_LOD_DIRS = {NAV_DIR, NAV_DIR + "/lod1", NAV_DIR + "/lod2"};
+
+    /**
+     * 分档阈值（物理像素宽），取自 ADR-0020 §8 的实测：≥ 240 全部内容；120–240 底部规则文本已经糊，去掉；
+     * < 120 只剩顶栏摘要与海鸥角标读得出，再加 ADR-0031 补的那一行口渴摘要。
+     */
+    private static final double NAV_LOD0_MIN_PX = 240;
+    private static final double NAV_LOD1_MIN_PX = 120;
 
     /** 已经换成本类载入的标识。只在渲染线程上碰。 */
     private static final Set<Identifier> REGISTERED = new HashSet<>();
@@ -98,13 +114,33 @@ public final class CardTexture extends AbstractTexture {
     }
 
     /**
-     * 进服时把全部卡面（物资 · 角色 · 牌背）先载好。
+     * 画一张航海卡面（划船与舵手两面，ADR-0020）。id 就是 {@code data/navigation} 的 id（{@code nav_07}）。
+     *
+     * @param w 这张牌画多宽（GUI 单位）—— 选档按它乘上界面缩放之后的物理像素
+     */
+    public static void drawNav(DrawContext context, String cardId, int x, int y, int w, int h) {
+        context.drawTexture(ensure(navId(cardId, navLod(w))), x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+    }
+
+    /** 这张牌画成 {@code guiWidth} 个单位宽时该用第几档（0 / 1 / 2）。 */
+    private static int navLod(int guiWidth) {
+        double px = guiWidth * MinecraftClient.getInstance().getWindow().getScaleFactor();
+        return px >= NAV_LOD0_MIN_PX ? 0 : px >= NAV_LOD1_MIN_PX ? 1 : 2;
+    }
+
+    private static Identifier navId(String cardId, int lod) {
+        return Identifier.of(HeavySeasMod.MOD_ID, NAV_LOD_DIRS[lod] + "/" + cardId + ".png");
+    }
+
+    /**
+     * 进服时把全部卡面（物资 · 角色 · 牌背 · 天候 · 航海三档）先载好。
      *
      * <p>不预载的话，补给箱第一次打开的那一帧要现场解码、生成缩小版、上传最多 8 张 ——
      * 那一帧会卡一下，而「发」的动画按墙钟算，卡掉的那几十毫秒会直接跳过去。
+     * {@code findResources} 连子目录一起找，所以 nav 只写根目录就把 lod1 / lod2 都带上了。
      */
     public static void preload(MinecraftClient client) {
-        for (String dir : new String[]{PROVISION_DIR, CHARACTER_DIR, BACK_DIR, WEATHER_DIR}) {
+        for (String dir : new String[]{PROVISION_DIR, CHARACTER_DIR, BACK_DIR, WEATHER_DIR, NAV_DIR}) {
             client.getResourceManager()
                     .findResources(dir, id -> id.getPath().endsWith(".png"))
                     .keySet().stream()

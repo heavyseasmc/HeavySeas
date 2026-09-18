@@ -32,11 +32,6 @@ public final class ConsentScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int TOP_BAND_Y = 12;
-    private static final int GAP = 8;
-    private static final int BAR_TO_TEXT = 3;
-    private static final int BAR_W_MAX = 220;
-
     private HudView view;
     /**
      * 开这一面时的那个窗口。
@@ -52,7 +47,6 @@ public final class ConsentScreen extends GameScreen {
     private int focus;
     private boolean committed;
     private final float[] lift = new float[2];
-    private long lastFrameMs = System.currentTimeMillis();
     private List<Box> boxes = List.of();
 
     public ConsentScreen(HudView view) {
@@ -80,8 +74,7 @@ public final class ConsentScreen extends GameScreen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));   // 掉帧时别让插值一步跳到底
-        lastFrameMs = now;
+        long dt = frameDelta(now);
         int fh = textRenderer.fontHeight;
 
         drawPublicBand(context, view, TOP_BAND_Y);
@@ -97,8 +90,8 @@ public final class ConsentScreen extends GameScreen {
         List<Text> labels = List.of(Text.translatable("heavyseas.consent.agree"),
                 Text.translatable("heavyseas.consent.fight"));
         // 按钮顶上留出「抬」的高度，免得抬起来的金框切进上面那行字。
-        int top = askY + fh + 2 * GAP + (int) Math.ceil(GuiLanguage.LIFT_PX);
-        boxes = layoutButtonRow(labels, top, GAP);
+        int top = askY + fh + 2 * BTN_GAP + buttonLiftRoom();
+        boxes = layoutButtonRow(labels, top, BTN_GAP);
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         // ❗每帧都要调一次：它记的是上一帧指针在哪，停一帧就会漏掉一次移动。
@@ -115,18 +108,18 @@ public final class ConsentScreen extends GameScreen {
                     i == 1 ? GuiLanguage.CINNABAR : GuiLanguage.INK, lift[i]);
         }
 
-        int barW = Math.min(width - 2 * BTN_SIDE, BAR_W_MAX);
-        int barY = top + rowHeight(boxes) + 2 * GAP;
+        int barW = countdownWidth(rowWidth(boxes));
+        int barY = top + rowHeight(boxes) + 2 * BTN_GAP;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         drawCountdown(context, now, deadlineMs, view.contest().windowMs(),
                 (width - barW) / 2, barY, barW, countdownY);
-        int hintY = countdownY + fh + GAP;
+        int hintY = countdownY + fh + HINT_GAP;
         context.drawCenteredTextWithShadow(textRenderer,
                 Text.translatable(focus == 1 ? "heavyseas.consent.fight_hint" : "heavyseas.consent.agree_hint"),
                 width / 2, hintY, GuiLanguage.MUTED);
         context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.consent.timeout"),
                 width / 2, hintY + fh + 2, GuiLanguage.DIM);
-        drawIdentity(context, view, height - Math.max(8, Math.round(height * 0.05f)) - fh);
+        drawIdentity(context, view, identityY());
     }
 
     /**

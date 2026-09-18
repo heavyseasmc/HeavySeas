@@ -10,7 +10,6 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,25 +30,17 @@ import java.util.List;
  * <h2>界面不能揭穿舵手</h2>
  * 这一面只在舵手自己的屏幕上。别人的屏幕上只有「划船堆 N 张 · 舵手 X · 倒计时」（HUD），
  * 结算后只公开被执行的那一张 —— 没挑中的几张不会出现在任何人的屏幕上。
+ *
+ * <h2>牌面是贴图</h2>
+ * 三档按物理像素选（{@link CardTexture#drawNav}）；一排好几张时牌很窄，字会小到读不清 ——
+ * 所以高亮那一张下面另有一行完整说明（{@link NavCardText#describe}），与补给箱「说明只跟高亮走」同一个做法。
  */
 public final class HelmScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static final int SIDE = 20;
-    private static final int TOP_BAND_Y = 12;
-    private static final int SEA_LINE_Y = 38;
-    private static final int GAP = 6;
-    private static final int BELOW_CARDS = 6;
-    private static final int BAR_H = 3;
-    private static final int BAR_TO_TEXT = 3;
-    private static final int HINT_GAP = 5;
+    /** 说明两行之间。 */
     private static final int LINE_GAP = 3;
-    /** 金框画在卡外 2 像素，再留 4 像素余量。 */
-    private static final int BORDER_ROOM = 2 + 4;
-    /** 窗口小到离谱时卡也不能缩没了 —— 缩没了与「没有牌」长得一样。 */
-    private static final int MIN_CARD_H = 24;
-    private static final float MAX_CARD_H_RATIO = 0.55f;
 
     private HudView view;
     /** 打开时的划船堆。结算那一刻投影里就没有了，而「顿」还要画在它上面 —— 所以留一份。 */
@@ -58,7 +49,6 @@ public final class HelmScreen extends GameScreen {
     private final long deadlineMs;
     private final float[] lift;
     private final long dealAt;
-    private long lastFrameMs;
     /** 高亮。一进来就在第一张，与服务端开窗时的默认一致。 */
     private int highlight;
     /** 服务端替你挑的那张；-1 表示没被替挑。 */
@@ -72,7 +62,7 @@ public final class HelmScreen extends GameScreen {
                           int countdownY, int hintY, int keepY, int identityY) {
 
         int cardX(int i) {
-            return left + i * (w + GAP);
+            return left + i * (w + CARD_GAP);
         }
     }
 
@@ -83,7 +73,6 @@ public final class HelmScreen extends GameScreen {
         this.deadlineMs = view.sea().helmDeadlineMs();
         this.lift = new float[offer.size()];
         this.dealAt = System.currentTimeMillis();
-        this.lastFrameMs = dealAt;
     }
 
     @Override
@@ -138,8 +127,7 @@ public final class HelmScreen extends GameScreen {
             return;
         }
         long now = System.currentTimeMillis();
-        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));   // 掉帧时别让插值一步跳到底
-        lastFrameMs = now;
+        long dt = frameDelta(now);
         Layout l = layout();
         float snapP = GuiLanguage.snap(now, snapAt);
 
@@ -172,14 +160,15 @@ public final class HelmScreen extends GameScreen {
             context.getMatrices().translate(l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h() - lift[i] + rise, 0);
             context.getMatrices().scale(scale, scale, 1f);
             context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
-            NavCardFace.draw(context, textRenderer, offer.get(i), view.seats(), 0, 0, l.w(), l.h());
+            CardTexture.drawNav(context, offer.get(i).id(), 0, 0, l.w(), l.h());
             if (hi) {
-                context.drawBorder(-2, -2, l.w() + 4, l.h() + 4, GuiLanguage.GOLD);
+                drawCardFrame(context, l.w(), l.h());
             }
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, now, l);
+        drawCountdown(context, now, deadlineMs, NavigationPhase.PICK_MILLIS,
+                l.barX(), l.barY(), l.barW(), l.countdownY());
         drawHint(context, l);
         drawIdentity(context, view, l.identityY());
     }
@@ -187,51 +176,28 @@ public final class HelmScreen extends GameScreen {
     /**
      * 这一帧的版面：牌吃掉上带与下面几行字之间剩下的高度，与它们一起居中。
      *
-     * <p>牌顶留的空把「顿」算进去（抬 · 顿的位移 · 顿放大长出来的那一截），理由同补给箱那一面的 topRoom。
+     * <p>牌顶留的空把「顿」算进去（{@link #snapRoom}），理由同补给箱那一面。
      */
     private Layout layout() {
         int n = Math.max(1, offer.size());
         int fh = textRenderer.fontHeight;
         int lineH = fh + 1;
-        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - fh;
+        int identityY = identityY();
         int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 2 * lineH + LINE_GAP + fh;
         int top = SEA_LINE_Y + fh;
         int avail = identityY - HINT_GAP - top - below;
         // 先按偏大的卡算出留空，再据此定卡高：留空只会偏大一点，卡绝不会反过来压上上带那一行。
-        int room = topRoom(cardHeightFor(n, avail - topRoom(0)));
+        int room = snapRoom(cardHeightFor(n, avail - snapRoom(0)));
         int h = cardHeightFor(n, avail - room);
         int w = GuiLanguage.cardWidth(h);
         int cardsTop = top + room + Math.max(0, (avail - room - h) / 2);
         int barY = cardsTop + h + BELOW_CARDS;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         int hintY = countdownY + fh + HINT_GAP;
-        int rowW = n * w + (n - 1) * GAP;
-        // 倒计时跟舞台一样宽：它是「这一排牌」的时间（ADR-0018 §7.1：时间永远在舞台正下方）。
-        int barW = Math.min(width - 2 * SIDE, Math.max(160, rowW));
+        int rowW = cardRowWidth(n, w);
+        int barW = countdownWidth(rowW);
         return new Layout(w, h, (width - rowW) / 2, cardsTop, barY, (width - barW) / 2, barW,
                 countdownY, hintY, hintY + 2 * lineH + LINE_GAP, identityY);
-    }
-
-    private int cardHeightFor(int n, int availH) {
-        int byWidth = GuiLanguage.cardHeight((width - 2 * SIDE - (n - 1) * GAP) / n);
-        return Math.max(MIN_CARD_H, Math.min(Math.min(availH, byWidth), Math.round(height * MAX_CARD_H_RATIO)));
-    }
-
-    private static int topRoom(int cardHeight) {
-        return (int) Math.ceil(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE
-                + (GuiLanguage.SNAP_PEAK_SCALE - 1f) * cardHeight) + BORDER_ROOM;
-    }
-
-    private void drawCountdown(DrawContext context, long now, Layout l) {
-        long total = NavigationPhase.PICK_MILLIS;
-        long left = Math.max(0L, deadlineMs - now);
-        float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
-        boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
-        context.fill(l.barX(), l.barY(), l.barX() + l.barW(), l.barY() + BAR_H, GuiLanguage.GROUND);
-        context.fill(l.barX(), l.barY(), l.barX() + Math.round(l.barW() * frac), l.barY() + BAR_H,
-                urgent ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(String.format("%.1fs", left / 1000f)),
-                width / 2, l.countdownY(), urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
     }
 
     /** 说明只跟高亮走：那张牌的完整内容（牌面上的字可能小到读不清），下面一行说这一面要你做什么。 */
@@ -251,16 +217,7 @@ public final class HelmScreen extends GameScreen {
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l) {
-        if (mouseY < l.cardsTop() - GuiLanguage.LIFT_PX || mouseY > l.cardsTop() + l.h()) {
-            return -1;
-        }
-        for (int i = 0; i < offer.size(); i++) {
-            int x = l.cardX(i);
-            if (mouseX >= x && mouseX < x + l.w()) {
-                return i;
-            }
-        }
-        return -1;
+        return cardIndexAt(mouseX, mouseY, l.left(), l.cardsTop(), l.w(), l.h(), offer.size());
     }
 
     /** 移高亮并上报：超时认的是它，服务端不知道的话只能乱挑。 */
