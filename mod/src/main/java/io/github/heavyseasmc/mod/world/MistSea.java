@@ -68,10 +68,6 @@ public final class MistSea {
         if (component.session().isPresent()) {
             throw new IllegalStateException("雾海中已有一局进行中");
         }
-        if (!component.voyageEscrowPlayers().isEmpty()) {
-            throw new IllegalStateException("仍有 %d 份上局的雾海托管未恢复，暂不能开新局"
-                    .formatted(component.voyageEscrowPlayers().size()));
-        }
         forceArena(sea, true);
         prepareShore(sea);
         List<ServerPlayerEntity> crossed = new ArrayList<>();

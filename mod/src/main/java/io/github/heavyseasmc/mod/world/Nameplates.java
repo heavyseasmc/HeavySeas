@@ -162,16 +162,16 @@ public final class Nameplates {
             reportConflict(name, "同名队伍不属于 HeavySeas");
             return null;
         }
-        if (team == null) {
-            team = board.addTeam(name);
-            team.setDisplayName(Text.literal(NameplateTeamNames.marker(name)));
-            board.updateScoreboardTeam(team);
-        }
         String holder = player.getNameForScoreboard();
         Team current = board.getScoreHolderTeam(holder);
         if (!NameplateTeamNames.mayJoin(name, current == null ? null : current.getName())) {
             reportConflict(holder, "玩家已经属于队伍 " + current.getName());
             return null;
+        }
+        if (team == null) {
+            team = board.addTeam(name);
+            team.setDisplayName(Text.literal(NameplateTeamNames.marker(name)));
+            board.updateScoreboardTeam(team);
         }
         // 同理：已经在队里就别再加一次，否则每次同步都会广播一遍成员变更。
         if (!team.getPlayerList().contains(holder)) {

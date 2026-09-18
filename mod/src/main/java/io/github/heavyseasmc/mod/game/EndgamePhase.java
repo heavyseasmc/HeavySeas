@@ -52,8 +52,6 @@ public final class EndgamePhase {
     /** 计分面板停多久再收起会话。{@code /seas end} 随时照样能提前结束。 */
     public static final long SCORE_HOLD_MS = 45_000L;
     public static final long ARRIVAL_STEP_MS = 500L;
-    public static final int ARRIVAL_STEPS = 8;
-
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     private EndgamePhase() {
@@ -99,7 +97,7 @@ public final class EndgamePhase {
         EndgameProgress progress = component.endgame().orElseThrow(
                 () -> new IllegalStateException("终局序列在排程里，组件上却没有终局状态"));
         if (progress.stage() == EndgameProgress.Stage.ARRIVAL) {
-            if (progress.flipped() < ARRIVAL_STEPS) {
+            if (progress.flipped() < EndgameProgress.ARRIVAL_STEPS) {
                 Seats.move(world, component, MistSea.SHORE_DIRECTION.multiply(4.0));
                 component.setEndgame(progress.withFlipped(progress.flipped() + 1));
                 GameComponents.sync(world);

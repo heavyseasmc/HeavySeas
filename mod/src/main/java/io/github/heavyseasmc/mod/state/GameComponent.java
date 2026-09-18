@@ -71,6 +71,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     /** 系统事件改画在 HUD 侧边栏，不再写入玩家聊天记录。 */
     private static final int MAX_NOTIFICATIONS = 8;
     private final ArrayDeque<Text> notifications = new ArrayDeque<>();
+    private List<String> notificationJsonCache;
     private boolean extraProvisionPending;
 
     public GameComponent(World owner) {
@@ -168,8 +169,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(g.gulls());
         buf.writeString(session.currentWeather().map(card -> card.id()).orElse(""));
         buf.writeVarInt(notifications.size());
-        for (Text notification : notifications) {
-            buf.writeString(Text.Serialization.toJsonString(notification, buf.getRegistryManager()));
+        for (String notification : notificationJson(buf.getRegistryManager())) {
+            buf.writeString(notification);
         }
         // 座位轨：谁坐哪、轮到谁。**公开信息**，每人一份照发 —— 等别人行动时全船看的就是它。
         buf.writeVarInt(g.bySeat().size());
@@ -965,6 +966,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearHelm();
         clearThirst();
         notifications.clear();
+        notificationJsonCache = null;
         extraProvisionPending = false;
         endgame = null;
         seatIds = List.of();
@@ -979,6 +981,16 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         while (notifications.size() > MAX_NOTIFICATIONS) {
             notifications.removeFirst();
         }
+        notificationJsonCache = null;
+    }
+
+    private List<String> notificationJson(RegistryWrapper.WrapperLookup registry) {
+        if (notificationJsonCache == null) {
+            notificationJsonCache = notifications.stream()
+                    .map(notification -> Text.Serialization.toJsonString(notification, registry))
+                    .toList();
+        }
+        return notificationJsonCache;
     }
 
     public void setExtraProvisionPending(boolean pending) {

@@ -21,7 +21,7 @@ final class EndgameProgressTest {
 
     @Test
     void arrivalAcceptsEightMotionStepsThenEntersHateReveal() {
-        EndgameProgress progress = progress(EndgameProgress.Stage.ARRIVAL, 8);
+        EndgameProgress progress = progress(EndgameProgress.Stage.ARRIVAL, EndgameProgress.ARRIVAL_STEPS);
 
         EndgameProgress reveal = progress.nextStage();
 

@@ -538,41 +538,19 @@ public final class GameFlow {
     /** 播给全场。包内可见：{@link ActionPhase} 与 {@link NavigationPhase} 要播同样的话。 */
     static void broadcast(ServerWorld world, Text message) {
         GameComponent component = GameComponents.of(world);
-        if (component.session().isPresent()) {
-            component.notify(message);
-            sync(world);
+        if (component.session().isEmpty()) {
+            LOGGER.warn("雾海没有进行中的对局，丢弃播报：{}", message.getString());
+            return;
         }
+        component.notify(message);
+        sync(world);
     }
 
     private static String weatherNameKey(WeatherCard card) {
-        return switch (card.id()) {
-            case "huge_wave" -> "heavyseas.weather.huge_wave";
-            case "sweltering" -> "heavyseas.weather.sweltering";
-            case "becalmed" -> "heavyseas.weather.becalmed";
-            case "scorching_heat" -> "heavyseas.weather.scorching_heat";
-            case "clear_skies" -> "heavyseas.weather.clear_skies";
-            case "dense_fog" -> "heavyseas.weather.dense_fog";
-            case "storm" -> "heavyseas.weather.storm";
-            case "gale" -> "heavyseas.weather.gale";
-            case "rain" -> "heavyseas.weather.rain";
-            case "sunday" -> "heavyseas.weather.sunday";
-            default -> throw new IllegalArgumentException("没有天候译名: " + card.id());
-        };
+        return "heavyseas.weather." + card.id();
     }
 
     private static String weatherEffectKey(WeatherCard card) {
-        return switch (card.id()) {
-            case "huge_wave" -> "heavyseas.weather.effect.huge_wave";
-            case "sweltering" -> "heavyseas.weather.effect.sweltering";
-            case "becalmed" -> "heavyseas.weather.effect.becalmed";
-            case "scorching_heat" -> "heavyseas.weather.effect.scorching_heat";
-            case "clear_skies" -> "heavyseas.weather.effect.clear_skies";
-            case "dense_fog" -> "heavyseas.weather.effect.dense_fog";
-            case "storm" -> "heavyseas.weather.effect.storm";
-            case "gale" -> "heavyseas.weather.effect.gale";
-            case "rain" -> "heavyseas.weather.effect.rain";
-            case "sunday" -> "heavyseas.weather.effect.sunday";
-            default -> throw new IllegalArgumentException("没有天候效果译文: " + card.id());
-        };
+        return "heavyseas.weather.effect." + card.id();
     }
 }

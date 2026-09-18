@@ -92,13 +92,20 @@ public final class ThirstPhase {
             resolve(world, component, 0);
             return;
         }
-        boolean canDecide = ThirstEligibility.canChoose(session.state().conditionOf(who), own);
+        boolean canDecide = ThirstEligibility.canChoose(session.state().conditionOf(who), own,
+                prompt.waterPerSource());
         boolean canReceiveDonation = hasHumanDonor(session, component, who);
         if (!canDecide && !canReceiveDonation) {
             // 没有可做的决定。说一句为什么，不然屏幕上只会看到血无缘无故掉了。
-            GameFlow.broadcast(world, Text.translatable(own == 0
-                            ? "heavyseas.game.thirst_no_water" : "heavyseas.game.thirst_unconscious",
-                    GameFlow.characterName(who), prompt.remaining()).formatted(Formatting.DARK_GRAY));
+            Text reason = own == 0
+                    ? Text.translatable("heavyseas.game.thirst_no_water",
+                    GameFlow.characterName(who), prompt.remaining())
+                    : !session.state().conditionOf(who).canAct()
+                    ? Text.translatable("heavyseas.game.thirst_unconscious",
+                    GameFlow.characterName(who), prompt.remaining())
+                    : Text.translatable("heavyseas.game.thirst_not_enough",
+                    GameFlow.characterName(who), own, prompt.waterPerSource());
+            GameFlow.broadcast(world, reason.copy().formatted(Formatting.DARK_GRAY));
             LOGGER.info("口渴：{} 无从决定也没人能代打（水 {} 张 · {}），按不喝结算 {} 次", who.value(), own,
                     session.state().conditionOf(who), prompt.remaining());
             resolve(world, component, 0);
@@ -141,7 +148,8 @@ public final class ThirstPhase {
             return;
         }
         CharacterId who = pending.get().who();
-        if (!ThirstEligibility.canChoose(session.state().conditionOf(who), session.watersOf(who))) {
+        if (!ThirstEligibility.canChoose(session.state().conditionOf(who), session.watersOf(who),
+                pending.get().waterPerSource())) {
             return;                             // 这是只给旁人捐水的窗口；本人无权用 0 提前收场
         }
         int waters = clamp(session, pending.get(), action.waters(), component.thirstDonors().size());
@@ -282,8 +290,14 @@ public final class ThirstPhase {
         for (int i = 0; i < own; i++) {
             donors.add(who);                  // 界面这条路只喝自己的；别人替他打走 /seas water from
         }
+        int promised = donors.size();
         while (!donors.isEmpty() && donors.size() % prompt.waterPerSource() != 0) {
             donors.removeLast();              // 不足一组的承诺不扣牌，也不能凭空化解口渴
+        }
+        int returned = promised - donors.size();
+        if (returned > 0) {
+            GameFlow.broadcast(world, Text.translatable("heavyseas.game.thirst_returned", returned)
+                    .formatted(Formatting.GRAY));
         }
         session.decideThirst(donors);
         waters = donors.size();

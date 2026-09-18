@@ -10,7 +10,8 @@ public final class ThirstEligibility {
     private ThirstEligibility() {
     }
 
-    public static boolean canChoose(Condition condition, int waters) {
-        return Objects.requireNonNull(condition, "condition").canAct() && waters > 0;
+    public static boolean canChoose(Condition condition, int waters, int waterPerSource) {
+        return Objects.requireNonNull(condition, "condition").canAct()
+                && waterPerSource > 0 && waters >= waterPerSource;
     }
 }

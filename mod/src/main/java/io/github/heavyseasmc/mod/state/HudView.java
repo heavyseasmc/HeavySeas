@@ -221,7 +221,8 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
     /** 该我决定喝不喝水了：口渴结算问到我，而且窗口开着（没水或昏迷时服务端不开窗口）。 */
     public boolean myThirstChoice() {
         return active && seated && thirstPrompt.active() && thirstPrompt.deadlineMs() > 0
-                && thirstPrompt.who().equals(character) && ThirstEligibility.canChoose(condition, myWaters());
+                && thirstPrompt.who().equals(character)
+                && ThirstEligibility.canChoose(condition, myWaters(), thirstPrompt.waterPerSource());
     }
 
     /** 服务器已经认下这张治疗牌，正等我挑一个受伤目标。 */

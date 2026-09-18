@@ -61,12 +61,11 @@ public final class ActionScreen extends GameScreen {
         }
 
         boolean enabled(HudView view) {
-            return (kind != null || this == USE) && !(this == ROW && "becalmed".equals(view.weather()));
+            return kind != null || this == USE;
         }
 
         String hint(HudView view) {
-            return this == ROW && "becalmed".equals(view.weather())
-                    ? "heavyseas.action.row_becalmed_hint" : hint;
+            return hint;
         }
     }
 

@@ -95,7 +95,7 @@ public final class ActionPhase {
         // 与语言无关的一行：验收要从日志里判「界面那条路真的走通了」（专用服务端不加载 lang）。
         LOGGER.info("行动（界面）：{} 选了 {}", who.value(), kind.get());
         switch (kind.get()) {
-            case ROW -> beginRow(world, component, who);
+            case ROW -> beginRow(world, component, player, who);
             case PASS -> {
                 GameFlow.broadcast(world, Text.translatable("heavyseas.command.passed", GameFlow.characterName(who)));
                 GameFlow.finishAction(world, component, who);
@@ -254,16 +254,22 @@ public final class ActionPhase {
      *
      * <p>牌堆空到一张都抽不出来时，引擎当场结束这次划船（照样领标记），这里就直接算行动结束。
      */
-    private static void beginRow(ServerWorld world, GameComponent component, CharacterId who) {
-        Session session = component.requireSession();
-        List<NavigationCard> drawn = session.beginRow(who);
-        GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
-        if (session.rower().isEmpty()) {
-            finishRow(world, component, who);
-            return;
+    private static void beginRow(ServerWorld world, GameComponent component, ServerPlayerEntity player,
+                                 CharacterId who) {
+        try {
+            Session session = component.requireSession();
+            List<NavigationCard> drawn = session.beginRow(who);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
+            if (session.rower().isEmpty()) {
+                finishRow(world, component, who);
+                return;
+            }
+            LOGGER.info("划船：{} 抽了 {} 张，等他一张一张定", who.value(), drawn.size());
+            GameComponents.sync(world);
+        } catch (RuntimeException failure) {
+            LOGGER.info("划船（界面）：{} 的操作被拒绝：{}", who.value(), failure.getMessage());
+            player.sendMessage(Text.literal(String.valueOf(failure.getMessage())).formatted(Formatting.RED), true);
         }
-        LOGGER.info("划船：{} 抽了 {} 张，等他一张一张定", who.value(), drawn.size());
-        GameComponents.sync(world);
     }
 
     /** 划船一面上定下的一张。不是划船者本人、不是还没定的那张 —— 一律当作没按。 */

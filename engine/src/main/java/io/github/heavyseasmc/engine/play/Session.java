@@ -819,6 +819,13 @@ public final class Session {
     /** 这一场战斗里，每个人已经打出去的武器。{@link #applyFight} 之后清空。 */
     private final Map<CharacterId, List<String>> weaponsPlayed = new LinkedHashMap<>();
 
+    /** Number of survivors healed by the most recent ration resolution. */
+    private int lastRationHealed;
+
+    public int lastRationHealed() {
+        return lastRationHealed;
+    }
+
     /**
      * 他现在能凑出多少战斗加值（手上 + 面前的武器之和）。
      *
@@ -1644,6 +1651,7 @@ public final class Session {
             healedSincePhaseStart += heal.amount();
             healed.add(id);
         }
+        lastRationHealed = healed.size();
         Invariants.requireValid(state, context, "绝境之后");
         requireNoProvisionLost("绝境之后");
         return List.copyOf(healed);

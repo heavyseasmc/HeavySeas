@@ -105,13 +105,15 @@ public final class ContestPhase {
         Contest contest = session.contest().orElseThrow();
         CharacterId attacker = contest.attacker();
         CharacterId target = contest.target();
-        int rationHealed = contest.kind() == Contest.Kind.RATION ? healable(session) : 0;
         session.consent(fight);
         LOGGER.info("表态：{} {}", target.value(), fight ? "战斗" : "同意");
-        GameFlow.broadcast(world, Text.translatable(fight ? "heavyseas.contest.refused" : "heavyseas.contest.agreed",
+        String responseKey = contest.kind() == Contest.Kind.RATION
+                ? (fight ? "heavyseas.contest.ration_objected" : "heavyseas.contest.ration_passed")
+                : (fight ? "heavyseas.contest.refused" : "heavyseas.contest.agreed");
+        GameFlow.broadcast(world, Text.translatable(responseKey,
                 GameFlow.characterName(target)).formatted(fight ? Formatting.RED : Formatting.GRAY));
         if (!fight && contest.kind() == Contest.Kind.RATION && session.contest().isEmpty()) {
-            announceRationed(world, attacker, rationHealed);
+            announceRationed(world, attacker, session.lastRationHealed());
         }
         after(world, component, attacker);
     }
@@ -156,8 +158,8 @@ public final class ContestPhase {
         Contest contest = session.contest().orElseThrow();
         CharacterId attacker = contest.attacker();
         CharacterId target = contest.target();
-        int rationHealed = contest.kind() == Contest.Kind.RATION ? healable(session) : 0;
         Fight.Outcome outcome = session.resolveContest();
+        int rationHealed = contest.kind() == Contest.Kind.RATION ? session.lastRationHealed() : 0;
         boolean won = outcome.attackerGetsWhatTheyWanted();
         LOGGER.info("战斗结算：{} 对 {} —— {}方胜，败方每人 {} 点", attacker.value(), target.value(),
                 won ? "进攻" : "防守", outcome.damagePerLoser());
@@ -438,14 +440,6 @@ public final class ContestPhase {
         }
         GameFlow.broadcast(world, Text.translatable("heavyseas.contest.nothing_to_take",
                 GameFlow.characterName(contest.target())).formatted(Formatting.GRAY));
-    }
-
-    /** 此刻会被绝境治到的人数；在规则结算前取，给播报用。 */
-    private static int healable(Session session) {
-        return (int) session.state().bySeat().stream()
-                .filter(id -> session.state().conditionOf(id) == io.github.heavyseasmc.engine.state.Condition.CONSCIOUS)
-                .filter(id -> session.state().stateOf(id).damage() > 0)
-                .count();
     }
 
     private static void announceRationed(ServerWorld world, CharacterId actor, int healed) {
