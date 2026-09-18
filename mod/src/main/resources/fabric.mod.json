@@ -15,6 +15,9 @@
     "client": ["io.github.heavyseasmc.mod.client.HeavySeasClient"],
     "cardinal-components": ["io.github.heavyseasmc.mod.state.GameComponents"]
   },
+  "mixins": [
+    { "config": "heavyseas.client.mixins.json", "environment": "client" }
+  ],
   "depends": {
     "fabricloader": ">=${loader_version}",
     "minecraft": "${minecraft_version}",

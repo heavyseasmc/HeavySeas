@@ -26,6 +26,8 @@ public final class GullEntity extends ParrotEntity {
     private int slot;
     private Vec3d center = Vec3d.ZERO;
     private boolean departing;
+    /** 齐飞的方向：布局里岸的方向（ADR-0034 §5.5），由 {@link #depart(Vec3d)} 给。 */
+    private Vec3d departToward = new Vec3d(0, 0, 1);
 
     public GullEntity(EntityType<? extends ParrotEntity> type, World world) {
         super(type, world);
@@ -48,8 +50,9 @@ public final class GullEntity extends ParrotEntity {
         setPosition(center.add(Math.cos(angle) * 14.0, 5.0, Math.sin(angle) * 14.0));
     }
 
-    public void depart() {
+    public void depart(Vec3d toward) {
         departing = true;
+        departToward = toward;
     }
 
     @Override
@@ -59,9 +62,9 @@ public final class GullEntity extends ParrotEntity {
             return;
         }
         if (departing) {
-            Vec3d next = getPos().add(MistSea.SHORE_DIRECTION.multiply(0.45)).add(0, 0.08, 0);
+            Vec3d next = getPos().add(departToward.multiply(0.45)).add(0, 0.08, 0);
             setPosition(next);
-            setYaw(0f);
+            setYaw((float) Math.toDegrees(Math.atan2(-departToward.x, departToward.z)));
             return;
         }
         double t = (age * 0.045) + slot * (Math.PI * 2.0 / 4.0);

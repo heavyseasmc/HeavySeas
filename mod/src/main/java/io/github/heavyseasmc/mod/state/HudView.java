@@ -29,6 +29,7 @@ import java.util.Optional;
  * @param turn      第几回合
  * @param phase     当前阶段
  * @param gulls     已有几只海鸥
+ * @param fog       今天的雾（起点 · 终点，格；0/0 = 走游戏默认）· 公开
  * @param seats     座位顺序（角色 id，船头到船尾）· 公开。❗<b>含被移出游戏的人</b>
  * @param removed   被移出游戏的人（角色 id）· 公开（ADR-0022）
  * @param actor     行动阶段正轮到谁（角色 id）；不在行动阶段、或已经没人能动时是空串 · 公开
@@ -59,7 +60,7 @@ import java.util.Optional;
  * @param front     收件人自己<b>亮在面前</b>的牌。规则上这一区是公开的，但别人的那份这一版还没发 ——
  *                  要等头顶信息条（决策 ⑥）才有地方显示
  */
-public record HudView(boolean active, int turn, Phase phase, int gulls, String weather, List<Text> notifications,
+public record HudView(boolean active, int turn, Phase phase, int gulls, String weather, Fog fog, List<Text> notifications,
                       List<String> seats, List<String> removed, String actor, Sea sea, Thirst thirstPrompt,
                       Endgame endgame, ContestView contest, boolean seated, String character,
                       int health, int maxHealth, Condition condition, int thirst, String love, String hate,
@@ -71,6 +72,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
     public HudView {
         seats = List.copyOf(Objects.requireNonNull(seats, "seats"));
         weather = Objects.requireNonNull(weather, "weather");
+        fog = Objects.requireNonNull(fog, "fog");
         notifications = List.copyOf(Objects.requireNonNull(notifications, "notifications"));
         removed = List.copyOf(Objects.requireNonNull(removed, "removed"));
         actor = Objects.requireNonNull(actor, "actor");
@@ -89,9 +91,24 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
-            false, 0, Phase.PROVISION, 0, "", List.of(), List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
+            false, 0, Phase.PROVISION, 0, "", Fog.NONE, List.of(), List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
             ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, 0L, 0L, false, 0L,
             "", List.of(), 0, List.of(), List.of(), Score.NONE);
+
+    /**
+     * 今天的雾（ADR-0034 §5.1）：地形雾从几格外开始变浓、几格外完全看不见。<b>公开</b>，全船同一片雾。
+     *
+     * <p>{@code 0/0} = 不改，走游戏默认的雾 —— 晴空那一天，以及雾散之后。服务端按当日天候查雾表算好再发，
+     * 客户端不自己推「雾还在不在」（那是第二份规则）。
+     */
+    public record Fog(int start, int end) {
+
+        public static final Fog NONE = new Fog(0, 0);
+
+        public boolean vanilla() {
+            return start == 0 && end == 0;
+        }
+    }
 
     /** The finale is public to everyone in the Mist Sea, including lobby spectators without a role. */
     public boolean myEndgame() {

@@ -51,8 +51,8 @@ public final class GameDataLoader implements SimpleSynchronousResourceReloadList
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    /** 本监听器自己的标识，与数据的 id 无关。 */
-    private static final Identifier FABRIC_ID = Identifier.of(HeavySeasMod.MOD_ID, "game_data");
+    /** 本监听器自己的标识，与数据的 id 无关。公开给 {@link SceneDataLoader} 声明「在它之后读」。 */
+    public static final Identifier FABRIC_ID = Identifier.of(HeavySeasMod.MOD_ID, "game_data");
 
     /** 最近一次<b>整套</b>读成功的数据。读失败时保持不动。 */
     private static volatile GameData current;

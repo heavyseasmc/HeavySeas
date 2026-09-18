@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.command.SeasCommand;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.ContestPhase;
 import io.github.heavyseasmc.mod.game.DesignationPhase;
@@ -30,6 +31,7 @@ import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
 import io.github.heavyseasmc.mod.world.LobbyBoat;
+import io.github.heavyseasmc.mod.world.SceneItems;
 import io.github.heavyseasmc.mod.world.Seats;
 
 import net.fabricmc.api.ModInitializer;
@@ -64,6 +66,10 @@ public final class HeavySeasMod implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("规则引擎已接入：一回合 {} 个阶段", Phase.values().length);
         GameDataLoader.register();
+        // 场景数据（航程布局，ADR-0034 §5.5）：与配平走同一条数据包重载路径，各读各的。
+        SceneDataLoader.register();
+        // 只用来挂模型的物品（布景 · 补给箱）：要在场景数据校验它们之前注册好。
+        SceneItems.register();
         LobbyBoatBlock.register();
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。
         SeatEntity.register();
@@ -74,7 +80,8 @@ public final class HeavySeasMod implements ModInitializer {
         // 队伍与座位同一个形状：它进 scoreboard.dat，上次没收干净的会原样留到下一次起服。
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             server.getWorlds().forEach(Nameplates::clear);
-            MistSea.resetForceloads(server);
+            // 船体是真方块、走廊是强加载票，都进存档：崩在对局中时这里清（ADR-0034 §5.2）。
+            MistSea.resetScene(server);
         });
         // M4 crash recovery: the match itself is intentionally ephemeral, but escrowed real inventories are not.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->

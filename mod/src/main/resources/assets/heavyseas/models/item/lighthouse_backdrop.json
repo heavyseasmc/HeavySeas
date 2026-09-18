@@ -1,0 +1,52 @@
+{
+  "_comment": "灯塔布景（ADR-0034 §5.3）：塔身 8×24×8 单位、红带、灯室、檐，整体 32 高 —— 元素每个分量限 [-16, 32]，第一版写到 44 被模型加载器拒绝（客户端日志 Failed to load model）。高度靠 display 的 scale 给。北面（-Z）朝船。",
+  "textures": {
+    "wall": "heavyseas:item/lighthouse_wall",
+    "band": "heavyseas:item/lighthouse_band",
+    "lamp": "heavyseas:item/lighthouse_lamp",
+    "roof": "heavyseas:item/coast_rock",
+    "particle": "heavyseas:item/lighthouse_wall"
+  },
+  "elements": [
+    {
+      "from": [4, 0, 4], "to": [12, 24, 12],
+      "faces": {
+        "north": { "uv": [0, 0, 5.3333, 16], "texture": "#wall" },
+        "south": { "uv": [0, 0, 5.3333, 16], "texture": "#wall" },
+        "east": { "uv": [0, 0, 5.3333, 16], "texture": "#wall" },
+        "west": { "uv": [0, 0, 5.3333, 16], "texture": "#wall" }
+      }
+    },
+    {
+      "from": [3, 14, 3], "to": [13, 18, 13],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 6.4], "texture": "#band" },
+        "south": { "uv": [0, 0, 16, 6.4], "texture": "#band" },
+        "east": { "uv": [0, 0, 16, 6.4], "texture": "#band" },
+        "west": { "uv": [0, 0, 16, 6.4], "texture": "#band" },
+        "up": { "uv": [0, 0, 16, 16], "texture": "#band" },
+        "down": { "uv": [0, 0, 16, 16], "texture": "#band" }
+      }
+    },
+    {
+      "from": [3, 24, 3], "to": [13, 30, 13],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 9.6], "texture": "#lamp" },
+        "south": { "uv": [0, 0, 16, 9.6], "texture": "#lamp" },
+        "east": { "uv": [0, 0, 16, 9.6], "texture": "#lamp" },
+        "west": { "uv": [0, 0, 16, 9.6], "texture": "#lamp" }
+      }
+    },
+    {
+      "from": [2, 30, 2], "to": [14, 32, 14],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 2.6667], "texture": "#roof" },
+        "south": { "uv": [0, 0, 16, 2.6667], "texture": "#roof" },
+        "east": { "uv": [0, 0, 16, 2.6667], "texture": "#roof" },
+        "west": { "uv": [0, 0, 16, 2.6667], "texture": "#roof" },
+        "up": { "uv": [0, 0, 16, 16], "texture": "#roof" },
+        "down": { "uv": [0, 0, 16, 16], "texture": "#roof" }
+      }
+    }
+  ]
+}

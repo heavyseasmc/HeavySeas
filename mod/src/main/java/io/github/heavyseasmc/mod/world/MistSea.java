@@ -2,12 +2,12 @@ package io.github.heavyseasmc.mod.world;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.data.FogTable;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
+import io.github.heavyseasmc.mod.data.VoyageLayout;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.RegistryKey;
@@ -17,36 +17,41 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/** M4's isolated all-ocean play space and the crash-safe boundary around player inventories. */
+/**
+ * M4's isolated all-ocean play space and the crash-safe boundary around player inventories.
+ *
+ * <h2>场景从布局取（ADR-0034 §5.5）</h2>
+ * 维度 · 船头 · 朝向 · 走廊此前都写死在这里；现在全从 {@link VoyageLayout} 读。
+ * 布局在开局那一刻校验：维度没加载、锚点下方没水、布景滑程超出服务端视距，一律拒绝开局并点名 —— 不静默退回。
+ *
+ * <h2>场景要收</h2>
+ * 船体是真方块、走廊是强加载票，两者都进存档。三条退出路径（终局收场 · {@code /seas end} · 推进出错）
+ * 都经 {@link #restoreAll} → {@link #cleanupScene}；起服时 {@link #resetScene} 清上一次崩在对局中留下的。
+ */
 public final class MistSea {
-
-    public static final RegistryKey<World> KEY = RegistryKey.of(
-            RegistryKeys.WORLD, Identifier.of(HeavySeasMod.MOD_ID, "mist_sea"));
-    public static final Vec3d BOAT_ORIGIN = new Vec3d(0.5, 65.15, 0.5);
-    // Seats extend from the bow along yaw, while riders face yaw + 180. A 180° layout therefore
-    // puts the bow and every rider toward +Z, the same direction as the fixed shore approach.
-    public static final float BOAT_YAW = 180f;
-    public static final Vec3d SHORE_DIRECTION = new Vec3d(0, 0, 1);
-    public static final BlockPos SHORE_CENTER = new BlockPos(0, 63, 72);
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     private MistSea() {
     }
 
+    /**
+     * 承载对局的世界：有对局时是那一局布局的维度，否则是默认布局的维度；维度没加载（或布局还没读到）时为 {@code null}。
+     */
     public static ServerWorld world(MinecraftServer server) {
-        return server.getWorld(KEY);
+        VoyageLayout layout = SceneDataLoader.activeLayout(server);
+        return layout == null ? null : server.getWorld(layout.dimensionKey());
     }
 
     /**
@@ -55,21 +60,38 @@ public final class MistSea {
      */
     public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
                                    Set<CharacterId> reservedForDummies) {
-        startVoyage(server, players, humans, reservedForDummies, null);
+        startVoyage(server, players, humans, reservedForDummies, null, SceneDataLoader.DEFAULT);
     }
 
     public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
                                    Set<CharacterId> reservedForDummies, List<CharacterId> selectedRoster) {
-        ServerWorld sea = world(server);
+        startVoyage(server, players, humans, reservedForDummies, selectedRoster, SceneDataLoader.DEFAULT);
+    }
+
+    /**
+     * @param selectedRoster 房主定的阵容；{@code null} 用预设
+     * @param layoutId       用哪份航程布局（{@code /seas start [players] [layout]}）
+     */
+    public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
+                                   Set<CharacterId> reservedForDummies, List<CharacterId> selectedRoster,
+                                   Identifier layoutId) {
+        VoyageLayout layout = SceneDataLoader.require(layoutId);
+        ServerWorld sea = server.getWorld(layout.dimensionKey());
         if (sea == null) {
-            throw new IllegalStateException("heavyseas:mist_sea 维度未加载");
+            throw new IllegalStateException("布局 %s 的 dimension：维度 %s 未加载 —— 服务端没有这个维度，或数据包没装"
+                    .formatted(layout.id(), layout.dimension()));
         }
         GameComponent component = GameComponents.of(sea);
         if (component.session().isPresent()) {
             throw new IllegalStateException("雾海中已有一局进行中");
         }
-        forceArena(sea, true);
-        prepareShore(sea);
+        // 上局离线玩家还没恢复的托管不影响开新局（协作者 965e383 去掉了那道全局守卫）；逐人那道「已有一份未恢复的托管」在 escrow() 里照旧。
+        int viewBlocks = server.getPlayerManager().getViewDistance() * 16;
+        if (layout.arrival().slideFrom() > viewBlocks) {
+            throw new IllegalStateException("布局 %s 的 arrival.slide_from：%d 格超过服务端 view-distance %d chunk = %d 格，布景送不到客户端"
+                    .formatted(layout.id(), layout.arrival().slideFrom(), server.getPlayerManager().getViewDistance(), viewBlocks));
+        }
+        prepareScene(sea, component, layout);
         List<ServerPlayerEntity> crossed = new ArrayList<>();
         try {
             for (ServerPlayerEntity player : humans) {
@@ -79,19 +101,21 @@ public final class MistSea {
             if (!crossed.isEmpty()) {
                 checkpoint(server, "进入雾海前的物品托管");
             }
+            Vec3d bow = layout.boat().bow();
             for (ServerPlayerEntity player : crossed) {
                 player.stopRiding();
-                player.teleport(sea, BOAT_ORIGIN.x, BOAT_ORIGIN.y + 1.0, BOAT_ORIGIN.z,
-                        BOAT_YAW + 180f, 0f);
+                player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
             }
+            component.setLayoutId(layout.id());
             if (selectedRoster == null) {
-                GameFlow.start(sea, players, humans, reservedForDummies, BOAT_ORIGIN, BOAT_YAW);
+                GameFlow.start(sea, players, humans, reservedForDummies, layout);
             } else {
-                GameFlow.start(sea, players, humans, reservedForDummies, BOAT_ORIGIN, BOAT_YAW, selectedRoster);
+                GameFlow.start(sea, players, humans, reservedForDummies, layout, selectedRoster);
             }
-            LOGGER.info("雾海：{} 名玩家已托管物品并进入独立维度", crossed.size());
+            LOGGER.info("雾海：{} 名玩家已托管物品并进入 {}（布局 {}）", crossed.size(), layout.dimension(), layout.id());
         } catch (RuntimeException failure) {
             Gulls.clear(sea, component);
+            Backdrop.clear(sea, component);
             Seats.clear(sea, component);
             if (component.session().isPresent()) {
                 component.end();
@@ -100,9 +124,64 @@ public final class MistSea {
             for (ServerPlayerEntity player : crossed) {
                 restore(component, player);
             }
-            forceArena(sea, false);
+            cleanupScene(sea, component);
             throw failure;
         }
+    }
+
+    /**
+     * 摆场景：强加载走廊、放船体，脚印记进组件。
+     *
+     * <p>先清上一次的残留：正常路径下这里应当什么都没有；有，说明上次没收干净，清掉并打一行 —— 别在旧船上再放一艘。
+     */
+    private static void prepareScene(ServerWorld sea, GameComponent component, VoyageLayout layout) {
+        if (component.sceneLeftover().isPresent()) {
+            LOGGER.warn("场景：上一局留下的船体或强加载还在，先清掉再摆");
+            cleanupScene(sea, component);
+        }
+        List<Long> forced = new ArrayList<>();
+        if (layout.arrival().forceload()) {
+            for (ChunkPos chunk : layout.corridor()) {
+                sea.setChunkForced(chunk.x, chunk.z, true);
+                forced.add(chunk.toLong());
+            }
+        }
+        // 先记走廊再放船：放船抛了（模板不在 · 没水），走廊已经在存档里，脚印必须已经记着才收得回。
+        component.setSceneLeftover(new GameComponent.SceneLeftover(Optional.empty(), forced));
+        Optional<GameComponent.HullFootprint> hull = Hull.place(sea, layout);
+        component.setSceneLeftover(new GameComponent.SceneLeftover(hull, forced));
+        LOGGER.info("场景已摆好：强加载 {} 个 chunk · 船体 {}", forced.size(), hull.isPresent() ? "已放" : "无");
+    }
+
+    /**
+     * 收场景：船体清回海水、走廊解除强加载、忘掉布局。三条退出路径都经过这里，起服也经过。
+     * 幂等：没有脚印时什么也不做。
+     */
+    public static void cleanupScene(ServerWorld sea, GameComponent component) {
+        component.sceneLeftover().ifPresent(leftover -> {
+            leftover.hull().ifPresent(footprint -> Hull.restore(sea, footprint));
+            for (long packed : leftover.forcedChunks()) {
+                ChunkPos chunk = new ChunkPos(packed);
+                sea.setChunkForced(chunk.x, chunk.z, false);
+            }
+            component.clearSceneLeftover();
+            LOGGER.info("场景已收：解除强加载 {} 个 chunk", leftover.forcedChunks().size());
+        });
+        clock(sea).resetWeather();                 // 雨与雷是这一局按天候开的，收场时放晴
+        component.clearLayoutId();
+    }
+
+    /**
+     * 时刻与天气该写给哪个世界：<b>主世界</b>，不是雾海那个维度。
+     *
+     * <p>2026-09-19 换地图演练实测：日志打着「时刻 13000」，维度里 {@code time query} 却是 19531 → 10 秒后 19731，
+     * 钟一直在走。查 1.21.1 字节码：主世界之外的 {@code ServerWorld} 拿到的是 {@code UnmodifiableLevelProperties}，
+     * 它的 {@code setTimeOfDay / setRaining / setThundering / setRainTime / setClearWeatherTime / setThunderTime}
+     * 六个方法的方法体全是一句 {@code return}，读则转给主世界那份。全服只有一口钟、一场雨，
+     * Minecraft 自己的 {@code /weather} 指令也是写 {@code getOverworld()}。于是大厅（主世界）里的人会同时看见雾海的昼夜与雨——这是游戏本身的形状，不是我们的选择。
+     */
+    private static ServerWorld clock(ServerWorld sea) {
+        return sea.getServer().getOverworld();
     }
 
     private static void escrow(GameComponent component, ServerPlayerEntity player) {
@@ -127,17 +206,24 @@ public final class MistSea {
                 restored++;
             }
         }
-        forceArena(sea, false);
+        cleanupScene(sea, component);
         if (restored > 0) {
             checkpoint(sea.getServer(), "雾海结束后的物品恢复");
         }
     }
 
-    /** Clears only the arena tickets owned by this mod after an interrupted server session. */
-    public static void resetForceloads(MinecraftServer server) {
-        ServerWorld sea = world(server);
-        if (sea != null && GameComponents.of(sea).session().isEmpty()) {
-            forceArena(sea, false);
+    /**
+     * 起服时：上一次崩在对局中留下的船体与强加载票。对局本身不持久化，所以「没有对局却有脚印」就是残留。
+     *
+     * <p>❗每个世界都看，不只看默认布局的维度 —— 非官方地图的那一局可能在别的维度里。
+     */
+    public static void resetScene(MinecraftServer server) {
+        for (ServerWorld world : server.getWorlds()) {
+            GameComponent component = GameComponents.of(world);
+            if (component.session().isEmpty() && component.sceneLeftover().isPresent()) {
+                LOGGER.info("场景：{} 里有上次留下的船体或强加载，清掉", world.getRegistryKey().getValue());
+                cleanupScene(world, component);
+            }
         }
     }
 
@@ -153,9 +239,11 @@ public final class MistSea {
         }
         if (component.session().isPresent()) {
             // This is a reconnect, not crash recovery. The escrow must remain sealed until the match ends.
-            if (!player.getWorld().getRegistryKey().equals(KEY)) {
-                player.teleport(sea, BOAT_ORIGIN.x, BOAT_ORIGIN.y + 1.0, BOAT_ORIGIN.z,
-                        BOAT_YAW + 180f, 0f);
+            VoyageLayout layout = component.layoutId().map(SceneDataLoader::require)
+                    .orElseGet(SceneDataLoader::defaultLayout);
+            if (!player.getWorld().getRegistryKey().equals(sea.getRegistryKey())) {
+                Vec3d bow = layout.boat().bow();
+                player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
             }
             GameComponents.sync(sea);
             return;
@@ -194,50 +282,44 @@ public final class MistSea {
         }
     }
 
-    /** Dense, particle-free fog for everyone inside the dimension; spectators see it too. */
+    /** 雨与时刻钉多久：一天的对局远不到这个数，中途不会自己放晴。 */
+    private static final int WEATHER_HOLD_TICKS = 6_000_000;
+
+    /** 时刻每隔这么多 tick 钉一次：{@code doDaylightCycle} 是全服规则，不能只关这一个维度。 */
+    private static final int TIME_PIN_INTERVAL = 20;
+
+    /**
+     * 天候到世界（ADR-0034 §5.1.5）：按雾表那一行开雨雷、钉时刻。每天翻出天候时调一次，{@code /seas dev weather} 也调。
+     *
+     * <p>雾本身不在这里：客户端按投影里的 {@code HudView.Fog} 渲染（§5.1.2）。M4 那版的 BLINDNESS 已经拿掉。
+     */
+    public static void applyWeather(ServerWorld world, GameComponent component, String weatherId) {
+        FogTable.Entry entry = SceneDataLoader.fogFor(component.layoutId().orElse(SceneDataLoader.DEFAULT), weatherId);
+        ServerWorld clock = clock(world);            // 写雾海那个维度是空操作，见 clock()
+        clock.setWeather(entry.rain() ? 0 : WEATHER_HOLD_TICKS, entry.rain() ? WEATHER_HOLD_TICKS : 0,
+                entry.rain(), entry.thunder());
+        clock.setTimeOfDay(entry.time());
+        // 与语言无关的一行。❗它只证明「写了」，不证明「落到了世界上」——2026-09-19 前这行照打、钟照走；
+        // 要核对得在维度里 time query 两次（ADR-0034 §10.4）。
+        LOGGER.info("天候到世界：{} · 雨 {} · 雷 {} · 时刻 {} · 雾 {}/{} · 钟 {}", weatherId, entry.rain(), entry.thunder(),
+                entry.time(), entry.start(), entry.end(), clock.getRegistryKey().getValue());
+    }
+
+    /** 每 20 tick 把时刻钉回当日天候那一行；对局外什么都不做。 */
     public static void tick(MinecraftServer server) {
+        if (server.getTicks() % TIME_PIN_INTERVAL != 0) {
+            return;
+        }
         ServerWorld sea = world(server);
         if (sea == null) {
             return;
         }
         GameComponent component = GameComponents.of(sea);
-        boolean fog = component.session().isPresent() && !component.fogCleared();
-        for (ServerPlayerEntity player : sea.getPlayers()) {
-            if (fog) {
-                player.addStatusEffect(new StatusEffectInstance(
-                        StatusEffects.BLINDNESS, 40, 0, true, false, false));
-            } else {
-                player.removeStatusEffect(StatusEffects.BLINDNESS);
-            }
+        if (component.session().isEmpty() || component.layoutId().isEmpty()) {
+            return;
         }
-    }
-
-    /** The generated dimension is all ocean; this fixed terminal shore is the one deliberate exception. */
-    private static void prepareShore(ServerWorld world) {
-        for (int x = -15; x <= 15; x++) {
-            for (int z = -12; z <= 12; z++) {
-                double oval = x * x / 225.0 + z * z / 144.0;
-                if (oval > 1.0) {
-                    continue;
-                }
-                int height = oval < 0.35 ? 2 : oval < 0.72 ? 1 : 0;
-                for (int y = -2; y <= height; y++) {
-                    BlockPos at = SHORE_CENTER.add(x, y, z);
-                    world.setBlockState(at, y == height ? Blocks.SAND.getDefaultState()
-                            : Blocks.SANDSTONE.getDefaultState(), Block.NOTIFY_LISTENERS);
-                }
-            }
-        }
-    }
-
-    private static void forceArena(ServerWorld world, boolean forced) {
-        // Boat starts in chunk 0,0 and reaches z=32; the fixed shore occupies chunks z=3..5.
-        // Keeping this narrow corridor loaded also makes headless/dummy verification deterministic.
-        for (int chunkX = -1; chunkX <= 1; chunkX++) {
-            for (int chunkZ = -1; chunkZ <= 5; chunkZ++) {
-                world.setChunkForced(chunkX, chunkZ, forced);
-            }
-        }
+        String weather = component.requireSession().currentWeather().map(card -> card.id()).orElse("");
+        clock(sea).setTimeOfDay(SceneDataLoader.fogFor(component.layoutId().get(), weather).time());
     }
 
     private static void checkpoint(MinecraftServer server, String reason) {

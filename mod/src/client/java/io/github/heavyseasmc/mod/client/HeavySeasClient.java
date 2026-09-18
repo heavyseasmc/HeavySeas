@@ -18,9 +18,9 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.render.entity.ParrotEntityRenderer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.option.KeyBinding;
@@ -109,7 +109,9 @@ public final class HeavySeasClient implements ClientModInitializer {
 
         // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
         EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);
-        EntityRendererRegistry.register(GullEntity.TYPE, ParrotEntityRenderer::new);
+        // 海鸥：自绘模型（ADR-0034 §5.4），模型层要先登记，渲染器构造时按层取部件。
+        EntityModelLayerRegistry.registerModelLayer(GullModel.LAYER, GullModel::getTexturedModelData);
+        EntityRendererRegistry.register(GullEntity.TYPE, GullRenderer::new);
 
         handKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R,

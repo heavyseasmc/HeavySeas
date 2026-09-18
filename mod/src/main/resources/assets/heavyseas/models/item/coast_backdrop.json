@@ -1,0 +1,60 @@
+{
+  "_comment": "岸布景（ADR-0034 §5.3）：舞台远景片，元素限 [-16, 32]，靠 display 的 scale 放大。北面（-Z）朝船。",
+  "textures": {
+    "rock": "heavyseas:item/coast_rock",
+    "grass": "heavyseas:item/coast_grass",
+    "sand": "heavyseas:item/coast_sand",
+    "particle": "heavyseas:item/coast_rock"
+  },
+  "elements": [
+    {
+      "from": [-16, 0, 0], "to": [32, 6, 8],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 2], "texture": "#rock" },
+        "south": { "uv": [0, 0, 16, 2], "texture": "#rock" },
+        "east": { "uv": [0, 0, 2.6667, 2], "texture": "#rock" },
+        "west": { "uv": [0, 0, 2.6667, 2], "texture": "#rock" },
+        "down": { "uv": [0, 0, 16, 2.6667], "texture": "#rock" }
+      }
+    },
+    {
+      "from": [-16, 6, 0], "to": [32, 8, 8],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 0.6667], "texture": "#grass" },
+        "south": { "uv": [0, 0, 16, 0.6667], "texture": "#grass" },
+        "east": { "uv": [0, 0, 2.6667, 0.6667], "texture": "#grass" },
+        "west": { "uv": [0, 0, 2.6667, 0.6667], "texture": "#grass" },
+        "up": { "uv": [0, 0, 16, 2.6667], "texture": "#grass" }
+      }
+    },
+    {
+      "from": [-16, 0, -2], "to": [32, 1, 0],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 0.3333], "texture": "#sand" },
+        "up": { "uv": [0, 0, 16, 0.6667], "texture": "#sand" },
+        "east": { "uv": [0, 0, 0.6667, 0.3333], "texture": "#sand" },
+        "west": { "uv": [0, 0, 0.6667, 0.3333], "texture": "#sand" }
+      }
+    },
+    {
+      "from": [-10, 8, 2], "to": [0, 12, 8],
+      "faces": {
+        "north": { "uv": [0, 0, 3.3333, 1.3333], "texture": "#rock" },
+        "south": { "uv": [0, 0, 3.3333, 1.3333], "texture": "#rock" },
+        "east": { "uv": [0, 0, 2, 1.3333], "texture": "#rock" },
+        "west": { "uv": [0, 0, 2, 1.3333], "texture": "#rock" },
+        "up": { "uv": [0, 0, 3.3333, 2], "texture": "#grass" }
+      }
+    },
+    {
+      "from": [14, 8, 3], "to": [26, 14, 8],
+      "faces": {
+        "north": { "uv": [0, 0, 4, 2], "texture": "#rock" },
+        "south": { "uv": [0, 0, 4, 2], "texture": "#rock" },
+        "east": { "uv": [0, 0, 1.6667, 2], "texture": "#rock" },
+        "west": { "uv": [0, 0, 1.6667, 2], "texture": "#rock" },
+        "up": { "uv": [0, 0, 4, 1.6667], "texture": "#grass" }
+      }
+    }
+  ]
+}

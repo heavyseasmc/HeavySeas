@@ -1,6 +1,8 @@
 package io.github.heavyseasmc.mod.state;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
+import io.github.heavyseasmc.mod.world.Crate;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.Seats;
 import io.github.heavyseasmc.mod.world.Gulls;
@@ -62,9 +64,12 @@ public final class GameComponents implements WorldComponentInitializer {
     public static void sync(World world) {
         world.syncComponent(GAME);
         if (world instanceof ServerWorld server) {
-            Seats.refresh(server, of(world));
-            Gulls.refresh(server, of(world));
-            Nameplates.refresh(server, of(world));   // 头顶信息条同理：投影，不是状态（决策 ⑥）
+            GameComponent component = of(world);
+            Seats.refresh(server, component);
+            Gulls.refresh(server, component);
+            Nameplates.refresh(server, component);   // 头顶信息条同理：投影，不是状态（决策 ⑥）
+            // 补给箱实物同理（ADR-0034 §5.4）：照引擎说的持有人滑过去。
+            component.layoutId().ifPresent(id -> Crate.refresh(server, component, SceneDataLoader.require(id)));
         }
     }
 }
