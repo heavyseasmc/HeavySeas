@@ -105,19 +105,20 @@ class SimulatorTest {
             //   ① ADR-0021 物资建模 —— 此前模拟器发不出物资，口渴时喝的是不存在的水、武器加值是凭空随机的；
             //   ② ADR-0022 终局 —— 开局发爱恨要消耗随机数（每一局从第一步起就不同），
             //      水里「恰好等于体型、没救生圈」的人从昏迷着回船改成淹死并移出；
-            //   ③ ADR-0023 换座位与抢夺 —— 换座位从「不问对方」改成要问，打架只从拒绝里来，抢赢了真的拿牌。
+            //   ③ ADR-0023 换座位与抢夺 —— 换座位从「不问对方」改成要问，打架只从拒绝里来，抢赢了真的拿牌；
+            //   ④ 划船从「逐张决定去留」纠正为「整组只选一张，其余回牌堆底」。
             //   三次都是「每一局必然不同」，这张表全红说明不了任何事 —— 所以看分布（DistributionDumpTest），
             //   再照新行为重钉。第二次顺势把靠岸的种子换成四个（全灭四个 · 靠岸四个，两种终局各占一半）；
             //   第三次靠岸的四个种子全部改掉了 —— 合成牌堆下原先那四个都不再靠岸（真实数据那一侧反而是靠岸变多）。
             List<Pinned> expected = List.of(
-                    new Pinned(0L, 4, 0, 5, GameState.Outcome.ALL_DEAD),
-                    new Pinned(1L, 9, 0, 9, GameState.Outcome.ALL_DEAD),
-                    new Pinned(2L, 9, 0, 2, GameState.Outcome.ALL_DEAD),
-                    new Pinned(3L, 19, 0, 6, GameState.Outcome.ALL_DEAD),
-                    new Pinned(12L, 19, 1, 6, GameState.Outcome.LANDED),
-                    new Pinned(18L, 14, 1, 6, GameState.Outcome.LANDED),
-                    new Pinned(19L, 19, 1, 5, GameState.Outcome.LANDED),
-                    new Pinned(25L, 12, 1, 7, GameState.Outcome.LANDED));
+                    new Pinned(0L, 5, 0, 4, GameState.Outcome.ALL_DEAD),
+                    new Pinned(1L, 11, 0, 2, GameState.Outcome.ALL_DEAD),
+                    new Pinned(2L, 16, 0, 5, GameState.Outcome.ALL_DEAD),
+                    new Pinned(3L, 16, 0, 6, GameState.Outcome.ALL_DEAD),
+                    new Pinned(6L, 8, 1, 6, GameState.Outcome.LANDED),
+                    new Pinned(13L, 9, 2, 3, GameState.Outcome.LANDED),
+                    new Pinned(22L, 24, 1, 5, GameState.Outcome.LANDED),
+                    new Pinned(24L, 18, 1, 6, GameState.Outcome.LANDED));
 
             // 正向对照：两种终局都得在表里，否则这张表只钉住了一条路。
             assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.LANDED));

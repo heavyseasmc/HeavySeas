@@ -60,7 +60,7 @@ public final class HeavySeasClient implements ClientModInitializer {
     }
 
     /**
-     * 打开行动一面（决策 ⑦）；划船抽到的牌还没定完时，打开的是划船一面。默认 G；
+     * 打开行动一面（决策 ⑦）；划船抽到的牌还没选完时，打开的是划船一面。默认 G；
      * 显示与关界面同样走绑定的那个键，理由同 {@link #handKey}。
      */
     private static KeyBinding actKey;

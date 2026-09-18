@@ -250,7 +250,7 @@ class ProvisionEffectTest {
             Session s = deal(List.of(mate(1), kid(2), hostess(3)), "water", "water", "water");
             // ❗给她两个口渴来源（划船 + 牌面点名），不然「蹭两次」与「蹭一次」看不出区别 ——
             //   她只需要化解 1 次时，蹭 1 次和蹭 2 次结果一模一样。
-            s.row(HOSTESS, (c, st, who) -> false);
+            s.row(HOSTESS, (cards, st, who) -> 0);
             toNavigation(s);
             s.beginNavigate(card("t", 0, new Selector.Nobody(), new Selector.Everyone(), true, false));
 
@@ -272,7 +272,7 @@ class ProvisionEffectTest {
         @DisplayName("对照：没人喝水时她照样得自己付账")
         void noFreeRideWhenNobodyDrinks() {
             Session s = deal(List.of(mate(1), kid(2), hostess(3)), "water", "water", "water");
-            s.row(HOSTESS, (c, st, who) -> false);
+            s.row(HOSTESS, (cards, st, who) -> 0);
             toNavigation(s);
             s.beginNavigate(card("t", 0, new Selector.Nobody(), new Selector.Everyone(), true, false));
             s.decideThirst(List.of());
@@ -416,15 +416,12 @@ class ProvisionEffectTest {
         void oarAddsDraws() {
             Session none = deal(List.of(mate(1), kid(2)), "oar", "water");
             assertEquals(2, none.beginRow(MATE).size(), "手里的船桨不算");
-            none.decideRow(0, false);
-            none.decideRow(1, false);
+            none.cancelRow();
 
             Session one = deal(List.of(mate(1), kid(2)), "oar", "water");
             one.reveal(MATE, "oar");
             assertEquals(3, one.beginRow(MATE).size());
-            one.decideRow(0, false);
-            one.decideRow(1, false);
-            one.decideRow(2, false);
+            one.cancelRow();
 
             Session two = deal(List.of(mate(1), kid(2)), "oar", "oar");
             two.reveal(MATE, "oar");
@@ -438,7 +435,7 @@ class ProvisionEffectTest {
         void compassWorksOnlyForHelmsman() {
             // 舵手 = 最靠船尾的清醒角色，这里是小孩（2 号座）。keeps 按船头 → 船尾发，第二张归小孩。
             Session helm = deal(List.of(mate(1), kid(2)), "water", "compass");
-            helm.row(MATE, (c, st, who) -> true);            // 划船堆里得先有牌，才有「挑选之前」
+            helm.row(MATE, (cards, st, who) -> 0);           // 划船堆里得先有牌，才有「挑选之前」
             toNavigation(helm);
             int before = helm.table().rowStack().size();
             assertEquals(1, helm.prepareRowStack(), "舵手握着指南针（没亮出）也该多抽一张");
@@ -448,7 +445,7 @@ class ProvisionEffectTest {
             // 对照 1：指南针在别人那里 —— 亮出来也不算。初稿正是这里写反了。
             Session other = deal(List.of(mate(1), kid(2)), "compass", "water");
             other.reveal(MATE, "compass");
-            other.row(MATE, (c, st, who) -> true);
+            other.row(MATE, (cards, st, who) -> 0);
             toNavigation(other);
             assertEquals(0, other.prepareRowStack(), "指南针在非舵手面前，什么也不做");
 
@@ -462,7 +459,7 @@ class ProvisionEffectTest {
         @DisplayName("❗结算航海牌之前没备划船堆就当场抛 —— 模组曾经一次都没调过，而一切都是绿的")
         void takeCardRequiresPreparedRowStack() {
             Session s = deal(List.of(mate(1), kid(2)), "water", "compass");
-            s.row(MATE, (c, st, who) -> true);
+            s.row(MATE, (cards, st, who) -> 0);
             toNavigation(s);
             IllegalStateException e = assertThrows(IllegalStateException.class,
                     () -> s.takeCardForNavigation(s.table().rowStack().get(0)));

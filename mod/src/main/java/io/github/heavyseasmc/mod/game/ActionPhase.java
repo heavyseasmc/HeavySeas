@@ -29,16 +29,16 @@ import java.util.Optional;
  * 行动阶段「界面那一条路」：玩家在行动一面与划船一面上按下的那一下，变成 {@link Session} 上的调用。
  *
  * <h2>规则不在这里</h2>
- * 谁能行动、划船抽几张、行动完轮到谁，全在引擎里 —— 与 {@link ProvisionPhase} 同一条分工。
+ * 谁能行动、划船抽几张、选中哪张、行动完轮到谁，全在引擎里 —— 与 {@link ProvisionPhase} 同一条分工。
  * 本类只做三件事：<b>认人、调用、播报</b>，然后交给 {@link GameFlow#finishAction} 推进。
  *
  * <h2>掉线保底</h2>
- * 行动选择给较长窗口，超时按「什么也不做」；划船给较短窗口，超时只把尚未决定的牌塞回牌堆底。
+ * 行动选择给较长窗口，超时按「什么也不做」；划船给较短窗口，超时把这一组牌全部塞回牌堆底。
  * 截止时间只在服务端判，客户端显示同一份投影，掉线或关界面都不会把整局永久卡住。
  *
  * <h2>划船分两步</h2>
- * 点「划船」时服务端抽 2 张，只写进划船者那一包（{@code GameComponent#writeView}）；他一张一张定，
- * 两张都定完才算行动结束、才轮到下一个人。
+ * 点「划船」时服务端抽 2 张，只写进划船者那一包（{@code GameComponent#writeView}）；他选中一张后，
+ * 服务端把它放进划船堆、其余塞回牌堆底，这次行动随即结束。
  *
  * <h2>替身</h2>
  * 自动推进开着时，轮到替身由 {@link #autoPass} 替它「什么也不做」（ADR-0019）；关着时照旧由 {@code /seas} 驱动 ——
@@ -49,7 +49,7 @@ public final class ActionPhase {
     /** 行动主界面：留一分钟谈判，超时按 Pass。 */
     public static final long ACTION_MILLIS = 60_000L;
 
-    /** 划船逐张决定：牌已经看见，只给较短的保底窗口。 */
+    /** 划船选一张：牌已经看见，只给较短的保底窗口。 */
     public static final long ROW_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
@@ -70,7 +70,7 @@ public final class ActionPhase {
             return;                       // 包与阶段擦肩而过（比如刚被指令推进了）：忽略
         }
         if (session.rower().isPresent()) {
-            return;                       // 划船抽到的牌还没定完：行动一面上再按一次不作数（改过的客户端发得出来）
+            return;                       // 划船抽到的牌还没选完：行动一面上再按一次不作数（改过的客户端发得出来）
         }
         if (component.provisionTargeter().isPresent()) {
             return;                       // 医疗箱正在挑目标；旧界面或改过的客户端不能趁机再做一个行动
@@ -274,7 +274,7 @@ public final class ActionPhase {
                 finishRow(world, component, who);
                 return;
             }
-            LOGGER.info("划船：{} 抽了 {} 张，等他一张一张定", who.value(), drawn.size());
+            LOGGER.info("划船：{} 抽了 {} 张，等他选一张", who.value(), drawn.size());
             GameComponents.sync(world);
         } catch (RuntimeException failure) {
             LOGGER.info("划船（界面）：{} 的操作被拒绝：{}", who.value(), failure.getMessage());
@@ -282,7 +282,7 @@ public final class ActionPhase {
         }
     }
 
-    /** 划船一面上定下的一张。不是划船者本人、不是还没定的那张 —— 一律当作没按。 */
+    /** 划船一面上选中的一张。不是划船者本人、不是这组里的待选牌 —— 一律当作没按。 */
     public static void onRowDecision(ServerPlayerEntity player, RowDecisionC2S decision) {
         ServerWorld world = player.getServerWorld();
         GameComponent component = GameComponents.of(world);
@@ -302,13 +302,9 @@ public final class ActionPhase {
             return;                       // 同一张按了两下、包与状态擦肩而过：忽略
         }
         CharacterId who = rower.get();
-        boolean done = session.decideRow(index, decision.keep());
-        LOGGER.info("划船（界面）：{} 第 {} 张{}", who.value(), index + 1, decision.keep() ? "留进划船堆" : "塞回牌堆底");
-        if (done) {
-            finishRow(world, component, who);
-        } else {
-            GameComponents.sync(world);   // 划船堆多没多一张是公开的；他那一包里这一张也定了
-        }
+        int returned = session.chooseRow(index);
+        LOGGER.info("划船（界面）：{} 选第 {} 张留进划船堆，其余 {} 张塞回牌堆底", who.value(), index + 1, returned);
+        finishRow(world, component, who);
     }
 
     private static void finishRow(ServerWorld world, GameComponent component, CharacterId who) {
@@ -366,17 +362,9 @@ public final class ActionPhase {
         return deadline > 0L && now >= deadline;
     }
 
-    /** 超时保留已经做出的选择，只替还悬着的牌选择「塞回牌堆底」。 */
+    /** 超时没有选中任何牌：整组塞回牌堆底。 */
     static int returnUndecided(Session session) {
-        List<Session.RowCard> cards = session.rowing();
-        int returned = 0;
-        for (int i = 0; i < cards.size(); i++) {
-            if (cards.get(i).fate() == Session.RowFate.UNDECIDED) {
-                session.decideRow(i, false);
-                returned++;
-            }
-        }
-        return returned;
+        return session.cancelRow();
     }
 
     /**
@@ -397,18 +385,12 @@ public final class ActionPhase {
     }
 
     /**
-     * 划船一次走完：抽 {@link Session#CARDS_DRAWN_WHEN_ROWING} 张，按给定的去留逐张决定。{@code /seas row} 用它。
+     * 划船一次走完：抽 {@link Session#CARDS_DRAWN_WHEN_ROWING} 张，选中给定下标的牌。{@code /seas row} 用它。
      *
-     * <p>界面那条路不走这里：真人要一张一张想，走的是 {@link Session#beginRow} 加 {@link Session#decideRow} 两步。
+     * <p>界面那条路不走这里：真人先看整组牌，走的是 {@link Session#beginRow} 加 {@link Session#chooseRow} 两步。
      * 两条路底下是同一份规则 —— {@link Session#row} 本身就是那两步的简写。
      */
-    public static List<NavigationCard> rowKeeping(Session session, CharacterId rower,
-                                                  boolean keepFirst, boolean keepSecond) {
-        boolean[] wanted = {keepFirst, keepSecond};
-        int[] seen = {0};
-        return session.row(rower, (card, state, who) -> {
-            int i = seen[0]++;
-            return i < wanted.length && wanted[i];
-        });
+    public static List<NavigationCard> rowChoosing(Session session, CharacterId rower, int selected) {
+        return session.row(rower, (cards, state, who) -> selected);
     }
 }

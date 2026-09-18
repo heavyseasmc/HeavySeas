@@ -39,16 +39,15 @@ class ActionPhaseTimeoutTest {
     }
 
     @Test
-    @DisplayName("划船超时只把尚未决定的牌塞回牌堆底，已经留下的选择不反悔")
-    void rowTimeoutReturnsOnlyUndecidedCards() {
+    @DisplayName("划船超时会把整组未选择的牌塞回牌堆底")
+    void rowTimeoutReturnsAllUnselectedCards() {
         Session session = session();
         session.beginRow(ROWER);
-        session.decideRow(0, true);
 
-        assertEquals(1, ActionPhase.returnUndecided(session));
+        assertEquals(2, ActionPhase.returnUndecided(session));
 
         assertTrue(session.rower().isEmpty());
-        assertEquals(1, session.table().rowStack().size(), "先前留下的牌仍在划船堆");
+        assertTrue(session.table().rowStack().isEmpty(), "没有选择就不该有牌进入划船堆");
         assertTrue(session.table().rowerHand().isEmpty(), "超时后不能还有牌卡在划船者手里");
     }
 

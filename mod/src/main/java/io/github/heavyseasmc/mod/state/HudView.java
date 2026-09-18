@@ -47,7 +47,7 @@ import java.util.Optional;
  * @param hate      收件人自己恨谁 · <b>只有本人</b>
  * @param myScore   计分阶段收件人自己的四项明细；不在计分阶段时为 {@link Score#NONE}
  * @param thirstPrompt 口渴结算正在问谁、还需化解几次、已经有人替他打了几张、还剩多久 · <b>公开</b>
- * @param yourTurn  行动阶段正轮到他、而且他没有划船抽到还没定完的牌 —— ❗只在行动阶段为真（见 GameComponent 的 writeView）
+ * @param yourTurn  行动阶段正轮到他、而且他没有划船抽到还没选完的牌 —— ❗只在行动阶段为真（见 GameComponent 的 writeView）
  * @param actionDeadlineMs 当前行动或划船决定的超时时刻；只投影给正在决定的人
  * @param actionWindowMs 当前窗口原本有多长，用来画完整倒计时横杠
  * @param designating  他正举着拳头找人（ADR-0025）· <b>只有本人</b>；别人看的是世界里那个发光的人
@@ -228,7 +228,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
         return active && seated && phase == Phase.ACTION && yourTurn;
     }
 
-    /** 我划船抽到的牌还有没定的 —— 划船一面开不开得起来只看这一条。 */
+    /** 我划船抽到的牌还没选中一张 —— 划船一面开不开得起来只看这一条。 */
     public boolean myRowPending() {
         return active && seated && sea.rowing().stream().anyMatch(r -> r.fate() == Session.RowFate.UNDECIDED);
     }

@@ -18,30 +18,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 划船：抽到的两张，逐张决定留进划船堆还是塞回牌堆底（决策 ⑭ · ADR-0018 §7.4）。
+ * 划船：查看抽到的牌，选择一张放进划船堆，其余自动塞回牌堆底（决策 ⑭ · ADR-0018 §7.4）。
  *
  * <h2>三带</h2>
  * <ul>
  *   <li><b>上带（公开）</b>：回合 · 阶段 · 海鸥，下面一行划船堆几张、舵手是谁 —— 全船都知道的数。</li>
- *   <li><b>中带（待决）</b>：两张牌。高亮一进来就在第一张；两个去向的按钮只跟高亮那一张走。</li>
+ *   <li><b>中带（待决）</b>：抽到的牌。高亮一进来就在第一张；「使用」按钮只跟高亮那一张走。</li>
  *   <li><b>下带（私有）</b>：高亮那张的完整说明（牌面上的字可能小到读不清），以及你是谁、还剩多少。</li>
  * </ul>
  *
  * <h2>短倒计时</h2>
- * 划船决定给 20 秒；超时只把尚未决定的牌塞回牌堆底，已经定下的去向不反悔。
+ * 划船决定给 20 秒；超时会把这一组牌全部塞回牌堆底。
  * Esc 可以收起来，服务端倒计时仍继续，按行动键可再开。
  *
- * <h2>两个去向：同一个动词，两个方向</h2>
- * ADR-0018 §7.4：留进划船堆往上「飞」（飞向上带那行划船堆的张数），塞回牌堆底往下「飞」出屏幕。
- * 飞的含义是「归属变了」—— 这张牌离开了你的手。
+ * <h2>一次选择，两种去向</h2>
+ * 选中的牌往上「飞」进划船堆，其余牌同时往下「飞」回牌堆底。
  *
  * <h2>按下就飞，不等服务端</h2>
- * 一张一个包（{@link RowDecisionC2S}）。服务端只会在「不是你在划船」「这张已经定过」时忽略它，
- * 而那两种情况在这一面上本来就按不到。
+ * 一次选择只发一个包（{@link RowDecisionC2S}）。服务端按同一条规则把未选中的牌全部放回。
  *
- * <h2>两个按钮与别的面同一个样子</h2>
- * 走 {@link GameScreen#drawButton}：悬停到哪个就抬起、镶金框。没有默认焦点 —— 这一面的默认答案不是某个按钮，
- * 而是「高亮那一张还没定」；键盘上 ↑ 留、↓ 塞回，与按钮是同一件事的两个入口。
+ * <h2>一个按钮与别的面同一个样子</h2>
+ * 走 {@link GameScreen#drawButton}：悬停时抬起、镶金框。←→ 换牌，Enter/Space 使用高亮牌。
  */
 public final class RowScreen extends GameScreen {
 
@@ -49,21 +46,20 @@ public final class RowScreen extends GameScreen {
 
     /** 牌与它下面那排按钮之间。 */
     private static final int CARD_TO_BUTTONS = 10;
-    /** 两个去向，次序即按钮次序：0 = 留进划船堆，1 = 塞回牌堆底。 */
-    private static final String[] BUTTONS = {"heavyseas.row.keep", "heavyseas.row.return"};
+    private static final String[] BUTTONS = {"heavyseas.row.use"};
 
     private HudView view = HudView.IDLE;
     /** 这一次抽到的牌，按抽出顺序。打开时从投影里拿一次：服务端划完之后投影里就没有了，而最后一张还在飞。 */
     private List<NavCardView> cards = List.of();
     private Session.RowFate[] fates = new Session.RowFate[0];
-    /** 每张起飞的时刻；0 表示没在这一面上飞过（还没定，或者是重开之前定的）。 */
+    /** 每张起飞的时刻；0 表示没在这一面上飞过（还没选择，或者是重开之前归位的）。 */
     private long[] flyAt = new long[0];
     private float[] lift = new float[0];
-    /** 两个按钮各自的抬起量。 */
+    /** 使用按钮的抬起量。 */
     private final float[] buttonLift = new float[BUTTONS.length];
     /** 指针停在哪个按钮上；-1 表示都不在。只认真的移动。 */
     private int buttonFocus = -1;
-    /** 高亮。一进来就在第一张还没定的牌上；全定完时为 -1。 */
+    /** 高亮。一进来就在第一张待选牌上；选择完成时为 -1。 */
     private int focus = -1;
     private long dealAt;
     private boolean opened;
@@ -203,7 +199,7 @@ public final class RowScreen extends GameScreen {
         int rowW = cardRowWidth(n, w);
         int left = (width - rowW) / 2;
 
-        // 按钮压在高亮那张牌正下方：去向说的是「这一张」，不是这一排。
+        // 按钮压在高亮那张牌正下方：使用的是「这一张」，不是这一排。
         int[] bw = new int[BUTTONS.length];
         int total = -BTN_GAP;
         for (int b = 0; b < BUTTONS.length; b++) {
@@ -296,7 +292,7 @@ public final class RowScreen extends GameScreen {
         if (l != null && focus >= 0) {
             int b = indexAt(l.buttons(), (int) mouseX, (int) mouseY);
             if (b >= 0) {
-                decide(focus, b == 0);
+                choose(focus);
                 return true;
             }
             int card = cardAt((int) mouseX, (int) mouseY, l);
@@ -325,12 +321,8 @@ public final class RowScreen extends GameScreen {
                     }
                     return true;
                 }
-                case GLFW.GLFW_KEY_UP -> {
-                    decide(focus, true);
-                    return true;
-                }
-                case GLFW.GLFW_KEY_DOWN -> {
-                    decide(focus, false);
+                case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_SPACE -> {
+                    choose(focus);
                     return true;
                 }
                 default -> {
@@ -340,19 +332,25 @@ public final class RowScreen extends GameScreen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    private void decide(int i, boolean keep) {
+    private void choose(int i) {
         if (i < 0 || i >= cards.size() || fates[i] != Session.RowFate.UNDECIDED) {
             return;
         }
-        fates[i] = keep ? Session.RowFate.KEPT : Session.RowFate.RETURNED;
-        flyAt[i] = System.currentTimeMillis();
-        ClientPlayNetworking.send(new RowDecisionC2S(i, keep));
+        long now = System.currentTimeMillis();
+        for (int card = 0; card < cards.size(); card++) {
+            if (fates[card] == Session.RowFate.UNDECIDED) {
+                fates[card] = card == i ? Session.RowFate.KEPT : Session.RowFate.RETURNED;
+                flyAt[card] = now;
+            }
+        }
+        ClientPlayNetworking.send(new RowDecisionC2S(i));
         // 验收靠这一行与服务端那行「划船（界面）」对上：客户端按了、服务端认了，两个来源。
-        LOGGER.info("划船：第 {} 张{}（{}）", i + 1, keep ? "留进划船堆" : "塞回牌堆底", cards.get(i).id());
-        focus = nextUndecided(0, 1);
+        LOGGER.info("划船：选择第 {} 张留进划船堆（{}），其余 {} 张塞回牌堆底",
+                i + 1, cards.get(i).id(), Math.max(0, cards.size() - 1));
+        focus = -1;
     }
 
-    /** 从 {@code from} 起朝 {@code step} 方向找第一张还没定的；没有就是 -1。 */
+    /** 从 {@code from} 起朝 {@code step} 方向找第一张待选牌；没有就是 -1。 */
     private int nextUndecided(int from, int step) {
         for (int i = from; i >= 0 && i < fates.length; i += step) {
             if (fates[i] == Session.RowFate.UNDECIDED) {

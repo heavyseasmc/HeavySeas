@@ -27,7 +27,6 @@ import io.github.heavyseasmc.mod.world.Seats;
 import io.github.heavyseasmc.mod.world.Gulls;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -140,12 +139,10 @@ public final class SeasCommand {
                 .then(CommandManager.literal("status").executes(guarded(SeasCommand::status)))
                 .then(CommandManager.literal("pass").executes(guarded(SeasCommand::pass)))
                 .then(CommandManager.literal("row")
-                        .executes(guarded(context -> row(context, true, true)))
-                        .then(CommandManager.argument("keepFirst", BoolArgumentType.bool())
-                                .then(CommandManager.argument("keepSecond", BoolArgumentType.bool())
-                                        .executes(guarded(context -> row(context,
-                                                BoolArgumentType.getBool(context, "keepFirst"),
-                                                BoolArgumentType.getBool(context, "keepSecond")))))))
+                        .executes(guarded(context -> row(context, 0)))
+                        .then(CommandManager.argument("card", IntegerArgumentType.integer(1))
+                                .executes(guarded(context -> row(context,
+                                        IntegerArgumentType.getInteger(context, "card") - 1)))))
                 .then(CommandManager.literal("swap")
                         .then(CommandManager.argument("character", StringArgumentType.word())
                                 .suggests(CHARACTERS)
@@ -422,11 +419,11 @@ public final class SeasCommand {
         });
     }
 
-    private static int row(CommandContext<ServerCommandSource> context, boolean keepFirst, boolean keepSecond) {
+    private static int row(CommandContext<ServerCommandSource> context, int selected) {
         return act(context, "ROW", (world, component, actor) -> {
             Session session = component.requireSession();
             // 一次走完两步：指令没有「想一想」这回事。底下与划船一面是同一份规则（Session#row 就是那两步）。
-            List<NavigationCard> drawn = ActionPhase.rowKeeping(session, actor, keepFirst, keepSecond);
+            List<NavigationCard> drawn = ActionPhase.rowChoosing(session, actor, selected);
             context.getSource().sendFeedback(
                     () -> Text.translatable("heavyseas.command.rowed", GameFlow.characterName(actor), drawn.size()),
                     true);
@@ -968,7 +965,7 @@ public final class SeasCommand {
             source.sendError(Text.translatable("heavyseas.command.not_action"));
             return 0;
         }
-        // ❗有人在划船一面上还没定完：他的行动还没结束，谁都不能插进来（引擎也会抛，这里先给一句人话）。
+        // ❗有人在划船一面上还没选完：他的行动还没结束，谁都不能插进来（引擎也会抛，这里先给一句人话）。
         Optional<CharacterId> rower = session.rower();
         if (rower.isPresent()) {
             source.sendError(Text.translatable("heavyseas.command.rowing_pending", GameFlow.characterName(rower.get())));

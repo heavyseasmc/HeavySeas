@@ -8,27 +8,24 @@ import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
 /**
- * 客户端告诉服务端：划船抽到的第 {@code index} 张，留进划船堆（{@code keep=true}）还是塞回牌堆底。
+ * 客户端告诉服务端：划船抽到的牌里，选择第 {@code index} 张放进划船堆。
  *
- * <h2>一张一个包</h2>
- * 规则是「对每一张分别决定」，桌上的人看得见划船者一张一张放下去 —— 划船堆有几张是公开信息（决策 ⑭）。
- * 两张攒到一起再发，中间那一段别人就看不到堆在变。
+ * <h2>一次选择，一个包</h2>
+ * 服务端把选中的牌放进划船堆，其余牌按抽出顺序塞回牌堆底。客户端不再逐张发送去留，
+ * 因而也不能通过改包把同一次划船里的多张牌都留下。
  *
  * <h2>服务端照样校验</h2>
- * 只认正在划船的那个人本人、只认还没定的那一张。同一张按了两下这种擦肩而过的包当作没按 ——
- * 引擎对「定两次」是抛的，那一道是给规则层的；网络层先挡掉，一个重复的包不值得把服务端日志刷红。
+ * 只认正在划船的那个人本人、只认这组待选牌里的下标。重复包与过期包直接忽略。
  *
  * @param index 抽出顺序里的第几张，从 0 起
- * @param keep  true = 留进划船堆；false = 塞回牌堆底部
  */
-public record RowDecisionC2S(int index, boolean keep) implements CustomPayload {
+public record RowDecisionC2S(int index) implements CustomPayload {
 
     public static final CustomPayload.Id<RowDecisionC2S> ID =
             new CustomPayload.Id<>(Identifier.of(HeavySeasMod.MOD_ID, "row_decision"));
 
     public static final PacketCodec<RegistryByteBuf, RowDecisionC2S> CODEC = PacketCodec.tuple(
             PacketCodecs.VAR_INT, RowDecisionC2S::index,
-            PacketCodecs.BOOL, RowDecisionC2S::keep,
             RowDecisionC2S::new);
 
     @Override

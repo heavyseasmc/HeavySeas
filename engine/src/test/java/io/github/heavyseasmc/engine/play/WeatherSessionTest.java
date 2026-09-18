@@ -103,7 +103,7 @@ class WeatherSessionTest {
                 card("b", 0, new Selector.Nobody(), false, false), QUIET);
         Session session = atAction(WeatherEffect.ROWERS_OVERBOARD, deck);
         CharacterId rower = session.state().bySeat().getFirst();
-        session.row(rower, (card, state, who) -> false);
+        session.row(rower, (cards, state, who) -> 0);
         session.advancePhase();
         NavigationReport report = session.beginNavigate(card("oar", 0, new Selector.Nobody(), true, false));
         assertTrue(report.overboardSelected().contains(rower));

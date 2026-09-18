@@ -28,12 +28,12 @@ import java.util.Set;
 public interface NavigationPolicy {
 
     /**
-     * 划船者看过这张牌之后：放进划船堆（true），还是塞回牌堆底部（false）。
+     * 划船者看过整组牌之后，选哪一张放进划船堆。传进来的列表非空。
      *
      * <p>❗划船堆是<b>面朝下</b>的：只有舵手能看到全部，别人只知道有几个人划了船。
      * 所以这个决定只能用划船者自己的视角，不能参考别人留了什么。
      */
-    boolean keepWhenRowing(NavigationCard card, GameState state, CharacterId rower, Random rng);
+    int chooseWhenRowing(List<NavigationCard> cards, GameState state, CharacterId rower, Random rng);
 
     /** 舵手从划船堆里挑一张执行。传进来的列表非空。 */
     NavigationCard pick(List<NavigationCard> rowStack, GameState state, CharacterId helmsman, Random rng);
@@ -42,15 +42,15 @@ public interface NavigationPolicy {
     String label();
 
     /**
-     * 无所谓：留不留、挑哪张全看运气。
+     * 无所谓：划船与掌舵都随机挑一张。
      *
      * <p>它是<b>对照组</b>，不是「玩家很笨」的模型：只有把它与有取向的策略放在一起，
      * 才分得清分布里哪一部分来自牌、哪一部分来自挑牌。
      */
     NavigationPolicy INDIFFERENT = new NavigationPolicy() {
         @Override
-        public boolean keepWhenRowing(NavigationCard card, GameState state, CharacterId rower, Random rng) {
-            return rng.nextBoolean();
+        public int chooseWhenRowing(List<NavigationCard> cards, GameState state, CharacterId rower, Random rng) {
+            return rng.nextInt(cards.size());
         }
 
         @Override
@@ -104,10 +104,17 @@ public interface NavigationPolicy {
         }
 
         @Override
-        public boolean keepWhenRowing(NavigationCard card, GameState state, CharacterId rower, Random rng) {
-            // 划船者只能二选一：留下，或塞回底部。留下意味着它可能被舵手挑中，
-            // 所以「对我不坏」就留 —— 阈值取 0，不是随手定的：0 分意味着这张牌与我无关。
-            return score(card, state, rower) >= 0;
+        public int chooseWhenRowing(List<NavigationCard> cards, GameState state, CharacterId rower, Random rng) {
+            int best = 0;
+            int bestScore = Integer.MIN_VALUE;
+            for (int i = 0; i < cards.size(); i++) {
+                int score = score(cards.get(i), state, rower);
+                if (score > bestScore || (score == bestScore && rng.nextBoolean())) {
+                    best = i;
+                    bestScore = score;
+                }
+            }
+            return best;
         }
 
         @Override

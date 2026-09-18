@@ -23,7 +23,7 @@ import java.util.Optional;
  * 两者性质不同，分开放。
  *
  * <h2>航海牌只在三个地方</h2>
- * 牌堆里、划船者手上（抽出来看过、还没定去向），或划船堆里。少一张的表现**不是报错，是某些名单再也不出现** ——
+ * 牌堆里、划船者手上（抽出来看过、还没选中一张），或划船堆里。少一张的表现**不是报错，是某些名单再也不出现** ——
  * 那种错能安静地跑完几千局。所以每一步之后都对账。
  *
  * <p>「划船者手上」是划船拆成「先抽 / 再定」两步之后才有的：真人要一张一张想，
@@ -48,7 +48,7 @@ public final class Table {
     /** 划船堆。面朝下，只有舵手看得到全部；结算完清空。 */
     private final List<NavigationCard> rowStack = new ArrayList<>();
 
-    /** 划船者手上：抽出来、还没定去向的牌。只有划船者本人看得到。 */
+    /** 划船者手上：抽出来、还没选中一张的牌。只有划船者本人看得到。 */
     private final List<NavigationCard> rowerHand = new ArrayList<>();
 
     /** 物资的效果目录。整副牌由它展开，所以两者同源。 */
@@ -204,7 +204,7 @@ public final class Table {
         return rowStack.remove(card);
     }
 
-    /** 划船者手上还没定去向的牌（只读视图）。 */
+    /** 划船者手上还没完成选择的牌（只读视图）。 */
     public List<NavigationCard> rowerHand() {
         return List.copyOf(rowerHand);
     }

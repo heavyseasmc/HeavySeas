@@ -309,17 +309,17 @@ public final class Session {
     /** 正在划船的人；{@code null} 表示没人在划（没开始，或者都定完了）。 */
     private CharacterId rower;
 
-    /** 这一次抽到的牌，按抽出顺序。下标在定去向的过程中不变 —— 界面按下标说「第几张」。 */
+    /** 这一次抽到的牌，按抽出顺序。下标在选择过程中不变 —— 界面按下标说「第几张」。 */
     private final List<RowCard> rowing = new ArrayList<>();
 
     /**
-     * 划船：抽 2 张看过，<b>对每一张分别</b>决定放进划船堆还是塞回牌堆底部，然后领一个划船标记。
+     * 划船：抽 2 张看过，选 1 张放进划船堆，其余塞回牌堆底部，然后领一个划船标记。
      *
      * <p>❗「看过再决定」是本作信息结构的核心：划船堆面朝下，划船者只知道自己放了什么，
      * 舵手知道全部，其他人只看得到有几个人划了船。舵手因此能从别人挑剩的里面再挑一次 ——
      * 落水/口渴的实际分布被这两道挑选<b>连挑两次</b>，与牌面上印的张数分布不是一回事。
      *
-     * <p>这是 {@link #beginRow} 加逐张 {@link #decideRow} 的简写，<b>按抽出的顺序</b>每张问一次 {@code choice}。
+     * <p>这是 {@link #beginRow} 加 {@link #chooseRow} 的简写。选择器看到完整的一组牌，只返回其中一张的下标。
      * 模拟器与 {@code /seas row} 走这里，界面走两步 —— 规则只有两步那一份。
      *
      * <p>牌堆不够 2 张时有几张抽几张。
@@ -328,8 +328,8 @@ public final class Session {
      */
     public List<NavigationCard> row(CharacterId rower, RowingChoice choice) {
         List<NavigationCard> drawn = beginRow(rower);
-        for (int i = 0; i < drawn.size(); i++) {
-            decideRow(i, choice.keep(drawn.get(i), state, rower));
+        if (!drawn.isEmpty()) {
+            chooseRow(choice.choose(drawn, state, rower));
         }
         return drawn;
     }
@@ -338,17 +338,17 @@ public final class Session {
      * 划船第一步：抽 2 张到划船者手上。
      *
      * <h2>为什么拆成两步</h2>
-     * 规则写的是「抽 2 张查看，对每一张分别决定」—— 两张先摆在面前，再一张张定。
-     * 原先一次调用里边抽边问，第一张塞回牌堆底之后才抽第二张：牌堆只剩一张时，第二张抽到的就是刚塞回去的那张。
+     * 规则写的是「抽 2 张查看，选择 1 张」—— 两张必须先摆在面前，才能进行这一组里的选择。
+     * 原先一次调用里边抽边决定，第一张塞回牌堆底之后才抽第二张：牌堆只剩一张时，第二张抽到的就是刚塞回去的那张。
      * 真人对局里决定要等人想，两张必须先摆在他面前。
      *
-     * <p>抽出来的牌在定去向之前待在 {@link Table#rowerHand()}：既不在牌堆里，也不在划船堆里，对账照样算得清。
+     * <p>抽出来的牌在做出选择之前待在 {@link Table#rowerHand()}：既不在牌堆里，也不在划船堆里，对账照样算得清。
      *
      * <p>面前亮着船桨的人多抽（{@code weapon_and_row_bonus}，可叠加）—— 手上的船桨不算，
      * 被动效果一律「在面前才算」（ADR-0021 决策 4）。
      *
      * @return 抽到的牌，按抽出顺序。牌堆不够时有几张抽几张；<b>一张都没抽到时这次划船当场结束</b>（照样领划船标记）
-     * @throws IllegalStateException 不在行动阶段，或者上一次划船抽到的牌还没定完
+     * @throws IllegalStateException 不在行动阶段，或者上一次划船抽到的牌还没选完
      */
     public List<NavigationCard> beginRow(CharacterId rower) {
         if (currentWeatherEffect() == WeatherEffect.SKIP_NAVIGATION) {
@@ -378,17 +378,15 @@ public final class Session {
     }
 
     /**
-     * 划船第二步：定第 {@code index} 张（按抽出顺序，从 0 起）的去向。先定哪张随划船者。
+     * 划船第二步：选择第 {@code index} 张（按抽出顺序，从 0 起）放进划船堆，其余全部塞回牌堆底。
      *
-     * <p>每定一张就立刻落到它该去的地方 —— 桌上的人看得见划船者把牌放进划船堆还是塞回牌堆底，
-     * 划船堆有几张是公开信息（决策 ⑭）。最后一张定下时领划船标记，这次划船结束。
+     * <p>选择一落定，整组牌就同时归位，随后领划船标记并结束这次划船。划船堆有几张仍是公开信息（决策 ⑭）。
      *
-     * @param keep true = 留进划船堆；false = 塞回牌堆底部
-     * @return 这一下是否让这次划船结束了（抽到的牌全都定了）
-     * @throws IllegalStateException    没有人在划船，或者这一张已经定过
+     * @return 自动塞回牌堆底的张数
+     * @throws IllegalStateException    没有人在划船，或者这组牌已经做过选择
      * @throws IllegalArgumentException 没有这一张
      */
-    public boolean decideRow(int index, boolean keep) {
+    public int chooseRow(int index) {
         if (rower == null) {
             throw new IllegalStateException("%s 现在没有人在划船".formatted(context));
         }
@@ -396,6 +394,39 @@ public final class Session {
             throw new IllegalArgumentException("%s %s 划船抽了 %d 张，没有第 %d 张"
                     .formatted(context, rower.value(), rowing.size(), index + 1));
         }
+        if (rowing.stream().anyMatch(row -> row.fate() != RowFate.UNDECIDED)) {
+            throw new IllegalStateException("%s %s 划船的这组牌已经做过选择".formatted(context, rower.value()));
+        }
+        int returned = 0;
+        for (int i = 0; i < rowing.size(); i++) {
+            moveRowCard(i, i == index ? RowFate.KEPT : RowFate.RETURNED);
+            if (i != index) {
+                returned++;
+            }
+        }
+        table.requireNoCardLost(context, "划船选择后");
+        finishRow();
+        return returned;
+    }
+
+    /** 超时或取消选择：这一组牌全部塞回牌堆底，照样结束划船并领取标记。 */
+    public int cancelRow() {
+        if (rower == null) {
+            throw new IllegalStateException("%s 现在没有人在划船".formatted(context));
+        }
+        int returned = 0;
+        for (int i = 0; i < rowing.size(); i++) {
+            if (rowing.get(i).fate() == RowFate.UNDECIDED) {
+                moveRowCard(i, RowFate.RETURNED);
+                returned++;
+            }
+        }
+        table.requireNoCardLost(context, "划船取消选择后");
+        finishRow();
+        return returned;
+    }
+
+    private void moveRowCard(int index, RowFate fate) {
         RowCard row = rowing.get(index);
         if (row.fate() != RowFate.UNDECIDED) {
             throw new IllegalStateException("%s %s 划船的第 %d 张已经定过了（%s）"
@@ -405,21 +436,15 @@ public final class Session {
             throw new IllegalStateException("%s %s 划船的第 %d 张不在他手上：%s"
                     .formatted(context, rower.value(), index + 1, row.card().id()));
         }
-        if (keep) {
+        if (fate == RowFate.KEPT) {
             table.addToRowStack(row.card());
         } else {
             table.pile().bottom(row.card());
         }
-        rowing.set(index, new RowCard(row.card(), keep ? RowFate.KEPT : RowFate.RETURNED));
-        table.requireNoCardLost(context, "划船定去向后");
-        if (rowing.stream().anyMatch(r -> r.fate() == RowFate.UNDECIDED)) {
-            return false;
-        }
-        finishRow();
-        return true;
+        rowing.set(index, new RowCard(row.card(), fate));
     }
 
-    /** 谁正在划船（抽到的牌还没定完）。 */
+    /** 谁正在划船（抽到的牌还没选完）。 */
     public Optional<CharacterId> rower() {
         return Optional.ofNullable(rower);
     }
@@ -444,7 +469,7 @@ public final class Session {
      */
     private void requireNoRowInProgress(String what) {
         if (rower != null) {
-            throw new IllegalStateException("%s %s 划船抽到的牌还没定完，不能%s"
+            throw new IllegalStateException("%s %s 划船抽到的牌还没选完，不能%s"
                     .formatted(context, rower.value(), what));
         }
     }
@@ -469,7 +494,7 @@ public final class Session {
      *   <li>其余 → 等目标表态（{@link #consent}）。</li>
      * </ul>
      *
-     * @throws IllegalStateException    不在行动阶段、没轮到他、上一场还没收场，或者划船抽到的牌还没定完
+     * @throws IllegalStateException    不在行动阶段、没轮到他、上一场还没收场，或者划船抽到的牌还没选完
      * @throws IllegalArgumentException 对自己，或者目标已经被移出游戏
      */
     public void declare(CharacterId actor, Contest.Kind kind, CharacterId target) {
@@ -2022,10 +2047,10 @@ public final class Session {
         return false;
     }
 
-    /** 划船时对每一张抽到的牌：留进划船堆（true）还是塞回牌堆底部（false）。 */
+    /** 划船时看完整组牌后，返回要放进划船堆的下标。 */
     @FunctionalInterface
     public interface RowingChoice {
-        boolean keep(NavigationCard card, GameState state, CharacterId rower);
+        int choose(List<NavigationCard> cards, GameState state, CharacterId rower);
     }
 
     /**

@@ -184,7 +184,7 @@ public final class Simulator {
             switch (rng.nextInt(5)) {
                 case 0 -> { }                                        // 什么都不做
                 case 1 -> session.row(actor,
-                        (card, state, rower) -> policy.keepWhenRowing(card, state, rower, rng));
+                        (cards, state, rower) -> policy.chooseWhenRowing(cards, state, rower, rng));
                 case 2 -> {
                     if (contest(session, actor, Contest.Kind.SWAP, rng)) {
                         fights++;
