@@ -22,6 +22,11 @@ loom {
             sourceSet sourceSets.client
         }
     }
+
+    // 唯一的 mixin 在 client 源码集里（雾，ADR-0034 §5.1.1）。❗这一版 Loom 在 remapJar 时直接把 mixin 注解里的
+    //   目标翻成中间名（实测：jar 里的 BackgroundRendererMixin 引用的是 class_758 / method_3211），**不生成 refmap**。
+    //   第一版在 mixins.json 里写了 "refmap"，jar 里却没有那个文件 —— 开发客户端照样能注入，生产客户端只会多一行警告。
+    //   所以 mixins.json 不写 refmap；下面的 checkMixinRemapped 守着「生产 jar 里的 mixin 真的翻过了」。
 }
 
 repositories {
@@ -601,6 +606,66 @@ def checkCardTextures = tasks.register('checkCardTextures') {
 
 tasks.named('check') {
     dependsOn checkCardTextures
+}
+
+// 生产 jar 里的 mixin 类必须已经翻成中间名（ADR-0034 §5.1.1）。
+//
+// 为什么要一道闸：开发客户端直接按 yarn 名注入，mixin 写错了 refmap、或 Loom 没翻注解，开发环境**一点都看不出来**；
+// 生产客户端上要么启动即崩（defaultRequire 1），要么 —— 若目标碰巧解析到了别处 —— 安静地没雾。
+// 判据与被测对象正交：不问 Loom 的配置，直接读 remapJar 产物里的类文件与 mixins.json。
+def checkMixinRemapped = tasks.register('checkMixinRemapped') {
+    group = 'verification'
+    description = '生产 jar 里的 mixin 类必须引用中间名、不得残留 yarn 名；mixins.json 不得指向不存在的 refmap'
+    def jarFile = tasks.named('remapJar').flatMap { it.archiveFile }
+    inputs.file(jarFile)
+    doLast {
+        def zip = new java.util.zip.ZipFile(jarFile.get().asFile)
+        try {
+            def problems = []
+            int scanned = 0
+            for (entry in java.util.Collections.list(zip.entries())) {
+                if (!entry.name.startsWith('io/github/heavyseasmc/mod/client/mixin/') || !entry.name.endsWith('.class')) {
+                    continue
+                }
+                scanned++
+                // 常量池里的 UTF8 常量是明文，按字节当 Latin-1 读出来做子串检查就够了。
+                def text = new String(zip.getInputStream(entry).bytes, 'ISO-8859-1')
+                if (!text.contains('net/minecraft/class_')) {
+                    problems << "${entry.name}：没有引用任何中间名 —— remapJar 没把 mixin 的目标翻过来"
+                }
+                if (text.contains('net/minecraft/client/') || text.contains('applyFog')) {
+                    problems << "${entry.name}：残留 yarn 名（net/minecraft/client/… 或 applyFog），生产客户端上找不到目标"
+                }
+            }
+            // 正向对照：一个 mixin 类都没扫到时，「全翻对了」与「没在扫」输出一样。
+            if (scanned == 0) {
+                throw new GradleException('生产 jar 里一个 mixin 类都没扫到 —— 判据坏了，不是干净')
+            }
+            def config = zip.getEntry('heavyseas.client.mixins.json')
+            if (config == null) {
+                problems << 'jar 里没有 heavyseas.client.mixins.json（client 源码集的资源没打进去）'
+            } else {
+                def json = new groovy.json.JsonSlurper().parse(zip.getInputStream(config), 'UTF-8')
+                if (json.refmap) {
+                    problems << "mixins.json 指向 refmap ${json.refmap}，而这一版 Loom 不生成 refmap —— 那个文件不在 jar 里"
+                }
+                if (!json.client || json.client.isEmpty()) {
+                    problems << 'mixins.json 的 client 列表是空的'
+                }
+            }
+            if (problems) {
+                throw new GradleException((['生产 jar 的 mixin 核对失败：'] + problems.collect { '  - ' + it })
+                        .join(System.lineSeparator()))
+            }
+            logger.lifecycle("生产 jar 的 mixin 核对通过：${scanned} 个类都已翻成中间名，mixins.json 不指向 refmap")
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkMixinRemapped
 }
 
 // ❗引擎的运行时依赖不嵌进本模组的 jar，靠 Minecraft 自带的那一份。于是必须同时成立两条：

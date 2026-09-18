@@ -19,14 +19,17 @@ final class EndgameProgressTest {
     private static final List<CharacterId> ORDER = List.of(
             CharacterId.of("captain"), CharacterId.of("mate"));
 
+    /** 船不动之后 ARRIVAL 是一段停顿、不计数（ADR-0034 §5.3.2）：只认 0，然后进翻恨。 */
     @Test
-    void arrivalAcceptsEightMotionStepsThenEntersHateReveal() {
-        EndgameProgress progress = progress(EndgameProgress.Stage.ARRIVAL, EndgameProgress.ARRIVAL_STEPS);
+    void arrivalIsASingleHoldThenEntersHateReveal() {
+        EndgameProgress progress = progress(EndgameProgress.Stage.ARRIVAL, 0);
 
         EndgameProgress reveal = progress.nextStage();
 
         assertEquals(EndgameProgress.Stage.HATE, reveal.stage());
         assertEquals(0, reveal.flipped());
+        // 红测过：把上限改回 8，这一条就放行 —— 那正是 ADR-0032 #7 那个不同源的字面量。
+        assertThrows(IllegalArgumentException.class, () -> progress(EndgameProgress.Stage.ARRIVAL, 1));
     }
 
     @Test

@@ -1,6 +1,8 @@
 package io.github.heavyseasmc.mod.world;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
+import io.github.heavyseasmc.mod.data.VoyageLayout;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import net.minecraft.entity.Entity;
@@ -63,12 +65,19 @@ public final class Gulls {
         }
     }
 
+    /** 四只齐飞：往布局里岸的方向去（决策 ⑮「鸟群指路」）。 */
     public static void depart(ServerWorld world, GameComponent component) {
+        Vec3d toward = layoutOf(component).bearingVector();
         for (UUID id : component.gullIds()) {
             if (world.getEntity(id) instanceof GullEntity gull) {
-                gull.depart();
+                gull.depart(toward);
             }
         }
+    }
+
+    /** 这一局的布局；对局外（收摊时）退回默认布局 —— 那时只用来算个声音位置。 */
+    private static VoyageLayout layoutOf(GameComponent component) {
+        return component.layoutId().map(SceneDataLoader::require).orElseGet(SceneDataLoader::defaultLayout);
     }
 
     public static void clear(ServerWorld world, GameComponent component) {
@@ -101,7 +110,7 @@ public final class Gulls {
                 return first.getPos();
             }
         }
-        return MistSea.BOAT_ORIGIN;
+        return layoutOf(component).boat().bow();
     }
 
     private static void sound(ServerWorld world, int count) {

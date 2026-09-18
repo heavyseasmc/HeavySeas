@@ -27,8 +27,6 @@ import java.util.Objects;
 public record EndgameProgress(GameState.Outcome outcome, int turn, int alive, List<CharacterId> order,
                               Stage stage, int flipped, Map<CharacterId, ScoreSheet> scores) {
 
-    public static final int ARRIVAL_STEPS = 8;
-
     /** M4's shore approach, followed by the two reveal rounds and scores. */
     public enum Stage {
         /** The fourth gull leads the occupied boat toward the newly visible shore. */
@@ -49,8 +47,10 @@ public record EndgameProgress(GameState.Outcome outcome, int turn, int alive, Li
         if (order.isEmpty()) {
             throw new IllegalArgumentException("终局没有人可翻");
         }
-        // During ARRIVAL this field is an animation step; during reveals it is a card count.
-        int maximum = stage == Stage.ARRIVAL ? ARRIVAL_STEPS : order.size();
+        // ARRIVAL 是一段停顿、不计数（ADR-0034 §5.3.2：船不动，没有「挪了几步」）；翻牌两轮里它是张数。
+        // ❗这里原先是字面量 8，与 EndgamePhase 那份 ARRIVAL_STEPS 不同源（ADR-0032 #7）；两处一起消失了。
+        //   协作者 965e383 把那个 8 收成 EndgameProgress.ARRIVAL_STEPS，与这里的「不计数」撞上，按本版为准。
+        int maximum = stage == Stage.ARRIVAL ? 0 : order.size();
         if (flipped < 0 || flipped > maximum) {
             throw new IllegalArgumentException("翻开张数越界：%d（共 %d 人）".formatted(flipped, order.size()));
         }

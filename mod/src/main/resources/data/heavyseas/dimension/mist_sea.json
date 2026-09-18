@@ -3,7 +3,7 @@
   "generator": {
     "type": "minecraft:flat",
     "settings": {
-      "biome": "minecraft:deep_ocean",
+      "biome": "heavyseas:mist_sea",
       "features": false,
       "lakes": false,
       "layers": [

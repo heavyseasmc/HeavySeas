@@ -2,17 +2,14 @@ package io.github.heavyseasmc.mod.world;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.data.VoyageLayout;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.decoration.DisplayEntity.BlockDisplayEntity;
-import net.minecraft.block.Blocks;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.slf4j.Logger;
@@ -37,6 +34,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * 就会多出一条「世界与引擎各自记了一份位次」的路，而两份迟早分家 ——
  * 分家的表现是屏幕上两个人换了、规则里没换，反过来也一样，而且都不报错。
  *
+ * <h2>座位在哪由布局定（ADR-0034 §5.5）</h2>
+ * 船头 · 朝向 · 间距全从 {@link VoyageLayout} 取。船体不再是这里摆的一排台阶 ——
+ * 它是一份结构模板（{@link Hull}），座位只负责「人坐哪」。
+ *
  * <h2>座位不跨重启</h2>
  * 对局本身就不持久化（存档时服务端会打一行「有一局进行到第 N 回合，不会被保存」），
  * 所以<b>起服时从存档载入的对局座位都是孤儿</b>：{@link #onSeatLoaded} 先登记，{@link #tick}
@@ -45,11 +46,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class Seats {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    /** M4 那一版的船体是一排 block display，带这个标签。船体改成结构模板之后它们只会出现在旧存档里，一律当孤儿清。 */
     private static final String HULL_TAG = "heavyseas_hull";
     private static final Queue<LoadedEntity> LOADED_ENTITIES = new ConcurrentLinkedQueue<>();
-
-    /** 船头到船尾，相邻两个座位隔多远（格）。一格：坐满八个人正好是一条小艇的长度。 */
-    private static final double SPACING = 1.0;
 
     /** 座位比脚下的地面略高一点：贴地放的话，骑上去的人会有半个身子陷进方块里。 */
     private static final double LIFT = 0.35;
@@ -58,23 +58,21 @@ public final class Seats {
     }
 
     /**
-     * 开局摆船：从 {@code origin} 起，沿 {@code yaw} 指的方向排开 {@code count} 个座位。
+     * 开局摆座位：从布局的船头起，沿船身方向每隔一个间距放一个，共 {@code count} 个。
      *
-     * <p>第 0 个是**船头**，也就是调用者脚下那一格；船往他面朝的方向延伸出去。
-     * 坐上去的人一律面朝船头 —— 看的是同一个方向，谁在前谁在后一眼就知道。
+     * <p>第 0 个是**船头**；坐上去的人一律面朝船头 —— 看的是同一个方向，谁在前谁在后一眼就知道。
      *
      * <p>❗摆之前先收摊：`/seas start` 连开两局时，上一局的座位还在世界里。
      */
-    public static void place(ServerWorld world, GameComponent component, Vec3d origin, float yaw, int count) {
+    public static void place(ServerWorld world, GameComponent component, VoyageLayout layout, int count) {
         clear(world, component);
-        Vec3d forward = forward(yaw);
-        float facing = MathHelper.wrapDegrees(yaw + 180f);   // 面朝船头
+        float facing = layout.ridersFacing();
         // ❗**先把名单写进组件，再让实体进世界**。顺序反了的话，实体一进世界就触发
         //   ENTITY_LOAD，而那一刻组件里还没有它 —— 清孤儿的那一手会把刚摆好的座位当场清掉。
         List<SeatEntity> seats = new ArrayList<>();
         List<UUID> ids = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            Vec3d at = origin.add(forward.multiply(i * SPACING)).add(0, LIFT, 0);
+            Vec3d at = layout.seatAt(i).add(0, LIFT, 0);
             SeatEntity seat = new SeatEntity(SeatEntity.TYPE, world);
             seat.setIndex(i);
             seat.markOurs();
@@ -83,20 +81,6 @@ public final class Seats {
             ids.add(seat.getUuid());
         }
         component.setSeatIds(ids);
-        List<BlockDisplayEntity> hull = new ArrayList<>();
-        List<UUID> hullIds = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            Vec3d at = origin.add(forward.multiply(i * SPACING)).add(0, -0.3, 0);
-            BlockDisplayEntity part = new BlockDisplayEntity(EntityType.BLOCK_DISPLAY, world);
-            part.setBlockState(Blocks.DARK_OAK_SLAB.getDefaultState());
-            part.addCommandTag(HULL_TAG);
-            part.setTeleportDuration(5);
-            part.refreshPositionAndAngles(at.x, at.y, at.z, facing, 0f);
-            hull.add(part);
-            hullIds.add(part.getUuid());
-        }
-        // Same load-event ordering rule as seats: publish ids before entities enter the world.
-        component.setBoatDisplayIds(hullIds);
         ids = new ArrayList<>();
         for (SeatEntity seat : seats) {
             if (!world.spawnEntity(seat)) {
@@ -108,16 +92,11 @@ public final class Seats {
             ids.add(seat.getUuid());
         }
         component.setSeatIds(ids);
-        hullIds = new ArrayList<>();
-        for (BlockDisplayEntity part : hull) {
-            if (world.spawnEntity(part)) {
-                hullIds.add(part.getUuid());
-            }
-        }
-        component.setBoatDisplayIds(hullIds);
+        Vec3d bow = layout.boat().bow();
         // 与语言无关的一行：验收靠它判「船真的摆出来了」。
-        LOGGER.info("座位已摆好：{} 个 · 船头 {} {} {} · 朝向 {}",
-                ids.size(), fmt(origin.x), fmt(origin.y), fmt(origin.z), Math.round(facing));
+        LOGGER.info("座位已摆好：{} 个 · 船头 {} {} {} · 朝向 {} · 间距 {}",
+                ids.size(), fmt(bow.x), fmt(bow.y), fmt(bow.z), Math.round(facing), layout.boat().seatSpacing());
+        Crate.place(world, component, layout);       // 补给箱实物跟座位同生同灭（ADR-0034 §5.4）
         refresh(world, component);
     }
 
@@ -154,8 +133,9 @@ public final class Seats {
         }
     }
 
-    /** 收摊：把这一局摆下的座位全部清掉，坐着的人自然落地。 */
+    /** 收摊：把这一局摆下的座位全部清掉，坐着的人自然落地；补给箱实物一起收。 */
     public static void clear(ServerWorld world, GameComponent component) {
+        Crate.clear(world, component);
         int gone = 0;
         for (UUID id : component.seatIds()) {
             Entity entity = world.getEntity(id);
@@ -166,13 +146,6 @@ public final class Seats {
             }
         }
         component.setSeatIds(List.of());
-        for (UUID id : component.boatDisplayIds()) {
-            Entity entity = world.getEntity(id);
-            if (entity != null) {
-                entity.discard();
-            }
-        }
-        component.setBoatDisplayIds(List.of());
         if (gone > 0) {
             LOGGER.info("座位已收摊：清掉 {} 个", gone);
         }
@@ -189,9 +162,20 @@ public final class Seats {
      * 造了 8 个真孤儿重启，报的还是 0，而世界里明明有 7 个。
      * 实体加载事件是在它<b>真的进世界那一刻</b>触发的：起服、区块重载、玩家走过去，全都算。
      */
+    /** 场景投影的标签：船体旧投影 · 布景 · 补给箱。带这些标签的实体会进存档，起服时按组件里的名单认亲，认不出的清掉。 */
+    private static final java.util.Set<String> SCENE_TAGS = java.util.Set.of(HULL_TAG, Backdrop.TAG, Crate.TAG);
+
+    private static boolean sceneTagged(Entity entity) {
+        for (String tag : SCENE_TAGS) {
+            if (entity.getCommandTags().contains(tag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void onSeatLoaded(Entity entity, ServerWorld world) {
-        if (!entity.getCommandTags().contains(HULL_TAG)
-                && (!(entity instanceof SeatEntity seat) || !seat.ours())) {
+        if (!sceneTagged(entity) && (!(entity instanceof SeatEntity seat) || !seat.ours())) {
             return;
         }
         // ENTITY_LOAD fires while Minecraft's entity manager may be iterating its backing collection.
@@ -217,9 +201,22 @@ public final class Seats {
 
     private static void removeIfOrphan(Entity entity, ServerWorld world) {
         if (entity.getCommandTags().contains(HULL_TAG)) {
-            if (!GameComponents.of(world).boatDisplayIds().contains(entity.getUuid())) {
+            // 船体已是结构模板，这种投影只会来自 M4 的旧存档。
+            entity.discard();
+            LOGGER.info("船体：清掉一个旧版的投影");
+            return;
+        }
+        if (entity.getCommandTags().contains(Backdrop.TAG)) {
+            if (!GameComponents.of(world).backdropIds().contains(entity.getUuid())) {
                 entity.discard();
-                LOGGER.info("船体：清掉一个孤儿投影");
+                LOGGER.info("布景：清掉一件孤儿（存档里留下的）");
+            }
+            return;
+        }
+        if (entity.getCommandTags().contains(Crate.TAG)) {
+            if (!GameComponents.of(world).crateId().map(entity.getUuid()::equals).orElse(false)) {
+                entity.discard();
+                LOGGER.info("补给箱：清掉一个孤儿（存档里留下的）");
             }
             return;
         }
@@ -247,34 +244,12 @@ public final class Seats {
     private record LoadedEntity(RegistryKey<World> world, UUID entity) {
     }
 
-    /** One interpolation step of the M4 shore approach; passengers remain mounted throughout. */
-    public static void move(ServerWorld world, GameComponent component, Vec3d delta) {
-        for (UUID id : component.seatIds()) {
-            Entity entity = world.getEntity(id);
-            if (entity != null) {
-                entity.setPosition(entity.getPos().add(delta));
-            }
-        }
-        for (UUID id : component.boatDisplayIds()) {
-            Entity entity = world.getEntity(id);
-            if (entity != null) {
-                entity.setPosition(entity.getPos().add(delta));
-            }
-        }
-    }
-
     private static SeatEntity seatAt(ServerWorld world, GameComponent component, int index) {
         List<UUID> ids = component.seatIds();
         if (index < 0 || index >= ids.size()) {
             return null;
         }
         return world.getEntity(ids.get(index)) instanceof SeatEntity seat ? seat : null;
-    }
-
-    /** yaw 指的水平方向的单位向量。yaw=0 是 +Z（南），与 Minecraft 一致。 */
-    private static Vec3d forward(float yaw) {
-        double rad = Math.toRadians(yaw);
-        return new Vec3d(-Math.sin(rad), 0, Math.cos(rad));
     }
 
     private static String fmt(double v) {

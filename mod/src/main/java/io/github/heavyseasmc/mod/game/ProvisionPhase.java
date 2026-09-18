@@ -4,11 +4,13 @@ import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.world.Crate;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -202,6 +204,8 @@ public final class ProvisionPhase {
     private static void broadcast(ServerWorld world, GameComponent component) {
         Session session = component.requireSession();
         Optional<CharacterId> holder = session.provisionHolder();
+        // 补给箱实物跟着每一次传递滑（ADR-0034 §5.4）：只靠投影同步的话，替身连传几手之间没有同步，箱子会跳着走。
+        component.layoutId().ifPresent(id -> Crate.refresh(world, component, SceneDataLoader.require(id)));
         if (holder.isEmpty()) {
             broadcastFinished(world);
             return;

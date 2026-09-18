@@ -17,9 +17,11 @@ import io.github.heavyseasmc.engine.weather.WeatherDeck;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameData;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.data.VoyageLayout;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.NavCardView;
+import io.github.heavyseasmc.mod.world.Backdrop;
 import io.github.heavyseasmc.mod.world.Seats;
 import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.MistSea;
@@ -30,7 +32,6 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.math.Vec3d;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,25 +79,23 @@ public final class GameFlow {
     private GameFlow() {
     }
 
-    /** 开一局。座位顺序由角色决定（夫人永远在船头），与谁来占无关。 */
+    /** 开一局。座位顺序由角色决定（夫人永远在船头），与谁来占无关；座位摆在哪由布局定（ADR-0034 §5.5）。 */
     public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
-                             Set<CharacterId> reservedForDummies, Vec3d boatAt, float boatYaw) {
+                             Set<CharacterId> reservedForDummies, VoyageLayout layout) {
         GameData data = GameDataLoader.require();
-        start(world, players, humans, reservedForDummies, boatAt, boatYaw, data.roster().preset(players));
+        start(world, players, humans, reservedForDummies, layout, data.roster().preset(players));
     }
 
     /** 房主从大厅面板确认的自定义阵容。 */
     public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
-                             Set<CharacterId> reservedForDummies, Vec3d boatAt, float boatYaw,
+                             Set<CharacterId> reservedForDummies, VoyageLayout layout,
                              List<CharacterId> selectedRoster) {
         GameData data = GameDataLoader.require();
-        start(world, players, humans, reservedForDummies, boatAt, boatYaw,
-                data.roster().select(selectedRoster));
+        start(world, players, humans, reservedForDummies, layout, data.roster().select(selectedRoster));
     }
 
     private static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
-                              Set<CharacterId> reservedForDummies, Vec3d boatAt, float boatYaw,
-                              Roster roster) {
+                              Set<CharacterId> reservedForDummies, VoyageLayout layout, Roster roster) {
         GameData data = GameDataLoader.require();
         if (roster.survivors().size() != players) {
             throw new IllegalArgumentException("阵容人数与登船人数不一致");
@@ -161,11 +160,12 @@ public final class GameFlow {
                     session.state().stateOf(id).seat(), characterName(id),
                     who.isDummy() ? Text.translatable("heavyseas.game.dummy") : Text.literal(who.label())));
         }
-        LOGGER.info("对局开始：{} 人局 · 座位 {} · 替身自动推进{}", players,
+        // ❗前半段的措辞被 playthrough-check.sh 与 playthrough_feed.py 盯着，只许往后加字段。
+        LOGGER.info("对局开始：{} 人局 · 座位 {} · 替身自动推进{} · 布局 {} · 维度 {}", players,
                 session.state().bySeat().stream().map(CharacterId::value).toList(),
-                component.dummyAutoplay() ? "开" : "关");
+                component.dummyAutoplay() ? "开" : "关", layout.id(), layout.dimension());
         // 位次摆进世界（ADR-0024）。放在播报之后：摆船会再推一次投影，而开局那一帧已经推过了。
-        Seats.place(world, component, boatAt, boatYaw, session.state().bySeat().size());
+        Seats.place(world, component, layout, session.state().bySeat().size());
         enterWeather(world, component);
     }
 
@@ -183,6 +183,8 @@ public final class GameFlow {
                 Text.translatable(weatherNameKey(weather)), Text.translatable(weatherEffectKey(weather)))
                 .formatted(Formatting.AQUA));
         LOGGER.info("天候：{}（{}）", weather.id(), weather.effect().id());
+        // 天候到世界（ADR-0034 §5.1.5）：雨 · 雷 · 时刻按雾表那一行；雾本身由投影带给客户端。
+        MistSea.applyWeather(world, component, weather.id());
         session.advancePhase();
         enterProvision(world, component);
     }
@@ -409,6 +411,7 @@ public final class GameFlow {
                 DesignationPhase.clear(world, component);
                 Nameplates.clear(world);
                 Gulls.clear(world, component);
+                Backdrop.clear(world, component);
                 Seats.clear(world, component);
                 // 普通系统事件都进 HUD 侧栏；崩溃会立刻收起会话，侧栏也随之消失，
                 // 所以最后这一句只能走 action bar。它不写入聊天历史。

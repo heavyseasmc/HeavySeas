@@ -7,9 +7,12 @@ import io.github.heavyseasmc.engine.scoring.ScoreSheet;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
+import io.github.heavyseasmc.mod.data.VoyageLayout;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.world.Backdrop;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.Seats;
 import io.github.heavyseasmc.mod.world.Gulls;
@@ -51,7 +54,19 @@ public final class EndgamePhase {
 
     /** 计分面板停多久再收起会话。{@code /seas end} 随时照样能提前结束。 */
     public static final long SCORE_HOLD_MS = 45_000L;
-    public static final long ARRIVAL_STEP_MS = 500L;
+
+    /**
+     * 第一幕「雾散向岸」停多久（ADR-0034 §5.3.2）。
+     *
+     * <p>船整局不动（§5.2 C）：这一段不再挪座位，只是一段停顿 —— 雾散、海鸥齐飞、（第 4 刀起）岸滑到船前。
+     * M4 那版是 8 步 × 500 ms 各挪 4 格，在客户端上一秒两下抽搐（§1.4）。
+     * 雾散的渐变（第 2 刀）与布景滑入（第 4 刀）都按这一个数走，不各写一份 4000。
+     */
+    public static final long ARRIVAL_MS = 4000L;
+
+    /** 布景生成之后隔多久起滑：至少一个 tick 让出生包先发出去，给两个 tick 留余量。 */
+    public static final long SLIDE_DELAY_MS = 100L;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     private EndgamePhase() {
@@ -78,18 +93,31 @@ public final class EndgamePhase {
         EndgameProgress progress = new EndgameProgress(outcome, end.turn(),
                 session.aliveCount(), revealOrder(end.bySeat(), scores), first, 0, scores);
         component.setEndgame(progress);
+        VoyageLayout layout = component.layoutId().map(SceneDataLoader::require).orElse(null);
         if (first == EndgameProgress.Stage.ARRIVAL) {
             component.clearFog();
+            if (layout != null) {
+                Backdrop.spawn(world, component, layout);   // 生成在停靠点，模型平移在起滑点（ADR-0034 §5.3.1）
+            }
         }
         // 与语言无关的一行：验收脚本从这一行起数「终局揭示」。
         LOGGER.info("终局开始：{} · 翻牌 {} 人 · {}", progress.outcome(), progress.order().size(),
                 first == EndgameProgress.Stage.ARRIVAL ? "先向岸航行，再恨后爱" : "先恨后爱");
         GameFlow.broadcast(world, Text.translatable("heavyseas.endgame.begin").formatted(Formatting.GOLD));
         GameComponents.sync(world);
-        GameFlow.schedule(component, hold(component,
-                        first == EndgameProgress.Stage.ARRIVAL ? ARRIVAL_STEP_MS : FLIP_HOLD_MS),
-                first == EndgameProgress.Stage.ARRIVAL ? "终局：雾散向岸" : "终局：点名第一个",
-                () -> step(world, component));
+        if (first == EndgameProgress.Stage.ARRIVAL) {
+            // ❗生成与起滑分两步：出生包带的是那一刻的 metadata，同 tick 改完再发，客户端收到的已是终点。
+            GameFlow.schedule(component, hold(component, SLIDE_DELAY_MS), "终局：布景起滑", () -> {
+                if (layout != null) {
+                    Backdrop.slide(world, component, layout, (int) (ARRIVAL_MS / 50L));
+                }
+                GameFlow.schedule(component, hold(component, ARRIVAL_MS), "终局：雾散向岸",
+                        () -> step(world, component));
+            });
+        } else {
+            GameFlow.schedule(component, hold(component, FLIP_HOLD_MS), "终局：点名第一个",
+                    () -> step(world, component));
+        }
     }
 
     /** 走一步：翻开当前这一张，或者进下一段。 */
@@ -97,14 +125,7 @@ public final class EndgamePhase {
         EndgameProgress progress = component.endgame().orElseThrow(
                 () -> new IllegalStateException("终局序列在排程里，组件上却没有终局状态"));
         if (progress.stage() == EndgameProgress.Stage.ARRIVAL) {
-            if (progress.flipped() < EndgameProgress.ARRIVAL_STEPS) {
-                Seats.move(world, component, MistSea.SHORE_DIRECTION.multiply(4.0));
-                component.setEndgame(progress.withFlipped(progress.flipped() + 1));
-                GameComponents.sync(world);
-                GameFlow.schedule(component, hold(component, ARRIVAL_STEP_MS), "终局：救生艇向岸前进",
-                        () -> step(world, component));
-                return;
-            }
+            // 船与座位一格都不挪（ADR-0034 §5.2 C）：这一段只是停 ARRIVAL_MS，雾散与鸟群在别处演。
             LOGGER.info("终局第一幕：第四只海鸥引航 · 浓雾散去 · 岸边出现 · 船上人员保持乘坐");
             GameFlow.broadcast(world, Text.translatable("heavyseas.endgame.arrived").formatted(Formatting.GOLD));
             component.setEndgame(progress.nextStage());
@@ -186,6 +207,7 @@ public final class EndgamePhase {
         DesignationPhase.clear(world, component);   // 还举着拳头的那一位要熄灯
         Nameplates.clear(world);             // 队伍进存档：不删的话下一局名牌上还挂着上一局的数
         Gulls.clear(world, component);
+        Backdrop.clear(world, component);    // 岸也是投影：下一局开局它不该还停在船前
         Seats.clear(world, component);       // 先收座位再收会话：clear 要读组件里那份名单
         component.end();
         GameComponents.sync(world);          // 结束那一帧也要推到（endedFor），否则计分面板一直挂着

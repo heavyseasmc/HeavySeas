@@ -13,6 +13,8 @@ import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.state.SurvivorState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.data.FogTable;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -21,6 +23,8 @@ import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockBox;
 import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.Component;
 import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
@@ -62,6 +66,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     private static final String KEY_INTERRUPTED_TURN = "interrupted_turn";
     private static final String KEY_ESCROWS = "voyage_escrows";
+    private static final String KEY_SCENE = "scene";
 
     /** Owning world, used to include same-dimension spectators in the public projection. */
     private final World owner;
@@ -168,6 +173,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeEnumConstant(g.phase());
         buf.writeVarInt(g.gulls());
         buf.writeString(session.currentWeather().map(card -> card.id()).orElse(""));
+        // 今天的雾（ADR-0034 §5.1.2）：服务端查表算好再发，雾散之后是 0/0。公开，全船同一片。
+        HudView.Fog fog = currentFog();
+        buf.writeVarInt(fog.start());
+        buf.writeVarInt(fog.end());
         buf.writeVarInt(notifications.size());
         for (String notification : notificationJson(buf.getRegistryManager())) {
             buf.writeString(notification);
@@ -363,6 +372,20 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     /**
+     * 今天的雾：按当日天候查这一局布局指的雾表；雾散之后（{@link #fogCleared}）与晴空那一天都是 {@code 0/0}。
+     *
+     * <p>❗算在服务端而不是把天候 id 交给客户端查表：客户端没有雾表，也不该有第二份「雾还在不在」的规则。
+     */
+    private HudView.Fog currentFog() {
+        if (session == null || fogCleared) {
+            return HudView.Fog.NONE;
+        }
+        String weather = session.currentWeather().map(card -> card.id()).orElse("");
+        FogTable.Entry entry = SceneDataLoader.fogFor(layoutId == null ? SceneDataLoader.DEFAULT : layoutId, weather);
+        return entry.vanilla() ? HudView.Fog.NONE : new HudView.Fog(entry.start(), entry.end());
+    }
+
+    /**
      * 一边：站了谁（公开），加上他们的<b>体型和</b>。
      *
      * <p>❗只有体型。押下的武器是暗牌，加进来就等于提前把它亮了 —— 而且是以最难发现的方式：
@@ -446,6 +469,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         Phase phase = buf.readEnumConstant(Phase.class);
         int gulls = buf.readVarInt();
         String weather = buf.readString();
+        HudView.Fog fog = new HudView.Fog(buf.readVarInt(), buf.readVarInt());
         int notificationCount = buf.readVarInt();
         List<Text> notifications = new ArrayList<>(notificationCount);
         for (int i = 0; i < notificationCount; i++) {
@@ -513,7 +537,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                         attackSide, defendSide, attackPower, defendPower, List.of(), 0, List.of(), 0)
                 : ContestView.NONE;
         if (!buf.readBoolean()) {
-            return new HudView(true, turn, phase, gulls, weather, notifications, seats, removed, actor,
+            return new HudView(true, turn, phase, gulls, weather, fog, notifications, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
                     false, 0L, 0L, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
@@ -573,7 +597,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     attackSide, defendSide, attackPower, defendPower, myWeapons, myCommitted,
                     victimFront, victimHand);
         }
-        return new HudView(true, turn, phase, gulls, weather, notifications, seats, removed, actor,
+        return new HudView(true, turn, phase, gulls, weather, fog, notifications, seats, removed, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
                 love, hate, yourTurn, actionDeadline, actionWindow, designating, designateUntil,
@@ -891,8 +915,102 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     private List<UUID> boatDisplayIds = List.of();
     private List<UUID> gullIds = List.of();
 
+    /** 靠岸时的布景实体（ADR-0034 §5.3），与布局里 {@code backdrops} 同序。运行时投影，不持久化；孤儿靠标签清。 */
+    private List<UUID> backdropIds = List.of();
+
+    public List<UUID> backdropIds() {
+        return backdropIds;
+    }
+
+    public void setBackdropIds(List<UUID> ids) {
+        this.backdropIds = List.copyOf(ids);
+    }
+
+    /** 补给箱实物（ADR-0034 §5.4）与它现在停在第几位（−1 = 没有箱子）。运行时投影，不持久化。 */
+    private UUID crateId;
+    private int crateSeat = -1;
+
+    public Optional<UUID> crateId() {
+        return Optional.ofNullable(crateId);
+    }
+
+    public void setCrateId(UUID id) {
+        this.crateId = id;
+    }
+
+    public int crateSeat() {
+        return crateSeat;
+    }
+
+    public void setCrateSeat(int seat) {
+        this.crateSeat = seat;
+    }
+
     /** Dense Mist Sea fog clears when the fourth gull starts the shore approach. */
     private boolean fogCleared;
+
+    /**
+     * 这一局用的哪份航程布局（ADR-0034 §5.5）。运行时状态，不持久化。
+     *
+     * <p>❗{@link #end()} <b>不清它</b>：收场景（船体清回海水 · 解除强加载）要靠它，而那一步在
+     * {@code MistSea.restoreAll} 里、排在 {@code end()} 之后。由 {@code MistSea.cleanupScene} 清。
+     */
+    private Identifier layoutId;
+
+    /**
+     * 场景在世界里留下的东西：船体的脚印与强加载的 chunk。
+     *
+     * <p>❗<b>持久化</b>，与座位相反：船体是真方块、强加载票也进存档，崩在对局中时下次起服要靠它清
+     * （ADR-0024 那一课：凡是写进存档的东西都要在退出路径与起服两处收）。
+     */
+    private SceneLeftover sceneLeftover;
+
+    public Optional<Identifier> layoutId() {
+        return Optional.ofNullable(layoutId);
+    }
+
+    public void setLayoutId(Identifier id) {
+        this.layoutId = Objects.requireNonNull(id, "layoutId");
+    }
+
+    public void clearLayoutId() {
+        this.layoutId = null;
+    }
+
+    public Optional<SceneLeftover> sceneLeftover() {
+        return Optional.ofNullable(sceneLeftover);
+    }
+
+    public void setSceneLeftover(SceneLeftover leftover) {
+        this.sceneLeftover = Objects.requireNonNull(leftover, "leftover");
+    }
+
+    public void clearSceneLeftover() {
+        this.sceneLeftover = null;
+    }
+
+    /**
+     * 船体在世界里占的那一块。
+     *
+     * @param box          放置后的包围盒
+     * @param waterTop     放置前锚点脚下最上一层水的 y；清的时候这一层及以下填水、以上填空气
+     * @param restoreWater 要不要清；地图自带船体的布局为假
+     */
+    public record HullFootprint(BlockBox box, int waterTop, boolean restoreWater) {
+
+        public HullFootprint {
+            Objects.requireNonNull(box, "box");
+        }
+    }
+
+    /** @param forcedChunks 强加载过的 chunk（{@code ChunkPos#toLong}） */
+    public record SceneLeftover(Optional<HullFootprint> hull, List<Long> forcedChunks) {
+
+        public SceneLeftover {
+            Objects.requireNonNull(hull, "hull");
+            forcedChunks = List.copyOf(forcedChunks);
+        }
+    }
 
     public List<UUID> seatIds() {
         return seatIds;
@@ -1005,6 +1123,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         seatIds = List.of();
         boatDisplayIds = List.of();
         gullIds = List.of();
+        backdropIds = List.of();
+        crateId = null;
+        crateSeat = -1;
         fogCleared = false;
         steps.clear();
     }
@@ -1107,6 +1228,25 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     saved.getList("inventory", NbtElement.COMPOUND_TYPE));
             voyageEscrows.put(escrow.player(), escrow);
         }
+        sceneLeftover = null;
+        if (tag.contains(KEY_SCENE, NbtElement.COMPOUND_TYPE)) {
+            NbtCompound scene = tag.getCompound(KEY_SCENE);
+            Optional<HullFootprint> hull = Optional.empty();
+            if (scene.contains("hull", NbtElement.COMPOUND_TYPE)) {
+                NbtCompound h = scene.getCompound("hull");
+                hull = Optional.of(new HullFootprint(new BlockBox(
+                        h.getInt("min_x"), h.getInt("min_y"), h.getInt("min_z"),
+                        h.getInt("max_x"), h.getInt("max_y"), h.getInt("max_z")),
+                        h.getInt("water_top"), h.getBoolean("restore_water")));
+            }
+            List<Long> forced = new ArrayList<>();
+            for (long packed : scene.getLongArray("forced")) {
+                forced.add(packed);
+            }
+            sceneLeftover = new SceneLeftover(hull, forced);
+            LOGGER.warn("存档里留着上一次的场景脚印（船体 {} · 强加载 {} 个 chunk）：起服后清。",
+                    hull.isPresent() ? "有" : "无", forced.size());
+        }
         if (interruptedTurn > 0) {
             LOGGER.warn("上一局没有保存（存档时进行到第 {} 回合）—— M1 不持久化对局，"
                     + "用 /seas start 重开一局。", interruptedTurn);
@@ -1135,6 +1275,27 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             escrows.add(saved);
         }
         tag.put(KEY_ESCROWS, escrows);
+        if (sceneLeftover != null) {
+            NbtCompound scene = new NbtCompound();
+            sceneLeftover.hull().ifPresent(footprint -> {
+                NbtCompound h = new NbtCompound();
+                h.putInt("min_x", footprint.box().getMinX());
+                h.putInt("min_y", footprint.box().getMinY());
+                h.putInt("min_z", footprint.box().getMinZ());
+                h.putInt("max_x", footprint.box().getMaxX());
+                h.putInt("max_y", footprint.box().getMaxY());
+                h.putInt("max_z", footprint.box().getMaxZ());
+                h.putInt("water_top", footprint.waterTop());
+                h.putBoolean("restore_water", footprint.restoreWater());
+                scene.put("hull", h);
+            });
+            long[] forced = new long[sceneLeftover.forcedChunks().size()];
+            for (int i = 0; i < forced.length; i++) {
+                forced[i] = sceneLeftover.forcedChunks().get(i);
+            }
+            scene.putLongArray("forced", forced);
+            tag.put(KEY_SCENE, scene);
+        }
         if (turn > 0) {
             LOGGER.warn("存档时有一局进行到第 {} 回合，**不会被保存** —— M1 不持久化对局。", turn);
         }

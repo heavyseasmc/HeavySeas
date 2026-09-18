@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "heavyseas:default",
+  "_comment": [
+    "官方地图的航程布局（ADR-0034 §5.5）。代码只认这份数据，不认坐标。",
+    "yaw / bearing 用 Minecraft 的约定：0 = +Z（南），90 = −X（西）。",
+    "yaw 180：座位从船头沿 −Z 排开，乘客面朝 +Z；bearing 0：岸从 +Z 来 —— 与 M4 写死的值逐项相同。",
+    "seat_spacing 2.0：给近距离语音留出「邻座听得见、隔一座听不见」的余量（服务端 whisper_distance 配 3、max_voice_distance 配 20）。",
+    "hull.anchor 是结构模板 boat_hull 里船头座位那一格（x 2 · y 2 · z 15），放置时它落在 floor(bow) 上。",
+    "fog 指一份雾表（data/<ns>/fog/<name>.json）：每种天候那一天的能见度、雨雷与时刻。",
+    "backdrops：靠岸时从 slide_from 滑到 slide_to 的布景。offset 相对岸锚点（船头外 slide_to 格）：x 右 · y 上 · z 朝船；",
+    "  模型以 (8,8,8) 为中心，scale 10 的岸从中心往下 5 格 —— y 偏移 2.0 让岩石底沉到水面下。剔除盒缺省按滑程算。",
+    "structures 这个字段等方案 D 的后手，这一版写了会被拒绝。"
+  ],
+  "dimension": "heavyseas:mist_sea",
+  "boat": { "bow": [0.5, 65.15, 0.5], "yaw": 180, "seat_spacing": 2.0 },
+  "hull": { "structure": "heavyseas:boat_hull", "anchor": [2, 2, 15], "restore": "water" },
+  "arrival": { "bearing": 0, "slide_from": 88, "slide_to": 40, "forceload": true },
+  "fog": "heavyseas:default",
+  "backdrops": [
+    { "item": "heavyseas:coast_backdrop",      "offset": [0, 2.0, 0],    "yaw": 0, "scale": 10 },
+    { "item": "heavyseas:lighthouse_backdrop", "offset": [9, 3.1, -2],   "yaw": 0, "scale": 5 },
+    { "item": "heavyseas:pier_backdrop",       "offset": [-8, -0.15, 4], "yaw": 0, "scale": 4 }
+  ]
+}

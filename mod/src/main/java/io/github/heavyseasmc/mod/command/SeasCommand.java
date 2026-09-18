@@ -10,6 +10,7 @@ import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.ContestPhase;
 import io.github.heavyseasmc.mod.game.DesignationPhase;
@@ -19,6 +20,7 @@ import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.world.Backdrop;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.MistSea;
 import io.github.heavyseasmc.mod.world.Seats;
@@ -30,6 +32,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -109,10 +112,16 @@ public final class SeasCommand {
         dispatcher.register(CommandManager.literal("seas")
                 .then(CommandManager.literal("start")
                         .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
-                        .executes(guarded(context -> start(context, 6)))
+                        .executes(guarded(context -> start(context, 6, SceneDataLoader.DEFAULT)))
                         .then(CommandManager.argument("players", IntegerArgumentType.integer(6, 8))
                                 .executes(guarded(context -> start(context,
-                                        IntegerArgumentType.getInteger(context, "players"))))))
+                                        IntegerArgumentType.getInteger(context, "players"), SceneDataLoader.DEFAULT)))
+                                // 用哪份航程布局（ADR-0034 §5.5）：换地图演练与非官方地图走这个口，缺省官方布局。
+                                .then(CommandManager.argument("layout", IdentifierArgumentType.identifier())
+                                        .suggests(LAYOUTS)
+                                        .executes(guarded(context -> start(context,
+                                                IntegerArgumentType.getInteger(context, "players"),
+                                                IdentifierArgumentType.getIdentifier(context, "layout")))))))
                 .then(CommandManager.literal("end")
                         .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .executes(guarded(SeasCommand::end)))
@@ -285,6 +294,8 @@ public final class SeasCommand {
         component.requireSession().table().weather()
                 .orElseThrow(() -> new IllegalStateException("当前对局没有天候牌堆"))
                 .overrideCurrentUntilNextDraw(weather);
+        // 雨 · 雷 · 时刻也跟着换，否则截图里只有雾变了、天没变（ADR-0034 §5.1.5）。
+        MistSea.applyWeather(world, component, weather.id());
         component.notify(Text.translatable("heavyseas.game.weather",
                 Text.translatable("heavyseas.weather." + weather.id()),
                 Text.translatable("heavyseas.weather.effect." + weather.id()))
@@ -294,12 +305,19 @@ public final class SeasCommand {
         return 1;
     }
 
-    private static int start(CommandContext<ServerCommandSource> context, int players) {
+    /** 已加载的布局 id：从场景数据现取，不在命令里维护第二张表。 */
+    private static final SuggestionProvider<ServerCommandSource> LAYOUTS = (context, builder) -> {
+        SceneDataLoader.ids().forEach(id -> builder.suggest(id.toString()));
+        return builder.buildFuture();
+    };
+
+    private static int start(CommandContext<ServerCommandSource> context, int players,
+                             net.minecraft.util.Identifier layoutId) {
         ServerWorld lobby = context.getSource().getWorld();
         GameComponent lobbyComponent = GameComponents.of(lobby);
         ServerWorld sea = MistSea.world(lobby.getServer());
         if (sea == null) {
-            context.getSource().sendError(Text.literal("heavyseas:mist_sea 维度未加载"));
+            context.getSource().sendError(Text.literal("雾海维度未加载（布局还没读到，或维度不在）"));
             return 0;
         }
         if (GameComponents.of(sea).session().isPresent()) {
@@ -308,7 +326,7 @@ public final class SeasCommand {
         }
         List<ServerPlayerEntity> humans = new ArrayList<>(lobby.getServer().getPlayerManager().getPlayerList());
         try {
-            MistSea.startVoyage(lobby.getServer(), players, humans, lobbyComponent.pendingDummies());
+            MistSea.startVoyage(lobby.getServer(), players, humans, lobbyComponent.pendingDummies(), null, layoutId);
             lobbyComponent.clearPendingDummies();
         } catch (RuntimeException e) {
             context.getSource().sendError(Text.literal(String.valueOf(e.getMessage())));
@@ -327,6 +345,7 @@ public final class SeasCommand {
         DesignationPhase.clear(world, component);
         Nameplates.clear(world);
         Gulls.clear(world, component);
+        Backdrop.clear(world, component);
         Seats.clear(world, component);
         component.end();
         GameComponents.sync(world);
