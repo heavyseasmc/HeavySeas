@@ -65,13 +65,11 @@ public final class WaterDonationScreen extends GameScreen {
         HudView.Thirst prompt = view.thirstPrompt();
         int still = Math.max(0, prompt.remaining() * prompt.waterPerSource() - prompt.donated());
         int available = Math.max(0, view.myWaters() - view.myDonatedWater());
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int titleY = SEA_LINE_Y + fh + HINT_GAP + 8;
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.donate.title", nameOf(prompt.who())),
+        drawLine(context, Text.translatable("heavyseas.donate.title", nameOf(prompt.who())),
                 width / 2, titleY, GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.donate.detail", still, prompt.donated(), available),
+        drawLine(context, Text.translatable("heavyseas.donate.detail", still, prompt.donated(), available),
                 width / 2, titleY + fh + 3, GuiLanguage.MUTED);
 
         // 舞台：一张水。上面留出「抬」的高度，下面留出横杠 · 秒数 · 按钮（连它的抬）· 一行说明。
@@ -102,7 +100,7 @@ public final class WaterDonationScreen extends GameScreen {
         button = layoutButtonRow(List.of(label), buttonY, BTN_GAP).getFirst();
         buttonLift = GuiLanguage.approach(buttonLift, awaiting ? 0f : GuiLanguage.LIFT_PX, dt);
         drawButton(context, button, label, !awaiting, GuiLanguage.VERDIGRIS, buttonLift);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.donate.hint"),
+        drawLine(context, Text.translatable("heavyseas.donate.hint"),
                 width / 2, buttonY + button.h() + BTN_GAP, GuiLanguage.MUTED);
         drawIdentity(context, view, identityY);
     }

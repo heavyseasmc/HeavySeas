@@ -176,21 +176,22 @@ public final class HandScreen extends GameScreen {
         // 身份那一行原先就在这 20 里，被抬起的牌压住了一半（真实客户端上看到的）。
         // 爱恨那一行占一行字的高度：从大图那一带里让出来，不压到抬起来的手牌（ADR-0022）。
         // 空手时也让 —— 身份那一行不能因为手上有没有牌就上下跳。
-        int affinityRoom = view.love().isEmpty() ? 0 : textRenderer.fontHeight + 4;
-        int statusY = drawExamined(context, TOP_BAND_H, handTop - 20 - affinityRoom);
+        int affinityRoom = view.love().isEmpty() ? 0 : textH() + 4;
+        // 那「20」原是两行 9 单位的字（身份 · 键位）；字的行高随界面尺寸变，按实际行高留（界面尺寸 1 下实拍过键位行压到手牌上）。
+        int statusY = drawExamined(context, topBandH(), handTop - 2 * (textH() + 2) - affinityRoom);
         // 爱恨：只有你看得到（全程保密，规则里也不许亮出来证明自己）。紧贴身份，键位那一行留在最靠近手牌的地方。
         if (affinityRoom > 0) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hand.affinity",
+            drawLine(context, Text.translatable("heavyseas.hand.affinity",
                             Text.translatable("heavyseas.character." + view.love()),
                             Text.translatable("heavyseas.character." + view.hate())),
-                    width / 2, statusY + textRenderer.fontHeight + 2, GuiLanguage.MUTED);
+                    width / 2, statusY + textH() + 2, GuiLanguage.MUTED);
         }
         drawIdentity(context, view, statusY);
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
         //   与 HUD 那一行「按绑定键查看」同一条理由。
         if (!hand.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hand.keys"),
-                    width / 2, statusY + (affinityRoom > 0 ? 2 : 1) * (textRenderer.fontHeight + 2), GuiLanguage.MUTED);
+            drawLine(context, Text.translatable("heavyseas.hand.keys"),
+                    width / 2, statusY + (affinityRoom > 0 ? 2 : 1) * (textH() + 2), GuiLanguage.MUTED);
         }
 
         if (hand.isEmpty()) {
@@ -264,7 +265,7 @@ public final class HandScreen extends GameScreen {
      */
     private int drawExamined(DrawContext context, int top, int bottom) {
         int room = bottom - top;
-        int text = textRenderer.fontHeight;
+        int text = textH();
         int h = Math.min(Math.max(room - text - 5, BIG_H_MIN), sharpCardHeight());
         int y = top + (room - h - text - 5) / 2;
         int statusY = y + h + 5;
@@ -273,8 +274,7 @@ public final class HandScreen extends GameScreen {
             // 空手也留出大图的位置：身份那一行不能因为手上没牌就跳到别处去。
             // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按绑定键进来的人，要的是「一张都没有」。
             boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
-            context.drawCenteredTextWithShadow(textRenderer,
-                    Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
+            drawLine(context, Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
                     width / 2, y + h / 2 - text / 2, GuiLanguage.DIM);
             return statusY;
         }

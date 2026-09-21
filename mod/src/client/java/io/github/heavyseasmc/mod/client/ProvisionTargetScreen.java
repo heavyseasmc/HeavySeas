@@ -55,12 +55,11 @@ public final class ProvisionTargetScreen extends GameScreen {
         long dt = frameDelta(now);
 
         drawPublicBand(context, view, TOP_BAND_Y);
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int titleY = 48;
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.target.title", provisionName(view.provisionTargetCard())),
+        drawLine(context, Text.translatable("heavyseas.target.title", provisionName(view.provisionTargetCard())),
                 width / 2, titleY, GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.target.detail"),
+        drawLine(context, Text.translatable("heavyseas.target.detail"),
                 width / 2, titleY + fh + 3, GuiLanguage.MUTED);
 
         List<Text> labels = new ArrayList<>();
@@ -71,8 +70,7 @@ public final class ProvisionTargetScreen extends GameScreen {
         int buttonsTop = titleY + 3 * (fh + 3) + buttonLiftRoom();
         boxes = layoutButtonRow(labels, buttonsTop, BTN_GAP);
         if (labels.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer,
-                    Text.translatable("heavyseas.command.nobody_wounded"),
+            drawLine(context, Text.translatable("heavyseas.command.nobody_wounded"),
                     width / 2, buttonsTop, GuiLanguage.MUTED);
         }
         if (mouseActuallyMoved(mouseX, mouseY) && !committed) {
@@ -89,7 +87,7 @@ public final class ProvisionTargetScreen extends GameScreen {
         }
 
         int hintY = buttonsTop + Math.max(fh, rowHeight(boxes)) + BTN_GAP;
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.target.hint"),
+        drawLine(context, Text.translatable("heavyseas.target.hint"),
                 width / 2, hintY, GuiLanguage.MUTED);
         drawIdentity(context, view, identityY());
     }

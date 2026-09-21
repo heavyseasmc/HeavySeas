@@ -26,7 +26,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
-/** Eight-seat, sit-to-register lobby with a right-click bell start. No role exists before start. */
+/** Eight-seat cruise-ship lobby with a right-click bell start. No role exists before start. */
 public final class LobbyBoat {
 
     private LobbyBoat() {

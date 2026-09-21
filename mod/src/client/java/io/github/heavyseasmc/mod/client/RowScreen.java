@@ -8,7 +8,6 @@ import io.github.heavyseasmc.mod.state.HudView;
 import io.github.heavyseasmc.mod.state.NavCardView;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -169,7 +168,7 @@ public final class RowScreen extends GameScreen {
         }
         drawCountdown(context, now, view.actionDeadlineMs(), view.actionWindowMs(),
                 l.barX(), l.barY(), l.barW(), l.countdownY());
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.row.timeout_hint"),
+        drawLine(context, Text.translatable("heavyseas.row.timeout_hint"),
                 width / 2, l.timeoutY(), GuiLanguage.DIM);
         drawIdentity(context, view, l.identityY());
     }
@@ -180,7 +179,7 @@ public final class RowScreen extends GameScreen {
      * <p>自下而上排：身份一行 · 说明两行 · 按钮 · 牌；牌吃掉剩下的高度，与按钮一起在上带与说明之间居中。
      */
     private Layout layout() {
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int lineH = fh + 1;
         int identityY = identityY();
         int timeoutY = identityY - HINT_GAP - fh;
@@ -241,7 +240,7 @@ public final class RowScreen extends GameScreen {
             boolean keep = fates[i] == Session.RowFate.KEPT;
             // 留进划船堆：飞向上带那一行「划船堆 N 张」；塞回牌堆底：往下飞出屏幕。弧线两头为 0，中间抬起。
             float targetX = keep ? width / 2f : cx;
-            float targetBottom = keep ? SEA_LINE_Y + textRenderer.fontHeight : height + l.h();
+            float targetBottom = keep ? SEA_LINE_Y + textH() : height + l.h();
             cx += (targetX - cx) * p;
             bottom += (targetBottom - bottom) * p - GuiLanguage.flyArc(p);
             scale *= 1f - (keep ? 0.75f : 0.3f) * p;
@@ -269,15 +268,10 @@ public final class RowScreen extends GameScreen {
 
     /** 说明只跟高亮走：那张牌的完整内容；一行放得下时，第二行说键位。 */
     private void drawHint(DrawContext context, Layout l) {
-        List<OrderedText> lines = textRenderer.wrapLines(
-                NavCardText.describe(cards.get(focus), view.seats()), width - 2 * SIDE);
-        int lineH = textRenderer.fontHeight + 1;
-        for (int i = 0; i < Math.min(2, lines.size()); i++) {
-            context.drawCenteredTextWithShadow(textRenderer, lines.get(i), width / 2, l.hintY() + i * lineH,
-                    GuiLanguage.INK);
-        }
-        if (lines.size() < 2) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.row.keys"),
+        int lineH = textH() + 1;
+        int lines = drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats()), l.hintY(), 2, GuiLanguage.INK);
+        if (lines < 2) {
+            drawLine(context, Text.translatable("heavyseas.row.keys"),
                     width / 2, l.hintY() + lineH, GuiLanguage.MUTED);
         }
     }

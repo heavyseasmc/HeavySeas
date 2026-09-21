@@ -122,16 +122,16 @@ public final class ActionScreen extends GameScreen {
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
 
-        int text = textRenderer.fontHeight;
+        int text = textH();
         drawPublicBand(context, view, TOP_BAND_Y);
-        int railY = TOP_BAND_H + 4;
+        int railY = topBandH() + 4;
         int identityY = identityY();
         int timeoutY = identityY - HINT_GAP - text;
         int countdownY = timeoutY - HINT_GAP - text;
         int barY = countdownY - BAR_TO_TEXT - BAR_H;
         int hintY = barY - HINT_GAP - text;
         // 按钮连同下面那行说明，在座位轨与身份行之间居中。顶上留出「抬」与「顿」的高度，免得弹进轨里。
-        buttons = layoutButtons(railY + RAIL_H + topRoom(), hintY - BTN_GAP);
+        buttons = layoutButtons(railY + railH() + topRoom(), hintY - BTN_GAP);
         drawRail(context, railY, rowWidth(buttons));
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
@@ -160,12 +160,12 @@ public final class ActionScreen extends GameScreen {
                     rise, scale);
         }
         // 说明只跟焦点走一行：按不动的那几件，这一行说为什么。
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable(CHOICES[focus].hint(view)),
+        drawLine(context, Text.translatable(CHOICES[focus].hint(view)),
                 width / 2, hintY, GuiLanguage.MUTED);
         int barW = countdownWidth(rowWidth(buttons));
         drawCountdown(context, now, view.actionDeadlineMs(), view.actionWindowMs(),
                 (width - barW) / 2, barY, barW, countdownY);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.action.timeout_hint"),
+        drawLine(context, Text.translatable("heavyseas.action.timeout_hint"),
                 width / 2, timeoutY, GuiLanguage.DIM);
         drawIdentity(context, view, identityY);
     }
@@ -240,7 +240,7 @@ public final class ActionScreen extends GameScreen {
         int n = seats.size();
         int widest = 0;
         for (String id : seats) {
-            widest = Math.max(widest, textRenderer.getWidth(Text.translatable("heavyseas.character." + id)));
+            widest = Math.max(widest, textW(Text.translatable("heavyseas.character." + id)));
         }
         int cell = Math.min(Math.max(widest + 8, stageW / n), (width - 2 * SIDE) / n);
         int left = (width - n * cell) / 2;
@@ -248,9 +248,9 @@ public final class ActionScreen extends GameScreen {
             String id = seats.get(i);
             boolean here = id.equals(view.actor());
             int x = left + i * cell;
-            context.fill(x + 2, y + 10, x + cell - 2, y + 11, here ? GuiLanguage.GOLD : GuiLanguage.GROUND);
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.character." + id),
-                    x + cell / 2, y, here ? GuiLanguage.GOLD : GuiLanguage.MUTED);
+            context.fill(x + 2, y + textH() + 1, x + cell - 2, y + textH() + 2, here ? GuiLanguage.GOLD : GuiLanguage.GROUND);
+            drawLineIn(context, Text.translatable("heavyseas.character." + id), x + 2, y, cell - 4,
+                    here ? GuiLanguage.GOLD : GuiLanguage.MUTED);
         }
     }
 

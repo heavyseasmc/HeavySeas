@@ -122,25 +122,23 @@ public final class ThirstScreen extends GameScreen {
                 l.barX(), l.barY(), l.barW(), l.countdownY());
         HudView.Thirst prompt = view.thirstPrompt();
         int hurt = Math.max(0, remaining - (prompt.donated() + chosen) / waterPerSource);
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
+        drawLine(context, Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
                 GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.thirst.detail", prompt.sources(), prompt.covered(),
+        drawLine(context, Text.translatable("heavyseas.thirst.detail", prompt.sources(), prompt.covered(),
                         prompt.shared(), prompt.donated()),
                 width / 2, l.detailY(), GuiLanguage.MUTED);
-        context.drawCenteredTextWithShadow(textRenderer, chosen == 0
+        drawLine(context, chosen == 0
                         ? Text.translatable("heavyseas.thirst.none")
                         : Text.translatable("heavyseas.thirst.drink", chosen, hurt),
                 width / 2, l.hintY(), hurt > 0 ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.thirst.hint"),
+        drawLine(context, Text.translatable("heavyseas.thirst.hint"),
                 width / 2, l.keysY(), GuiLanguage.MUTED);
         drawIdentity(context, view, l.identityY());
     }
 
     private Layout layout() {
         int n = Math.max(1, waters);
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int lineH = fh + 2;
         int identityY = identityY();
         // ❗倒计时之下有**四行**：还需化解几次 · 来源明细 · 喝几张挨几点 · 键位。

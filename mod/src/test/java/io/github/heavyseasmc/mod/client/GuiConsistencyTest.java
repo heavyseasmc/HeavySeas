@@ -78,4 +78,49 @@ class GuiConsistencyTest {
         }
         assertTrue(problems.isEmpty(), "GUI 定义不再只有一份（ADR-0033）：\n  " + String.join("\n  ", problems));
     }
+
+    /** 直接画字、直接量字的写法：只许出现在 {@code GuiText} 里（ADR-0037）。 */
+    private static final List<Pattern> RAW_TEXT = List.of(
+            Pattern.compile("drawTextWithShadow"),
+            Pattern.compile("drawCenteredTextWithShadow"),
+            Pattern.compile("context\\.drawText\\("),
+            Pattern.compile("textRenderer\\s*\\."),
+            Pattern.compile("\\.fontHeight\\b"));
+
+    /**
+     * 界面上的字只经 {@code GuiText}：它在物理像素空间里排、量过才画、放不下就缩 → 折 → 截（ADR-0037）。
+     * 绕开它直接调 Minecraft 的画字接口，就回到了像素字，而且不再有「不越界」的保证 —— 屏幕上不会报任何错。
+     */
+    @Test
+    void textIsDrawnOnlyThroughGuiText() throws IOException {
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(CLIENT_DIR)) {
+            files = listing.filter(p -> p.toString().endsWith(".java")).sorted().toList();
+        }
+        assertTrue(files.size() >= MIN_FILES, "只扫到 " + files.size() + " 份客户端源码 —— 没在扫，不是干净");
+        assertTrue(files.stream().anyMatch(f -> f.getFileName().toString().equals("GuiText.java")),
+                "GuiText.java 不在扫到的文件里 —— 豁免的那一份都没找到，这道判据多半扫错了目录");
+
+        List<String> problems = new ArrayList<>();
+        for (Path file : files) {
+            if (file.getFileName().toString().equals("GuiText.java")) {
+                continue;
+            }
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                String code = line.strip();
+                if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) {
+                    continue;                                 // 注释里提到旧写法不算
+                }
+                for (Pattern p : RAW_TEXT) {
+                    if (p.matcher(line).find()) {
+                        problems.add(file.getFileName() + ":" + (i + 1) + "  " + p.pattern() + "：" + code);
+                    }
+                }
+            }
+        }
+        assertTrue(problems.isEmpty(), "有字绕开了 GuiText（ADR-0037）：" + System.lineSeparator() + "  "
+                + String.join(System.lineSeparator() + "  ", problems));
+    }
 }

@@ -1,9 +1,15 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [
-    { "item": "minecraft:oak_boat" },
-    { "item": "minecraft:bell" }
+  "pattern": [
+    " B ",
+    "I#I",
+    "III"
   ],
+  "key": {
+    "B": { "item": "minecraft:bell" },
+    "I": { "item": "minecraft:iron_block" },
+    "#": { "tag": "minecraft:boats" }
+  },
   "result": { "id": "heavyseas:lobby_boat", "count": 1 }
 }

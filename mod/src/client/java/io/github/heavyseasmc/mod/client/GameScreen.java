@@ -149,7 +149,7 @@ public abstract class GameScreen extends Screen {
         Text helm = view.sea().helmsman().isEmpty()
                 ? Text.literal("—")
                 : Text.translatable("heavyseas.character." + view.sea().helmsman());
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.hud.sea", rowStack, helm),
+        drawLine(context, Text.translatable("heavyseas.hud.sea", rowStack, helm),
                 width / 2, y, GuiLanguage.MUTED);
     }
 
@@ -276,7 +276,7 @@ public abstract class GameScreen extends Screen {
 
     /** 身份那一行画在哪：贴底，留出屏幕高的 5%（至少 8 单位）。 */
     protected int identityY() {
-        return height - Math.max(8, Math.round(height * 0.05f)) - textRenderer.fontHeight;
+        return height - Math.max(8, Math.round(height * 0.05f)) - textH();
     }
 
     /** 一个按钮排在哪。 */
@@ -305,7 +305,7 @@ public abstract class GameScreen extends Screen {
         context.fill(barX, barY, barX + barW, barY + BAR_H, GuiLanguage.GROUND);
         context.fill(barX, barY, barX + Math.round(barW * frac), barY + BAR_H,
                 urgent ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
-        context.drawCenteredTextWithShadow(textRenderer, Text.literal(String.format("%.1fs", left / 1000f)),
+        drawLine(context, Text.literal(String.format("%.1fs", left / 1000f)),
                 width / 2, textY, urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
     }
 
@@ -373,12 +373,12 @@ public abstract class GameScreen extends Screen {
 
     /** 一个按钮多高：一行字加上下内边距。 */
     protected int buttonHeight() {
-        return textRenderer.fontHeight + 2 * BTN_PAD_Y;
+        return textH() + 2 * BTN_PAD_Y;
     }
 
     /** 一个按钮多宽：字宽加左右内边距。 */
     protected int buttonWidth(Text label) {
-        return textRenderer.getWidth(label) + 2 * BTN_PAD_X;
+        return textW(label) + 2 * BTN_PAD_X;
     }
 
     /**
@@ -442,9 +442,77 @@ public abstract class GameScreen extends Screen {
             // 金 =「你 · 你选的那个」。按钮的框是 1 像素，卡的框是 2 像素（CARD_FRAME）—— 两种元素，各只此一处。
             context.drawBorder(-1, -1, b.w() + 2, b.h() + 2, GuiLanguage.GOLD);
         }
-        context.drawCenteredTextWithShadow(textRenderer, label, b.w() / 2,
-                (b.h() - textRenderer.fontHeight) / 2 + 1, color);
+        drawLine(context, label, b.w() / 2,
+                (b.h() - textH()) / 2 + 1, color);
         context.getMatrices().pop();
+    }
+
+    // ------------------------------------------------------------------ 字：只经 GuiText（ADR-0037）
+
+    /** 版面常量当初是按「一行字 9 个单位」定的；字的实际行高随界面尺寸变，凡含一行字的高度都要补上这个差。 */
+    private static final int BASE_TEXT_H = 9;
+
+    /** 座位轨多高：{@link #RAIL_H} 补上实际行高与 9 的差。 */
+    protected static int railH() {
+        return RAIL_H + textH() - BASE_TEXT_H;
+    }
+
+    /** 上带多高：{@link #TOP_BAND_H} 补上实际行高与 9 的差。 */
+    protected static int topBandH() {
+        return TOP_BAND_H + textH() - BASE_TEXT_H;
+    }
+
+    /** 一行正文多高，GUI 单位。版面里凡是「一行字」都用它 —— 界面尺寸小的时候有字号地板，一行不止 9 个单位。 */
+    protected static int textH() {
+        return GuiText.lineHeight(GuiText.BODY, false);
+    }
+
+    /** 一行正文多宽，GUI 单位。 */
+    protected static int textW(Text text) {
+        return GuiText.width(text.getString(), GuiText.BODY, false);
+    }
+
+    protected static int textW(String text) {
+        return GuiText.width(text, GuiText.BODY, false);
+    }
+
+    /** 以 {@code cx} 为中心画一行正文。框取到舞台两边里较近的那一边为止：放不下就缩，绝不出舞台。 */
+    protected void drawLine(DrawContext context, Text text, int cx, int y, int color) {
+        drawLine(context, text, cx, y, color, GuiText.BODY, false);
+    }
+
+    protected void drawLine(DrawContext context, String text, int cx, int y, int color) {
+        drawLine(context, Text.literal(text), cx, y, color, GuiText.BODY, false);
+    }
+
+    protected void drawLine(DrawContext context, Text text, int cx, int y, int color, int size, boolean bold) {
+        int half = Math.max(1, Math.min(cx, width - cx) - 2);
+        GuiText.line(context, text, cx - half, y, 2 * half, size, bold, color, GuiText.Align.CENTER);
+    }
+
+    /** 在 {@code [x, x + w]} 这一格里居中画一行正文：格子窄就缩字号，绝不压到邻格。 */
+    protected void drawLineIn(DrawContext context, Text text, int x, int y, int w, int color) {
+        GuiText.line(context, text, x, y, Math.max(1, w), GuiText.BODY, false, color, GuiText.Align.CENTER);
+    }
+
+    /**
+     * 在舞台宽里居中画一段正文，最多 {@code maxLines} 行（折行归 {@link GuiText}）。
+     *
+     * @return 实际画了几行
+     */
+    protected int drawParagraph(DrawContext context, Text text, int y, int maxLines, int color) {
+        int used = GuiText.draw(context, text.getString(), SIDE, y, width - 2 * SIDE, GuiText.BODY, false, color,
+                GuiText.Align.CENTER, maxLines);
+        return Math.max(1, Math.round(used / (float) textH()));
+    }
+
+    /** 从 {@code x} 起左对齐画一行正文，最宽到舞台右边。 */
+    protected void drawLineLeft(DrawContext context, Text text, int x, int y, int color) {
+        GuiText.line(context, text, x, y, Math.max(1, width - x - 2), GuiText.BODY, false, color, GuiText.Align.LEFT);
+    }
+
+    protected void drawLineLeft(DrawContext context, String text, int x, int y, int color) {
+        drawLineLeft(context, Text.literal(text), x, y, color);
     }
 
     /** 把一个 ARGB 色换成另一个不透明度。按不动的东西靠它淡下去，不另起颜色：语义色只有三个。 */
@@ -470,8 +538,7 @@ public abstract class GameScreen extends Screen {
      * 上带：回合 · 阶段 · 海鸥。全船都知道的东西 —— 每一面都要、而且必须长得一样，所以放在这里。
      */
     protected void drawPublicBand(DrawContext context, HudView view, int y) {
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
+        drawLine(context, Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
                         view.gulls(), GameState.GULLS_TO_LAND),
                 width / 2, y, GuiLanguage.MUTED);
         // 海鸥画成格子而不是数字：够不够 4 只是一眼的事，不该让人去读。
@@ -481,7 +548,7 @@ public abstract class GameScreen extends Screen {
         int x = (width - span) / 2;
         for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
             int left = x + i * (pip + gap);
-            context.fill(left, y + 12, left + pip, y + 12 + pip,
+            context.fill(left, y + textH() + 3, left + pip, y + textH() + 3 + pip,
                     i < view.gulls() ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
         }
     }
@@ -497,15 +564,16 @@ public abstract class GameScreen extends Screen {
         Text who = Text.translatable("heavyseas.character." + view.character());
         Text vitals = Text.translatable("heavyseas.hand.vitals", view.health(), view.maxHealth(),
                 conditionName(view.condition()), view.thirst());
-        Text sep = Text.literal(" · ");
-        int wWho = textRenderer.getWidth(who);
-        int wSep = textRenderer.getWidth(sep);
-        int x = (width - (wWho + wSep + textRenderer.getWidth(vitals))) / 2;
-        context.drawTextWithShadow(textRenderer, who, x, y, GuiLanguage.GOLD);
-        context.drawTextWithShadow(textRenderer, sep, x + wWho, y, GuiLanguage.DIM);
+        Text sep = Text.literal("·");
+        int gap = 4;                                             // 分隔符两边的空：排字会剥掉前后空格，间距要自己给
+        int wWho = textW(who) + gap;
+        int wSep = textW(sep) + gap;
+        int x = (width - (wWho + wSep + textW(vitals))) / 2;
+        drawLineLeft(context, who, x, y, GuiLanguage.GOLD);
+        drawLineLeft(context, sep, x + wWho, y, GuiLanguage.DIM);
         // 体力见底或者已经昏迷才用朱砂 —— 它只给紧迫与伤害，
         // 当强调色用的话，真紧迫那一刻就喊不动了。
-        context.drawTextWithShadow(textRenderer, vitals, x + wWho + wSep, y,
+        drawLineLeft(context, vitals, x + wWho + wSep, y,
                 view.health() <= 1 || view.condition() != Condition.CONSCIOUS
                         ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
     }

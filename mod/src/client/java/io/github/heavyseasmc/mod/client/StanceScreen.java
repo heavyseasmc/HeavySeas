@@ -70,13 +70,12 @@ public final class StanceScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         ContestView c = view.contest();
 
         drawPublicBand(context, view, TOP_BAND_Y);
         int headerY = TOP_BAND_Y + 30;
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable(switch (kind) {
+        drawLine(context, Text.translatable(switch (kind) {
                             case SWAP -> "heavyseas.stance.header_swap";
                             case STEAL -> "heavyseas.stance.header_steal";
                             case RATION -> "heavyseas.stance.header_ration";
@@ -85,11 +84,9 @@ public final class StanceScreen extends GameScreen {
         // 两边各一行：站了谁 · 体型和。朱砂留给倒计时见底那一段，这里两边一视同仁。
         int attackY = headerY + fh + BTN_GAP;
         int defendY = attackY + fh + 2;
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.stance.attack_side", names(c.attackSide()), c.attackPower()),
+        drawLine(context, Text.translatable("heavyseas.stance.attack_side", names(c.attackSide()), c.attackPower()),
                 width / 2, attackY, GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.stance.defend_side", names(c.defendSide()), c.defendPower()),
+        drawLine(context, Text.translatable("heavyseas.stance.defend_side", names(c.defendSide()), c.defendPower()),
                 width / 2, defendY, GuiLanguage.INK);
 
         List<Text> labels = List.of(Text.translatable("heavyseas.stance.join_attack"),
@@ -115,7 +112,7 @@ public final class StanceScreen extends GameScreen {
         int barY = top + rowHeight(boxes) + 2 * BTN_GAP;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         drawCountdown(context, now, c.deadlineMs(), c.windowMs(), (width - barW) / 2, barY, barW, countdownY);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.stance.hint"),
+        drawLine(context, Text.translatable("heavyseas.stance.hint"),
                 width / 2, countdownY + fh + HINT_GAP, GuiLanguage.MUTED);
         drawIdentity(context, view, identityY());
     }

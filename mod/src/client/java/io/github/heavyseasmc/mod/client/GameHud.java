@@ -13,7 +13,6 @@ import io.github.heavyseasmc.mod.ui.NotificationSidebarLayout;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -49,7 +48,6 @@ import java.util.List;
 public final class GameHud {
 
     private static final int MARGIN = NotificationSidebarLayout.MARGIN;
-    private static final int LINE_HEIGHT = 10;
     /** 普通 HUD 底部留给热栏；对局 Screen 没有热栏，可以用到窗口底。 */
     private static final int HUD_BOTTOM_SAFE = 48;
 
@@ -148,10 +146,9 @@ public final class GameHud {
                 context.getScaledWindowWidth() - sidebar.sidebarWidth() - 3 * MARGIN);
         int y = MARGIN;
         for (Line line : lines) {
-            for (OrderedText part : client.textRenderer.wrapLines(line.text(), maxWidth)) {
-                context.drawTextWithShadow(client.textRenderer, part, MARGIN, y, line.color());
-                y += LINE_HEIGHT;
-            }
+            // 压在世界上的字：带阴影。最多三行 —— 结算那一行可能很长，再长就截断，绝不画出屏幕。
+            y += GuiText.draw(context, line.text().getString(), MARGIN, y, maxWidth, GuiText.BODY, false,
+                    line.color(), GuiText.Align.LEFT, 3, true);
         }
         drawNotifications(context, client, view.weather(), view.notifications(), sidebar);
     }
@@ -204,31 +201,48 @@ public final class GameHud {
             return;
         }
         int inner = width - 2 * MARGIN;
-        List<OrderedText> rendered = new ArrayList<>();
-        rendered.add(Text.translatable("heavyseas.hud.notifications").asOrderedText());
+        // 第一条是栏名（次要色），下面才是播报，最新的在最上。
+        List<Text> entries = new ArrayList<>();
+        entries.add(Text.translatable("heavyseas.hud.notifications"));
         for (int i = notifications.size() - 1; i >= 0; i--) {
-            rendered.addAll(client.textRenderer.wrapLines(notifications.get(i), inner));
+            entries.add(notifications.get(i));
         }
         // 天候卡已经占掉上半截；按剩余高度裁，而不是按整屏高度裁。否则低分辨率下
-        // 八条长通知会把侧栏画出屏幕底边。
+        // 八条长通知会把侧栏画出屏幕底边。先量后画：放不下的那一条整条不要，不画半条。
         int bottomSafe = client.currentScreen == null ? HUD_BOTTOM_SAFE : 2 * MARGIN;
-        int maxLines = Math.max(0,
-                (context.getScaledWindowHeight() - y - bottomSafe) / LINE_HEIGHT);
-        if (maxLines == 0) {
+        int room = context.getScaledWindowHeight() - y - bottomSafe - 2 * MARGIN;
+        int used = 0;
+        int shown = 0;
+        for (Text entry : entries) {
+            int h = GuiText.height(entry.getString(), inner, GuiText.BODY, false, MAX_LINES_PER_NOTE);
+            if (used + h > room) {
+                break;
+            }
+            used += h;
+            shown++;
+        }
+        if (shown == 0) {
             return;
         }
-        if (rendered.size() > maxLines) {
-            rendered = new ArrayList<>(rendered.subList(0, maxLines));
-        }
-        int height = rendered.size() * LINE_HEIGHT + 2 * MARGIN;
-        context.fill(x, y, x + width, y + height, GuiLanguage.BACKDROP);
+        context.fill(x, y, x + width, y + used + 2 * MARGIN, GuiLanguage.BACKDROP);
         int textY = y + MARGIN;
-        for (int i = 0; i < rendered.size(); i++) {
-            // 第一行是栏名（次要色），下面才是播报（纸色）。
-            context.drawTextWithShadow(client.textRenderer, rendered.get(i), x + MARGIN, textY,
-                    i == 0 ? GuiLanguage.MUTED : GuiLanguage.INK);
-            textY += LINE_HEIGHT;
+        for (int i = 0; i < shown; i++) {
+            Text entry = entries.get(i);
+            textY += GuiText.draw(context, entry.getString(), x + MARGIN, textY, inner, GuiText.BODY, false,
+                    i == 0 ? GuiLanguage.MUTED : noteColor(entry), GuiText.Align.LEFT, MAX_LINES_PER_NOTE);
         }
+    }
+
+    /** 一条播报最多折几行；再长就截断 —— 侧栏是提要，全文该去的地方不是这里。 */
+    private static final int MAX_LINES_PER_NOTE = 4;
+
+    /** 播报自带的颜色（服务端给战斗结算标的红）照原样用；没标色的是纸色。 */
+    private static int noteColor(Text entry) {
+        net.minecraft.text.TextColor c = entry.getStyle().getColor();
+        if (c == null && !entry.getSiblings().isEmpty()) {
+            c = entry.getSiblings().get(0).getStyle().getColor();
+        }
+        return c == null ? GuiLanguage.INK : 0xFF000000 | c.getRgb();
     }
 
     /**

@@ -24,7 +24,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 
-/** Placeable/recoverable overworld lobby anchor. The eight actual registrations are mounted seats. */
+/** Placeable/recoverable overworld cruise-ship lobby anchor. The eight registrations are mounted seats. */
 public final class LobbyBoatBlock extends Block {
 
     public static final Identifier ID = Identifier.of(HeavySeasMod.MOD_ID, "lobby_boat");

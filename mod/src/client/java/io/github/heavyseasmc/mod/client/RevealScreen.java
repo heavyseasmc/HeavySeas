@@ -4,9 +4,7 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
-import net.minecraft.util.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,12 +132,11 @@ public final class RevealScreen extends GameScreen {
         }
         renderBackdrop(context, mouseX, mouseY, delta);
         boolean hate = e.stage() == EndgameProgress.Stage.HATE;
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
 
         drawPublicBand(context, view, TOP_BAND_Y);
         int titleY = TOP_BAND_Y + 26;
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable(hate ? "heavyseas.reveal.round_hate" : "heavyseas.reveal.round_love"),
+        drawLine(context, Text.translatable(hate ? "heavyseas.reveal.round_hate" : "heavyseas.reveal.round_love"),
                 width / 2, titleY, GuiLanguage.INK);
         int railBottom = drawRail(context, now, e, titleY + fh + 6);
 
@@ -149,11 +146,11 @@ public final class RevealScreen extends GameScreen {
         drawStage(context, now, e, hate, railBottom + 8, sayY - 8);
         drawSay(context, now, e, hate, sayY);
         if (view.seated()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.reveal.yours",
+            drawLine(context, Text.translatable("heavyseas.reveal.yours",
                     nameOf(view.hate()), nameOf(view.love())), width / 2, ownY, GuiLanguage.MUTED);
             drawIdentity(context, view, identityY);
         } else {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.endgame.spectating"),
+            drawLine(context, Text.translatable("heavyseas.endgame.spectating"),
                     width / 2, identityY, GuiLanguage.MUTED);
         }
     }
@@ -169,10 +166,10 @@ public final class RevealScreen extends GameScreen {
     private int drawRail(DrawContext context, long now, HudView.Endgame e, int y) {
         List<HudView.Endgame.Entry> entries = e.entries();
         int n = entries.size();
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int widest = 0;
         for (HudView.Endgame.Entry en : entries) {
-            widest = Math.max(widest, textRenderer.getWidth(nameOf(en.who())));
+            widest = Math.max(widest, textW(nameOf(en.who())));
         }
         int cell = Math.min(Math.max(widest + 8, 48), (width - 2 * SIDE) / n);
         int left = (width - n * cell) / 2;
@@ -183,11 +180,10 @@ public final class RevealScreen extends GameScreen {
             boolean done = !en.target().isEmpty() && !midFlip;
             boolean here = i == stageWho && !done;
             int nameColor = here ? GuiLanguage.GOLD : done ? GuiLanguage.MUTED : GuiLanguage.DIM;
-            context.drawCenteredTextWithShadow(textRenderer, fit(nameOf(en.who()), cell - 4), x + cell / 2, y, nameColor);
+            drawLineIn(context, nameOf(en.who()), x + 2, y, cell - 4, nameColor);
             context.fill(x + 3, y + fh + 1, x + cell - 3, y + fh + 3, done ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
             if (done) {
-                context.drawCenteredTextWithShadow(textRenderer, fit(nameOf(en.target()), cell - 4), x + cell / 2,
-                        y + fh + 5, GuiLanguage.MUTED);
+                drawLineIn(context, nameOf(en.target()), x + 2, y + fh + 5, cell - 4, GuiLanguage.MUTED);
             }
         }
         return y + 2 * fh + 6;
@@ -201,7 +197,7 @@ public final class RevealScreen extends GameScreen {
         }
         HudView.Endgame.Entry en = entries.get(stageWho);
         Text label = Text.translatable(hate ? "heavyseas.reveal.hates" : "heavyseas.reveal.loves");
-        int labelW = textRenderer.getWidth(label) * LABEL_SCALE;
+        int labelW = textW(label) * LABEL_SCALE;
         int avail = bottom - top;
         int byWidth = GuiLanguage.cardHeight(Math.max(1, (width - 2 * SIDE - labelW - 2 * STAGE_GAP) / 2));
         int cap = Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO));
@@ -220,9 +216,9 @@ public final class RevealScreen extends GameScreen {
 
         // 「恨」用朱砂 —— 它只给伤害与紧迫；「爱」不占语义色（ADR-0018 §7.3：多了就不成语义）。
         context.getMatrices().push();
-        context.getMatrices().translate(left + w + STAGE_GAP, y + h / 2f - textRenderer.fontHeight * LABEL_SCALE / 2f, 0);
+        context.getMatrices().translate(left + w + STAGE_GAP, y + h / 2f - textH() * LABEL_SCALE / 2f, 0);
         context.getMatrices().scale(LABEL_SCALE, LABEL_SCALE, 1f);
-        context.drawTextWithShadow(textRenderer, label, 0, 0, hate ? GuiLanguage.CINNABAR : GuiLanguage.INK);
+        drawLineLeft(context, label, 0, 0, hate ? GuiLanguage.CINNABAR : GuiLanguage.INK);
         context.getMatrices().pop();
 
         int tx = left + w + labelW + 2 * STAGE_GAP;
@@ -257,7 +253,7 @@ public final class RevealScreen extends GameScreen {
             line = Text.translatable(hate ? "heavyseas.reveal.asking_hate" : "heavyseas.reveal.asking_love",
                     nameOf(en.who()));
         }
-        context.drawCenteredTextWithShadow(textRenderer, line, width / 2, y, color);
+        drawLine(context, line, width / 2, y, color);
     }
 
     private static long flipMillis(HudView.Endgame.Entry entry) {
@@ -285,7 +281,4 @@ public final class RevealScreen extends GameScreen {
     }
 
     /** 名字放不下一格时截短 —— 八人局、英文、窄窗口时相邻两格会叠成一团，截短至少还认得出是谁。 */
-    private OrderedText fit(Text text, int maxWidth) {
-        return Language.getInstance().reorder(textRenderer.trimToWidth(text, Math.max(1, maxWidth)));
-    }
 }
