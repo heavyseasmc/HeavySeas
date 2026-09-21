@@ -73,8 +73,8 @@ public final class StanceScreen extends GameScreen {
         int fh = textH();
         ContestView c = view.contest();
 
-        drawPublicBand(context, view, TOP_BAND_Y);
-        int headerY = TOP_BAND_Y + 30;
+        Bands b = drawChrome(context, view);
+        int headerY = b.stageTop();
         drawLine(context, Text.translatable(switch (kind) {
                             case SWAP -> "heavyseas.stance.header_swap";
                             case STEAL -> "heavyseas.stance.header_steal";
@@ -82,8 +82,8 @@ public final class StanceScreen extends GameScreen {
                         },
                         nameOf(attacker), nameOf(target)), width / 2, headerY, GuiLanguage.ink());
         // 两边各一行：站了谁 · 体型和。朱砂留给倒计时见底那一段，这里两边一视同仁。
-        int attackY = headerY + fh + BTN_GAP;
-        int defendY = attackY + fh + 2;
+        int attackY = headerY + lineStep() + BTN_GAP;
+        int defendY = attackY + lineStep();
         drawLine(context, Text.translatable("heavyseas.stance.attack_side", names(c.attackSide()), c.attackPower()),
                 width / 2, attackY, GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.stance.defend_side", names(c.defendSide()), c.defendPower()),
@@ -92,7 +92,10 @@ public final class StanceScreen extends GameScreen {
         List<Text> labels = List.of(Text.translatable("heavyseas.stance.join_attack"),
                 Text.translatable("heavyseas.stance.join_defend"),
                 Text.translatable("heavyseas.stance.watch"));
-        int top = defendY + fh + 2 * BTN_GAP + buttonLiftRoom();
+        // 按钮在两边那两行与舞台底边之间居中（先量一次有多高，再排定 —— §7.7 的教训）。
+        int regionTop = defendY + lineStep() + BTN_GAP + buttonLiftRoom();
+        int blockH = rowHeight(layoutButtonRow(labels, 0, BTN_GAP));
+        int top = regionTop + Math.max(0, (b.stageBottom() - regionTop - blockH) / 2);
         boxes = layoutButtonRow(labels, top, BTN_GAP);
 
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
@@ -108,13 +111,8 @@ public final class StanceScreen extends GameScreen {
                     i == WATCH ? GuiLanguage.muted() : GuiLanguage.ink(), lift[i]);
         }
 
-        int barW = countdownWidth(rowWidth(boxes));
-        int barY = top + rowHeight(boxes) + 2 * BTN_GAP;
-        int countdownY = barY + BAR_H + BAR_TO_TEXT;
-        drawCountdown(context, now, c.deadlineMs(), c.windowMs(), (width - barW) / 2, barY, barW, countdownY);
-        drawLine(context, Text.translatable("heavyseas.stance.hint"),
-                width / 2, countdownY + fh + HINT_GAP, GuiLanguage.muted());
-        drawIdentity(context, view, identityY());
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
+        drawCountdown(context, b, now, c.deadlineMs(), c.windowMs(), rowWidth(boxes));
     }
 
     /** 一边站了谁。一个人都没有时写一道破折号 —— 空白与「还没读到」长得一样。 */

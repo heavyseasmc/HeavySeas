@@ -54,20 +54,22 @@ public final class ProvisionTargetScreen extends GameScreen {
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
 
-        drawPublicBand(context, view, TOP_BAND_Y);
-        int fh = textH();
-        int titleY = 48;
+        Bands b = drawChrome(context, view);
+        int titleY = b.stageTop();
         drawLine(context, Text.translatable("heavyseas.target.title", provisionName(view.provisionTargetCard())),
                 width / 2, titleY, GuiLanguage.ink());
-        drawLine(context, Text.translatable("heavyseas.target.detail"),
-                width / 2, titleY + fh + 3, GuiLanguage.muted());
+
 
         List<Text> labels = new ArrayList<>();
         for (HudView.MedicalTarget target : view.provisionTargets()) {
             labels.add(Text.translatable("heavyseas.target.entry", nameOf(target.id()),
                     target.health(), target.maxHealth(), conditionName(target.condition())));
         }
-        int buttonsTop = titleY + 3 * (fh + 3) + buttonLiftRoom();
+        // 说明一行贴舞台底边；按钮在两行题头与它之间居中。
+        int bottom = b.stageBottom();
+        int regionTop = titleY + lineStep() + BTN_GAP + buttonLiftRoom();
+        int blockH = labels.isEmpty() ? textH() : rowHeight(layoutButtonRow(labels, 0, BTN_GAP));
+        int buttonsTop = regionTop + Math.max(0, (bottom - regionTop - blockH) / 2);
         boxes = layoutButtonRow(labels, buttonsTop, BTN_GAP);
         if (labels.isEmpty()) {
             drawLine(context, Text.translatable("heavyseas.command.nobody_wounded"),
@@ -86,10 +88,8 @@ public final class ProvisionTargetScreen extends GameScreen {
                     i == focus ? GuiLanguage.verdigris() : GuiLanguage.ink(), lift[i]);
         }
 
-        int hintY = buttonsTop + Math.max(fh, rowHeight(boxes)) + BTN_GAP;
-        drawLine(context, Text.translatable("heavyseas.target.hint"),
-                width / 2, hintY, GuiLanguage.muted());
-        drawIdentity(context, view, identityY());
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")),
+                List.of(keys("confirm", "Enter"), keys("cancel", "Esc")));
     }
 
     @Override

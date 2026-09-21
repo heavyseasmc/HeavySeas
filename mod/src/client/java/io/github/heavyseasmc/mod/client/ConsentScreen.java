@@ -77,8 +77,8 @@ public final class ConsentScreen extends GameScreen {
         long dt = frameDelta(now);
         int fh = textH();
 
-        drawPublicBand(context, view, TOP_BAND_Y);
-        int askY = TOP_BAND_Y + 30;
+        Bands b = drawChrome(context, view);
+        int askY = b.stageTop();
         drawLine(context, Text.translatable(switch (kind) {
                     case SWAP -> "heavyseas.consent.swap";
                     case STEAL -> "heavyseas.consent.steal";
@@ -88,8 +88,10 @@ public final class ConsentScreen extends GameScreen {
 
         List<Text> labels = List.of(Text.translatable("heavyseas.consent.agree"),
                 Text.translatable("heavyseas.consent.fight"));
-        // 按钮顶上留出「抬」的高度，免得抬起来的金框切进上面那行字。
-        int top = askY + fh + 2 * BTN_GAP + buttonLiftRoom();
+        // 按钮在问句与舞台底边之间居中，顶上留出「抬」的高度，免得金框切进上面那行字。
+        int regionTop = askY + lineStep() + BTN_GAP + buttonLiftRoom();
+        int blockH = rowHeight(layoutButtonRow(labels, 0, BTN_GAP));
+        int top = regionTop + Math.max(0, (b.stageBottom() - regionTop - blockH) / 2);
         boxes = layoutButtonRow(labels, top, BTN_GAP);
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
@@ -107,17 +109,8 @@ public final class ConsentScreen extends GameScreen {
                     i == 1 ? GuiLanguage.cinnabar() : GuiLanguage.ink(), lift[i]);
         }
 
-        int barW = countdownWidth(rowWidth(boxes));
-        int barY = top + rowHeight(boxes) + 2 * BTN_GAP;
-        int countdownY = barY + BAR_H + BAR_TO_TEXT;
-        drawCountdown(context, now, deadlineMs, view.contest().windowMs(),
-                (width - barW) / 2, barY, barW, countdownY);
-        int hintY = countdownY + fh + HINT_GAP;
-        drawLine(context, Text.translatable(focus == 1 ? "heavyseas.consent.fight_hint" : "heavyseas.consent.agree_hint"),
-                width / 2, hintY, GuiLanguage.muted());
-        drawLine(context, Text.translatable("heavyseas.consent.timeout"),
-                width / 2, hintY + fh + 2, GuiLanguage.dim());
-        drawIdentity(context, view, identityY());
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
+        drawCountdown(context, b, now, deadlineMs, view.contest().windowMs(), rowWidth(boxes));
     }
 
     /**

@@ -42,8 +42,16 @@ final class GuiMaterial {
 
     /** 倒计时多高，GUI 单位。版面里的 {@code BAR_H} 取它。 */
     static final int GAUGE_H = GAUGE_H_TEXELS / TEXELS_PER_UNIT;
-    /** 浅色比例尺一格多长，GUI 单位。 */
-    private static final int GAUGE_BLOCK = 8;
+    /**
+     * 浅色比例尺一格多长，GUI 单位。
+     *
+     * <p>❗照样张取：那边一格 40 物理像素（1280×720 · 界面尺寸 3 → 约 13 个单位）。
+     * 原先写的 8 只有它的六成，格子密到整条读成一块实心黑 —— 用户 2026-09-22 看实拍时说
+     * 「倒计时带怎么和设计稿里的出入那么大」，这是其中一条。
+     */
+    private static final int GAUGE_BLOCK = 13;
+    /** 比例尺上墨块的不透明度：满格时整条曾是全屏最重的一块。朱砂那一档不走它。 */
+    private static final int GAUGE_BLOCK_ALPHA = 0xC8;
 
     /** 材质板离舞台四边多远。 */
     static final int SHEET_MARGIN = 5;
@@ -125,6 +133,40 @@ final class GuiMaterial {
         }
     }
 
+    /** 舞台角标的两条臂各多长，GUI 单位。 */
+    static final int STAGE_MARK = 24;
+
+    /**
+     * 舞台四角的角标：每角一横一竖两条短臂，标出「牌与按钮在这一格里」。
+     *
+     * <p>❗<b>不通栏。</b> 一条横贯全屏的线会把版面切断 —— 收倒计时那一刀（`7c08a1a`）就是为这个，
+     * 用户当时的话是「横向利用得很满，纵向是否能分担一些」。角标只在四个角上，各面共用同一个矩形，
+     * 于是换面时这四个角一个像素都不动。
+     *
+     * <p>用 {@link GuiLanguage#rim()}（板最外一圈那个色）：它不与任何一处的字同色，
+     * 所以截图判据数得出这四条臂在第几行 —— 与墨色同色的话，每一行正文都会混进来。
+     */
+    static void stageMarks(DrawContext context, int x, int y, int w, int h) {
+        if (w < 4 * STAGE_MARK || h < 2 * STAGE_MARK) {
+            return;                                           // 舞台比角标还小：画出来只剩一个框
+        }
+        int c = GuiLanguage.rim();
+        int arm = STAGE_MARK;
+        int leg = STAGE_MARK / 3;
+        for (int[] corner : new int[][]{{x, y, 1, 1}, {x + w, y, -1, 1}, {x, y + h, 1, -1}, {x + w, y + h, -1, -1}}) {
+            int cx = corner[0];
+            int cy = corner[1];
+            int sx = corner[2];
+            int sy = corner[3];
+            int x0 = sx > 0 ? cx : cx - arm;
+            int y0 = sy > 0 ? cy : cy - 1;
+            context.fill(x0, y0, x0 + arm, y0 + 1, c);
+            int lx = sx > 0 ? cx : cx - 1;
+            int ly = sy > 0 ? cy : cy - leg;
+            context.fill(lx, ly, lx + 1, ly + leg, c);
+        }
+    }
+
     /**
      * 一块标签（九宫格）：浅色是纸签，深色是搪瓷牌。按钮、提示签、航海日志的底都是它。
      * ❗标签永远是<b>浅底</b>，印在上面的字要用 {@link GuiLanguage#onTag} 换成深墨。
@@ -196,8 +238,11 @@ final class GuiMaterial {
             context.fill(ix, iy, ix + iw, iy + ih, GuiLanguage.ground());
             context.fill(ix, iy, ix + left, iy + ih, color);
         } else {
+            // 满格那一刻整条比例尺是全屏最重的一块（2026-09-22 实拍），所以墨块压淡一档；
+            // 紧迫的朱砂不淡 —— 它要压得住，那正是这个语义要做的事。
+            int block = urgent ? color : (color & 0xFFFFFF) | (GAUGE_BLOCK_ALPHA << 24);
             for (int bx = 0; bx < left; bx += 2 * GAUGE_BLOCK) {
-                context.fill(ix + bx, iy, ix + Math.min(bx + GAUGE_BLOCK, left), iy + ih, color);
+                context.fill(ix + bx, iy, ix + Math.min(bx + GAUGE_BLOCK, left), iy + ih, block);
             }
             if (left > 0 && left < iw) {
                 context.fill(ix + left - 1, iy, ix + left, iy + ih, color);      // 吃到哪了：空白格里也看得出

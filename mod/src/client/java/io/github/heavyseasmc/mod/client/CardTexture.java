@@ -9,6 +9,7 @@ import net.minecraft.client.texture.MipmapHelper;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 import java.io.FileNotFoundException;
@@ -85,10 +86,77 @@ public final class CardTexture extends AbstractTexture {
         }
     }
 
+    // ---------------------------------------------------------------- 牌面上的字（ADR-0037 §7.1 第三刀）
+
+    /**
+     * 牌面母版的坐标系：竖版 300×420，天候是横版 420×300。**牌上的位置一律按母版单位写**，
+     * 再按画出来的大小等比缩 —— 调用方给多大是它自己的版面问题，这里不必知道。
+     */
+    private static final int MASTER_W = 300;
+    private static final int MASTER_H = 420;
+    private static final int MASTER_W_LANDSCAPE = 420;
+    private static final int MASTER_H_LANDSCAPE = 300;
+
+    /**
+     * 牌名那一行。三类牌（物资 · 角色 · 天候）共用同一份表头骨架：母版里 x=28、基线 58、字号 24、粗体。
+     * {@code NAME_TOP} 是行框顶边 —— 基线减去一个字面框的高（{@code GuiText} 把基线放在行框里的同一个位置）。
+     */
+    private static final int NAME_X = 28;
+    private static final int NAME_TOP = 34;
+    private static final int NAME_SIZE = 24;
+    /** 右上角那个分数 / 属性框占掉的宽（连同它与牌名之间的空）：牌名绝不许压到它。 */
+    private static final int NAME_BOX_ROOM = 68;
+    /** 表头那一行至少要有这么大才画；再小就换成下面那套放大牌名。 */
+    private static final int NAME_HEADER_MIN = 7;
+    /**
+     * 牌小到表头读不出时，牌名放大居中 —— 可读性的解法不是把字缩小（ADR-0020 §8）。
+     *
+     * <p>❗它必须落在**画区下面那条留白带**里，不能按牌高取比例。母版的画区是 y 78–316、裁剪到 322，
+     * 规则条被无字画层整条拿掉之后 324 以下是空的；而每张牌的物件画到多低并不一样
+     * （`FILL` 从 0.70 到 1.00），所以按比例放的字一定会盖住其中一些
+     * （用户 2026-09-22：「牌里的物品不等高，下方没有留白用来放文字，字会盖住卡牌里的物体」）。
+     * 落在裁剪线以下就与物件多高无关了 —— 画区在 322 处被裁掉，字永远在它下面。
+     */
+    private static final int BIG_NAME_TOP = 324;
+    private static final int BIG_NAME_BOTTOM = 374;
+    private static final int BIG_NAME_SIZE = 44;
+    private static final int BIG_NAME_SIDE = 24;
+    /** 小到这个地步就不画：一两个像素高的字不是「小字」，是噪点。 */
+    private static final int NAME_MIN_SIZE = 5;
+
+    /**
+     * 把牌名按当前语言排到牌面上。贴图是<b>无字画层</b>（管线 {@code --textless}：母版里每一处中文都不烘），
+     * 牌上的字改由这里实时排 —— 于是同一批贴图对每种语言都成立，小尺寸下也按屏幕分辨率排、不会糊。
+     *
+     * <p>色用 {@link GuiLanguage#CARD_INK} 而不是主题的墨：牌面永远是纸，深色主题下也一样。
+     */
+    private static void drawName(DrawContext context, String key, String id,
+                                 int x, int y, int w, int h, int masterW, int masterH) {
+        String name = Text.translatable(key + id).getString();
+        float fx = w / (float) masterW;
+        float fy = h / (float) masterH;
+        int header = Math.round(NAME_SIZE * fy);
+        int boxW = Math.round((masterW - NAME_BOX_ROOM - NAME_X) * fx);
+        if (header >= NAME_HEADER_MIN && boxW >= NAME_MIN_SIZE) {
+            GuiText.draw(context, name, x + Math.round(NAME_X * fx), y + Math.round(NAME_TOP * fy),
+                    boxW, header, true, GuiLanguage.CARD_INK, GuiText.Align.LEFT, 1, false, true);
+            return;
+        }
+        // 行框高是字号的 1.25 倍（GuiText 的度量），所以字号还要被那条带的高卡一道 —— 名字绝不许探出带外。
+        int big = Math.round(Math.min(BIG_NAME_SIZE, (BIG_NAME_BOTTOM - BIG_NAME_TOP) / 1.25f) * fy);
+        int side = Math.round(BIG_NAME_SIDE * fx);
+        if (big < NAME_MIN_SIZE || w - 2 * side < NAME_MIN_SIZE) {
+            return;                      // 这张牌已经小到一枚图标，名字由界面自己在牌外写
+        }
+        GuiText.draw(context, name, x + side, y + Math.round(BIG_NAME_TOP * fy),
+                w - 2 * side, big, true, GuiLanguage.CARD_INK, GuiText.Align.CENTER, 1, false, true);
+    }
+
     /** 画一张物资卡面。 */
     public static void drawProvision(DrawContext context, String cardId, int x, int y, int w, int h) {
         // 区域取整张贴图：UV 只看比值，写 1/1 就不必知道贴图烘成了多大。
         context.drawTexture(ensure(provisionId(cardId)), x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+        drawName(context, "heavyseas.provision.", cardId, x, y, w, h, MASTER_W, MASTER_H);
     }
 
     /**
@@ -99,6 +167,7 @@ public final class CardTexture extends AbstractTexture {
     public static void drawCharacter(DrawContext context, String characterId, int x, int y, int w, int h) {
         context.drawTexture(ensure(Identifier.of(HeavySeasMod.MOD_ID, CHARACTER_DIR + "/" + characterId + ".png")),
                 x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+        drawName(context, "heavyseas.character.", characterId, x, y, w, h, MASTER_W, MASTER_H);
     }
 
     /** 画一张牌背。终局翻牌的暗牌用 {@code secret} —— 爱恨卡的背面。 */
@@ -111,6 +180,7 @@ public final class CardTexture extends AbstractTexture {
     public static void drawWeather(DrawContext context, String weatherId, int x, int y, int w, int h) {
         context.drawTexture(ensure(Identifier.of(HeavySeasMod.MOD_ID, WEATHER_DIR + "/" + weatherId + ".png")),
                 x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+        drawName(context, "heavyseas.weather.", weatherId, x, y, w, h, MASTER_W_LANDSCAPE, MASTER_H_LANDSCAPE);
     }
 
     /**

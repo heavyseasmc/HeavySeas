@@ -40,25 +40,35 @@ public abstract class GameScreen extends Screen {
      */
     private static final double SHARP_CARD_PX_H = 840 * 1.1;
 
-    // ---------------------------------------------------------------- 带位（ADR-0018 §7.1：各面同一套）
+    // ---------------------------------------------------------------- 带位（ADR-0037 §7.10：一套带位版面）
 
     /** 上带（回合 · 阶段 · 海鸥）画在哪一行。 */
     protected static final int TOP_BAND_Y = 12;
-    /** 上带占掉的高度：一行字加一排海鸥格。 */
-    protected static final int TOP_BAND_H = 34;
-    /** 上带下面那一行（划船堆 · 舵手，或座位轨）画在哪一行。 */
-    protected static final int SEA_LINE_Y = 38;
+    /**
+     * 上带里那一行字<b>下面</b>还要多少：到海鸥格 3 · 海鸥格 7 · 留白 4。
+     *
+     * <p>原先这里是写死的 34，而实际用掉的只有「一行字 + 10」—— 界面尺寸自动时白白空掉 15 个单位，
+     * 而舞台正缺这 15 个（总纲 §7.8：牌是主体）。改成按实际行高算，上带于是只占它真正用到的那么高。
+     */
+    protected static final int TOP_BAND_H = 14;
+    /** 相邻两条带之间。 */
+    protected static final int BAND_GAP = 5;
+    /**
+     * 座位轨最多吃掉「轨 + 舞台」那一段的几成。
+     *
+     * <p>❗<b>舞台先给牌，轨拿剩下的</b>（总纲 §7.8）。反过来（轨先按窗口取高、内容再挤剩下的）
+     * 就是第二刀收尾那次实拍的病根：轨一变高，行动一面的按钮被顶出去盖在说明那一行上（§7.7）。
+     */
+    protected static final float RAIL_MAX_SHARE = 0.32f;
     /** 两侧留白。 */
     protected static final int SIDE = 20;
     /** 一排卡里相邻两张之间。 */
     protected static final int CARD_GAP = 6;
     /** 一排按钮里相邻两个之间。 */
     protected static final int BTN_GAP = 6;
-    /** 舞台（那一排卡）到倒计时横杠。 */
-    protected static final int BELOW_CARDS = 6;
     /** 横杠到秒数。 */
     protected static final int BAR_TO_TEXT = 3;
-    /** 秒数到下面第一行说明。 */
+    /** 舞台里两段内容之间。 */
     protected static final int HINT_GAP = 5;
     /**
      * 倒计时有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。
@@ -240,6 +250,21 @@ public abstract class GameScreen extends Screen {
         return n * w + (n - 1) * CARD_GAP;
     }
 
+    /**
+     * 一排高 {@code h} 的牌在 {@code [top, bottom)} 里排在哪一行。
+     *
+     * <p>牌顶要留一段 {@code room}（「抬」9 像素 · 「顿」的位移与放大 —— 牌绕<b>底边</b>缩放，
+     * 长出来的那一截全在上面）。❗留空<b>只在真的不够时</b>才把牌往下推：
+     * 先按整格居中，再保证抬起来的那一截不越过 {@code top}。
+     *
+     * <p>原先写的是 {@code top + room + (余下的)/2} —— 留空先扣、牌再在<b>剩下的</b>里居中，
+     * 于是整排恒比这一格的正中低半个留空（补给箱实测低 7 个单位，1280×720 下约 21 物理像素）。
+     * 用户 2026-09-22 看第四刀实拍时问的就是这个。与「牌是余数」是同一个毛病的小号版本。
+     */
+    protected static int cardsTopIn(int top, int bottom, int h, int room) {
+        return Math.max(top + room, top + Math.max(0, (bottom - top - h) / 2));
+    }
+
     /** 一排卡里，指针落在第几张上；都不在时 {@code -1}。上边界把「抬」起来的那几像素算进去。 */
     protected static int cardIndexAt(int mouseX, int mouseY, int left, int top, int w, int h, int count) {
         if (mouseY < top - GuiLanguage.LIFT_PX || mouseY > top + h) {
@@ -284,9 +309,120 @@ public abstract class GameScreen extends Screen {
         context.drawBorder(-CARD_FRAME, -CARD_FRAME, w + 2 * CARD_FRAME, h + 2 * CARD_FRAME, GuiLanguage.gold());
     }
 
-    /** 身份那一行画在哪：贴底，留出屏幕高的 5%（至少 8 单位）。 */
-    protected int identityY() {
-        return height - Math.max(8, Math.round(height * 0.05f)) - textH();
+    /**
+     * 五条带的 y，<b>只由窗口算出来</b>：与这一面有什么内容无关，所以同一个窗口下每一面都一样。
+     *
+     * <p>❗这是第四刀的全部要点（ADR-0037 §7.10 第 4 条）。此前十五个 {@code Screen} 各自从零算版面 ——
+     * 上带 · 座位轨 · 倒计时 · 身份行在每一面的 y 都不同，换面时整屏都在跳，用户判「每个阶段页面感觉像独立的」。
+     * 现在共有的四条带一个像素都不动，<b>连续感来自它们没动</b>，不来自动效；各面只填舞台那一格。
+     *
+     * <p>顺带治「文字太多」：带位一定，每面能放多少字就有了上限 —— 放不下的只能删，不能再往下挤。
+     *
+     * @param avatar 座位轨上头像的直径；{@code 0} = 这一档窗口放不下头像（退回只有名字的轨）
+     */
+    protected record Bands(int topY, int railY, int railH, int avatar, int stageTop, int stageBottom,
+                           int gaugeY, int identityY) {
+
+        /** 舞台那一格有多高。 */
+        int stageH() {
+            return Math.max(0, stageBottom - stageTop);
+        }
+
+        /** 倒计时那一条带多高：横杠与它旁边那行秒数，谁高算谁。 */
+        int gaugeH() {
+            return Math.max(BAR_H, textH());
+        }
+    }
+
+    /**
+     * 这一帧的带位。每帧重算，不缓存：窗口与界面尺寸随时会变（与各面的版面同一条规矩）。
+     *
+     * <p>排法是<b>两头往中间</b>：上带钉在顶上、身份行贴底、倒计时压在身份行上面，
+     * 剩下的一段由座位轨与舞台分 —— 轨最多拿 {@link #RAIL_MAX_SHARE}，舞台拿剩下的全部。
+     */
+    protected Bands bands() {
+        int text = textH();
+        // 身份行：贴底，留出屏幕高的 5%（至少 8 单位）。
+        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - text;
+        int gaugeY = identityY - BAND_GAP - Math.max(BAR_H, text);
+        int railY = TOP_BAND_Y + topBandH();
+        int stageBottom = gaugeY - BAND_GAP;
+        int middle = Math.max(0, stageBottom - railY);           // 座位轨与舞台分这一段
+        int bare = RAIL_H + text - BASE_TEXT_H;                  // 只有名字与那条线的轨
+        int room = Math.round(middle * RAIL_MAX_SHARE);
+        int avatar = bare > room ? 0 : avatarDiameter(room - bare);
+        int railH = bare > room ? 0 : bare + blockOf(avatar);
+        int stageTop = railY + (railH > 0 ? railH + BAND_GAP : 0);
+        return new Bands(TOP_BAND_Y, railY, railH, avatar, stageTop, stageBottom, gaugeY, identityY);
+    }
+
+    /**
+     * 舞台里贴着底边往上排 {@code lines} 行说明时，第一行在哪。
+     *
+     * <p>说明贴舞台底边，所以<b>最后一行永远压在倒计时上面同一个位置</b> —— 各面说明行数不同，
+     * 但它们与倒计时之间的距离一样，换面时下半屏同样不跳。
+     */
+    protected int footerTop(Bands b, int lines) {
+        return b.stageBottom() - lines * lineStep();
+    }
+
+    /** 舞台里相邻两行说明之间隔多远（一行字加 2）。 */
+    protected static int lineStep() {
+        return textH() + 2;
+    }
+
+    /**
+     * 四条共有的带一次画完：上带 · 座位轨 · 身份行（倒计时归 {@link #drawCountdown}，
+     * 只有会超时的面才画它 —— ADR-0018 §7.4），外加舞台四角的角标。
+     *
+     * <p>各面在 {@code render} 的开头调它一次，拿回来的 {@link Bands} 就是这一帧唯一的版面来源。
+     */
+    protected Bands drawChrome(DrawContext context, HudView view) {
+        edgeLeftW = 0;
+        edgeRightW = 0;                        // 每帧清零：这一面这一帧到底放没放边上的提示，只认它自己说的
+        Bands b = bands();
+        drawTopBand(context, view, b);
+        drawRailBand(context, view, b);
+        GuiMaterial.stageMarks(context, SIDE, b.stageTop(), width - 2 * SIDE, b.stageH());
+        if (showsIdentity()) {
+            drawIdentity(context, view, b.identityY());
+        }
+        return b;
+    }
+
+    /** 上带画什么。默认是「回合 · 阶段 · 海鸥」；对局已经结束的那两面写别的（计分写结局，阵容写标题）。 */
+    protected void drawTopBand(DrawContext context, HudView view, Bands b) {
+        drawPublicBand(context, view, b.topY());
+    }
+
+    /**
+     * 座位轨画什么。默认是这一局的座位，轮到的那个人是金的 —— 全船都看得见轮到谁。
+     *
+     * <p>补给箱与终局翻牌两面覆写它：那两面的轨是<b>这一条链</b>与<b>翻到谁</b>，不是座位序。
+     */
+    protected void drawRailBand(DrawContext context, HudView view, Bands b) {
+        List<String> seats = view.seats();
+        if (seats.isEmpty() || b.railH() == 0) {
+            return;
+        }
+        int cell = railCell(seats.size());
+        int left = (width - seats.size() * cell) / 2;
+        for (int i = 0; i < seats.size(); i++) {
+            String id = seats.get(i);
+            boolean here = id.equals(view.actor());
+            drawSeat(context, id, left + i * cell, b.railY(), cell, b, here ? GuiLanguage.gold() : 0, false,
+                    here ? GuiLanguage.gold() : GuiLanguage.muted(), here ? GuiLanguage.gold() : GuiLanguage.ground());
+        }
+    }
+
+    /** 座位轨一格多宽：整条铺到舞台两边，格子按人数均分。 */
+    protected int railCell(int seats) {
+        return (width - 2 * SIDE) / Math.max(1, seats);
+    }
+
+    /** 这一面画不画身份行。阵容那一面还没入座，没有身份可写。 */
+    protected boolean showsIdentity() {
+        return true;
     }
 
     /** 一个按钮排在哪。 */
@@ -306,21 +442,42 @@ public abstract class GameScreen extends Screen {
      * <p>「什么时候算紧迫」取自 {@link GuiLanguage#urgencyThreshold}：朱砂只给最后一段，
      * 一直红着就喊不动了。
      */
-    protected void drawCountdown(DrawContext context, long now, long deadlineMs, long totalMs,
-                                 int barX, int barY, int barW, int textY) {
+    protected void drawCountdown(DrawContext context, Bands b, long now, long deadlineMs, long totalMs, int stageW) {
         long left = Math.max(0L, deadlineMs - now);
         long total = Math.max(1L, totalMs);
         float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
         boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
-        GuiMaterial.gauge(context, barX, barY, barW, frac, urgent);
-        drawLine(context, Text.literal(String.format("%.1fs", left / 1000f)),
-                width / 2, textY, urgent ? GuiLanguage.cinnabar() : GuiLanguage.muted());
+        // ❗秒数排在横杠**旁边**，不排在它下面：叠成两行时这一条带要 21 个单位，并排只要一行字那么高。
+        //   省下来的十几个单位全归舞台（总纲 §7.8）。
+        // 样张里这个数是墨色的、没有 s 后缀 —— 它是这一条带上唯一要读的东西，不该比刻度还淡。
+        Text seconds = Text.literal(String.format("%.1f", left / 1000f));
+        int textW = textW(seconds);
+        int gap = 2 * BAR_TO_TEXT;
+        // 两头的按键提示先占位：倒计时绝不压到它们（窄窗口下会真的撞上）。
+        int free = width - 2 * SIDE - edgeLeftW - edgeRightW - 2 * HINT_SPACING;
+        int barW = countdownWidth(Math.min(Math.max(0, stageW - textW - gap), Math.max(0, free - textW - gap)));
+        int x = (width - (barW + gap + textW)) / 2;
+        GuiMaterial.gauge(context, x, b.gaugeY() + (b.gaugeH() - BAR_H) / 2, barW, frac, urgent);
+        drawLineLeft(context, seconds, x + barW + gap, b.gaugeY() + (b.gaugeH() - textH()) / 2,
+                urgent ? GuiLanguage.cinnabar() : GuiLanguage.ink());
     }
 
-    /** 倒计时跟舞台一样宽：它是「这一排牌」的时间，不是屏幕上的装饰线。至少 160，绝不出屏。 */
+    /**
+     * 倒计时多宽。它是「这一排牌」的时间，所以跟着舞台走；但**不通栏**。
+     *
+     * <p>❗右栏收起之后舞台就是整屏，倒计时于是横跨一千多像素去表达「还剩几秒」这一个标量 ——
+     * 全屏信息量对面积比最差的一件，而且一条通栏的横线会把版面切断（用户 2026-09-22：
+     * 「横向利用得很满，纵向是否能分担一些」，指的是 GUI 元素的排布）。
+     * 上限按舞台的比例写，不写死像素：界面尺寸与窗口都会变。
+     */
     protected int countdownWidth(int stageW) {
-        return Math.min(width - 2 * SIDE, Math.max(160, stageW));
+        int cap = Math.max(MIN_COUNTDOWN_W, Math.round((width - 2 * SIDE) * COUNTDOWN_MAX_SHARE));
+        return Math.min(Math.min(width - 2 * SIDE, cap), Math.max(MIN_COUNTDOWN_W, stageW));
     }
+
+    /** 倒计时最多占舞台的几成宽，以及它的下限（GUI 单位）。 */
+    private static final float COUNTDOWN_MAX_SHARE = 0.46f;
+    private static final int MIN_COUNTDOWN_W = 160;
 
     /**
      * 一排按钮排在哪：一行放得下就并排居中，放不下就一行一个。
@@ -466,11 +623,6 @@ public abstract class GameScreen extends Screen {
     /** 版面常量当初是按「一行字 9 个单位」定的；字的实际行高随界面尺寸变，凡含一行字的高度都要补上这个差。 */
     private static final int BASE_TEXT_H = 9;
 
-    /** 座位轨多高：头像那一块，加 {@link #RAIL_H} 补上实际行高与 9 的差。 */
-    protected int railH() {
-        return avatarBlockH() + RAIL_H + textH() - BASE_TEXT_H;
-    }
-
     // ------------------------------------------------------------------ 座位：头像 · 名字 · 一道线（ADR-0037）
 
     /** 头像最小、最大画多少<b>物理像素</b>，以及取窗口高的几分之一。上限按像素写：GUI 单位随界面尺寸差出好几倍。 */
@@ -483,38 +635,24 @@ public abstract class GameScreen extends Screen {
     protected static final float SEAT_FADED = 0.5f;
 
     /**
-     * 这一帧留给座位轨多少高（GUI 单位）。默认不限：只有把轨夹在别的东西中间的那些面才需要设。
+     * 座位上的头像画多大（直径，GUI 单位）：先按窗口高取，再缩到 {@code room} 以内；一枚都放不下就是 {@code 0}。
      *
-     * <p>❗行动一面就是这么被挤坏的：按钮那一片排在轨与倒计时之间，轨一变高（换成头像之后高出约 28 个单位），
-     * 按钮就从下面顶出去、盖在说明那一行上 —— 三档窗口、两个主题全中。版面里能缩的是头像，不是按钮。
+     * <p>❗<b>缩的是头像，不是舞台。</b> 第二刀收尾那次实拍：轨换成头像之后高出约 28 个单位，
+     * 行动一面的按钮被顶出去盖在说明那一行上（§7.7）。带位版面里轨只拿 {@link #RAIL_MAX_SHARE}，
+     * 这个方法负责把头像塞进那点高度里；缩到看不清还硬画不如不画，而把舞台挤掉是绝不允许的。
      */
-    private int railRoom = Integer.MAX_VALUE;
-
-    /** 这一面的座位轨最多占多高。每帧设一次：窗口与界面尺寸随时会变。 */
-    protected void capRail(int room) {
-        railRoom = room;
-    }
-
-    /** 座位上的头像画多大，GUI 单位。先按窗口高取，再按 {@link #capRail} 留下的高度缩。 */
-    protected int avatarSize() {
+    private int avatarDiameter(int room) {
         var window = net.minecraft.client.MinecraftClient.getInstance().getWindow();
         double scale = Math.max(1.0, window.getScaleFactor());
         double px = Math.max(AVATAR_MIN_PX, Math.min(AVATAR_MAX_PX, window.getHeight() * AVATAR_WINDOW_RATIO));
         int d = Math.max(AVATAR_FLOOR, (int) Math.round(px / scale));
-        int budget = railRoom - RAIL_H - (textH() - BASE_TEXT_H);   // 名字与那条线之外，留给头像连圈的
-        while (d > AVATAR_FLOOR && blockOf(d) > budget) {
+        while (d > AVATAR_FLOOR && blockOf(d) > room) {
             d--;
         }
-        // 连最小的一枚都放不下：这一面这一帧不画头像，退回只有名字与一条线的那条轨（这一刀之前的样子）。
-        // 缩到看不清还硬画，不如不画 —— 而把下面的东西挤掉是绝不允许的。
-        return blockOf(d) <= budget ? d : 0;
+        return blockOf(d) <= room ? d : 0;
     }
 
-    /** 头像连圈占多高，外加到名字的 1 个单位；这一面不画头像时是 0。 */
-    protected int avatarBlockH() {
-        return blockOf(avatarSize());
-    }
-
+    /** 头像连圈占多高，外加到名字的 1 个单位；这一档不画头像时是 0。 */
     private static int blockOf(int diameter) {
         return diameter <= 0 ? 0 : diameter + 2 * GuiMaterial.ringMargin(diameter) + 1;
     }
@@ -528,24 +666,24 @@ public abstract class GameScreen extends Screen {
      * @param lineColor 名字底下那道线
      * @return 名字那一行的 y —— 终局那一面还要在线下面再写一行
      */
-    protected int drawSeat(DrawContext context, String characterId, int x, int y, int cell,
+    protected int drawSeat(DrawContext context, String characterId, int x, int y, int cell, Bands b,
                            int mark, boolean faded, int nameColor, int lineColor) {
-        int full = avatarSize();
+        int full = b.avatar();
         if (full > 0) {
             int m = GuiMaterial.ringMargin(full);
             int d = Math.max(1, Math.min(full, cell - 2 * m - 2));   // 格子比头像还窄（界面尺寸 1、八个人）就跟着格子缩，绝不压到邻座
             GuiMaterial.avatar(context, characterId, x + (cell - d) / 2, y + m + (full - d) / 2, d, mark,
                     faded ? SEAT_FADED : 1f);
         }
-        int nameY = y + avatarBlockH();
+        int nameY = y + blockOf(full);
         drawLineIn(context, nameOf(characterId), x + 2, nameY, cell - 4, nameColor);
         context.fill(x + 2, nameY + textH() + 1, x + cell - 2, nameY + textH() + 2, lineColor);
         return nameY;
     }
 
-    /** 上带多高：{@link #TOP_BAND_H} 补上实际行高与 9 的差。 */
+    /** 上带多高：一行字加 {@link #TOP_BAND_H}（海鸥格那一排与留白）。 */
     protected static int topBandH() {
-        return TOP_BAND_H + textH() - BASE_TEXT_H;
+        return textH() + TOP_BAND_H;
     }
 
     /** 一行正文多高，GUI 单位。版面里凡是「一行字」都用它 —— 界面尺寸小的时候有字号地板，一行不止 9 个单位。 */
@@ -610,7 +748,7 @@ public abstract class GameScreen extends Screen {
     /** 同一条提示里相邻两枚键帽之间、键帽与那句话之间。 */
     private static final int KEY_GAP = 2;
     private static final int KEY_TO_LABEL = 4;
-    /** 相邻两条提示之间。 */
+    /** 相邻两条提示之间，也是提示与倒计时之间。 */
     private static final int HINT_SPACING = 12;
 
     /** 一枚键帽多高：一行字加键帽自己的边与底下那道厚边。按键提示那一行就这么高。 */
@@ -670,25 +808,67 @@ public abstract class GameScreen extends Screen {
             for (KeyHint hint : row) {
                 total += keyHintW(hint) + HINT_SPACING;
             }
-            int x = (width - total) / 2;
-            for (KeyHint hint : row) {
-                int end = x + keyHintW(hint);
-                for (String key : hint.keys()) {
-                    int w = keycapW(key);
-                    GuiMaterial.keycap(context, x, y, w, rowH);
-                    GuiText.line(context, Text.literal(key), x + 1, y + GuiMaterial.KEY_PAD_TOP, w - 2, GuiText.BODY, false,
-                            GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.CENTER);
-                    x += w + KEY_GAP;
-                }
-                if (!hint.keys().isEmpty()) {
-                    x += KEY_TO_LABEL - KEY_GAP;
-                }
-                GuiText.line(context, hint.label(), x, y + GuiMaterial.KEY_PAD_TOP, Math.max(1, end - x), GuiText.BODY, false,
-                        color, GuiText.Align.LEFT);
-                x = end + HINT_SPACING;
-            }
+            drawHintRun(context, row, (width - total) / 2, y, color);
             y += rowH + KEY_GAP;
         }
+    }
+
+    /** 一串提示从 {@code x} 起往右画一行。 */
+    private void drawHintRun(DrawContext context, List<KeyHint> hints, int x, int y, int color) {
+        int rowH = keyHintRowH();
+        for (KeyHint hint : hints) {
+            int end = x + keyHintW(hint);
+            for (String key : hint.keys()) {
+                int w = keycapW(key);
+                GuiMaterial.keycap(context, x, y, w, rowH);
+                GuiText.line(context, Text.literal(key), x + 1, y + GuiMaterial.KEY_PAD_TOP, w - 2, GuiText.BODY, false,
+                        GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.CENTER);
+                x += w + KEY_GAP;
+            }
+            if (!hint.keys().isEmpty()) {
+                x += KEY_TO_LABEL - KEY_GAP;
+            }
+            GuiText.line(context, hint.label(), x, y + GuiMaterial.KEY_PAD_TOP, Math.max(1, end - x), GuiText.BODY, false,
+                    color, GuiText.Align.LEFT);
+            x = end + HINT_SPACING;
+        }
+    }
+
+    /** 一串提示排成一行有多宽。 */
+    private int runWidth(List<KeyHint> hints) {
+        int total = -HINT_SPACING;
+        for (KeyHint hint : hints) {
+            total += keyHintW(hint) + HINT_SPACING;
+        }
+        return Math.max(0, total);
+    }
+
+    /** 这一帧按键提示在倒计时那一条带的两头各占多宽。{@link #drawChrome} 每帧清零。 */
+    private int edgeLeftW;
+    private int edgeRightW;
+
+    /**
+     * 按键提示排在<b>倒计时那一条带的两头</b>：左边怎么选，右边怎么定，中间是倒计时。
+     *
+     * <p>❗它不占舞台一行。原先这几句挤在舞台底边居中的一排里，把牌往上顶
+     * （用户 2026-09-22：「文字也可以拿掉了，按钮示范拿到左下角，或者左右两边…这样空间就省出来了，
+     * 牌可以大一点，底部也不拥挤了」）。而倒计时按舞台的比例只占中间不到一半，两头本来就空着 ——
+     * 键位是<b>常驻的操作说明</b>，不是这一面的内容，放边上正好。
+     *
+     * <p>文案一律短到两个字（{@code heavyseas.keys.*} 一处定义）：动效已经把「依次传、选一张」演出来了，
+     * 不必再用一句话讲一遍。
+     */
+    protected void drawEdgeHints(DrawContext context, Bands b, List<KeyHint> left, List<KeyHint> right) {
+        edgeLeftW = runWidth(left);
+        edgeRightW = runWidth(right);
+        int y = b.gaugeY() + (b.gaugeH() - keyHintRowH()) / 2;
+        drawHintRun(context, left, SIDE, y, GuiLanguage.muted());
+        drawHintRun(context, right, width - SIDE - edgeRightW, y, GuiLanguage.muted());
+    }
+
+    /** 一条提示：几枚键帽加一个短词。 */
+    protected static KeyHint keys(String label, String... caps) {
+        return new KeyHint(List.of(caps), Text.translatable("heavyseas.keys." + label));
     }
 
     /** 把一个 ARGB 色换成另一个不透明度。按不动的东西靠它淡下去，不另起颜色：语义色只有三个。 */
