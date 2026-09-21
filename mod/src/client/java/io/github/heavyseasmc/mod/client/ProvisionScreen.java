@@ -146,7 +146,7 @@ public final class ProvisionScreen extends GameScreen {
         int text = textH();
         // 牌名与提示两行是 GuiText 的字：行高要问它（界面尺寸小的时候有字号地板，一行比 9 个单位高）。
         int nameH = GuiText.lineHeight(GuiText.NAME, true);
-        int keepH = GuiText.lineHeight(GuiText.BODY, false);
+        int keepH = keyHintsH(hints());
         int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + text + HINT_GAP + nameH + LINE_GAP + keepH;
         // 卡顶要留多少空，取决于卡有多高（「顿」放大 7%，绕底边，长出来的那一截全在上面）；
         // 而卡有多高又取决于留了多少空。先按一个偏大的 h 算出空，再据此定 h ——
@@ -277,11 +277,10 @@ public final class ProvisionScreen extends GameScreen {
             int x = l.railLeft() + i * cell;
             boolean done = i < data.at();
             boolean here = i == data.at();
-            context.fill(x + 2, y + textH() + 1, x + cell - 2, y + textH() + 2, done ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
-            Text name = Text.translatable("heavyseas.character." + chain.get(i));
             // 每个名字只许占自己那一格：格子窄（界面尺寸 1、八个人）时缩字号，绝不压到邻座。
-            GuiText.line(context, name, x + 2, y, cell - 4, GuiText.BODY, false,
-                    here ? GuiLanguage.GOLD : (done ? GuiLanguage.MUTED : GuiLanguage.DIM), GuiText.Align.CENTER);
+            drawSeat(context, chain.get(i), x, y, cell, here ? GuiLanguage.gold() : 0, !done && !here,
+                    here ? GuiLanguage.gold() : (done ? GuiLanguage.muted() : GuiLanguage.dim()),
+                    done ? GuiLanguage.verdigris() : GuiLanguage.ground());
         }
     }
 
@@ -293,9 +292,16 @@ public final class ProvisionScreen extends GameScreen {
         }
         Text name = Text.translatable("heavyseas.provision." + offer.get(highlight));
         int boxW = width - 2 * SIDE;
-        GuiText.line(context, name, SIDE, l.hintY(), boxW, GuiText.NAME, true, GuiLanguage.INK, GuiText.Align.CENTER);
-        GuiText.line(context, Text.translatable("heavyseas.provision.keep_one", offer.size()),
-                SIDE, l.keepY(), boxW, GuiText.BODY, false, GuiLanguage.MUTED, GuiText.Align.CENTER);
+        GuiText.line(context, name, SIDE, l.hintY(), boxW, GuiText.NAME, true, GuiLanguage.ink(), GuiText.Align.CENTER);
+        drawKeyHints(context, hints(), l.keepY(), GuiLanguage.muted());
+    }
+
+    /** 最底下那一行：规矩一句话，后面跟着怎么按。键是写死的那几个（见 {@link #keyPressed}），所以键名也写死。 */
+    private List<KeyHint> hints() {
+        return List.of(
+                new KeyHint(List.of(), Text.translatable("heavyseas.provision.keep_one", data.offer().size())),
+                new KeyHint(List.of("←", "→"), Text.translatable("heavyseas.provision.key_switch")),
+                new KeyHint(List.of("Enter"), Text.translatable("heavyseas.provision.key_keep")));
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l) {

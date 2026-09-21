@@ -204,9 +204,9 @@ public final class HelmScreen extends GameScreen {
         if (highlight < 0 || highlight >= offer.size()) {
             return;
         }
-        drawParagraph(context, NavCardText.describe(offer.get(highlight), view.seats()), l.hintY(), 2, GuiLanguage.INK);
+        drawParagraph(context, NavCardText.describe(offer.get(highlight), view.seats()), l.hintY(), 2, GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.helm.pick_one", offer.size()),
-                width / 2, l.keepY(), GuiLanguage.MUTED);
+                width / 2, l.keepY(), GuiLanguage.muted());
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l) {

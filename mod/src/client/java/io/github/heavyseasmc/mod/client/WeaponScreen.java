@@ -125,13 +125,13 @@ public final class WeaponScreen extends GameScreen {
         drawCountdown(context, now, c.deadlineMs(), c.windowMs(),
                 l.barX(), l.barY(), l.barW(), l.countdownY());
         drawLine(context, Text.translatable("heavyseas.weapon.header"),
-                width / 2, l.headerY(), GuiLanguage.INK);
+                width / 2, l.headerY(), GuiLanguage.ink());
         drawLine(context, c.myCommitted() == 0
                         ? Text.translatable("heavyseas.weapon.none")
                         : Text.translatable("heavyseas.weapon.committed", c.myCommitted()),
-                width / 2, l.committedY(), c.myCommitted() == 0 ? GuiLanguage.MUTED : GuiLanguage.VERDIGRIS);
+                width / 2, l.committedY(), c.myCommitted() == 0 ? GuiLanguage.muted() : GuiLanguage.verdigris());
         drawLine(context, Text.translatable("heavyseas.weapon.hint"),
-                width / 2, l.hintY(), GuiLanguage.MUTED);
+                width / 2, l.hintY(), GuiLanguage.muted());
         drawIdentity(context, view, l.identityY());
     }
 

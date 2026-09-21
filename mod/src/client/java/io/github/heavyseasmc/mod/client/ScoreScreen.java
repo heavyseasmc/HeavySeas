@@ -72,7 +72,7 @@ public final class ScoreScreen extends GameScreen {
         // 上带（公开）：这一局怎么结束的，然后全员合计。
         Text outcome = Text.translatable(e.outcome() == GameState.Outcome.LANDED
                 ? "heavyseas.game.over.landed" : "heavyseas.game.over.all_dead", view.turn(), e.alive());
-        drawLine(context, outcome, width / 2, TOP_BAND_Y, GuiLanguage.INK);
+        drawLine(context, outcome, width / 2, TOP_BAND_Y, GuiLanguage.ink());
         int totalsBottom = drawTotals(context, e, TOP_BAND_Y + fh + 8);
 
         HudView.Score s = view.myScore();
@@ -80,7 +80,7 @@ public final class ScoreScreen extends GameScreen {
         if (!s.present()) {
             drawLine(context, Text.translatable(
                             view.seated() ? "heavyseas.score.waiting" : "heavyseas.endgame.spectating"),
-                    width / 2, (totalsBottom + identityY) / 2, GuiLanguage.MUTED);
+                    width / 2, (totalsBottom + identityY) / 2, GuiLanguage.muted());
             if (view.seated()) {
                 drawIdentity(context, view, identityY);
             }
@@ -109,7 +109,7 @@ public final class ScoreScreen extends GameScreen {
             }
             float rise = (1f - p) * GuiLanguage.DEAL_RISE;
             int y = Math.round(top + i * rowH + rise);
-            int color = values[i] == 0 ? GuiLanguage.DIM : GuiLanguage.INK;
+            int color = values[i] == 0 ? GuiLanguage.dim() : GuiLanguage.ink();
             drawLineLeft(context, Text.translatable(labels[i]), left, y, color);
             Text value = Text.literal(Integer.toString(values[i]));
             drawLineLeft(context, value, left + rowW - textW(value), y, color);
@@ -117,7 +117,7 @@ public final class ScoreScreen extends GameScreen {
         long snapAt = dealAt + 3 * GuiLanguage.DEAL_STAGGER_MS + GuiLanguage.DEAL_MS;
         if (now >= snapAt) {
             int ruleY = top + 4 * rowH + 1;
-            context.fill(left, ruleY, left + rowW, ruleY + 1, GuiLanguage.GROUND);
+            context.fill(left, ruleY, left + rowW, ruleY + 1, GuiLanguage.ground());
             float p = GuiLanguage.snap(now, snapAt);
             float rise = GuiLanguage.snapRise(p);
             float scale = GuiLanguage.snapScale(p);
@@ -128,9 +128,9 @@ public final class ScoreScreen extends GameScreen {
             context.getMatrices().scale(scale, scale, 1f);
             context.getMatrices().translate(-width / 2f, -(y + fh / 2f), 0);
             // 合计是「你」的数 —— 金色（ADR-0018 §7.3：金 = 你）。
-            drawLineLeft(context, Text.translatable("heavyseas.score.total"), left, y, GuiLanguage.GOLD);
+            drawLineLeft(context, Text.translatable("heavyseas.score.total"), left, y, GuiLanguage.gold());
             Text total = Text.literal(Integer.toString(s.total()));
-            drawLineLeft(context, total, left + rowW - textW(total), y, GuiLanguage.GOLD);
+            drawLineLeft(context, total, left + rowW - textW(total), y, GuiLanguage.gold());
             context.getMatrices().pop();
         }
         drawIdentity(context, view, identityY);
@@ -173,11 +173,11 @@ public final class ScoreScreen extends GameScreen {
             boolean me = en.who().equals(view.character());
             boolean top = en.total() == best;
             boolean gone = view.removed().contains(en.who());
-            int nameColor = me ? GuiLanguage.GOLD : top ? GuiLanguage.INK : GuiLanguage.MUTED;
+            int nameColor = me ? GuiLanguage.gold() : top ? GuiLanguage.ink() : GuiLanguage.muted();
             drawLineIn(context, Text.translatable("heavyseas.character." + en.who()), x - (cell - 4) / 2, y, cell - 4,
-                    gone ? GuiLanguage.DIM : nameColor);
+                    gone ? GuiLanguage.dim() : nameColor);
             drawLine(context, Text.literal(Integer.toString(Math.max(0, en.total()))),
-                    x, y + fh + 3, top ? GuiLanguage.INK : GuiLanguage.MUTED);
+                    x, y + fh + 3, top ? GuiLanguage.ink() : GuiLanguage.muted());
         }
         return y + 2 * fh + 6;
     }

@@ -79,6 +79,49 @@ class GuiConsistencyTest {
         assertTrue(problems.isEmpty(), "GUI 定义不再只有一份（ADR-0033）：\n  " + String.join("\n  ", problems));
     }
 
+    /** 材质相关的写法：只许出现在 {@code GuiMaterial} 里（ADR-0037 第二刀）。 */
+    private static final List<Pattern> RAW_MATERIAL = List.of(
+            Pattern.compile("textures/gui/material"),            // 材质贴图的路径：主题怎么选只此一处
+            Pattern.compile("\\brenderBackground\\s*\\("),       // Minecraft 那层「模糊 + 压暗」：界面像深色模式应用的原因
+            Pattern.compile("\\bapplyBlur\\s*\\("),
+            Pattern.compile("\\brenderInGameBackground\\s*\\("));
+
+    /**
+     * 铺底与标签只经 {@code GuiMaterial}。哪一面自己去调模糊背景、自己去拼材质贴图的路径，就又回到
+     * 「各面各铺各的底」，而且换主题时那一面不会跟着换 —— 屏幕上不报错，只是有一面永远是另一个样子。
+     */
+    @Test
+    void materialIsDefinedOnlyInGuiMaterial() throws IOException {
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(CLIENT_DIR)) {
+            files = listing.filter(p -> p.toString().endsWith(".java")).sorted().toList();
+        }
+        assertTrue(files.size() >= MIN_FILES, "只扫到 " + files.size() + " 份客户端源码 —— 没在扫，不是干净");
+        assertTrue(files.stream().anyMatch(f -> f.getFileName().toString().equals("GuiMaterial.java")),
+                "GuiMaterial.java 不在扫到的文件里 —— 豁免的那一份都没找到，这道判据多半扫错了目录");
+
+        List<String> problems = new ArrayList<>();
+        for (Path file : files) {
+            if (file.getFileName().toString().equals("GuiMaterial.java")) {
+                continue;
+            }
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                String code = lines.get(i).strip();
+                if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) {
+                    continue;
+                }
+                for (Pattern p : RAW_MATERIAL) {
+                    if (p.matcher(code).find()) {
+                        problems.add(file.getFileName() + ":" + (i + 1) + "  " + p.pattern() + "：" + code);
+                    }
+                }
+            }
+        }
+        assertTrue(problems.isEmpty(), "有界面绕开了 GuiMaterial（ADR-0037）：" + System.lineSeparator() + "  "
+                + String.join(System.lineSeparator() + "  ", problems));
+    }
+
     /** 直接画字、直接量字的写法：只许出现在 {@code GuiText} 里（ADR-0037）。 */
     private static final List<Pattern> RAW_TEXT = List.of(
             Pattern.compile("drawTextWithShadow"),

@@ -26,44 +26,142 @@ public final class GuiLanguage {
     private GuiLanguage() {
     }
 
-    // ---------------------------------------------------------------- 三个语义色
+    // ---------------------------------------------------------------- 主题与调色板（ADR-0037）
 
-    /** 铜绿：正常 · 可选 · 安全。 */
-    public static final int VERDIGRIS = 0xFF5E9C94;
-
-    /** 朱砂：紧迫 · 伤害 · 不可逆。❗只给这三件事 —— 当强调色用，真紧迫时就喊不动了。 */
-    public static final int CINNABAR = 0xFFC8573F;
-
-    /** 金：你 · 轮到你。 */
-    public static final int GOLD = 0xFFC9A227;
-
-    // 中性色。取自已交付的卡面 SVG —— GUI 与牌面必须是同一个世界。
-    /** 纸。正文与卡名。 */
-    public static final int INK = 0xFFEAE0C6;
-    /** 次要文字。 */
-    public static final int MUTED = 0xFF7E8C86;
-    /** 更弱的文字（还没轮到的人、已用完的格）。 */
-    public static final int DIM = 0xFF55655F;
-    /** 底槽：进度条与轨道没走到的那一段。 */
-    public static final int GROUND = 0xFF2A3A34;
-
-    /** 纸：画出来的牌面的底色。与 {@link #INK} 是同一个颜色 —— 深底上的正文用的就是纸色，所以引用它，不另写一遍。 */
-    public static final int PAPER = INK;
-    /** 墨 {@code #241E1A}：印在纸色牌面上的字（ADR-0018 §7.3）。 */
-    public static final int CARD_INK = 0xFF241E1A;
+    /** 浅色 = 海图桌，深色 = 船舱木作。两个主题共用一份版面骨架，只换调色板与 {@link GuiMaterial} 的材质表。 */
+    public enum Theme { LIGHT, DARK }
 
     /**
-     * 罩在 {@code Screen.renderBackground} 那层模糊之上的底色（底 {@code #0B120F} 带透明度）。
+     * 一个主题下的全部颜色。**语义不变**：铜绿 = 正常 · 可选 · 安全；朱砂 = 紧迫 · 伤害 · 不可逆（❗只给这三件事 ——
+     * 当强调色用，真紧迫时就喊不动了）；金 = 你 · 轮到你。换的只是色相与明度：浅色底上压深成「墨」，深色底上提亮。
+     * 中性色取自已交付的卡面 SVG（墨 {@code #241E1A} · 次墨 {@code #55483B} · 纸 {@code #EADFC6}）—— GUI 与牌面必须是同一个世界。
      *
-     * <p>不铺这一层的话，界面坐在一片灰蓝的 Minecraft 世界上，而牌面是暖纸色的 ——
-     * 两个世界。铺上之后 GUI 与牌面才是同一个世界，这是 ADR-0018 §7.3 那句
-     * 「GUI 与牌面必须是同一个世界」的落地处。
-     *
-     * <p>❗透明度是用户 2026-09-15 从实测四档里定的 {@code 0xE4}。原先的 {@code 0xB8} 下，
-     * 界面尺寸一大，Minecraft 自带的聊天就从这层后面透出来、字字可读 —— 而界面刚弹出时
-     * 正是开局播报刷屏的时候。{@code 0xE4} 只剩淡影。底色在卡面之下，加深它不影响卡面。
+     * @param ink    正文
+     * @param muted  次要文字
+     * @param dim    更弱的文字（还没轮到的人、已用完的格）
+     * @param ground 底槽：进度条与轨道没走到的那一段
+     * @param dimmer 压在世界上的那一层暗（带色相，不用中性灰）
+     * @param frame  材质板上的框线
+     * @param rim    材质板最外一圈
      */
-    public static final int BACKDROP = 0xE40B120F;
+    private record Palette(int ink, int muted, int dim, int ground, int verdigris, int cinnabar, int gold,
+                           int dimmer, int frame, int rim) {
+    }
+
+    private static final Palette LIGHT_PALETTE = new Palette(0xFF241E1A, 0xFF5A4D3E, 0xFF8A7C62, 0xFFCDBF9C,
+            0xFF2C6E66, 0xFFB83F28, 0xFFB48A2A, 0xD81A1208, 0xFF241E1A, 0xFF8D7C5A);
+    private static final Palette DARK_PALETTE = new Palette(0xFFEDE3CA, 0xFFCFC2A2, 0xFFA39574, 0xFF1C1007,
+            0xFF6FB3A6, 0xFFDA5B3E, 0xFFE6BC50, 0xDC080502, 0xFF120A04, 0xFF5A3D22);
+
+    private static Theme theme = Theme.LIGHT;
+
+    public static Theme theme() {
+        return theme;
+    }
+
+    public static void setTheme(Theme next) {
+        theme = next;
+    }
+
+    private static Palette palette() {
+        return theme == Theme.DARK ? DARK_PALETTE : LIGHT_PALETTE;
+    }
+
+    /** 铜绿：正常 · 可选 · 安全。 */
+    public static int verdigris() {
+        return palette().verdigris();
+    }
+
+    /** 朱砂：紧迫 · 伤害 · 不可逆。 */
+    public static int cinnabar() {
+        return palette().cinnabar();
+    }
+
+    /** 金：你 · 轮到你。 */
+    public static int gold() {
+        return palette().gold();
+    }
+
+    public static int ink() {
+        return palette().ink();
+    }
+
+    public static int muted() {
+        return palette().muted();
+    }
+
+    public static int dim() {
+        return palette().dim();
+    }
+
+    public static int ground() {
+        return palette().ground();
+    }
+
+    public static int dimmer() {
+        return palette().dimmer();
+    }
+
+    public static int frame() {
+        return palette().frame();
+    }
+
+    public static int rim() {
+        return palette().rim();
+    }
+
+    /**
+     * 印在<b>标签</b>（纸签 · 搪瓷牌）上的字该用什么色。标签永远是浅底，所以深色主题下要把板上的浅色换成浅色主题的深墨；
+     * 不透明度原样保留（按不动的按钮靠它淡下去）。
+     */
+    public static int onTag(int color) {
+        return theme == Theme.LIGHT ? color : swap(color, DARK_PALETTE, LIGHT_PALETTE);
+    }
+
+    /**
+     * 直接压在<b>世界</b>上的字（主画面 HUD）该用什么色。背后是海是天说不准、多半是暗的，所以永远用深色主题那一套浅色 ——
+     * 浅色主题下的「正文」是深墨，印在海上读不出。
+     */
+    public static int onWorld(int color) {
+        return theme == Theme.DARK ? color : swap(color, LIGHT_PALETTE, DARK_PALETTE);
+    }
+
+    private static int swap(int color, Palette from, Palette to) {
+        int rgb = color & 0x00FFFFFF;
+        int[][] map = {{from.ink(), to.ink()}, {from.muted(), to.muted()}, {from.dim(), to.dim()},
+                {from.verdigris(), to.verdigris()}, {from.cinnabar(), to.cinnabar()}, {from.gold(), to.gold()}};
+        for (int[] pair : map) {
+            if ((pair[0] & 0x00FFFFFF) == rgb) {
+                return (color & 0xFF000000) | (pair[1] & 0x00FFFFFF);
+            }
+        }
+        return color;
+    }
+
+    /**
+     * 服务端给播报标的颜色（Minecraft 自带的十六色）归到三个语义色上：偏红 = 朱砂，偏黄 = 金，偏青绿蓝 = 铜绿，其余是正文。
+     * 十六色里的亮青、亮黄印在纸上读不出，也不属于这个世界。
+     */
+    public static int semantic(int rgb) {
+        int r = rgb >> 16 & 0xFF;
+        int g = rgb >> 8 & 0xFF;
+        int bl = rgb & 0xFF;
+        int max = Math.max(r, Math.max(g, bl));
+        int min = Math.min(r, Math.min(g, bl));
+        if (max - min < 40) {
+            return max < 140 ? muted() : ink();
+        }
+        if (r == max && g < 0.6f * r) {
+            return cinnabar();
+        }
+        if (r >= 0.8f * max && g >= 0.6f * max && bl < 0.6f * max) {
+            return gold();
+        }
+        return verdigris();
+    }
+
+    /** 墨 {@code #241E1A}：印在纸色牌面上的字（ADR-0018 §7.3）。与主题无关 —— 牌面永远是纸。 */
+    public static final int CARD_INK = 0xFF241E1A;
 
     // ---------------------------------------------------------------- 卡面
 

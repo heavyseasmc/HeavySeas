@@ -240,7 +240,11 @@ def checkNotificationSidebarIntegration = tasks.register('checkNotificationSideb
         if (!screen.contains('reserveNotificationSidebar(client == null ? width : client.getWindow().getScaledWidth());')) {
             problems << 'GameScreen.init 没有在子类创建控件前预留侧栏'
         }
-        if (!screen.contains('context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(),')) {
+        // 「整窗压暗」自 ADR-0037 起归 GuiMaterial.dimWorld：铺底要调它，而它铺的必须是整个窗口 ——
+        // 材质板只铺在收窄后的舞台上，侧栏那一侧靠的就是这一层，少了它侧栏下半截会露出比左边亮的世界。
+        def material = file('src/client/java/io/github/heavyseasmc/mod/client/GuiMaterial.java').getText('UTF-8')
+        if (!screen.contains('GuiMaterial.dimWorld(context);')
+                || !material.contains('context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(),')) {
             problems << 'GameScreen 主内容收窄后，公共底色没有继续覆盖完整窗口'
         }
 

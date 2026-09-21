@@ -153,6 +153,11 @@ public final class CardTexture extends AbstractTexture {
         return Identifier.of(HeavySeasMod.MOD_ID, PROVISION_DIR + "/" + cardId + ".png");
     }
 
+    /** 别的 GUI 贴图（材质）也按牌面这一套载入：多级纹理 + 线性过滤，缩放才平滑。 */
+    static Identifier smooth(Identifier id) {
+        return ensure(id);
+    }
+
     private static Identifier ensure(Identifier id) {
         if (REGISTERED.add(id)) {
             // 同一标识若已被默认方式载过一份，注册会把那一份换下并释放。

@@ -169,7 +169,7 @@ public final class RowScreen extends GameScreen {
         drawCountdown(context, now, view.actionDeadlineMs(), view.actionWindowMs(),
                 l.barX(), l.barY(), l.barW(), l.countdownY());
         drawLine(context, Text.translatable("heavyseas.row.timeout_hint"),
-                width / 2, l.timeoutY(), GuiLanguage.DIM);
+                width / 2, l.timeoutY(), GuiLanguage.dim());
         drawIdentity(context, view, l.identityY());
     }
 
@@ -261,7 +261,7 @@ public final class RowScreen extends GameScreen {
         for (int b = 0; b < BUTTONS.length; b++) {
             boolean focused = b == buttonFocus;
             buttonLift[b] = GuiLanguage.approach(buttonLift[b], focused ? GuiLanguage.LIFT_PX : 0f, dt);
-            drawButton(context, l.buttons().get(b), Text.translatable(BUTTONS[b]), focused, GuiLanguage.INK,
+            drawButton(context, l.buttons().get(b), Text.translatable(BUTTONS[b]), focused, GuiLanguage.ink(),
                     buttonLift[b]);
         }
     }
@@ -269,10 +269,10 @@ public final class RowScreen extends GameScreen {
     /** 说明只跟高亮走：那张牌的完整内容；一行放得下时，第二行说键位。 */
     private void drawHint(DrawContext context, Layout l) {
         int lineH = textH() + 1;
-        int lines = drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats()), l.hintY(), 2, GuiLanguage.INK);
+        int lines = drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats()), l.hintY(), 2, GuiLanguage.ink());
         if (lines < 2) {
             drawLine(context, Text.translatable("heavyseas.row.keys"),
-                    width / 2, l.hintY() + lineH, GuiLanguage.MUTED);
+                    width / 2, l.hintY() + lineH, GuiLanguage.muted());
         }
     }
 

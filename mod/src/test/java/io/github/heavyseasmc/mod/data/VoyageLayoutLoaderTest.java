@@ -42,7 +42,7 @@ final class VoyageLayoutLoaderTest {
         assertEquals(180f, layout.boat().yaw());
         assertEquals(2.0, layout.boat().seatSpacing());
         assertEquals(Identifier.of("heavyseas", "boat_hull"), layout.hull().orElseThrow().structure());
-        assertEquals(new Vec3i(2, 2, 15), layout.hull().orElseThrow().anchor());
+        assertEquals(new Vec3i(5, 2, 22), layout.hull().orElseThrow().anchor());
         assertEquals(VoyageLayout.Restore.WATER, layout.hull().orElseThrow().restore());
         assertEquals(0f, layout.arrival().bearing());
         assertEquals(88, layout.arrival().slideFrom());

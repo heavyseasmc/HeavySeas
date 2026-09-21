@@ -65,6 +65,13 @@ public final class HeavySeasClient implements ClientModInitializer {
      */
     private static KeyBinding actKey;
 
+    private static KeyBinding themeKey;
+
+    /** 换界面主题的键。界面开着时 {@link GameScreen} 用它认按键。 */
+    public static KeyBinding themeKey() {
+        return themeKey;
+    }
+
     /**
      * 轮到你了、但行动一面还没弹出来。
      *
@@ -122,6 +129,16 @@ public final class HeavySeasClient implements ClientModInitializer {
                 "key.heavyseas.act", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G,
                 "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollTurn);
+        // 界面主题（ADR-0037）：浅色海图桌 / 深色船舱木作。没开界面时由这里接；开着界面时按键不走按键绑定，由 GameScreen 接。
+        ClientPrefs.load();
+        themeKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.theme", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F8,
+                "key.categories.heavyseas"));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (themeKey.wasPressed()) {
+                ClientPrefs.toggleTheme();
+            }
+        });
 
         // 进服就把卡面载好：补给箱第一次打开时现场载，「发」的动画会在那一帧卡掉一截。
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->

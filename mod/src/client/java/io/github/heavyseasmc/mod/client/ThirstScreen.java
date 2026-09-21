@@ -123,16 +123,16 @@ public final class ThirstScreen extends GameScreen {
         HudView.Thirst prompt = view.thirstPrompt();
         int hurt = Math.max(0, remaining - (prompt.donated() + chosen) / waterPerSource);
         drawLine(context, Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
-                GuiLanguage.INK);
+                GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.thirst.detail", prompt.sources(), prompt.covered(),
                         prompt.shared(), prompt.donated()),
-                width / 2, l.detailY(), GuiLanguage.MUTED);
+                width / 2, l.detailY(), GuiLanguage.muted());
         drawLine(context, chosen == 0
                         ? Text.translatable("heavyseas.thirst.none")
                         : Text.translatable("heavyseas.thirst.drink", chosen, hurt),
-                width / 2, l.hintY(), hurt > 0 ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
+                width / 2, l.hintY(), hurt > 0 ? GuiLanguage.cinnabar() : GuiLanguage.verdigris());
         drawLine(context, Text.translatable("heavyseas.thirst.hint"),
-                width / 2, l.keysY(), GuiLanguage.MUTED);
+                width / 2, l.keysY(), GuiLanguage.muted());
         drawIdentity(context, view, l.identityY());
     }
 

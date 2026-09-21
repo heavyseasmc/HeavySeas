@@ -34,7 +34,7 @@ final class HullRotationTest {
     @Test
     void officialLayoutNeedsNoRotation() {
         assertEquals(BlockRotation.NONE, Hull.rotationFor(180f));
-        assertEquals(new BlockPos(2, 2, 15), Hull.rotate(new Vec3i(2, 2, 15), BlockRotation.NONE));
+        assertEquals(new BlockPos(5, 2, 22), Hull.rotate(new Vec3i(5, 2, 22), BlockRotation.NONE));
     }
 
     @Test

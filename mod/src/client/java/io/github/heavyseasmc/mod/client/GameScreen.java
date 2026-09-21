@@ -60,8 +60,11 @@ public abstract class GameScreen extends Screen {
     protected static final int BAR_TO_TEXT = 3;
     /** 秒数到下面第一行说明。 */
     protected static final int HINT_GAP = 5;
-    /** 倒计时那条细横杠有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。 */
-    protected static final int BAR_H = 3;
+    /**
+     * 倒计时有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。
+     * 它现在是一件材质（比例尺 / 液位管，ADR-0037），高度由材质定 —— 各面的版面照旧只引用这一个数。
+     */
+    protected static final int BAR_H = GuiMaterial.GAUGE_H;
     /** 座位轨：一行字，下面一条线。行动一面与补给箱都画它。 */
     protected static final int RAIL_H = 12;
 
@@ -150,7 +153,7 @@ public abstract class GameScreen extends Screen {
                 ? Text.literal("—")
                 : Text.translatable("heavyseas.character." + view.sea().helmsman());
         drawLine(context, Text.translatable("heavyseas.hud.sea", rowStack, helm),
-                width / 2, y, GuiLanguage.MUTED);
+                width / 2, y, GuiLanguage.muted());
     }
 
     /**
@@ -181,23 +184,30 @@ public abstract class GameScreen extends Screen {
         return dt;
     }
 
+    /** 界面开着时按键不经按键绑定的轮询，所以换主题在这里接一次；各面的 keyPressed 最后都会落到 super。 */
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (HeavySeasClient.themeKey() != null && HeavySeasClient.themeKey().matchesKey(keyCode, scanCode)) {
+            ClientPrefs.toggleTheme();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
     @Override
     public boolean shouldPause() {
         return false;                  // 多人游戏里暂停毫无意义：别人还在等你，服务端的计时也不会停
     }
 
-    /** 模糊背景加同一层底色（ADR-0018 §7.3：GUI 与牌面必须是同一个世界）。 */
+    /**
+     * 铺底：压暗的世界上放一张材质板（ADR-0037）。取代原先的「模糊背景 + 半透明黑」——
+     * 那一套正是界面读起来像深色模式应用的原因。板是不透明的，聊天从底下透上来的问题由它自然兜住
+     * （原先靠把黑加到 0xE4）。板只铺在舞台上：{@code width} 已为侧栏收窄，侧栏自己有一块标签作底。
+     */
     protected void renderBackdrop(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Screen.renderBackground 会读取字段 width 来铺暗纹。主内容的 width 已为侧栏收窄，
-        // 这里只在背景调用期间还原完整宽度，否则侧栏下半截会直接露出比左边亮的世界画面。
-        int contentWidth = width;
-        width = context.getScaledWindowWidth();
-        try {
-            renderBackground(context, mouseX, mouseY, delta);
-        } finally {
-            width = contentWidth;
-        }
-        context.fill(0, 0, context.getScaledWindowWidth(), context.getScaledWindowHeight(), GuiLanguage.BACKDROP);
+        GuiMaterial.dimWorld(context);
+        int m = GuiMaterial.SHEET_MARGIN;
+        GuiMaterial.sheet(context, m, m, width - 2 * m, height - 2 * m);
     }
 
     /**
@@ -271,7 +281,7 @@ public abstract class GameScreen extends Screen {
      * —— 画在矩阵外面的那一版，发牌那 300ms 里框停在落点、卡还在下面往上走（2026-09-15 真实客户端上看到的）。
      */
     protected static void drawCardFrame(DrawContext context, int w, int h) {
-        context.drawBorder(-CARD_FRAME, -CARD_FRAME, w + 2 * CARD_FRAME, h + 2 * CARD_FRAME, GuiLanguage.GOLD);
+        context.drawBorder(-CARD_FRAME, -CARD_FRAME, w + 2 * CARD_FRAME, h + 2 * CARD_FRAME, GuiLanguage.gold());
     }
 
     /** 身份那一行画在哪：贴底，留出屏幕高的 5%（至少 8 单位）。 */
@@ -302,11 +312,9 @@ public abstract class GameScreen extends Screen {
         long total = Math.max(1L, totalMs);
         float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
         boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
-        context.fill(barX, barY, barX + barW, barY + BAR_H, GuiLanguage.GROUND);
-        context.fill(barX, barY, barX + Math.round(barW * frac), barY + BAR_H,
-                urgent ? GuiLanguage.CINNABAR : GuiLanguage.VERDIGRIS);
+        GuiMaterial.gauge(context, barX, barY, barW, frac, urgent);
         drawLine(context, Text.literal(String.format("%.1fs", left / 1000f)),
-                width / 2, textY, urgent ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
+                width / 2, textY, urgent ? GuiLanguage.cinnabar() : GuiLanguage.muted());
     }
 
     /** 倒计时跟舞台一样宽：它是「这一排牌」的时间，不是屏幕上的装饰线。至少 160，绝不出屏。 */
@@ -421,7 +429,7 @@ public abstract class GameScreen extends Screen {
 
     /** 一个按钮：底 · 金框（选中 =「你选的那个」）· 居中的字。与行动一面同一个样子。 */
     protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color, float lift) {
-        drawButton(context, b, label, focused, color, GuiLanguage.GROUND, -lift, 1f);
+        drawButton(context, b, label, focused, color, GuiLanguage.ground(), -lift, 1f);
     }
 
     /**
@@ -437,10 +445,16 @@ public abstract class GameScreen extends Screen {
         context.getMatrices().translate(b.x() + b.w() / 2f, b.y() + b.h() + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-b.w() / 2f, -b.h(), 0);
-        context.fill(0, 0, b.w(), b.h(), fill);
+        // 按钮是一块标签（纸签 / 搪瓷牌）；按不动的连底一起淡下去（fill 的不透明度就是那个「淡」）。
+        float alpha = (fill >>> 24) / 255f;
+        context.setShaderColor(1f, 1f, 1f, alpha);
+        GuiMaterial.tag(context, 0, 0, b.w(), b.h());
+        context.setShaderColor(1f, 1f, 1f, 1f);
+        color = GuiLanguage.onTag(color);
         if (focused) {
             // 金 =「你 · 你选的那个」。按钮的框是 1 像素，卡的框是 2 像素（CARD_FRAME）—— 两种元素，各只此一处。
-            context.drawBorder(-1, -1, b.w() + 2, b.h() + 2, GuiLanguage.GOLD);
+            context.drawBorder(-1, -1, b.w() + 2, b.h() + 2, GuiLanguage.gold());
+            context.drawBorder(-2, -2, b.w() + 4, b.h() + 4, GuiLanguage.gold());
         }
         drawLine(context, label, b.w() / 2,
                 (b.h() - textH()) / 2 + 1, color);
@@ -452,9 +466,81 @@ public abstract class GameScreen extends Screen {
     /** 版面常量当初是按「一行字 9 个单位」定的；字的实际行高随界面尺寸变，凡含一行字的高度都要补上这个差。 */
     private static final int BASE_TEXT_H = 9;
 
-    /** 座位轨多高：{@link #RAIL_H} 补上实际行高与 9 的差。 */
-    protected static int railH() {
-        return RAIL_H + textH() - BASE_TEXT_H;
+    /** 座位轨多高：头像那一块，加 {@link #RAIL_H} 补上实际行高与 9 的差。 */
+    protected int railH() {
+        return avatarBlockH() + RAIL_H + textH() - BASE_TEXT_H;
+    }
+
+    // ------------------------------------------------------------------ 座位：头像 · 名字 · 一道线（ADR-0037）
+
+    /** 头像最小、最大画多少<b>物理像素</b>，以及取窗口高的几分之一。上限按像素写：GUI 单位随界面尺寸差出好几倍。 */
+    private static final double AVATAR_MIN_PX = 36;
+    private static final double AVATAR_MAX_PX = 72;
+    private static final double AVATAR_WINDOW_RATIO = 1 / 12.0;
+    /** 头像最小画几个 GUI 单位：再小就只剩一团色，不如不画圈。 */
+    private static final int AVATAR_FLOOR = 8;
+    /** 还没轮到的人，头像淡到多少。 */
+    protected static final float SEAT_FADED = 0.5f;
+
+    /**
+     * 这一帧留给座位轨多少高（GUI 单位）。默认不限：只有把轨夹在别的东西中间的那些面才需要设。
+     *
+     * <p>❗行动一面就是这么被挤坏的：按钮那一片排在轨与倒计时之间，轨一变高（换成头像之后高出约 28 个单位），
+     * 按钮就从下面顶出去、盖在说明那一行上 —— 三档窗口、两个主题全中。版面里能缩的是头像，不是按钮。
+     */
+    private int railRoom = Integer.MAX_VALUE;
+
+    /** 这一面的座位轨最多占多高。每帧设一次：窗口与界面尺寸随时会变。 */
+    protected void capRail(int room) {
+        railRoom = room;
+    }
+
+    /** 座位上的头像画多大，GUI 单位。先按窗口高取，再按 {@link #capRail} 留下的高度缩。 */
+    protected int avatarSize() {
+        var window = net.minecraft.client.MinecraftClient.getInstance().getWindow();
+        double scale = Math.max(1.0, window.getScaleFactor());
+        double px = Math.max(AVATAR_MIN_PX, Math.min(AVATAR_MAX_PX, window.getHeight() * AVATAR_WINDOW_RATIO));
+        int d = Math.max(AVATAR_FLOOR, (int) Math.round(px / scale));
+        int budget = railRoom - RAIL_H - (textH() - BASE_TEXT_H);   // 名字与那条线之外，留给头像连圈的
+        while (d > AVATAR_FLOOR && blockOf(d) > budget) {
+            d--;
+        }
+        // 连最小的一枚都放不下：这一面这一帧不画头像，退回只有名字与一条线的那条轨（这一刀之前的样子）。
+        // 缩到看不清还硬画，不如不画 —— 而把下面的东西挤掉是绝不允许的。
+        return blockOf(d) <= budget ? d : 0;
+    }
+
+    /** 头像连圈占多高，外加到名字的 1 个单位；这一面不画头像时是 0。 */
+    protected int avatarBlockH() {
+        return blockOf(avatarSize());
+    }
+
+    private static int blockOf(int diameter) {
+        return diameter <= 0 ? 0 : diameter + 2 * GuiMaterial.ringMargin(diameter) + 1;
+    }
+
+    /**
+     * 座位轨上的一格：头像、名字、名字底下一道线。三面的座位轨（补给箱 · 行动 · 终局）都画它 ——
+     * 各面只决定「这一格现在是什么状态」，长什么样只此一处。
+     *
+     * @param mark      头像圈上的语义色（金 = 你 · 铜绿 = 正轮到），{@code 0} 不着色
+     * @param faded     还没轮到：头像淡下去
+     * @param lineColor 名字底下那道线
+     * @return 名字那一行的 y —— 终局那一面还要在线下面再写一行
+     */
+    protected int drawSeat(DrawContext context, String characterId, int x, int y, int cell,
+                           int mark, boolean faded, int nameColor, int lineColor) {
+        int full = avatarSize();
+        if (full > 0) {
+            int m = GuiMaterial.ringMargin(full);
+            int d = Math.max(1, Math.min(full, cell - 2 * m - 2));   // 格子比头像还窄（界面尺寸 1、八个人）就跟着格子缩，绝不压到邻座
+            GuiMaterial.avatar(context, characterId, x + (cell - d) / 2, y + m + (full - d) / 2, d, mark,
+                    faded ? SEAT_FADED : 1f);
+        }
+        int nameY = y + avatarBlockH();
+        drawLineIn(context, nameOf(characterId), x + 2, nameY, cell - 4, nameColor);
+        context.fill(x + 2, nameY + textH() + 1, x + cell - 2, nameY + textH() + 2, lineColor);
+        return nameY;
     }
 
     /** 上带多高：{@link #TOP_BAND_H} 补上实际行高与 9 的差。 */
@@ -515,6 +601,96 @@ public abstract class GameScreen extends Screen {
         drawLineLeft(context, Text.literal(text), x, y, color);
     }
 
+    // ------------------------------------------------------------------ 按键提示：键帽 + 一句话（ADR-0037）
+
+    /** 一条按键提示：几枚键帽，后面跟一句话。{@code keys} 为空就只是一句话 —— 它与带键帽的提示排在同一行里。 */
+    protected record KeyHint(List<String> keys, Text label) {
+    }
+
+    /** 同一条提示里相邻两枚键帽之间、键帽与那句话之间。 */
+    private static final int KEY_GAP = 2;
+    private static final int KEY_TO_LABEL = 4;
+    /** 相邻两条提示之间。 */
+    private static final int HINT_SPACING = 12;
+
+    /** 一枚键帽多高：一行字加键帽自己的边与底下那道厚边。按键提示那一行就这么高。 */
+    protected static int keyHintRowH() {
+        return textH() + GuiMaterial.KEY_PAD_TOP + GuiMaterial.KEY_PAD_BOTTOM;
+    }
+
+    private static int keycapW(String key) {
+        // 单个字符的键帽至少是方的：「←」比「Enter」窄得多，照字宽画出来是一根竖条。
+        return Math.max(keyHintRowH(), textW(key) + 2 * GuiMaterial.KEY_PAD_X);
+    }
+
+    private int keyHintW(KeyHint hint) {
+        int w = 0;
+        for (String key : hint.keys()) {
+            w += keycapW(key) + KEY_GAP;
+        }
+        if (!hint.keys().isEmpty()) {
+            w += KEY_TO_LABEL - KEY_GAP;
+        }
+        return Math.min(width - 2 * SIDE, w + textW(hint.label()));
+    }
+
+    /** 这几条提示排成几行：一行放不下就在两条提示之间折行，一条提示绝不拆开。 */
+    private List<List<KeyHint>> flowKeyHints(List<KeyHint> hints) {
+        int avail = width - 2 * SIDE;
+        List<List<KeyHint>> rows = new ArrayList<>();
+        List<KeyHint> row = new ArrayList<>();
+        int used = 0;
+        for (KeyHint hint : hints) {
+            int w = keyHintW(hint);
+            if (!row.isEmpty() && used + HINT_SPACING + w > avail) {
+                rows.add(row);
+                row = new ArrayList<>();
+                used = 0;
+            }
+            used += (row.isEmpty() ? 0 : HINT_SPACING) + w;
+            row.add(hint);
+        }
+        if (!row.isEmpty()) {
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    /** 这几条提示总共占多高。版面要先问它 —— 窄窗口下会折成两行。 */
+    protected int keyHintsH(List<KeyHint> hints) {
+        int rows = flowKeyHints(hints).size();
+        return rows * keyHintRowH() + Math.max(0, rows - 1) * KEY_GAP;
+    }
+
+    /** 在舞台宽里居中画一排按键提示；放不下就折行，单条太长就缩字号（归 {@link GuiText}），绝不出舞台。 */
+    protected void drawKeyHints(DrawContext context, List<KeyHint> hints, int y, int color) {
+        int rowH = keyHintRowH();
+        for (List<KeyHint> row : flowKeyHints(hints)) {
+            int total = -HINT_SPACING;
+            for (KeyHint hint : row) {
+                total += keyHintW(hint) + HINT_SPACING;
+            }
+            int x = (width - total) / 2;
+            for (KeyHint hint : row) {
+                int end = x + keyHintW(hint);
+                for (String key : hint.keys()) {
+                    int w = keycapW(key);
+                    GuiMaterial.keycap(context, x, y, w, rowH);
+                    GuiText.line(context, Text.literal(key), x + 1, y + GuiMaterial.KEY_PAD_TOP, w - 2, GuiText.BODY, false,
+                            GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.CENTER);
+                    x += w + KEY_GAP;
+                }
+                if (!hint.keys().isEmpty()) {
+                    x += KEY_TO_LABEL - KEY_GAP;
+                }
+                GuiText.line(context, hint.label(), x, y + GuiMaterial.KEY_PAD_TOP, Math.max(1, end - x), GuiText.BODY, false,
+                        color, GuiText.Align.LEFT);
+                x = end + HINT_SPACING;
+            }
+            y += rowH + KEY_GAP;
+        }
+    }
+
     /** 把一个 ARGB 色换成另一个不透明度。按不动的东西靠它淡下去，不另起颜色：语义色只有三个。 */
     protected static int withAlpha(int argb, int alpha) {
         return (alpha << 24) | (argb & 0xFFFFFF);
@@ -540,7 +716,7 @@ public abstract class GameScreen extends Screen {
     protected void drawPublicBand(DrawContext context, HudView view, int y) {
         drawLine(context, Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
                         view.gulls(), GameState.GULLS_TO_LAND),
-                width / 2, y, GuiLanguage.MUTED);
+                width / 2, y, GuiLanguage.muted());
         // 海鸥画成格子而不是数字：够不够 4 只是一眼的事，不该让人去读。
         int pip = 7;
         int gap = 4;
@@ -549,7 +725,7 @@ public abstract class GameScreen extends Screen {
         for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
             int left = x + i * (pip + gap);
             context.fill(left, y + textH() + 3, left + pip, y + textH() + 3 + pip,
-                    i < view.gulls() ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
+                    i < view.gulls() ? GuiLanguage.verdigris() : GuiLanguage.ground());
         }
     }
 
@@ -569,13 +745,13 @@ public abstract class GameScreen extends Screen {
         int wWho = textW(who) + gap;
         int wSep = textW(sep) + gap;
         int x = (width - (wWho + wSep + textW(vitals))) / 2;
-        drawLineLeft(context, who, x, y, GuiLanguage.GOLD);
-        drawLineLeft(context, sep, x + wWho, y, GuiLanguage.DIM);
+        drawLineLeft(context, who, x, y, GuiLanguage.gold());
+        drawLineLeft(context, sep, x + wWho, y, GuiLanguage.dim());
         // 体力见底或者已经昏迷才用朱砂 —— 它只给紧迫与伤害，
         // 当强调色用的话，真紧迫那一刻就喊不动了。
         drawLineLeft(context, vitals, x + wWho + wSep, y,
                 view.health() <= 1 || view.condition() != Condition.CONSCIOUS
-                        ? GuiLanguage.CINNABAR : GuiLanguage.MUTED);
+                        ? GuiLanguage.cinnabar() : GuiLanguage.muted());
     }
 
     /**

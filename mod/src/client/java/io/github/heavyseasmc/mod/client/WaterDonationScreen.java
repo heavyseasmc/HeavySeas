@@ -68,9 +68,9 @@ public final class WaterDonationScreen extends GameScreen {
         int fh = textH();
         int titleY = SEA_LINE_Y + fh + HINT_GAP + 8;
         drawLine(context, Text.translatable("heavyseas.donate.title", nameOf(prompt.who())),
-                width / 2, titleY, GuiLanguage.INK);
+                width / 2, titleY, GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.donate.detail", still, prompt.donated(), available),
-                width / 2, titleY + fh + 3, GuiLanguage.MUTED);
+                width / 2, titleY + fh + 3, GuiLanguage.muted());
 
         // 舞台：一张水。上面留出「抬」的高度，下面留出横杠 · 秒数 · 按钮（连它的抬）· 一行说明。
         int identityY = identityY();
@@ -87,7 +87,7 @@ public final class WaterDonationScreen extends GameScreen {
         CardTexture.drawProvision(context, Session.WATER, cardX, drawY, cardW, cardH);
         if (!awaiting) {
             context.drawBorder(cardX - CARD_FRAME, drawY - CARD_FRAME, cardW + 2 * CARD_FRAME, cardH + 2 * CARD_FRAME,
-                    GuiLanguage.GOLD);
+                    GuiLanguage.gold());
         }
 
         int barY = cardY + cardH + BELOW_CARDS;
@@ -99,9 +99,9 @@ public final class WaterDonationScreen extends GameScreen {
         int buttonY = barY + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + buttonLiftRoom();
         button = layoutButtonRow(List.of(label), buttonY, BTN_GAP).getFirst();
         buttonLift = GuiLanguage.approach(buttonLift, awaiting ? 0f : GuiLanguage.LIFT_PX, dt);
-        drawButton(context, button, label, !awaiting, GuiLanguage.VERDIGRIS, buttonLift);
+        drawButton(context, button, label, !awaiting, GuiLanguage.verdigris(), buttonLift);
         drawLine(context, Text.translatable("heavyseas.donate.hint"),
-                width / 2, buttonY + button.h() + BTN_GAP, GuiLanguage.MUTED);
+                width / 2, buttonY + button.h() + BTN_GAP, GuiLanguage.muted());
         drawIdentity(context, view, identityY);
     }
 
