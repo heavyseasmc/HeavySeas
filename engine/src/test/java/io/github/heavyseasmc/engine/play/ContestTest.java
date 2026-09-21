@@ -405,6 +405,21 @@ class ContestTest {
             assertEquals(1, damage(lost, CAPTAIN), "反对方赢，绝境不生效");
             assertEquals(List.of("ration"), lost.table().provisionDiscard(), "失败照样弃牌");
         }
+
+        @Test
+        @DisplayName("播报用的回血人数是战斗结算之后数的：开局没人受伤，败方挨的那一点也算（ADR-0032 #5）")
+        void healedCountIsTakenAfterTheFight() {
+            Session s = rationGame();                                // 只有一具尸体，清醒的人一个都没受伤
+            assertEquals(0, damage(s, CAPTAIN));
+            s.beginRation(MATE, "ration");
+            s.consent(true);                                         // 船长反对（座位序里第一个被问到的）
+            s.closeStances();
+            assertTrue(s.resolveContest().attackerGetsWhatTheyWanted(), "8 对 7，打牌方赢");
+
+            assertEquals(0, damage(s, CAPTAIN), "败方那一点伤害被绝境治回来了");
+            assertEquals(1, s.lastRationHealed(),
+                    "引擎实际治了 1 人 —— 战斗前采样会得 0，全船看到「0 人回了血」");
+        }
     }
 
     // ------------------------------------------------------------------ 进行中

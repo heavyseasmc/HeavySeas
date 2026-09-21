@@ -8,6 +8,7 @@ import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
+import io.github.heavyseasmc.engine.weather.WeatherEffect;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.data.SceneDataLoader;
@@ -419,9 +420,20 @@ public final class SeasCommand {
         });
     }
 
+    /** 今天有没有航海阶段。按**效果**判、不按天候 id：数据包可以给任何 id 配这个效果（ADR-0032 #2 · #3）。 */
+    static boolean skipsNavigation(Optional<WeatherCard> weather) {
+        return weather.map(WeatherCard::effect).filter(e -> e == WeatherEffect.SKIP_NAVIGATION).isPresent();
+    }
+
     private static int row(CommandContext<ServerCommandSource> context, int selected) {
         return act(context, "ROW", (world, component, actor) -> {
             Session session = component.requireSession();
+            // ❗无风日没有航海阶段，引擎的 beginRow 会抛。指令路径以前直接把它抛给 guarded，于是日志里是一句「/seas 出错」+ 堆栈，
+            //   与真的有 bug 长得一样 —— 出口验收随天候抽签时红时绿（2026-09-20 实拍）。先给一句人话，与界面路径同一条规矩。
+            if (skipsNavigation(session.currentWeather())) {
+                context.getSource().sendError(Text.translatable("heavyseas.action.row_becalmed_hint"));
+                return false;
+            }
             // 一次走完两步：指令没有「想一想」这回事。底下与划船一面是同一份规则（Session#row 就是那两步）。
             List<NavigationCard> drawn = ActionPhase.rowChoosing(session, actor, selected);
             context.getSource().sendFeedback(

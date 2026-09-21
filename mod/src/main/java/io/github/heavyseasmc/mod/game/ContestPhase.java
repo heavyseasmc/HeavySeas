@@ -101,6 +101,17 @@ public final class ContestPhase {
         after(world, component, actor);
     }
 
+    /**
+     * 表态那一句播报用的 lang 键。绝境不是「同意被换座位 / 被抢」，是「不反对你吃」—— 文案借了另一件事的前提
+     * 会在日志里长得一模一样，只有人看得出来（ADR-0032 #6）。抽成函数是为了能单测，不必起世界。
+     */
+    static String responseKey(Contest.Kind kind, boolean fight) {
+        if (kind == Contest.Kind.RATION) {
+            return fight ? "heavyseas.contest.ration_objected" : "heavyseas.contest.ration_passed";
+        }
+        return fight ? "heavyseas.contest.refused" : "heavyseas.contest.agreed";
+    }
+
     /** 被指定的人表态。{@code fight = false} 是同意（超时也走这一条）。 */
     public static void consent(ServerWorld world, GameComponent component, boolean fight) {
         Session session = component.requireSession();
@@ -109,10 +120,7 @@ public final class ContestPhase {
         CharacterId target = contest.target();
         session.consent(fight);
         LOGGER.info("表态：{} {}", target.value(), fight ? "战斗" : "同意");
-        String responseKey = contest.kind() == Contest.Kind.RATION
-                ? (fight ? "heavyseas.contest.ration_objected" : "heavyseas.contest.ration_passed")
-                : (fight ? "heavyseas.contest.refused" : "heavyseas.contest.agreed");
-        GameFlow.broadcast(world, Text.translatable(responseKey,
+        GameFlow.broadcast(world, Text.translatable(responseKey(contest.kind(), fight),
                 GameFlow.characterName(target)).formatted(fight ? Formatting.RED : Formatting.GRAY));
         if (!fight && contest.kind() == Contest.Kind.RATION && session.contest().isEmpty()) {
             announceRationed(world, attacker, session.lastRationHealed());
