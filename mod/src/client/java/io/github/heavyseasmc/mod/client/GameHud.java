@@ -172,7 +172,8 @@ public final class GameHud {
 
     /** GameScreen 与实际绘制共用这一份几何；两边各算一遍仍会得到完全相同的边界。 */
     static NotificationSidebarLayout sidebarLayout(int screenWidth, HudView view) {
-        boolean visible = view.active() && (!view.notifications().isEmpty() || !view.weather().isEmpty());
+        boolean visible = view.active() && (!view.notifications().isEmpty() || !view.weather().isEmpty())
+                && !(MinecraftClient.getInstance().currentScreen instanceof GameScreen);
         return NotificationSidebarLayout.of(screenWidth, visible);
     }
 

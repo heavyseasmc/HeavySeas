@@ -4,6 +4,7 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.game.ProvisionPhase;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
+import io.github.heavyseasmc.mod.state.HudView;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
@@ -40,11 +41,6 @@ import java.util.List;
  * ADR-0018 §7.2：同一动词在不同界面用不同时长，就又变回十种游戏了。
  */
 public final class ProvisionScreen extends GameScreen {
-
-    /** 整面上下的留白（座位轨到顶、卡到底）。 */
-    private static final int MARGIN = 6;
-    /** 说明两行之间。 */
-    private static final int LINE_GAP = 3;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -126,9 +122,8 @@ public final class ProvisionScreen extends GameScreen {
         return false;                 // 选牌不能逃 —— 逃了也只是超时替你选
     }
 
-    /** 一帧的版面，全部以 GUI 单位计。 */
-    private record Layout(int w, int h, int left, int railY, int railLeft, int railCell, int cardsTop,
-                          int barY, int barX, int barW, int countdownY, int hintY, int keepY) {
+    /** 一帧的版面，全部以 GUI 单位计。带位归 {@link Bands}，这里只排舞台那一格里的东西。 */
+    private record Layout(int w, int h, int left, int cardsTop, int rowW) {
 
         int cardX(int i) {
             return left + i * (w + CARD_GAP);
@@ -136,45 +131,47 @@ public final class ProvisionScreen extends GameScreen {
     }
 
     /**
-     * 这一帧的版面。
+     * 这一帧舞台里的版面。
      *
      * <p>每帧、每次点击都按当前的 {@code width}/{@code height} 重算，不缓存：
      * 窗口随时会被拖大拖小，界面尺寸也随时会在设置里改，缓存下来的版面会跟画面对不上。
      */
-    private Layout layout() {
+    private Layout layout(Bands b) {
         int n = Math.max(1, data.offer().size());
-        int text = textH();
-        // 牌名与提示两行是 GuiText 的字：行高要问它（界面尺寸小的时候有字号地板，一行比 9 个单位高）。
-        int nameH = GuiText.lineHeight(GuiText.NAME, true);
-        int keepH = keyHintsH(hints());
-        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + text + HINT_GAP + nameH + LINE_GAP + keepH;
+        // ❗牌名不再单占一行：第三刀之后它印在牌上（CardTexture 实时排字）。
+        // 同一个名字在屏幕上出现两次是这一刀带出来的重复，省下的高度全还给牌 —— 用户 2026-09-22：「卡牌太小」。
+        // 舞台整格都给牌：键位排到倒计时那一条带的两头，规矩那一句拿掉了
+        // （用户 2026-09-22：「GUI 文字不是用来教玩家怎么玩游戏的」—— 箱子怎么传，动效已经演出来了）。
+        int bottom = b.stageBottom();
+        int avail = bottom - b.stageTop();
         // 卡顶要留多少空，取决于卡有多高（「顿」放大 7%，绕底边，长出来的那一截全在上面）；
         // 而卡有多高又取决于留了多少空。先按一个偏大的 h 算出空，再据此定 h ——
         // 空只会偏大一点点，卡因此略小一点点，绝不会反过来压上座位轨。
-        int room = snapRoom(cardHeightWithin(n, railH() + snapRoom(0) + below));
-        int fixed = railH() + room + below;
-        int h = cardHeightWithin(n, fixed);
+        int room = snapRoom(cardHeightFor(n, avail - snapRoom(0)));
+        int h = cardHeightFor(n, avail - room);
         int w = GuiLanguage.cardWidth(h);
-
-        int railY = Math.max(MARGIN, (height - fixed - h) / 2);
-        int cardsTop = railY + railH() + room;
-        int barY = cardsTop + h + BELOW_CARDS;
-        int countdownY = barY + BAR_H + BAR_TO_TEXT;
-        int hintY = countdownY + text + HINT_GAP;
+        int cardsTop = cardsTopIn(b.stageTop(), bottom, h, room);
         int rowW = cardRowWidth(n, w);
-        int barW = countdownWidth(rowW);
-        // 座位轨按「整条链都在」时的牌距排：船头那一位看到的正是整条链的牌，每一格压在一张牌上方。
-        // ❗不跟着这一次的张数走 —— 箱子往后传、牌越来越少，轨却始终是整条链，不能一格一格地缩。
-        // 原先写死每格最宽 96：界面尺寸设成 1 或 2 时，轨缩在屏幕中间一截，牌却铺满全宽（真实客户端上看到的）。
-        int seats = Math.max(1, data.chain().size());
-        int railCell = GuiLanguage.cardWidth(cardHeightWithin(seats, fixed)) + CARD_GAP;
-        return new Layout(w, h, (width - rowW) / 2, railY, (width - seats * railCell) / 2, railCell,
-                cardsTop, barY, (width - barW) / 2, barW, countdownY, hintY, hintY + nameH + LINE_GAP);
+        return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW);
     }
 
-    /** N 张一排时卡能画多高，竖着只剩 {@code height - 2*MARGIN - fixed}。 */
-    private int cardHeightWithin(int n, int fixed) {
-        return cardHeightFor(n, height - 2 * MARGIN - fixed);
+    /** 座位轨是<b>这一条链</b>（箱子传到哪了），不是座位序 —— 所以覆写它。**公开信息**，等待要看得见（决策 ⑨）。 */
+    @Override
+    protected void drawRailBand(DrawContext context, HudView view, Bands b) {
+        List<String> chain = data == null ? List.of() : data.chain();
+        if (chain.isEmpty() || b.railH() == 0) {
+            return;
+        }
+        int cell = railCell(chain.size());
+        int left = (width - chain.size() * cell) / 2;
+        for (int i = 0; i < chain.size(); i++) {
+            boolean done = i < data.at();
+            boolean here = i == data.at();
+            // 每个名字只许占自己那一格：格子窄（界面尺寸 1、八个人）时缩字号，绝不压到邻座。
+            drawSeat(context, chain.get(i), left + i * cell, b.railY(), cell, b, here ? GuiLanguage.gold() : 0,
+                    !done && !here, here ? GuiLanguage.gold() : (done ? GuiLanguage.muted() : GuiLanguage.dim()),
+                    done ? GuiLanguage.verdigris() : GuiLanguage.ground());
+        }
     }
 
     @Override
@@ -185,10 +182,9 @@ public final class ProvisionScreen extends GameScreen {
         }
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        Layout l = layout();
+        Bands b = drawChrome(context, projection());
+        Layout l = layout(b);
         float snapP = GuiLanguage.snap(now, snapAt);
-
-        drawRail(context, l);
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         // ❗即使这一轮已经定了也要每帧调一次：它记的是上一帧指针在哪，停一帧就会漏掉一次移动。
@@ -232,10 +228,9 @@ public final class ProvisionScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, now, data.deadlineMs(),
-                Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD,
-                l.barX(), l.barY(), l.barW(), l.countdownY());
-        drawHint(context, l);
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
+        drawCountdown(context, b, now, data.deadlineMs(),
+                Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD, l.rowW());
     }
 
     /**
@@ -265,45 +260,6 @@ public final class ProvisionScreen extends GameScreen {
         }
     }
 
-    /** 座位轨：箱子传到哪了。**公开信息** —— 等待要看得见（决策 ⑨）。 */
-    private void drawRail(DrawContext context, Layout l) {
-        List<String> chain = data.chain();
-        if (chain.isEmpty()) {
-            return;
-        }
-        int y = l.railY();
-        int cell = l.railCell();
-        for (int i = 0; i < chain.size(); i++) {
-            int x = l.railLeft() + i * cell;
-            boolean done = i < data.at();
-            boolean here = i == data.at();
-            // 每个名字只许占自己那一格：格子窄（界面尺寸 1、八个人）时缩字号，绝不压到邻座。
-            drawSeat(context, chain.get(i), x, y, cell, here ? GuiLanguage.gold() : 0, !done && !here,
-                    here ? GuiLanguage.gold() : (done ? GuiLanguage.muted() : GuiLanguage.dim()),
-                    done ? GuiLanguage.verdigris() : GuiLanguage.ground());
-        }
-    }
-
-    /** 说明只跟高亮走一行 —— 每张都摊开就变成读说明书了。 */
-    private void drawHint(DrawContext context, Layout l) {
-        List<String> offer = data.offer();
-        if (highlight < 0 || highlight >= offer.size()) {
-            return;
-        }
-        Text name = Text.translatable("heavyseas.provision." + offer.get(highlight));
-        int boxW = width - 2 * SIDE;
-        GuiText.line(context, name, SIDE, l.hintY(), boxW, GuiText.NAME, true, GuiLanguage.ink(), GuiText.Align.CENTER);
-        drawKeyHints(context, hints(), l.keepY(), GuiLanguage.muted());
-    }
-
-    /** 最底下那一行：规矩一句话，后面跟着怎么按。键是写死的那几个（见 {@link #keyPressed}），所以键名也写死。 */
-    private List<KeyHint> hints() {
-        return List.of(
-                new KeyHint(List.of(), Text.translatable("heavyseas.provision.keep_one", data.offer().size())),
-                new KeyHint(List.of("←", "→"), Text.translatable("heavyseas.provision.key_switch")),
-                new KeyHint(List.of("Enter"), Text.translatable("heavyseas.provision.key_keep")));
-    }
-
     private int indexAt(int mouseX, int mouseY, Layout l) {
         return cardIndexAt(mouseX, mouseY, l.left(), l.cardsTop(), l.w(), l.h(), data.offer().size());
     }
@@ -330,7 +286,7 @@ public final class ProvisionScreen extends GameScreen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (data != null && !data.offer().isEmpty() && !decided()) {
-            int i = indexAt((int) mouseX, (int) mouseY, layout());
+            int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
                 send(i, true);
                 return true;

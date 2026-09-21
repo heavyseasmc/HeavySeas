@@ -22,22 +22,20 @@ import java.util.List;
  * 屏幕上哪儿都没有。挑完即失踪，等于告诉玩家刚才那个选择没有意义，
  * 而「留哪张」正是本作头一个真正的决策。
  *
- * <h2>布局照 ADR-0018 的空间语法：公开 → 待决 → 私有</h2>
- * <ul>
- *   <li><b>上带</b>：回合 · 阶段 · 海鸥。全船都知道的东西。</li>
- *   <li><b>中带</b>：正在看的那张，放大到看得清卡面上印的规则条；紧贴其下是身份 · 体力。</li>
- *   <li><b>下带</b>：手牌。<b>只有你</b>。</li>
- * </ul>
+ * <h2>版面就是那一套带位（ADR-0037 §7.10）</h2>
+ * 上带 · 座位轨 · 倒计时 · 身份行四条带由 {@code GameScreen} 排定，这一面只填舞台那一格：
+ * 手牌摊成一排，吃掉舞台减去底下两行（爱恨 · 键位）之后剩下的全部高度。
  *
- * <p>这一面<b>没有倒计时</b>，因为它不会超时 —— 所以舞台下方那条细横杠不出现。
- * 它不出现与它挪了位置是两回事：会超时的界面必须有，不会超时的界面必须没有。
+ * <p>这一面<b>没有倒计时</b>，因为它不会超时 —— 那一条带空着。
+ * 空着与挪了位置是两回事：会超时的界面必须画它，不会超时的界面必须不画。
  *
- * <h2>中带那张大图是放大镜</h2>
- * 下面一排小图读不出卡面上的规则条；鼠标指到哪张（或左右方向键切到哪张），中带就放大哪张。
+ * <h2>放大镜去掉了</h2>
+ * 第四刀之前这一面是「上面一张大图 + 下面一排小图」。大图当初是为了读卡面上的规则条，
+ * 而第三刀把规则条整条从牌面上拿掉了（说明改走提示签），大图于是只是同一张牌画两遍 ——
+ * 带位版面里它还把那一排挤成一条。现在只有一排，牌反而比原先那张大图还高。
  *
  * <h2>屏幕上几乎没有 UI 文字</h2>
- * 卡面自己印着名称、类别、编号、数值与规则条，这里一律不叠。大图下面原先补的那行卡名也拿掉了
- * （用户 2026-09-15 看过真实客户端：卡名图上有），那一行的位置给了身份与体力，别的位置不动。
+ * 卡面自己印着名称与编号，这里一律不叠（用户 2026-09-15 看过真实客户端：卡名图上有）。
  *
  * <h2>动效的数不写在这里</h2>
  * 「发」与「抬」的时长、距离、缓动全部取自 {@link GuiLanguage} —— ADR-0018 §7.2：
@@ -46,26 +44,6 @@ import java.util.List;
 public final class HandScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
-
-    /**
-     * 手牌那一排的高度取屏幕高的这个比例，再夹进上下限。
-     *
-     * <p>❗不写死像素：GUI Scale 4× 配 720p 时可用高度只有 180，写死 109px 的牌
-     * 会把中间那张挤到屏幕外面（负坐标，照样画，只是看不见）。
-     * 断点要在真实客户端上量（ADR-0018 §3 把这件事排除在外），但「按比例 + 夹住」
-     * 至少保证每个档位都摆得下。
-     */
-    private static final float HAND_H_RATIO = 0.26f;
-    private static final int HAND_H_MIN = 44;
-
-    /**
-     * 放大那张的高度下限。
-     *
-     * <p>❗上限不再写成 GUI 单位（原先手牌 112、大图 252）：视频设置里的界面尺寸设成 1 或 2 时，
-     * 同一个窗口里的 GUI 单位多出好几倍，写死的单位上限会让卡缩在一大片空白中间。
-     * 现在上限只有一个 —— {@link GameScreen#sharpCardHeight()}，按物理像素算清不清楚。
-     */
-    private static final int BIG_H_MIN = 64;
 
     private static final int HAND_GAP = 8;
     private HudView view = HudView.IDLE;
@@ -82,9 +60,6 @@ public final class HandScreen extends GameScreen {
 
     /** 打开过了。见 {@link #init()}。 */
     private boolean opened;
-
-    /** 大图上一次换牌的时刻；0 表示打开以来还没换过。见 {@link #select}。 */
-    private long examineSwitchedAt;
 
     public HandScreen() {
         super(Text.translatable("heavyseas.hand.title"));
@@ -165,37 +140,42 @@ public final class HandScreen extends GameScreen {
         long dt = frameDelta(now);
 
         List<String> hand = view.hand();
-        // 三带从屏幕两头往里排：上带钉在顶上，手牌钉在底下，中带吃掉剩下的。
-        int cardH = Math.min(Math.max(Math.round(height * HAND_H_RATIO), HAND_H_MIN), sharpCardHeight());
-        int cardW = GuiLanguage.cardWidth(cardH);
-        int handBottom = height - Math.max(8, Math.round(height * 0.05f));
-        int handTop = handBottom - cardH;
+        // 共有的四条带在 GameScreen 里排定（这一面没有倒计时，那一格空着 —— 空着与挪位置是两回事）。
+        Bands b = drawChrome(context, view);
 
-        drawPublicBand(context, view, TOP_BAND_Y);
-        // 大图那一带的下沿与原先一样停在手牌上方 20：那 20 里要放得下「抬」起来的牌与它的框 ——
-        // 身份那一行原先就在这 20 里，被抬起的牌压住了一半（真实客户端上看到的）。
-        // 爱恨那一行占一行字的高度：从大图那一带里让出来，不压到抬起来的手牌（ADR-0022）。
-        // 空手时也让 —— 身份那一行不能因为手上有没有牌就上下跳。
-        int affinityRoom = view.love().isEmpty() ? 0 : textH() + 4;
-        // 那「20」原是两行 9 单位的字（身份 · 键位）；字的行高随界面尺寸变，按实际行高留（界面尺寸 1 下实拍过键位行压到手牌上）。
-        int statusY = drawExamined(context, topBandH(), handTop - 2 * (textH() + 2) - affinityRoom);
-        // 爱恨：只有你看得到（全程保密，规则里也不许亮出来证明自己）。紧贴身份，键位那一行留在最靠近手牌的地方。
-        if (affinityRoom > 0) {
+        // 爱恨那一行只有你看得到（全程保密，规则里也不许亮出来证明自己）；键位那一行紧贴手牌。
+        // 两行都贴舞台底边，且<b>空手时照样让位</b> —— 牌不能因为手上有没有牌就上下跳。
+        int lines = view.love().isEmpty() ? 0 : 1;
+        int linesTop = footerTop(b, lines);
+        int lineY = linesTop;
+        if (!view.love().isEmpty()) {
             drawLine(context, Text.translatable("heavyseas.hand.affinity",
                             Text.translatable("heavyseas.character." + view.love()),
                             Text.translatable("heavyseas.character." + view.hate())),
-                    width / 2, statusY + textH() + 2, GuiLanguage.muted());
+                    width / 2, lineY, GuiLanguage.muted());
+            lineY += lineStep();
         }
-        drawIdentity(context, view, statusY);
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
-        //   与 HUD 那一行「按绑定键查看」同一条理由。
+        //   与 HUD 那一行「按绑定键查看」同一条理由。排在倒计时那一条带的右头，不占舞台。
         if (!hand.isEmpty()) {
-            drawLine(context, Text.translatable("heavyseas.hand.keys"),
-                    width / 2, statusY + (affinityRoom > 0 ? 2 : 1) * (textH() + 2), GuiLanguage.muted());
+            drawEdgeHints(context, b, List.of(keys("select", "←", "→")),
+                    List.of(keys("reveal", "Enter"), keys("play", "U")));
         }
 
+        // 手牌摊在舞台里，一排，吃掉舞台减去那两行之后剩下的全部高度。
+        int room = liftRoom();
+        int avail = linesTop - HINT_GAP - b.stageTop();
+        int cardH = cardHeightFor(Math.max(1, hand.size()), avail - room);
+        int cardW = GuiLanguage.cardWidth(cardH);
+        int handTop = cardsTopIn(b.stageTop(), linesTop - HINT_GAP, cardH, room);
+
         if (hand.isEmpty()) {
-            return;                           // 下带没东西可画，但上面三条照样在
+            // 空手也留出牌的位置：下面那两行不能因为手上没牌就跳到别处去。
+            // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按绑定键进来的人，要的是「一张都没有」。
+            boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
+            drawLine(context, Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
+                    width / 2, handTop + (cardH - textH()) / 2, GuiLanguage.dim());
+            return;
         }
 
         int step = step(hand.size(), cardW);
@@ -256,43 +236,6 @@ public final class HandScreen extends GameScreen {
             drawCardFrame(context, w, h);
         }
         context.getMatrices().pop();
-    }
-
-    /**
-     * 中带：正在看的那张，放大到读得出卡面上的规则条。
-     *
-     * @return 身份那一行画在哪 —— 紧贴大图下沿，占的是原先卡名那一行
-     */
-    private int drawExamined(DrawContext context, int top, int bottom) {
-        int room = bottom - top;
-        int text = textH();
-        int h = Math.min(Math.max(room - text - 5, BIG_H_MIN), sharpCardHeight());
-        int y = top + (room - h - text - 5) / 2;
-        int statusY = y + h + 5;
-        List<String> hand = view.hand();
-        if (hand.isEmpty()) {
-            // 空手也留出大图的位置：身份那一行不能因为手上没牌就跳到别处去。
-            // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按绑定键进来的人，要的是「一张都没有」。
-            boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
-            drawLine(context, Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
-                    width / 2, y + h / 2 - text / 2, GuiLanguage.dim());
-            return statusY;
-        }
-        int w = GuiLanguage.cardWidth(h);
-        int x = (width - w) / 2;
-        // 放大的这张不走「发」：它是「当前选中」的结果，不是新发到面前的东西。
-        // 换了一张就重新「抬」一次（见 select）：从下方升回原位、由暗转亮。
-        // 裁在自己的位子里 —— 升起的那 180ms 里不能压住下面那行身份。
-        float p = GuiLanguage.lift(System.currentTimeMillis(), examineSwitchedAt);
-        int dy = Math.round((1f - p) * GuiLanguage.LIFT_PX);
-        context.enableScissor(x, y, x + w, y + h);
-        CardTexture.drawProvision(context, hand.get(selected), x, y + dy, w, h);
-        if (p < 1f) {
-            int alpha = Math.round((1f - p) * 0x78);
-            context.fill(x, y + dy, x + w, y + dy + h, (alpha << 24) | (GuiLanguage.dimmer() & 0xFFFFFF));
-        }
-        context.disableScissor();
-        return statusY;
     }
 
     /** 叠起来时上面那张说了算，所以先问选中的那张，再从右往左问。 */
@@ -362,10 +305,7 @@ public final class HandScreen extends GameScreen {
     }
 
     private void select(int index) {
-        if (index != selected) {
-            selected = index;
-            examineSwitchedAt = System.currentTimeMillis();
-        }
+        selected = index;
     }
 
     @Override

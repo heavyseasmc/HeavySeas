@@ -59,25 +59,23 @@ public final class WaterDonationScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        drawPublicBand(context, view, TOP_BAND_Y);
-        drawSeaLine(context, view, SEA_LINE_Y);
+        // 「划船堆 N 张 · 舵手 X」这一行在这一面去掉了：替人打水与它无关（§7.10 第 3 条：字太多）。
+        Bands b = drawChrome(context, view);
 
         HudView.Thirst prompt = view.thirstPrompt();
         int still = Math.max(0, prompt.remaining() * prompt.waterPerSource() - prompt.donated());
         int available = Math.max(0, view.myWaters() - view.myDonatedWater());
-        int fh = textH();
-        int titleY = SEA_LINE_Y + fh + HINT_GAP + 8;
+        int titleY = b.stageTop();
         drawLine(context, Text.translatable("heavyseas.donate.title", nameOf(prompt.who())),
                 width / 2, titleY, GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.donate.detail", still, prompt.donated(), available),
-                width / 2, titleY + fh + 3, GuiLanguage.muted());
+                width / 2, titleY + lineStep(), GuiLanguage.muted());
 
-        // 舞台：一张水。上面留出「抬」的高度，下面留出横杠 · 秒数 · 按钮（连它的抬）· 一行说明。
-        int identityY = identityY();
-        int top = titleY + 2 * (fh + 3) + 8 + liftRoom();
-        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + buttonLiftRoom() + buttonHeight()
-                + BTN_GAP + fh;
-        int avail = identityY - HINT_GAP - top - below;
+        // 舞台里：一张水，下面是按钮与一行说明。牌上面留出「抬」的高度。
+        int bottom = b.stageBottom();
+        int top = titleY + 2 * lineStep() + liftRoom();
+        int below = buttonLiftRoom() + buttonHeight() + BTN_GAP;
+        int avail = bottom - top - below;
         int cardH = cardHeightFor(1, avail);
         int cardW = GuiLanguage.cardWidth(cardH);
         int cardY = top + Math.max(0, (avail - cardH) / 2);
@@ -90,19 +88,13 @@ public final class WaterDonationScreen extends GameScreen {
                     GuiLanguage.gold());
         }
 
-        int barY = cardY + cardH + BELOW_CARDS;
-        int barW = countdownWidth(cardW);
-        drawCountdown(context, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS,
-                (width - barW) / 2, barY, barW, barY + BAR_H + BAR_TO_TEXT);
-
         Text label = Text.translatable(awaiting ? "heavyseas.donate.sending" : "heavyseas.donate.give");
-        int buttonY = barY + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + buttonLiftRoom();
+        int buttonY = cardY + cardH + buttonLiftRoom();
         button = layoutButtonRow(List.of(label), buttonY, BTN_GAP).getFirst();
         buttonLift = GuiLanguage.approach(buttonLift, awaiting ? 0f : GuiLanguage.LIFT_PX, dt);
         drawButton(context, button, label, !awaiting, GuiLanguage.verdigris(), buttonLift);
-        drawLine(context, Text.translatable("heavyseas.donate.hint"),
-                width / 2, buttonY + button.h() + BTN_GAP, GuiLanguage.muted());
-        drawIdentity(context, view, identityY);
+        drawEdgeHints(context, b, List.of(), List.of(keys("give", "Enter"), keys("cancel", "Esc")));
+        drawCountdown(context, b, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS, cardW);
     }
 
     @Override

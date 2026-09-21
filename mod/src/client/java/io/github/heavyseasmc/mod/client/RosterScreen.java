@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod.client;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.net.StartVoyageC2S;
+import io.github.heavyseasmc.mod.state.HudView;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
@@ -77,23 +78,29 @@ public final class RosterScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        int fh = textH();
 
-        drawLine(context, title, width / 2, TOP_BAND_Y, GuiLanguage.ink());
-        drawLine(context, Text.translatable("heavyseas.roster.detail", config.players(), selected.size()),
-                width / 2, TOP_BAND_Y + fh + 3, GuiLanguage.muted());
+        // 还没入座，所以上带写标题、座位轨那一条带写人数，身份行空着（showsIdentity = false）。
+        Bands b = drawChrome(context, projection());
 
         // 三片按钮自上而下：角色格 · 预设 · 开航与取消。每片顶上都留出「抬」的高度。
         List<Text> characterLabels = new ArrayList<>();
         for (String id : config.characters()) {
             characterLabels.add(label(id));
         }
-        int gridTop = TOP_BAND_Y + 2 * (fh + 3) + BTN_GAP + buttonLiftRoom();
-        List<Box> grid = layoutButtonGrid(characterLabels, gridTop, BTN_GAP, COLUMNS);
         List<Text> presetLabels = new ArrayList<>();
         for (int players : PRESETS) {
             presetLabels.add(Text.translatable("heavyseas.roster.preset", players));
         }
+        // 先量这三片一共多高，再决定从哪一行起排 —— 装不下就往上挪进座位轨那一条带
+        // （这一面还没有座位，那条带上只有一行字）。❗反过来（先定起点再往下堆）第三片会掉出舞台，
+        // 而掉出去与没画长得一样：§7.7 那次是按钮盖住说明行，这次会是「开航」按钮根本看不见。
+        int lead = BTN_GAP + buttonLiftRoom();
+        int total = rowHeight(layoutButtonGrid(characterLabels, 0, BTN_GAP, COLUMNS))
+                + lead + rowHeight(layoutButtonRow(presetLabels, 0, BTN_GAP))
+                + lead + buttonHeight();
+        int floor = b.railY() + lineStep() + buttonLiftRoom();
+        int gridTop = Math.max(floor, Math.min(b.stageTop() + buttonLiftRoom(), b.stageBottom() - total));
+        List<Box> grid = layoutButtonGrid(characterLabels, gridTop, BTN_GAP, COLUMNS);
         int presetsTop = gridTop + rowHeight(grid) + BTN_GAP + buttonLiftRoom();
         List<Box> presets = layoutButtonRow(presetLabels, presetsTop, BTN_GAP);
         List<Text> actionLabels = List.of(Text.translatable("heavyseas.roster.start"), Text.translatable("gui.cancel"));
@@ -135,6 +142,25 @@ public final class RosterScreen extends GameScreen {
             }
             drawButton(context, all.get(i), text, i == focus, color, fill, -lift[i], 1f);
         }
+    }
+
+    /** 还没开局，上带写这一面的标题。 */
+    @Override
+    protected void drawTopBand(DrawContext context, HudView view, Bands b) {
+        drawLine(context, title, width / 2, b.topY(), GuiLanguage.ink());
+    }
+
+    /** 还没有座位，这一条带上写「要几个人 · 已选几个」。 */
+    @Override
+    protected void drawRailBand(DrawContext context, HudView view, Bands b) {
+        drawLine(context, Text.translatable("heavyseas.roster.detail", config.players(), selected.size()),
+                width / 2, b.railY(), GuiLanguage.muted());
+    }
+
+    /** 还没入座，没有身份可写。 */
+    @Override
+    protected boolean showsIdentity() {
+        return false;
     }
 
     private void toggle(String id) {

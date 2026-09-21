@@ -13,7 +13,6 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,16 +35,13 @@ import java.util.List;
  * <h2>按下就飞，不等服务端</h2>
  * 一次选择只发一个包（{@link RowDecisionC2S}）。服务端按同一条规则把未选中的牌全部放回。
  *
- * <h2>一个按钮与别的面同一个样子</h2>
- * 走 {@link GameScreen#drawButton}：悬停时抬起、镶金框。←→ 换牌，Enter/Space 使用高亮牌。
+ * <h2>没有「使用」按钮</h2>
+ * 第四刀之前牌底下压着一个按钮，说的正是键位那一行已经说过的话，却吃掉舞台四分之一的高度 ——
+ * 带位版面里舞台先给牌（总纲 §7.8），所以它去掉了：←→ 换牌，Enter/Space 或<b>再点一次同一张</b>使用。
  */
 public final class RowScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
-
-    /** 牌与它下面那排按钮之间。 */
-    private static final int CARD_TO_BUTTONS = 10;
-    private static final String[] BUTTONS = {"heavyseas.row.use"};
 
     private HudView view = HudView.IDLE;
     /** 这一次抽到的牌，按抽出顺序。打开时从投影里拿一次：服务端划完之后投影里就没有了，而最后一张还在飞。 */
@@ -54,10 +50,6 @@ public final class RowScreen extends GameScreen {
     /** 每张起飞的时刻；0 表示没在这一面上飞过（还没选择，或者是重开之前归位的）。 */
     private long[] flyAt = new long[0];
     private float[] lift = new float[0];
-    /** 使用按钮的抬起量。 */
-    private final float[] buttonLift = new float[BUTTONS.length];
-    /** 指针停在哪个按钮上；-1 表示都不在。只认真的移动。 */
-    private int buttonFocus = -1;
     /** 高亮。一进来就在第一张待选牌上；选择完成时为 -1。 */
     private int focus = -1;
     private long dealAt;
@@ -65,10 +57,8 @@ public final class RowScreen extends GameScreen {
     /** 上一帧排出来的版面，点击按它判。 */
     private Layout layout;
 
-    /** 一帧的版面，全部以 GUI 单位计。 */
-    private record Layout(int w, int h, int left, int cardsTop, List<Box> buttons,
-                          int barX, int barY, int barW, int countdownY,
-                          int hintY, int timeoutY, int identityY) {
+    /** 一帧的版面，全部以 GUI 单位计。带位归 {@link Bands}，这里只排舞台那一格里的东西。 */
+    private record Layout(int w, int h, int left, int cardsTop, int rowW, int seaY, int hintY) {
 
         int cardX(int i) {
             return left + i * (w + CARD_GAP);
@@ -144,11 +134,12 @@ public final class RowScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        Layout l = layout();
+        Bands b = drawChrome(context, view);
+        Layout l = layout(b);
         layout = l;
 
-        drawPublicBand(context, view, TOP_BAND_Y);
-        drawSeaLine(context, view, SEA_LINE_Y);
+        // 划船堆几张 · 舵手是谁：这一面才要，所以排在舞台里，不占共有的带。
+        drawSeaLine(context, view, l.seaY());
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         if (mouseActuallyMoved(mouseX, mouseY)) {
@@ -156,66 +147,34 @@ public final class RowScreen extends GameScreen {
             if (hovered >= 0 && fates[hovered] == Session.RowFate.UNDECIDED) {
                 focus = hovered;
             }
-            buttonFocus = focus >= 0 ? indexAt(l.buttons(), mouseX, mouseY) : -1;
         }
 
         for (int i = 0; i < cards.size(); i++) {
             drawCard(context, now, dt, l, i);
         }
         if (focus >= 0) {
-            drawButtons(context, dt, l);
             drawHint(context, l);
         }
-        drawCountdown(context, now, view.actionDeadlineMs(), view.actionWindowMs(),
-                l.barX(), l.barY(), l.barW(), l.countdownY());
-        drawLine(context, Text.translatable("heavyseas.row.timeout_hint"),
-                width / 2, l.timeoutY(), GuiLanguage.dim());
-        drawIdentity(context, view, l.identityY());
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("use", "Enter")));
+        drawCountdown(context, b, now, view.actionDeadlineMs(), view.actionWindowMs(), l.rowW());
     }
 
     /**
-     * 这一帧的版面。每帧按当前的 {@code width}/{@code height} 重算：窗口与界面尺寸随时会变。
+     * 这一帧舞台里的版面。每帧按当前的 {@code width}/{@code height} 重算：窗口与界面尺寸随时会变。
      *
-     * <p>自下而上排：身份一行 · 说明两行 · 按钮 · 牌；牌吃掉剩下的高度，与按钮一起在上带与说明之间居中。
+     * <p>舞台里自上而下：划船堆那一行 · 牌 · 按钮；说明两行与超时一行贴着舞台底边。
      */
-    private Layout layout() {
-        int fh = textH();
-        int lineH = fh + 1;
-        int identityY = identityY();
-        int timeoutY = identityY - HINT_GAP - fh;
-        int hintY = timeoutY - HINT_GAP - 2 * lineH;
-        int countdownY = hintY - HINT_GAP - fh;
-        int barY = countdownY - BAR_TO_TEXT - BAR_H;
-        int buttonH = buttonHeight();
-        int top = SEA_LINE_Y + fh + liftRoom();          // 抬起来的牌连同金框不碰上带那一行
-        int bottomLimit = barY - BELOW_CARDS;
+    private Layout layout(Bands b) {
+        int seaY = b.stageTop();
+        int hintY = footerTop(b, 2);                     // 这一张牌会做什么，最多两行
+        int top = seaY + lineStep() + liftRoom();        // 抬起来的牌连同金框不碰划船堆那一行
+        int bottomLimit = hintY - HINT_GAP;
         int n = Math.max(1, cards.size());
-        int byHeight = bottomLimit - top - CARD_TO_BUTTONS - buttonH;
-        int h = cardHeightFor(n, byHeight);
+        int h = cardHeightFor(n, bottomLimit - top);
         int w = GuiLanguage.cardWidth(h);
-        int block = h + CARD_TO_BUTTONS + buttonH;
-        int cardsTop = top + Math.max(0, (bottomLimit - top - block) / 2);
+        int cardsTop = cardsTopIn(top, bottomLimit, h, 0);
         int rowW = cardRowWidth(n, w);
-        int left = (width - rowW) / 2;
-
-        // 按钮压在高亮那张牌正下方：使用的是「这一张」，不是这一排。
-        int[] bw = new int[BUTTONS.length];
-        int total = -BTN_GAP;
-        for (int b = 0; b < BUTTONS.length; b++) {
-            bw[b] = buttonWidth(Text.translatable(BUTTONS[b]));
-            total += bw[b] + BTN_GAP;
-        }
-        int center = left + Math.max(0, focus) * (w + CARD_GAP) + w / 2;
-        int x = Math.max(SIDE, Math.min(width - SIDE - total, center - total / 2));
-        int buttonsY = cardsTop + h + CARD_TO_BUTTONS;
-        List<Box> buttons = new ArrayList<>(BUTTONS.length);
-        for (int b = 0; b < BUTTONS.length; b++) {
-            buttons.add(new Box(x, buttonsY, bw[b], buttonH));
-            x += bw[b] + BTN_GAP;
-        }
-        int barW = countdownWidth(rowW);
-        return new Layout(w, h, left, cardsTop, buttons, (width - barW) / 2, barY, barW, countdownY,
-                hintY, timeoutY, identityY);
+        return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW, seaY, hintY);
     }
 
     private void drawCard(DrawContext context, long now, long dt, Layout l, int i) {
@@ -240,7 +199,7 @@ public final class RowScreen extends GameScreen {
             boolean keep = fates[i] == Session.RowFate.KEPT;
             // 留进划船堆：飞向上带那一行「划船堆 N 张」；塞回牌堆底：往下飞出屏幕。弧线两头为 0，中间抬起。
             float targetX = keep ? width / 2f : cx;
-            float targetBottom = keep ? SEA_LINE_Y + textH() : height + l.h();
+            float targetBottom = keep ? l.seaY() + textH() : height + l.h();
             cx += (targetX - cx) * p;
             bottom += (targetBottom - bottom) * p - GuiLanguage.flyArc(p);
             scale *= 1f - (keep ? 0.75f : 0.3f) * p;
@@ -257,23 +216,11 @@ public final class RowScreen extends GameScreen {
         context.getMatrices().pop();
     }
 
-    private void drawButtons(DrawContext context, long dt, Layout l) {
-        for (int b = 0; b < BUTTONS.length; b++) {
-            boolean focused = b == buttonFocus;
-            buttonLift[b] = GuiLanguage.approach(buttonLift[b], focused ? GuiLanguage.LIFT_PX : 0f, dt);
-            drawButton(context, l.buttons().get(b), Text.translatable(BUTTONS[b]), focused, GuiLanguage.ink(),
-                    buttonLift[b]);
-        }
-    }
-
     /** 说明只跟高亮走：那张牌的完整内容；一行放得下时，第二行说键位。 */
     private void drawHint(DrawContext context, Layout l) {
-        int lineH = textH() + 1;
-        int lines = drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats()), l.hintY(), 2, GuiLanguage.ink());
-        if (lines < 2) {
-            drawLine(context, Text.translatable("heavyseas.row.keys"),
-                    width / 2, l.hintY() + lineH, GuiLanguage.muted());
-        }
+        // 这一行说的是**这张牌会做什么**（牌面上的字在这个尺寸下读不出来），不是规矩 ——
+        // 航海卡去字并接上提示签之后，这一行也该跟着走（ADR-0037 §7.4 第 3 条还欠）。
+        drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats()), l.hintY(), 2, GuiLanguage.ink());
     }
 
     private int cardAt(int mouseX, int mouseY, Layout l) {
@@ -284,14 +231,15 @@ public final class RowScreen extends GameScreen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         Layout l = layout;
         if (l != null && focus >= 0) {
-            int b = indexAt(l.buttons(), (int) mouseX, (int) mouseY);
-            if (b >= 0) {
-                choose(focus);
-                return true;
-            }
             int card = cardAt((int) mouseX, (int) mouseY, l);
             if (card >= 0 && fates[card] == Session.RowFate.UNDECIDED) {
-                focus = card;
+                // 第一下选中，再点同一张才使用 —— 与补给箱「点一下就定」不同：那一面点错还能等超时，
+                // 这一面一点下去其余几张当场塞回牌堆底，不可逆（朱砂那一类）。按键那一行写着这条。
+                if (card == focus) {
+                    choose(card);
+                } else {
+                    focus = card;
+                }
                 return true;
             }
         }

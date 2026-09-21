@@ -35,7 +35,7 @@ class GuiConsistencyTest {
     /** 只许在 {@code GameScreen} 里声明的版面常量与帧计时字段。 */
     private static final Pattern HOISTED = Pattern.compile(
             "\\b(?:static\\s+final\\s+(?:int|float)|private\\s+long)\\s+"
-                    + "(TOP_BAND_Y|TOP_BAND_H|SEA_LINE_Y|SIDE|BAR_H|BAR_TO_TEXT|BELOW_CARDS|HINT_GAP|BORDER_ROOM"
+                    + "(TOP_BAND_Y|TOP_BAND_H|BAND_GAP|RAIL_MAX_SHARE|SIDE|BAR_H|BAR_TO_TEXT|HINT_GAP|BORDER_ROOM"
                     + "|CARD_FRAME|MIN_CARD_H|MAX_CARD_H_RATIO|RAIL_H|BTN_PAD_X|BTN_PAD_Y|lastFrameMs)\\b");
 
     /** 只许在 {@code GameScreen} 里出现的写法：各是审查抓到过的一种「又写了一份」。 */
@@ -119,6 +119,73 @@ class GuiConsistencyTest {
             }
         }
         assertTrue(problems.isEmpty(), "有界面绕开了 GuiMaterial（ADR-0037）：" + System.lineSeparator() + "  "
+                + String.join(System.lineSeparator() + "  ", problems));
+    }
+
+    /**
+     * 自己算带位的写法：只许出现在 {@code GameScreen} 里（ADR-0037 §7.10 第四刀）。
+     *
+     * <p>名字前面带点的（{@code b.railH()} · {@code b.identityY()}）是<b>从 Bands 里取</b>，放行；
+     * 裸写的是自己又算了一遍，红。
+     */
+    private static final List<Pattern> OWN_BANDS = List.of(
+            Pattern.compile("(?<![.\\w])(?:TOP_BAND_Y|TOP_BAND_H|BAND_GAP|RAIL_MAX_SHARE|BAR_H|BAR_TO_TEXT|RAIL_H)\\b"),
+            Pattern.compile("(?<![.\\w])(?:identityY|topBandH|railH|avatarDiameter)\\s*\\("),
+            // 身份行原先是各面各写一遍 `height - Math.max(8, …)` 算出来的，带位之后只许问 Bands。
+            Pattern.compile("height\\s*-\\s*Math\\.max\\s*\\(\\s*8\\b"));
+
+    /**
+     * 版面只有一套带位：五条带的 y 只在 {@code GameScreen#bands()} 里算一次，各面只填舞台那一格。
+     *
+     * <h2>为什么值得一道闸门</h2>
+     * 第四刀之前十五个界面各自从零算版面 —— 上带 · 座位轨 · 倒计时 · 身份行在每一面的 y 都不同，
+     * 换面时整屏都在跳（用户 2026-09-22：「每个阶段页面感觉像独立的」）。这类漂移没有任何一处会报错，
+     * 与 2026-09-18 抓到的「{@code TOP_BAND_Y = 12} 在 10 个界面各写一遍」是同一个形状。
+     *
+     * <h2>正向对照</h2>
+     * 不只查「没人自己算」，还查<b>每一面都真的调了</b> {@code drawChrome} ——
+     * 只查前者的话，一个干脆什么都不画的界面也能全绿（「0 命中」与「没在扫」输出相同）。
+     */
+    @Test
+    void bandsAreComputedOnceInGameScreen() throws IOException {
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(CLIENT_DIR)) {
+            files = listing.filter(p -> p.toString().endsWith(".java")).sorted().toList();
+        }
+        assertTrue(files.size() >= MIN_FILES, "只扫到 " + files.size() + " 份客户端源码 —— 没在扫，不是干净");
+
+        List<String> problems = new ArrayList<>();
+        int screens = 0;
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            String whole = String.join("\n", lines);
+            if (name.equals("GameScreen.java")) {
+                assertTrue(whole.contains("protected Bands bands()"),
+                        "GameScreen 里找不到 bands() —— 唯一那份定义都不在，这道判据多半扫错了目录");
+                continue;                                     // 唯一一处算带位的地方
+            }
+            if (whole.contains("extends GameScreen")) {
+                screens++;
+                if (!whole.contains("drawChrome(")) {
+                    problems.add(name + "  这一面没调 drawChrome：共有的四条带它一条都没画");
+                }
+            }
+            for (int i = 0; i < lines.size(); i++) {
+                String code = lines.get(i).strip();
+                if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) {
+                    continue;                                 // 注释里提到旧写法不算
+                }
+                for (Pattern p : OWN_BANDS) {
+                    if (p.matcher(code).find()) {
+                        problems.add(name + ":" + (i + 1) + "  又自己算了一遍带位：" + code);
+                    }
+                }
+            }
+        }
+        assertTrue(screens >= MIN_FILES - 5,
+                "只认出 " + screens + " 个界面 —— 没在扫，不是干净");
+        assertTrue(problems.isEmpty(), "版面不再只有一套带位（ADR-0037 §7.10）：" + System.lineSeparator() + "  "
                 + String.join(System.lineSeparator() + "  ", problems));
     }
 

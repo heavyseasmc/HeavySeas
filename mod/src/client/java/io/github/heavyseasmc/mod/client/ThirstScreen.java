@@ -13,6 +13,8 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * 口渴：喝几张水（ADR-0021）。
  *
@@ -79,9 +81,9 @@ public final class ThirstScreen extends GameScreen {
         chosen = normalized(chosen, false);
     }
 
-    /** 一帧的版面，全部以 GUI 单位计。 */
-    private record Layout(int w, int h, int left, int cardsTop, int barY, int barX, int barW,
-                          int countdownY, int titleY, int detailY, int hintY, int keysY, int identityY) {
+    /** 一帧的版面，全部以 GUI 单位计。带位归 {@link Bands}，这里只排舞台那一格里的东西。 */
+    private record Layout(int w, int h, int left, int cardsTop, int rowW,
+                          int titleY, int detailY, int hintY) {
 
         int cardX(int i) {
             return left + i * (w + CARD_GAP);
@@ -93,10 +95,8 @@ public final class ThirstScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        Layout l = layout();
-
-        drawPublicBand(context, view, TOP_BAND_Y);
-        drawSeaLine(context, view, SEA_LINE_Y);
+        Bands b = drawChrome(context, view);
+        Layout l = layout(b);
 
         for (int i = 0; i < waters; i++) {
             float in = GuiLanguage.deal(now, dealAt, i);
@@ -118,8 +118,7 @@ public final class ThirstScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS,
-                l.barX(), l.barY(), l.barW(), l.countdownY());
+        drawCountdown(context, b, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS, l.rowW());
         HudView.Thirst prompt = view.thirstPrompt();
         int hurt = Math.max(0, remaining - (prompt.donated() + chosen) / waterPerSource);
         drawLine(context, Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
@@ -131,32 +130,23 @@ public final class ThirstScreen extends GameScreen {
                         ? Text.translatable("heavyseas.thirst.none")
                         : Text.translatable("heavyseas.thirst.drink", chosen, hurt),
                 width / 2, l.hintY(), hurt > 0 ? GuiLanguage.cinnabar() : GuiLanguage.verdigris());
-        drawLine(context, Text.translatable("heavyseas.thirst.hint"),
-                width / 2, l.keysY(), GuiLanguage.muted());
-        drawIdentity(context, view, l.identityY());
+        drawEdgeHints(context, b, List.of(keys("amount", "←", "→")), List.of(keys("confirm", "Enter")));
     }
 
-    private Layout layout() {
+    private Layout layout(Bands b) {
         int n = Math.max(1, waters);
-        int fh = textH();
-        int lineH = fh + 2;
-        int identityY = identityY();
-        // ❗倒计时之下有**四行**：还需化解几次 · 来源明细 · 喝几张挨几点 · 键位。
-        //   1280x720 实拍：这里原先只留了三行，键位那一行画到了身份那一行上面，两行字叠在一起。
-        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 4 * lineH;
-        int top = SEA_LINE_Y + fh;
-        int avail = identityY - HINT_GAP - top - below;
+        // 贴舞台底边的三行全是**此刻的状态**：还需化解几次 · 来源明细 · 喝几张挨几点。
+        // 键位挪到了倒计时那一条带的两头；「划船堆 N 张 · 舵手 X」在这一面去掉了（与口渴无关）。
+        int titleY = footerTop(b, 3);
+        int step = lineStep();
         int room = liftRoom();
+        int avail = titleY - HINT_GAP - b.stageTop();
         int h = cardHeightFor(n, avail - room);
         int w = GuiLanguage.cardWidth(h);
-        int cardsTop = top + room + Math.max(0, (avail - room - h) / 2);
-        int barY = cardsTop + h + BELOW_CARDS;
-        int countdownY = barY + BAR_H + BAR_TO_TEXT;
-        int titleY = countdownY + fh + HINT_GAP;
+        int cardsTop = cardsTopIn(b.stageTop(), titleY - HINT_GAP, h, room);
         int rowW = cardRowWidth(n, w);
-        int barW = countdownWidth(rowW);
-        return new Layout(w, h, (width - rowW) / 2, cardsTop, barY, (width - barW) / 2, barW,
-                countdownY, titleY, titleY + lineH, titleY + 2 * lineH, titleY + 3 * lineH, identityY);
+        return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW,
+                titleY, titleY + step, titleY + 2 * step);
     }
 
     /** 改张数并上报：超时认的是它，服务端不知道的话只能按开窗时那个默认值算。 */
@@ -199,7 +189,7 @@ public final class ThirstScreen extends GameScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        Layout l = layout();
+        Layout l = layout(bands());
         int i = cardIndexAt((int) mouseX, (int) mouseY, l.left(), l.cardsTop(), l.w(), l.h(), waters);
         if (i >= 0) {
             // 点第 i 张 = 「喝到这一张为止」。再点同一张就是取消它。

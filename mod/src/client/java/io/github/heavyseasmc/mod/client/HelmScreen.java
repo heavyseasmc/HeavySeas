@@ -38,9 +38,6 @@ public final class HelmScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    /** 说明两行之间。 */
-    private static final int LINE_GAP = 3;
-
     private HudView view;
     /** 打开时的划船堆。结算那一刻投影里就没有了，而「顿」还要画在它上面 —— 所以留一份。 */
     private final List<NavCardView> offer;
@@ -57,8 +54,7 @@ public final class HelmScreen extends GameScreen {
     private boolean committed;
 
     /** 一帧的版面，全部以 GUI 单位计。 */
-    private record Layout(int w, int h, int left, int cardsTop, int barY, int barX, int barW,
-                          int countdownY, int hintY, int keepY, int identityY) {
+    private record Layout(int w, int h, int left, int cardsTop, int rowW, int seaY, int hintY) {
 
         int cardX(int i) {
             return left + i * (w + CARD_GAP);
@@ -127,11 +123,12 @@ public final class HelmScreen extends GameScreen {
         }
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        Layout l = layout();
+        Bands b = drawChrome(context, view);
+        Layout l = layout(b);
         float snapP = GuiLanguage.snap(now, snapAt);
 
-        drawPublicBand(context, view, TOP_BAND_Y);
-        drawSeaLine(context, view, SEA_LINE_Y, offer.size());
+        // 划船堆几张 · 舵手是谁：这一面才要，所以排在舞台里，不占共有的带。
+        drawSeaLine(context, view, l.seaY(), offer.size());
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向）。定了之后鼠标与键盘都不再改高亮。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
@@ -166,37 +163,29 @@ public final class HelmScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, now, deadlineMs, NavigationPhase.PICK_MILLIS,
-                l.barX(), l.barY(), l.barW(), l.countdownY());
         drawHint(context, l);
-        drawIdentity(context, view, l.identityY());
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
+        drawCountdown(context, b, now, deadlineMs, NavigationPhase.PICK_MILLIS, l.rowW());
     }
 
     /**
-     * 这一帧的版面：牌吃掉上带与下面几行字之间剩下的高度，与它们一起居中。
+     * 这一帧舞台里的版面：划船堆那一行在最上、说明三行贴舞台底边，牌吃掉中间剩下的。
      *
      * <p>牌顶留的空把「顿」算进去（{@link #snapRoom}），理由同补给箱那一面。
      */
-    private Layout layout() {
+    private Layout layout(Bands b) {
         int n = Math.max(1, offer.size());
-        int fh = textH();
-        int lineH = fh + 1;
-        int identityY = identityY();
-        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 2 * lineH + LINE_GAP + fh;
-        int top = SEA_LINE_Y + fh;
-        int avail = identityY - HINT_GAP - top - below;
-        // 先按偏大的卡算出留空，再据此定卡高：留空只会偏大一点，卡绝不会反过来压上上带那一行。
+        int seaY = b.stageTop();
+        int hintY = footerTop(b, 2);                     // 这一张牌会做什么，最多两行
+        int top = seaY + lineStep();
+        int avail = hintY - HINT_GAP - top;
+        // 先按偏大的卡算出留空，再据此定卡高：留空只会偏大一点，卡绝不会反过来压上划船堆那一行。
         int room = snapRoom(cardHeightFor(n, avail - snapRoom(0)));
         int h = cardHeightFor(n, avail - room);
         int w = GuiLanguage.cardWidth(h);
-        int cardsTop = top + room + Math.max(0, (avail - room - h) / 2);
-        int barY = cardsTop + h + BELOW_CARDS;
-        int countdownY = barY + BAR_H + BAR_TO_TEXT;
-        int hintY = countdownY + fh + HINT_GAP;
+        int cardsTop = cardsTopIn(top, hintY - HINT_GAP, h, room);
         int rowW = cardRowWidth(n, w);
-        int barW = countdownWidth(rowW);
-        return new Layout(w, h, (width - rowW) / 2, cardsTop, barY, (width - barW) / 2, barW,
-                countdownY, hintY, hintY + 2 * lineH + LINE_GAP, identityY);
+        return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW, seaY, hintY);
     }
 
     /** 说明只跟高亮走：那张牌的完整内容（牌面上的字可能小到读不清），下面一行说这一面要你做什么。 */
@@ -205,8 +194,6 @@ public final class HelmScreen extends GameScreen {
             return;
         }
         drawParagraph(context, NavCardText.describe(offer.get(highlight), view.seats()), l.hintY(), 2, GuiLanguage.ink());
-        drawLine(context, Text.translatable("heavyseas.helm.pick_one", offer.size()),
-                width / 2, l.keepY(), GuiLanguage.muted());
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l) {
@@ -235,7 +222,7 @@ public final class HelmScreen extends GameScreen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!decided()) {
-            int i = indexAt((int) mouseX, (int) mouseY, layout());
+            int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
                 setHighlight(i);
                 commit();

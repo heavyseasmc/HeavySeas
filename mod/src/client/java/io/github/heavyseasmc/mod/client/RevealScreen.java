@@ -132,27 +132,32 @@ public final class RevealScreen extends GameScreen {
         }
         renderBackdrop(context, mouseX, mouseY, delta);
         boolean hate = e.stage() == EndgameProgress.Stage.HATE;
-        int fh = textH();
 
-        drawPublicBand(context, view, TOP_BAND_Y);
-        int titleY = TOP_BAND_Y + 26;
+        Bands b = drawChrome(context, view);
+        // 舞台第一行：这一轮翻的是恨还是爱；第二行：每一格点了谁（座位轨那一条带只容得下名字与线）。
+        int titleY = b.stageTop();
+        int targetsY = titleY + lineStep();
         drawLine(context, Text.translatable(hate ? "heavyseas.reveal.round_hate" : "heavyseas.reveal.round_love"),
                 width / 2, titleY, GuiLanguage.ink());
-        int railBottom = drawRail(context, now, e, titleY + fh + 6);
+        drawTargets(context, now, e, b, targetsY);
 
-        int identityY = identityY();
-        int ownY = identityY - fh - 3;
-        int sayY = ownY - fh - 8;
-        drawStage(context, now, e, hate, railBottom + 8, sayY - 8);
+        int sayY = footerTop(b, 2);
+        int ownY = sayY + lineStep();
+        drawStage(context, now, e, hate, targetsY + lineStep() + HINT_GAP, sayY - HINT_GAP);
         drawSay(context, now, e, hate, sayY);
         if (view.seated()) {
             drawLine(context, Text.translatable("heavyseas.reveal.yours",
                     nameOf(view.hate()), nameOf(view.love())), width / 2, ownY, GuiLanguage.muted());
-            drawIdentity(context, view, identityY);
         } else {
             drawLine(context, Text.translatable("heavyseas.endgame.spectating"),
-                    width / 2, identityY, GuiLanguage.muted());
+                    width / 2, b.identityY(), GuiLanguage.muted());
         }
+    }
+
+    /** 旁观的人没有身份可写，那一行改写「旁观中」（在 {@link #render} 里）。 */
+    @Override
+    protected boolean showsIdentity() {
+        return view.seated();
     }
 
     /**
@@ -163,30 +168,42 @@ public final class RevealScreen extends GameScreen {
      *
      * @return 条的下沿
      */
-    private int drawRail(DrawContext context, long now, HudView.Endgame e, int y) {
-        List<HudView.Endgame.Entry> entries = e.entries();
-        int n = entries.size();
-        int fh = textH();
-        int widest = 0;
-        for (HudView.Endgame.Entry en : entries) {
-            widest = Math.max(widest, textW(nameOf(en.who())));
+    /** 座位轨是<b>翻到谁</b>，不是座位序 —— 所以覆写它。 */
+    @Override
+    protected void drawRailBand(DrawContext context, HudView unused, Bands b) {
+        long now = System.currentTimeMillis();
+        List<HudView.Endgame.Entry> entries = view.endgame().entries();
+        if (entries.isEmpty() || b.railH() == 0) {
+            return;
         }
-        int cell = Math.min(Math.max(widest + 8, 48), (width - 2 * SIDE) / n);
-        int left = (width - n * cell) / 2;
-        for (int i = 0; i < n; i++) {
+        int cell = railCell(entries.size());
+        int left = (width - entries.size() * cell) / 2;
+        for (int i = 0; i < entries.size(); i++) {
             HudView.Endgame.Entry en = entries.get(i);
-            int x = left + i * cell;
             boolean midFlip = i == stageWho && stageRevealed && !showsFront(now, en);
             boolean done = !en.target().isEmpty() && !midFlip;
             boolean here = i == stageWho && !done;
             int nameColor = here ? GuiLanguage.gold() : done ? GuiLanguage.muted() : GuiLanguage.dim();
-            int nameY = drawSeat(context, en.who(), x, y, cell, here ? GuiLanguage.gold() : 0, !done && !here, nameColor,
-                    done ? GuiLanguage.verdigris() : GuiLanguage.ground());
-            if (done) {
-                drawLineIn(context, nameOf(en.target()), x + 2, nameY + fh + 5, cell - 4, GuiLanguage.muted());
+            drawSeat(context, en.who(), left + i * cell, b.railY(), cell, b, here ? GuiLanguage.gold() : 0,
+                    !done && !here, nameColor, done ? GuiLanguage.verdigris() : GuiLanguage.ground());
+        }
+    }
+
+    /** 轨底下那一行：已经翻过的，点的是谁。它是这一面自己的内容，所以排在舞台里，不挤共有的那条带。 */
+    private void drawTargets(DrawContext context, long now, HudView.Endgame e, Bands b, int y) {
+        List<HudView.Endgame.Entry> entries = e.entries();
+        if (entries.isEmpty()) {
+            return;
+        }
+        int cell = railCell(entries.size());
+        int left = (width - entries.size() * cell) / 2;
+        for (int i = 0; i < entries.size(); i++) {
+            HudView.Endgame.Entry en = entries.get(i);
+            boolean midFlip = i == stageWho && stageRevealed && !showsFront(now, en);
+            if (!en.target().isEmpty() && !midFlip) {
+                drawLineIn(context, nameOf(en.target()), left + i * cell + 2, y, cell - 4, GuiLanguage.muted());
             }
         }
-        return y + avatarBlockH() + 2 * fh + 6;
     }
 
     /** 舞台：被点名的人 · 「恨 / 爱」· 暗牌（翻开是目标）。整排跟着「滑」。 */

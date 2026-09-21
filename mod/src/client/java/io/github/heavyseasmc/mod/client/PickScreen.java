@@ -11,6 +11,8 @@ import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * 挑牌：抢赢了，从他那里拿走一张（ADR-0023 · 规则 §5）。
  *
@@ -71,33 +73,25 @@ public final class PickScreen extends GameScreen {
         }
     }
 
-    private record Layout(int w, int h, int left, int cardsTop, int barY, int barX, int barW,
-                          int countdownY, int headerY, int hintY, int keysY, int identityY) {
+    private record Layout(int w, int h, int left, int cardsTop, int rowW, int headerY, int hintY) {
 
         int cardX(int i) {
             return left + i * (w + CARD_GAP);
         }
     }
 
-    private Layout layout(int count) {
+    private Layout layout(Bands b, int count) {
         int n = Math.max(1, count);
-        int fh = textH();
-        int lineH = fh + 2;
-        int identityY = identityY();
-        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 3 * lineH;
-        int top = TOP_BAND_Y + topBandH();
-        int avail = identityY - HINT_GAP - top - below;
+        // 牌下面贴着舞台底边的三行字：这一段是什么 · 说明 · 键位。
+        int headerY = footerTop(b, 2);
+        int step = lineStep();
         int room = liftRoom();
+        int avail = headerY - HINT_GAP - b.stageTop();
         int h = cardHeightFor(n, avail - room);
         int w = GuiLanguage.cardWidth(h);
-        int cardsTop = top + room + Math.max(0, (avail - room - h) / 2);
-        int barY = cardsTop + h + BELOW_CARDS;
-        int countdownY = barY + BAR_H + BAR_TO_TEXT;
-        int headerY = countdownY + fh + HINT_GAP;
+        int cardsTop = cardsTopIn(b.stageTop(), headerY - HINT_GAP, h, room);
         int rowW = cardRowWidth(n, w);
-        int barW = countdownWidth(rowW);
-        return new Layout(w, h, (width - rowW) / 2, cardsTop, barY, (width - barW) / 2, barW,
-                countdownY, headerY, headerY + lineH, headerY + 2 * lineH, identityY);
+        return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW, headerY, headerY + step);
     }
 
     @Override
@@ -114,9 +108,8 @@ public final class PickScreen extends GameScreen {
             lift = new float[count];
             highlight = Math.min(highlight, count - 1);
         }
-        Layout l = layout(count);
-
-        drawPublicBand(context, view, TOP_BAND_Y);
+        Bands b = drawChrome(context, view);
+        Layout l = layout(b, count);
 
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
         if (moved && !committed) {
@@ -141,8 +134,7 @@ public final class PickScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, now, c.deadlineMs(), c.windowMs(),
-                l.barX(), l.barY(), l.barW(), l.countdownY());
+        drawCountdown(context, b, now, c.deadlineMs(), c.windowMs(), l.rowW());
         drawLine(context, Text.translatable("heavyseas.pick.header", nameOf(c.target())),
                 width / 2, l.headerY(), GuiLanguage.ink());
         // 说明只跟高亮走一行 —— 把每一张都摊开就变成读说明书了（与补给箱同一条）。
@@ -150,9 +142,7 @@ public final class PickScreen extends GameScreen {
                         ? Text.translatable("heavyseas.pick.from_hand", c.victimHand())
                         : Text.translatable("heavyseas.provision." + c.victimFront().get(highlight)),
                 width / 2, l.hintY(), GuiLanguage.ink());
-        drawLine(context, Text.translatable("heavyseas.pick.hint"),
-                width / 2, l.keysY(), GuiLanguage.muted());
-        drawIdentity(context, view, l.identityY());
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("take", "Enter")));
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l, int count) {
@@ -182,7 +172,7 @@ public final class PickScreen extends GameScreen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int count = options(view.contest());
         if (!committed && count > 0) {
-            int i = indexAt((int) mouseX, (int) mouseY, layout(count), count);
+            int i = indexAt((int) mouseX, (int) mouseY, layout(bands(), count), count);
             if (i >= 0) {
                 highlight = i;
                 commit();

@@ -50,6 +50,15 @@ final class GuiText {
     /** 阴影的颜色（不含不透明度）：牌面墨色那一路的近黑，不用纯黑。 */
     private static final int SHADOW = 0x00120E0B;
 
+    /** 印在纸上的墨：正文略透一点，纸纹从底下透上来；四周各一道更淡的，边缘微微洇开。 */
+    private static final int INK_ALPHA = 0xEE;
+    private static final int INK_BLEED_ALPHA = 0x26;
+    private static final int[][] INK_BLEED = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    private static int inked(int color) {
+        return (color & 0xFFFFFF) | (INK_ALPHA << 24);
+    }
+
     enum Align { LEFT, CENTER, RIGHT }
 
     private GuiText() {
@@ -78,6 +87,15 @@ final class GuiText {
      */
     static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
                     int color, Align align, int maxLines, boolean shadow) {
+        return draw(context, text, x, y, boxW, guiSize, bold, color, align, maxLines, shadow, false);
+    }
+
+    /**
+     * 同上，{@code ink} = 这行字是<b>印在牌面上</b>的：正文略透、边缘微微洇开，让它读起来是墨而不是贴纸。
+     * 界面上的字一律不走它 —— 界面不是纸。
+     */
+    static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
+                    int color, Align align, int maxLines, boolean shadow, boolean ink) {
         MinecraftClient client = MinecraftClient.getInstance();
         TextRenderer renderer = client.textRenderer;
         int scale = scale(client);
@@ -104,7 +122,16 @@ final class GuiText {
                 int off = Math.max(1, scale / 2);                  // 半个 GUI 单位：界面尺寸大了影子也跟着厚
                 context.drawText(renderer, styled, px + off, py + off, SHADOW | (color & 0xFF000000), false);
             }
-            context.drawText(renderer, styled, px, py, color, false);
+            if (ink) {
+                // 墨会被纸吃掉一点：先在四周各压一道极淡的同色，再写正文，边缘于是有一点点洇开。
+                // ❗这是给<b>印在牌面上</b>的字用的 —— 界面上的字一律不走它。
+                // 起因：牌名改成实时排字之后，锐利的字压在被重采样柔化过的牌上，读起来像贴纸（用户 2026-09-22 判「塑料感」）。
+                int bleed = (color & 0xFFFFFF) | (INK_BLEED_ALPHA << 24);
+                for (int[] d : INK_BLEED) {
+                    context.drawText(renderer, styled, px + d[0], py + d[1], bleed, false);
+                }
+            }
+            context.drawText(renderer, styled, px, py, ink ? inked(color) : color, false);
         }
         matrices.pop();
         return ceilDiv(Math.max(1, fit.lines().size()) * linePx, scale);

@@ -69,21 +69,15 @@ public final class ScoreScreen extends GameScreen {
         long now = System.currentTimeMillis();
         int fh = textH();
 
-        // 上带（公开）：这一局怎么结束的，然后全员合计。
-        Text outcome = Text.translatable(e.outcome() == GameState.Outcome.LANDED
-                ? "heavyseas.game.over.landed" : "heavyseas.game.over.all_dead", view.turn(), e.alive());
-        drawLine(context, outcome, width / 2, TOP_BAND_Y, GuiLanguage.ink());
-        int totalsBottom = drawTotals(context, e, TOP_BAND_Y + fh + 8);
+        // 上带（公开）：这一局怎么结束的（drawTopBand 覆写），座位轨那一条带上是全员合计。
+        Bands b = drawChrome(context, view);
+        int totalsBottom = drawTotals(context, e, b.railY());
 
         HudView.Score s = view.myScore();
-        int identityY = identityY();
         if (!s.present()) {
             drawLine(context, Text.translatable(
                             view.seated() ? "heavyseas.score.waiting" : "heavyseas.endgame.spectating"),
-                    width / 2, (totalsBottom + identityY) / 2, GuiLanguage.muted());
-            if (view.seated()) {
-                drawIdentity(context, view, identityY);
-            }
+                    width / 2, (b.stageTop() + b.stageBottom()) / 2, GuiLanguage.muted());
             return;
         }
         if (!logged) {
@@ -100,7 +94,7 @@ public final class ScoreScreen extends GameScreen {
         int rowW = Math.min(ROW_MAX_W, width - 2 * SIDE);
         int rowH = fh + 6;
         int blockH = 5 * rowH + 6;
-        int top = totalsBottom + Math.max(8, (identityY - 8 - totalsBottom - blockH) / 2);
+        int top = Math.max(totalsBottom, b.stageTop()) + Math.max(0, (b.stageBottom() - b.stageTop() - blockH) / 2);
         int left = (width - rowW) / 2;
         for (int i = 0; i < labels.length; i++) {
             float p = GuiLanguage.deal(now, dealAt, i);
@@ -133,7 +127,26 @@ public final class ScoreScreen extends GameScreen {
             drawLineLeft(context, total, left + rowW - textW(total), y, GuiLanguage.gold());
             context.getMatrices().pop();
         }
-        drawIdentity(context, view, identityY);
+    }
+
+    /** 对局已经结束，上带写的是「这一局怎么结束的」，不是回合与阶段（ADR-0022）。 */
+    @Override
+    protected void drawTopBand(DrawContext context, HudView v, Bands b) {
+        HudView.Endgame e = v.endgame();
+        drawLine(context, Text.translatable(e.outcome() == GameState.Outcome.LANDED
+                        ? "heavyseas.game.over.landed" : "heavyseas.game.over.all_dead", v.turn(), e.alive()),
+                width / 2, b.topY(), GuiLanguage.ink());
+    }
+
+    /** 这一条带上不是座位轨，是全员合计（在 {@link #render} 里画）。 */
+    @Override
+    protected void drawRailBand(DrawContext context, HudView v, Bands b) {
+    }
+
+    /** 旁观的人没有身份可写。 */
+    @Override
+    protected boolean showsIdentity() {
+        return view.seated();
     }
 
     @Override
