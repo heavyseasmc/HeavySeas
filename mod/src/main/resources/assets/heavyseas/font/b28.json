@@ -1,0 +1,18 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "heavyseas:serif_bold.ttf",
+      "size": 28.0,
+      "oversample": 1.0,
+      "shift": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "type": "reference",
+      "id": "heavyseas:r28"
+    }
+  ]
+}

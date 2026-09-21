@@ -8,7 +8,6 @@ import io.github.heavyseasmc.mod.state.HudView;
 import io.github.heavyseasmc.mod.state.NavCardView;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
@@ -180,7 +179,7 @@ public final class HelmScreen extends GameScreen {
      */
     private Layout layout() {
         int n = Math.max(1, offer.size());
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int lineH = fh + 1;
         int identityY = identityY();
         int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 2 * lineH + LINE_GAP + fh;
@@ -205,14 +204,8 @@ public final class HelmScreen extends GameScreen {
         if (highlight < 0 || highlight >= offer.size()) {
             return;
         }
-        List<OrderedText> lines = textRenderer.wrapLines(
-                NavCardText.describe(offer.get(highlight), view.seats()), width - 2 * SIDE);
-        int lineH = textRenderer.fontHeight + 1;
-        for (int i = 0; i < Math.min(2, lines.size()); i++) {
-            context.drawCenteredTextWithShadow(textRenderer, lines.get(i), width / 2, l.hintY() + i * lineH,
-                    GuiLanguage.INK);
-        }
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.helm.pick_one", offer.size()),
+        drawParagraph(context, NavCardText.describe(offer.get(highlight), view.seats()), l.hintY(), 2, GuiLanguage.INK);
+        drawLine(context, Text.translatable("heavyseas.helm.pick_one", offer.size()),
                 width / 2, l.keepY(), GuiLanguage.MUTED);
     }
 

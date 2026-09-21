@@ -81,11 +81,11 @@ public final class PickScreen extends GameScreen {
 
     private Layout layout(int count) {
         int n = Math.max(1, count);
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int lineH = fh + 2;
         int identityY = identityY();
         int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 3 * lineH;
-        int top = TOP_BAND_Y + TOP_BAND_H;
+        int top = TOP_BAND_Y + topBandH();
         int avail = identityY - HINT_GAP - top - below;
         int room = liftRoom();
         int h = cardHeightFor(n, avail - room);
@@ -143,15 +143,14 @@ public final class PickScreen extends GameScreen {
 
         drawCountdown(context, now, c.deadlineMs(), c.windowMs(),
                 l.barX(), l.barY(), l.barW(), l.countdownY());
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.pick.header", nameOf(c.target())),
+        drawLine(context, Text.translatable("heavyseas.pick.header", nameOf(c.target())),
                 width / 2, l.headerY(), GuiLanguage.INK);
         // 说明只跟高亮走一行 —— 把每一张都摊开就变成读说明书了（与补给箱同一条）。
-        context.drawCenteredTextWithShadow(textRenderer, isHandOption(highlight)
+        drawLine(context, isHandOption(highlight)
                         ? Text.translatable("heavyseas.pick.from_hand", c.victimHand())
                         : Text.translatable("heavyseas.provision." + c.victimFront().get(highlight)),
                 width / 2, l.hintY(), GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.pick.hint"),
+        drawLine(context, Text.translatable("heavyseas.pick.hint"),
                 width / 2, l.keysY(), GuiLanguage.MUTED);
         drawIdentity(context, view, l.identityY());
     }

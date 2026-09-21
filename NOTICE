@@ -34,8 +34,24 @@ Simple Voice Chat（软依赖，仅编译期对其公开 API）
 字体
 ================================================================================
 
-卡面上的文字不是运行时绘制的，而是在构建前用下面两套字体渲染进 PNG 贴图。
-**本仓库不分发任何字体文件本身**；这里列出的是渲染所用字体的出处与授权。
+分两类：**随模组分发的字体文件**（界面文字，运行时绘制），与**只用于构建前渲染贴图的字体**
+（卡面上的文字烘进 PNG，字体文件本身不在本仓库里）。
+
+---- 随模组分发 ----
+
+Noto Serif SC（思源宋体）—— 界面上的全部文字
+  文件    mod/src/main/resources/assets/heavyseas/font/serif.ttf · serif_bold.ttf
+          （由可变字体定成静态字重 600 / 800 后取子集而成，属 OFL 所说的 Modified Version；
+          name 表里的版权与授权字段原样保留）
+  版权    (c) 2017-2024 Adobe (http://www.adobe.com/).（字体文件 name 表 nameID 0 原文）
+          Noto is a trademark of Google Inc.（nameID 7 原文）
+  授权    SIL Open Font License 1.1（字体文件 nameID 13 自述，nameID 14 指向
+          https://openfontlicense.org）。授权全文随字体一起分发：
+          mod/src/main/resources/assets/heavyseas/font/OFL-NotoSerifSC.txt
+  出处    https://github.com/google/fonts/tree/main/ofl/notoserifsc
+          （NotoSerifSC[wght].ttf，2026-03-12 的提交；上游 https://github.com/notofonts/noto-cjk）
+
+---- 只用于构建前渲染贴图（字体文件不在本仓库）----
 
 汇文明朝体 GBK（Huiwen-MinchoGBK）—— 全部中文
   作者    特里王

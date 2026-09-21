@@ -77,11 +77,10 @@ public final class RosterScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
 
-        context.drawCenteredTextWithShadow(textRenderer, title, width / 2, TOP_BAND_Y, GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.roster.detail", config.players(), selected.size()),
+        drawLine(context, title, width / 2, TOP_BAND_Y, GuiLanguage.INK);
+        drawLine(context, Text.translatable("heavyseas.roster.detail", config.players(), selected.size()),
                 width / 2, TOP_BAND_Y + fh + 3, GuiLanguage.MUTED);
 
         // 三片按钮自上而下：角色格 · 预设 · 开航与取消。每片顶上都留出「抬」的高度。

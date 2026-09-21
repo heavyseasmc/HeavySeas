@@ -75,12 +75,11 @@ public final class ConsentScreen extends GameScreen {
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
 
         drawPublicBand(context, view, TOP_BAND_Y);
         int askY = TOP_BAND_Y + 30;
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable(switch (kind) {
+        drawLine(context, Text.translatable(switch (kind) {
                     case SWAP -> "heavyseas.consent.swap";
                     case STEAL -> "heavyseas.consent.steal";
                     case RATION -> "heavyseas.consent.ration";
@@ -114,10 +113,9 @@ public final class ConsentScreen extends GameScreen {
         drawCountdown(context, now, deadlineMs, view.contest().windowMs(),
                 (width - barW) / 2, barY, barW, countdownY);
         int hintY = countdownY + fh + HINT_GAP;
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable(focus == 1 ? "heavyseas.consent.fight_hint" : "heavyseas.consent.agree_hint"),
+        drawLine(context, Text.translatable(focus == 1 ? "heavyseas.consent.fight_hint" : "heavyseas.consent.agree_hint"),
                 width / 2, hintY, GuiLanguage.MUTED);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.consent.timeout"),
+        drawLine(context, Text.translatable("heavyseas.consent.timeout"),
                 width / 2, hintY + fh + 2, GuiLanguage.DIM);
         drawIdentity(context, view, identityY());
     }

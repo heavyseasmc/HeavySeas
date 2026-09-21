@@ -66,12 +66,12 @@ public final class WeaponScreen extends GameScreen {
 
     private Layout layout(int count) {
         int n = Math.max(1, count);
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int lineH = fh + 2;
         int identityY = identityY();
         // 卡下面有：横杠 · 秒数 · 三行字（这一段是什么 · 已押几张 · 键位）。按行高从下往上留够。
         int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + fh + HINT_GAP + 3 * lineH;
-        int top = TOP_BAND_Y + TOP_BAND_H;
+        int top = TOP_BAND_Y + topBandH();
         int avail = identityY - HINT_GAP - top - below;
         int room = liftRoom();
         int h = cardHeightFor(n, avail - room);
@@ -124,13 +124,13 @@ public final class WeaponScreen extends GameScreen {
 
         drawCountdown(context, now, c.deadlineMs(), c.windowMs(),
                 l.barX(), l.barY(), l.barW(), l.countdownY());
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.weapon.header"),
+        drawLine(context, Text.translatable("heavyseas.weapon.header"),
                 width / 2, l.headerY(), GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer, c.myCommitted() == 0
+        drawLine(context, c.myCommitted() == 0
                         ? Text.translatable("heavyseas.weapon.none")
                         : Text.translatable("heavyseas.weapon.committed", c.myCommitted()),
                 width / 2, l.committedY(), c.myCommitted() == 0 ? GuiLanguage.MUTED : GuiLanguage.VERDIGRIS);
-        context.drawCenteredTextWithShadow(textRenderer, Text.translatable("heavyseas.weapon.hint"),
+        drawLine(context, Text.translatable("heavyseas.weapon.hint"),
                 width / 2, l.hintY(), GuiLanguage.MUTED);
         drawIdentity(context, view, l.identityY());
     }

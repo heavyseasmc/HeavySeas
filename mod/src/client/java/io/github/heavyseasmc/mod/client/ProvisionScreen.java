@@ -143,18 +143,21 @@ public final class ProvisionScreen extends GameScreen {
      */
     private Layout layout() {
         int n = Math.max(1, data.offer().size());
-        int text = textRenderer.fontHeight;
-        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + text + HINT_GAP + text + LINE_GAP + text;
+        int text = textH();
+        // 牌名与提示两行是 GuiText 的字：行高要问它（界面尺寸小的时候有字号地板，一行比 9 个单位高）。
+        int nameH = GuiText.lineHeight(GuiText.NAME, true);
+        int keepH = GuiText.lineHeight(GuiText.BODY, false);
+        int below = BELOW_CARDS + BAR_H + BAR_TO_TEXT + text + HINT_GAP + nameH + LINE_GAP + keepH;
         // 卡顶要留多少空，取决于卡有多高（「顿」放大 7%，绕底边，长出来的那一截全在上面）；
         // 而卡有多高又取决于留了多少空。先按一个偏大的 h 算出空，再据此定 h ——
         // 空只会偏大一点点，卡因此略小一点点，绝不会反过来压上座位轨。
-        int room = snapRoom(cardHeightWithin(n, RAIL_H + snapRoom(0) + below));
-        int fixed = RAIL_H + room + below;
+        int room = snapRoom(cardHeightWithin(n, railH() + snapRoom(0) + below));
+        int fixed = railH() + room + below;
         int h = cardHeightWithin(n, fixed);
         int w = GuiLanguage.cardWidth(h);
 
         int railY = Math.max(MARGIN, (height - fixed - h) / 2);
-        int cardsTop = railY + RAIL_H + room;
+        int cardsTop = railY + railH() + room;
         int barY = cardsTop + h + BELOW_CARDS;
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         int hintY = countdownY + text + HINT_GAP;
@@ -166,7 +169,7 @@ public final class ProvisionScreen extends GameScreen {
         int seats = Math.max(1, data.chain().size());
         int railCell = GuiLanguage.cardWidth(cardHeightWithin(seats, fixed)) + CARD_GAP;
         return new Layout(w, h, (width - rowW) / 2, railY, (width - seats * railCell) / 2, railCell,
-                cardsTop, barY, (width - barW) / 2, barW, countdownY, hintY, hintY + text + LINE_GAP);
+                cardsTop, barY, (width - barW) / 2, barW, countdownY, hintY, hintY + nameH + LINE_GAP);
     }
 
     /** N 张一排时卡能画多高，竖着只剩 {@code height - 2*MARGIN - fixed}。 */
@@ -274,10 +277,11 @@ public final class ProvisionScreen extends GameScreen {
             int x = l.railLeft() + i * cell;
             boolean done = i < data.at();
             boolean here = i == data.at();
-            context.fill(x + 2, y + 10, x + cell - 2, y + 11, done ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
+            context.fill(x + 2, y + textH() + 1, x + cell - 2, y + textH() + 2, done ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
             Text name = Text.translatable("heavyseas.character." + chain.get(i));
-            context.drawCenteredTextWithShadow(textRenderer, name, x + cell / 2, y,
-                    here ? GuiLanguage.GOLD : (done ? GuiLanguage.MUTED : GuiLanguage.DIM));
+            // 每个名字只许占自己那一格：格子窄（界面尺寸 1、八个人）时缩字号，绝不压到邻座。
+            GuiText.line(context, name, x + 2, y, cell - 4, GuiText.BODY, false,
+                    here ? GuiLanguage.GOLD : (done ? GuiLanguage.MUTED : GuiLanguage.DIM), GuiText.Align.CENTER);
         }
     }
 
@@ -288,10 +292,10 @@ public final class ProvisionScreen extends GameScreen {
             return;
         }
         Text name = Text.translatable("heavyseas.provision." + offer.get(highlight));
-        context.drawCenteredTextWithShadow(textRenderer, name, width / 2, l.hintY(), GuiLanguage.INK);
-        context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable("heavyseas.provision.keep_one", offer.size()),
-                width / 2, l.keepY(), GuiLanguage.MUTED);
+        int boxW = width - 2 * SIDE;
+        GuiText.line(context, name, SIDE, l.hintY(), boxW, GuiText.NAME, true, GuiLanguage.INK, GuiText.Align.CENTER);
+        GuiText.line(context, Text.translatable("heavyseas.provision.keep_one", offer.size()),
+                SIDE, l.keepY(), boxW, GuiText.BODY, false, GuiLanguage.MUTED, GuiText.Align.CENTER);
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l) {

@@ -5,9 +5,7 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
-import net.minecraft.util.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,18 +67,18 @@ public final class ScoreScreen extends GameScreen {
         }
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
 
         // 上带（公开）：这一局怎么结束的，然后全员合计。
         Text outcome = Text.translatable(e.outcome() == GameState.Outcome.LANDED
                 ? "heavyseas.game.over.landed" : "heavyseas.game.over.all_dead", view.turn(), e.alive());
-        context.drawCenteredTextWithShadow(textRenderer, outcome, width / 2, TOP_BAND_Y, GuiLanguage.INK);
+        drawLine(context, outcome, width / 2, TOP_BAND_Y, GuiLanguage.INK);
         int totalsBottom = drawTotals(context, e, TOP_BAND_Y + fh + 8);
 
         HudView.Score s = view.myScore();
         int identityY = identityY();
         if (!s.present()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable(
+            drawLine(context, Text.translatable(
                             view.seated() ? "heavyseas.score.waiting" : "heavyseas.endgame.spectating"),
                     width / 2, (totalsBottom + identityY) / 2, GuiLanguage.MUTED);
             if (view.seated()) {
@@ -112,9 +110,9 @@ public final class ScoreScreen extends GameScreen {
             float rise = (1f - p) * GuiLanguage.DEAL_RISE;
             int y = Math.round(top + i * rowH + rise);
             int color = values[i] == 0 ? GuiLanguage.DIM : GuiLanguage.INK;
-            context.drawTextWithShadow(textRenderer, Text.translatable(labels[i]), left, y, color);
+            drawLineLeft(context, Text.translatable(labels[i]), left, y, color);
             Text value = Text.literal(Integer.toString(values[i]));
-            context.drawTextWithShadow(textRenderer, value, left + rowW - textRenderer.getWidth(value), y, color);
+            drawLineLeft(context, value, left + rowW - textW(value), y, color);
         }
         long snapAt = dealAt + 3 * GuiLanguage.DEAL_STAGGER_MS + GuiLanguage.DEAL_MS;
         if (now >= snapAt) {
@@ -130,9 +128,9 @@ public final class ScoreScreen extends GameScreen {
             context.getMatrices().scale(scale, scale, 1f);
             context.getMatrices().translate(-width / 2f, -(y + fh / 2f), 0);
             // 合计是「你」的数 —— 金色（ADR-0018 §7.3：金 = 你）。
-            context.drawTextWithShadow(textRenderer, Text.translatable("heavyseas.score.total"), left, y, GuiLanguage.GOLD);
+            drawLineLeft(context, Text.translatable("heavyseas.score.total"), left, y, GuiLanguage.GOLD);
             Text total = Text.literal(Integer.toString(s.total()));
-            context.drawTextWithShadow(textRenderer, total, left + rowW - textRenderer.getWidth(total), y, GuiLanguage.GOLD);
+            drawLineLeft(context, total, left + rowW - textW(total), y, GuiLanguage.GOLD);
             context.getMatrices().pop();
         }
         drawIdentity(context, view, identityY);
@@ -149,10 +147,6 @@ public final class ScoreScreen extends GameScreen {
     }
 
     /** 名字放不下一格时截短 —— 八人局、英文、窄窗口时相邻两格会叠成一团，截短至少还认得出是谁。 */
-    private OrderedText fit(Text text, int maxWidth) {
-        return Language.getInstance().reorder(textRenderer.trimToWidth(text, Math.max(1, maxWidth)));
-    }
-
     /**
      * 全员合计：名字一行、分数一行。最高分用墨色、其余用灰；你自己的名字是金色。
      *
@@ -164,12 +158,12 @@ public final class ScoreScreen extends GameScreen {
         if (n == 0) {
             return y;
         }
-        int fh = textRenderer.fontHeight;
+        int fh = textH();
         int best = Integer.MIN_VALUE;
         int widest = 0;
         for (HudView.Endgame.Entry en : entries) {
             best = Math.max(best, en.total());
-            widest = Math.max(widest, textRenderer.getWidth(Text.translatable("heavyseas.character." + en.who())));
+            widest = Math.max(widest, textW(Text.translatable("heavyseas.character." + en.who())));
         }
         int cell = Math.min(Math.max(widest + 8, 48), (width - 2 * SIDE) / n);
         int left = (width - n * cell) / 2;
@@ -180,9 +174,9 @@ public final class ScoreScreen extends GameScreen {
             boolean top = en.total() == best;
             boolean gone = view.removed().contains(en.who());
             int nameColor = me ? GuiLanguage.GOLD : top ? GuiLanguage.INK : GuiLanguage.MUTED;
-            context.drawCenteredTextWithShadow(textRenderer, fit(Text.translatable("heavyseas.character." + en.who()), cell - 4),
-                    x, y, gone ? GuiLanguage.DIM : nameColor);
-            context.drawCenteredTextWithShadow(textRenderer, Text.literal(Integer.toString(Math.max(0, en.total()))),
+            drawLineIn(context, Text.translatable("heavyseas.character." + en.who()), x - (cell - 4) / 2, y, cell - 4,
+                    gone ? GuiLanguage.DIM : nameColor);
+            drawLine(context, Text.literal(Integer.toString(Math.max(0, en.total()))),
                     x, y + fh + 3, top ? GuiLanguage.INK : GuiLanguage.MUTED);
         }
         return y + 2 * fh + 6;

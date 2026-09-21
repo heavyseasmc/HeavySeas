@@ -608,6 +608,107 @@ tasks.named('check') {
     dependsOn checkCardTextures
 }
 
+// 场景资源（ADR-0034 §5.2.3 · §8.2）：模型与贴图写错了，游戏照跑、没有报错 ——
+// 越界的元素被裁掉、缺的贴图是一块紫黑格子、非 16 倍数的贴图在低档位上糊掉，都只有进了世界才看得见。
+// 判据都读文件本身（JSON 坐标 · PNG 头 · 布局里的 item id），不问加载器怎么说。
+def checkSceneAssets = tasks.register('checkSceneAssets') {
+    group = 'verification'
+    description = '场景模型元素在 [-16, 32]、引用的贴图存在且是 16 的倍数的 PNG、布局里每个 item 有模型、音频都在 NOTICE 里登记'
+    // 任务属性而不是局部变量：红测要能把它们指向造坏的副本，而不去改被跟踪的资源。
+    ext.assetsDir = file('src/main/resources/assets/heavyseas')
+    ext.layoutFile = file('src/main/resources/data/heavyseas/voyage/default.json')
+    ext.noticeFile = rootProject.file('NOTICE')
+    inputs.dir(ext.assetsDir).optional()
+    inputs.file(ext.layoutFile).optional()
+    inputs.file(ext.noticeFile).optional()
+    doLast {
+        def slurper = new groovy.json.JsonSlurper()
+        def problems = []
+        def rel = { File f -> ext.assetsDir.toPath().relativize(f.toPath()).toString().replace('\\', '/') }
+        // PNG 头：8 字节签名 + IHDR 里的宽高（大端）。不经 ImageIO：无头环境下它的行为随平台变。
+        def pngSize = { File f ->
+            def head = new byte[24]
+            f.withInputStream { it.read(head) }
+            def sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+            if ((0..7).any { (head[it] & 0xFF) != sig[it] }) { return null }
+            def be = { int o -> ((head[o] & 0xFF) << 24) | ((head[o + 1] & 0xFF) << 16) | ((head[o + 2] & 0xFF) << 8) | (head[o + 3] & 0xFF) }
+            return [be(16), be(20)]
+        }
+        def modelFiles = []
+        ['item', 'block'].each { kind ->
+            def dir = new File(ext.assetsDir, "models/${kind}")
+            if (dir.isDirectory()) {
+                dir.listFiles({ File f -> f.name.endsWith('.json') } as FileFilter).sort { it.name }.each { modelFiles << it }
+            }
+        }
+        // 正向对照：一个模型都没扫到，「0 处问题」与「没在查」输出完全相同。
+        if (modelFiles.isEmpty()) {
+            throw new GradleException("没在查：${ext.assetsDir} 下 models/item 与 models/block 里一个模型 JSON 都没读到 —— 判据坏了，不是真的没有模型")
+        }
+        def checkedTextures = [] as Set
+        modelFiles.each { File f ->
+            def model = slurper.parse(f, 'UTF-8') as Map
+            (model.elements ?: []).eachWithIndex { el, i ->
+                ['from', 'to'].each { key ->
+                    (el[key] ?: []).eachWithIndex { v, axis ->
+                        if (v < -16 || v > 32) {
+                            problems << "${rel(f)}：元素 ${i} 的 ${key}.${'xyz'[axis]} = ${v}，越界 [−16, 32]"
+                        }
+                    }
+                }
+            }
+            (model.textures ?: [:]).each { name, ref ->
+                def s = ref.toString()
+                if (s.startsWith('#') || !s.startsWith('heavyseas:')) { return }   // 别的命名空间是 Minecraft 自带的，不归这里
+                def png = new File(ext.assetsDir, "textures/${s.substring('heavyseas:'.length())}.png")
+                if (!checkedTextures.add(png.path)) { return }
+                if (!png.isFile()) {
+                    problems << "${rel(f)}：贴图 ${s} 不存在（要 ${rel(png)}）"
+                    return
+                }
+                def size = pngSize(png)
+                if (size == null) {
+                    problems << "${rel(png)}：不是 PNG（签名对不上）"
+                } else if (size[0] % 16 != 0 || size[1] % 16 != 0) {
+                    problems << "${rel(png)}：${size[0]}×${size[1]}，边长不是 16 的倍数"
+                }
+            }
+        }
+        // 布局里出现的每个 item id 都要有物品模型：缺了它，布景 / 箱子在世界里是一块紫黑格子。
+        def layoutItems = [] as List
+        def walk
+        walk = { node ->
+            if (node instanceof Map) {
+                node.each { k, v -> if (k == 'item' && v instanceof CharSequence) { layoutItems << v.toString() } else { walk(v) } }
+            } else if (node instanceof List) {
+                node.each { walk(it) }
+            }
+        }
+        if (ext.layoutFile.isFile()) { walk(slurper.parse(ext.layoutFile, 'UTF-8')) }
+        layoutItems.each { id ->
+            def name = id.contains(':') ? id.substring(id.indexOf(':') + 1) : id
+            if (!new File(ext.assetsDir, "models/item/${name}.json").isFile()) {
+                problems << "布局里的 item ${id}：没有 models/item/${name}.json"
+            }
+        }
+        // 音频（§8.2）：每个 ogg 都要在 NOTICE 里有同名条目。判据与素材正交 —— 文件在、条目不在就红。
+        def sounds = new File(ext.assetsDir, 'sounds')
+        def oggs = sounds.isDirectory() ? sounds.listFiles({ File f -> f.name.endsWith('.ogg') } as FileFilter).sort { it.name } : []
+        def notice = ext.noticeFile.isFile() ? ext.noticeFile.getText('UTF-8') : ''
+        oggs.each { File f ->
+            if (!notice.contains(f.name)) { problems << "${rel(f)}：NOTICE 里没有同名条目（音频必须登记出处与许可）" }
+        }
+        if (problems) {
+            throw new GradleException((['场景资源核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("场景资源核对通过：${modelFiles.size()} 个模型 · ${checkedTextures.size()} 张贴图 · 布局 item ${layoutItems.size()} 个 · 音频 ${oggs.size()} 个")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkSceneAssets
+}
+
 // 生产 jar 里的 mixin 类必须已经翻成中间名（ADR-0034 §5.1.1）。
 //
 // 为什么要一道闸：开发客户端直接按 yarn 名注入，mixin 写错了 refmap、或 Loom 没翻注解，开发环境**一点都看不出来**；
@@ -633,8 +734,11 @@ def checkMixinRemapped = tasks.register('checkMixinRemapped') {
                 if (!text.contains('net/minecraft/class_')) {
                     problems << "${entry.name}：没有引用任何中间名 —— remapJar 没把 mixin 的目标翻过来"
                 }
-                if (text.contains('net/minecraft/client/') || text.contains('applyFog')) {
-                    problems << "${entry.name}：残留 yarn 名（net/minecraft/client/… 或 applyFog），生产客户端上找不到目标"
+                // 每个 mixin 的目标方法名都列在这里：漏列一个，那个 mixin 翻没翻对这道闸门就看不见。
+                def yarnTargets = ['applyFog', 'getGlyph', 'getProvidedGlyphs', 'makeGlyphBitmapSubpixel']
+                def leftover = yarnTargets.findAll { text.contains(it) }
+                if (text.contains('net/minecraft/client/') || !leftover.isEmpty()) {
+                    problems << "${entry.name}：残留 yarn 名（net/minecraft/client/… 或 ${leftover}），生产客户端上找不到目标"
                 }
             }
             // 正向对照：一个 mixin 类都没扫到时，「全翻对了」与「没在扫」输出一样。
