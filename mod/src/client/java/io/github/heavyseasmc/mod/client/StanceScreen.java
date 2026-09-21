@@ -80,14 +80,14 @@ public final class StanceScreen extends GameScreen {
                             case STEAL -> "heavyseas.stance.header_steal";
                             case RATION -> "heavyseas.stance.header_ration";
                         },
-                        nameOf(attacker), nameOf(target)), width / 2, headerY, GuiLanguage.INK);
+                        nameOf(attacker), nameOf(target)), width / 2, headerY, GuiLanguage.ink());
         // 两边各一行：站了谁 · 体型和。朱砂留给倒计时见底那一段，这里两边一视同仁。
         int attackY = headerY + fh + BTN_GAP;
         int defendY = attackY + fh + 2;
         drawLine(context, Text.translatable("heavyseas.stance.attack_side", names(c.attackSide()), c.attackPower()),
-                width / 2, attackY, GuiLanguage.INK);
+                width / 2, attackY, GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.stance.defend_side", names(c.defendSide()), c.defendPower()),
-                width / 2, defendY, GuiLanguage.INK);
+                width / 2, defendY, GuiLanguage.ink());
 
         List<Text> labels = List.of(Text.translatable("heavyseas.stance.join_attack"),
                 Text.translatable("heavyseas.stance.join_defend"),
@@ -105,7 +105,7 @@ public final class StanceScreen extends GameScreen {
         for (int i = 0; i < boxes.size(); i++) {
             lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
             drawButton(context, boxes.get(i), labels.get(i), i == focus,
-                    i == WATCH ? GuiLanguage.MUTED : GuiLanguage.INK, lift[i]);
+                    i == WATCH ? GuiLanguage.muted() : GuiLanguage.ink(), lift[i]);
         }
 
         int barW = countdownWidth(rowWidth(boxes));
@@ -113,7 +113,7 @@ public final class StanceScreen extends GameScreen {
         int countdownY = barY + BAR_H + BAR_TO_TEXT;
         drawCountdown(context, now, c.deadlineMs(), c.windowMs(), (width - barW) / 2, barY, barW, countdownY);
         drawLine(context, Text.translatable("heavyseas.stance.hint"),
-                width / 2, countdownY + fh + HINT_GAP, GuiLanguage.MUTED);
+                width / 2, countdownY + fh + HINT_GAP, GuiLanguage.muted());
         drawIdentity(context, view, identityY());
     }
 

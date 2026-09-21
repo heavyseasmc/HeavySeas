@@ -184,14 +184,14 @@ public final class HandScreen extends GameScreen {
             drawLine(context, Text.translatable("heavyseas.hand.affinity",
                             Text.translatable("heavyseas.character." + view.love()),
                             Text.translatable("heavyseas.character." + view.hate())),
-                    width / 2, statusY + textH() + 2, GuiLanguage.MUTED);
+                    width / 2, statusY + textH() + 2, GuiLanguage.muted());
         }
         drawIdentity(context, view, statusY);
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
         //   与 HUD 那一行「按绑定键查看」同一条理由。
         if (!hand.isEmpty()) {
             drawLine(context, Text.translatable("heavyseas.hand.keys"),
-                    width / 2, statusY + (affinityRoom > 0 ? 2 : 1) * (textH() + 2), GuiLanguage.MUTED);
+                    width / 2, statusY + (affinityRoom > 0 ? 2 : 1) * (textH() + 2), GuiLanguage.muted());
         }
 
         if (hand.isEmpty()) {
@@ -275,7 +275,7 @@ public final class HandScreen extends GameScreen {
             // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按绑定键进来的人，要的是「一张都没有」。
             boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
             drawLine(context, Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
-                    width / 2, y + h / 2 - text / 2, GuiLanguage.DIM);
+                    width / 2, y + h / 2 - text / 2, GuiLanguage.dim());
             return statusY;
         }
         int w = GuiLanguage.cardWidth(h);
@@ -289,7 +289,7 @@ public final class HandScreen extends GameScreen {
         CardTexture.drawProvision(context, hand.get(selected), x, y + dy, w, h);
         if (p < 1f) {
             int alpha = Math.round((1f - p) * 0x78);
-            context.fill(x, y + dy, x + w, y + dy + h, (alpha << 24) | (GuiLanguage.BACKDROP & 0xFFFFFF));
+            context.fill(x, y + dy, x + w, y + dy + h, (alpha << 24) | (GuiLanguage.dimmer() & 0xFFFFFF));
         }
         context.disableScissor();
         return statusY;

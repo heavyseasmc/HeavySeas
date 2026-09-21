@@ -137,7 +137,7 @@ public final class RevealScreen extends GameScreen {
         drawPublicBand(context, view, TOP_BAND_Y);
         int titleY = TOP_BAND_Y + 26;
         drawLine(context, Text.translatable(hate ? "heavyseas.reveal.round_hate" : "heavyseas.reveal.round_love"),
-                width / 2, titleY, GuiLanguage.INK);
+                width / 2, titleY, GuiLanguage.ink());
         int railBottom = drawRail(context, now, e, titleY + fh + 6);
 
         int identityY = identityY();
@@ -147,11 +147,11 @@ public final class RevealScreen extends GameScreen {
         drawSay(context, now, e, hate, sayY);
         if (view.seated()) {
             drawLine(context, Text.translatable("heavyseas.reveal.yours",
-                    nameOf(view.hate()), nameOf(view.love())), width / 2, ownY, GuiLanguage.MUTED);
+                    nameOf(view.hate()), nameOf(view.love())), width / 2, ownY, GuiLanguage.muted());
             drawIdentity(context, view, identityY);
         } else {
             drawLine(context, Text.translatable("heavyseas.endgame.spectating"),
-                    width / 2, identityY, GuiLanguage.MUTED);
+                    width / 2, identityY, GuiLanguage.muted());
         }
     }
 
@@ -179,14 +179,14 @@ public final class RevealScreen extends GameScreen {
             boolean midFlip = i == stageWho && stageRevealed && !showsFront(now, en);
             boolean done = !en.target().isEmpty() && !midFlip;
             boolean here = i == stageWho && !done;
-            int nameColor = here ? GuiLanguage.GOLD : done ? GuiLanguage.MUTED : GuiLanguage.DIM;
-            drawLineIn(context, nameOf(en.who()), x + 2, y, cell - 4, nameColor);
-            context.fill(x + 3, y + fh + 1, x + cell - 3, y + fh + 3, done ? GuiLanguage.VERDIGRIS : GuiLanguage.GROUND);
+            int nameColor = here ? GuiLanguage.gold() : done ? GuiLanguage.muted() : GuiLanguage.dim();
+            int nameY = drawSeat(context, en.who(), x, y, cell, here ? GuiLanguage.gold() : 0, !done && !here, nameColor,
+                    done ? GuiLanguage.verdigris() : GuiLanguage.ground());
             if (done) {
-                drawLineIn(context, nameOf(en.target()), x + 2, y + fh + 5, cell - 4, GuiLanguage.MUTED);
+                drawLineIn(context, nameOf(en.target()), x + 2, nameY + fh + 5, cell - 4, GuiLanguage.muted());
             }
         }
-        return y + 2 * fh + 6;
+        return y + avatarBlockH() + 2 * fh + 6;
     }
 
     /** 舞台：被点名的人 · 「恨 / 爱」· 暗牌（翻开是目标）。整排跟着「滑」。 */
@@ -211,14 +211,14 @@ public final class RevealScreen extends GameScreen {
         CardTexture.drawCharacter(context, en.who(), left, y, w, h);
         if (en.winner() && stageRevealed && showsFront(now, en)) {
             context.drawBorder(left - CARD_FRAME, y - CARD_FRAME, w + 2 * CARD_FRAME, h + 2 * CARD_FRAME,
-                    GuiLanguage.GOLD);
+                    GuiLanguage.gold());
         }
 
         // 「恨」用朱砂 —— 它只给伤害与紧迫；「爱」不占语义色（ADR-0018 §7.3：多了就不成语义）。
         context.getMatrices().push();
         context.getMatrices().translate(left + w + STAGE_GAP, y + h / 2f - textH() * LABEL_SCALE / 2f, 0);
         context.getMatrices().scale(LABEL_SCALE, LABEL_SCALE, 1f);
-        drawLineLeft(context, label, 0, 0, hate ? GuiLanguage.CINNABAR : GuiLanguage.INK);
+        drawLineLeft(context, label, 0, 0, hate ? GuiLanguage.cinnabar() : GuiLanguage.ink());
         context.getMatrices().pop();
 
         int tx = left + w + labelW + 2 * STAGE_GAP;
@@ -244,11 +244,11 @@ public final class RevealScreen extends GameScreen {
         }
         HudView.Endgame.Entry en = entries.get(stageWho);
         Text line;
-        int color = GuiLanguage.MUTED;
+        int color = GuiLanguage.muted();
         if (stageRevealed && !en.target().isEmpty() && showsFront(now, en)) {
             line = Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
                     nameOf(en.who()), nameOf(en.target()));
-            color = GuiLanguage.INK;
+            color = GuiLanguage.ink();
         } else {
             line = Text.translatable(hate ? "heavyseas.reveal.asking_hate" : "heavyseas.reveal.asking_love",
                     nameOf(en.who()));

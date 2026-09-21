@@ -79,9 +79,9 @@ public final class RosterScreen extends GameScreen {
         long dt = frameDelta(now);
         int fh = textH();
 
-        drawLine(context, title, width / 2, TOP_BAND_Y, GuiLanguage.INK);
+        drawLine(context, title, width / 2, TOP_BAND_Y, GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.roster.detail", config.players(), selected.size()),
-                width / 2, TOP_BAND_Y + fh + 3, GuiLanguage.MUTED);
+                width / 2, TOP_BAND_Y + fh + 3, GuiLanguage.muted());
 
         // 三片按钮自上而下：角色格 · 预设 · 开航与取消。每片顶上都留出「抬」的高度。
         List<Text> characterLabels = new ArrayList<>();
@@ -117,21 +117,21 @@ public final class RosterScreen extends GameScreen {
             lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
             Text text;
             int color;
-            int fill = GuiLanguage.GROUND;
+            int fill = GuiLanguage.ground();
             if (i < characterCount()) {
                 text = characterLabels.get(i);
-                color = selected.contains(config.characters().get(i)) ? GuiLanguage.VERDIGRIS : GuiLanguage.MUTED;
+                color = selected.contains(config.characters().get(i)) ? GuiLanguage.verdigris() : GuiLanguage.muted();
             } else if (i < startIndex()) {
                 text = presetLabels.get(i - characterCount());
-                color = GuiLanguage.INK;
+                color = GuiLanguage.ink();
             } else if (i == startIndex()) {
                 text = actionLabels.get(0);
                 // 人数对不上时按不动：底与字一起淡下去（只淡字与本来就淡字的「取消」分不开）。
-                color = canStart() ? GuiLanguage.VERDIGRIS : withAlpha(GuiLanguage.VERDIGRIS, DISABLED_TEXT_ALPHA);
-                fill = canStart() ? GuiLanguage.GROUND : withAlpha(GuiLanguage.GROUND, DISABLED_FILL_ALPHA);
+                color = canStart() ? GuiLanguage.verdigris() : withAlpha(GuiLanguage.verdigris(), DISABLED_TEXT_ALPHA);
+                fill = canStart() ? GuiLanguage.ground() : withAlpha(GuiLanguage.ground(), DISABLED_FILL_ALPHA);
             } else {
                 text = actionLabels.get(1);
-                color = GuiLanguage.MUTED;
+                color = GuiLanguage.muted();
             }
             drawButton(context, all.get(i), text, i == focus, color, fill, -lift[i], 1f);
         }

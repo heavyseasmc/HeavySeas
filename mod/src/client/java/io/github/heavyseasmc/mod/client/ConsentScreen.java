@@ -84,7 +84,7 @@ public final class ConsentScreen extends GameScreen {
                     case STEAL -> "heavyseas.consent.steal";
                     case RATION -> "heavyseas.consent.ration";
                 }, nameOf(attacker)),
-                width / 2, askY, GuiLanguage.INK);
+                width / 2, askY, GuiLanguage.ink());
 
         List<Text> labels = List.of(Text.translatable("heavyseas.consent.agree"),
                 Text.translatable("heavyseas.consent.fight"));
@@ -104,7 +104,7 @@ public final class ConsentScreen extends GameScreen {
         for (int i = 0; i < boxes.size(); i++) {
             lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
             drawButton(context, boxes.get(i), labels.get(i), i == focus,
-                    i == 1 ? GuiLanguage.CINNABAR : GuiLanguage.INK, lift[i]);
+                    i == 1 ? GuiLanguage.cinnabar() : GuiLanguage.ink(), lift[i]);
         }
 
         int barW = countdownWidth(rowWidth(boxes));
@@ -114,9 +114,9 @@ public final class ConsentScreen extends GameScreen {
                 (width - barW) / 2, barY, barW, countdownY);
         int hintY = countdownY + fh + HINT_GAP;
         drawLine(context, Text.translatable(focus == 1 ? "heavyseas.consent.fight_hint" : "heavyseas.consent.agree_hint"),
-                width / 2, hintY, GuiLanguage.MUTED);
+                width / 2, hintY, GuiLanguage.muted());
         drawLine(context, Text.translatable("heavyseas.consent.timeout"),
-                width / 2, hintY + fh + 2, GuiLanguage.DIM);
+                width / 2, hintY + fh + 2, GuiLanguage.dim());
         drawIdentity(context, view, identityY());
     }
 

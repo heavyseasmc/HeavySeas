@@ -130,6 +130,9 @@ public final class ActionScreen extends GameScreen {
         int countdownY = timeoutY - HINT_GAP - text;
         int barY = countdownY - BAR_TO_TEXT - BAR_H;
         int hintY = barY - HINT_GAP - text;
+        // 按钮排几行只看宽度，所以能先算它要多高；座位轨拿走的是<b>剩下的</b>那点高 ——
+        // 反过来（轨先按窗口取高、按钮再挤剩下的）按钮会被顶出去盖住说明那一行。
+        capRail(hintY - BTN_GAP - buttonsH() - topRoom() - railY);
         // 按钮连同下面那行说明，在座位轨与身份行之间居中。顶上留出「抬」与「顿」的高度，免得弹进轨里。
         buttons = layoutButtons(railY + railH() + topRoom(), hintY - BTN_GAP);
         drawRail(context, railY, rowWidth(buttons));
@@ -156,17 +159,17 @@ public final class ActionScreen extends GameScreen {
             }
             Choice c = CHOICES[i];
             drawButton(context, b, Text.translatable(c.label), i == focus, labelColor(c),
-                    c.enabled(view) ? GuiLanguage.GROUND : withAlpha(GuiLanguage.GROUND, DISABLED_FILL_ALPHA),
+                    c.enabled(view) ? GuiLanguage.ground() : withAlpha(GuiLanguage.ground(), DISABLED_FILL_ALPHA),
                     rise, scale);
         }
         // 说明只跟焦点走一行：按不动的那几件，这一行说为什么。
         drawLine(context, Text.translatable(CHOICES[focus].hint(view)),
-                width / 2, hintY, GuiLanguage.MUTED);
+                width / 2, hintY, GuiLanguage.muted());
         int barW = countdownWidth(rowWidth(buttons));
         drawCountdown(context, now, view.actionDeadlineMs(), view.actionWindowMs(),
                 (width - barW) / 2, barY, barW, countdownY);
         drawLine(context, Text.translatable("heavyseas.action.timeout_hint"),
-                width / 2, timeoutY, GuiLanguage.DIM);
+                width / 2, timeoutY, GuiLanguage.dim());
         drawIdentity(context, view, identityY);
     }
 
@@ -189,28 +192,14 @@ public final class ActionScreen extends GameScreen {
      */
     private List<Box> layoutButtons(int top, int bottom) {
         int h = buttonHeight();
-        int avail = width - 2 * SIDE;
-        int[] w = new int[CHOICES.length];
-        for (int i = 0; i < CHOICES.length; i++) {
-            w[i] = buttonWidth(Text.translatable(CHOICES[i].label));
-        }
-        List<int[]> rows = new ArrayList<>();
-        int from = 0;
-        int rowW = w[0];
-        for (int i = 1; i < CHOICES.length; i++) {
-            if (rowW + BTN_GAP + w[i] > avail) {
-                rows.add(new int[]{from, i});
-                from = i;
-                rowW = w[i];
-            } else {
-                rowW += BTN_GAP + w[i];
-            }
-        }
-        rows.add(new int[]{from, CHOICES.length});
+        int[] w = buttonWidths();
+        List<int[]> rows = buttonRows(w);
 
         int rowStep = h + BTN_GAP + topRoom();
-        int blockH = rows.size() * h + (rows.size() - 1) * (BTN_GAP + topRoom());
-        int y = top + Math.max(0, (bottom - top - blockH) / 2);
+        // 放得下就居中；放不下就贴着 bottom 往上排 —— 顶上的那点「抬」与「顿」的余量可以让，
+        // 说明那一行不能让：854×480 下就算不画头像，只有名字的轨加按钮也还差两个单位。
+        int blockH = buttonsH();
+        int y = bottom - top >= blockH ? top + (bottom - top - blockH) / 2 : bottom - blockH;
         List<Box> out = new ArrayList<>(CHOICES.length);
         for (int[] row : rows) {
             int total = -BTN_GAP;
@@ -225,6 +214,39 @@ public final class ActionScreen extends GameScreen {
             y += rowStep;
         }
         return out;
+    }
+
+    private int[] buttonWidths() {
+        int[] w = new int[CHOICES.length];
+        for (int i = 0; i < CHOICES.length; i++) {
+            w[i] = buttonWidth(Text.translatable(CHOICES[i].label));
+        }
+        return w;
+    }
+
+    /** 哪几个按钮排在同一行：{@code [起, 止)}。只看宽度，所以不必先知道排在哪个高度上。 */
+    private List<int[]> buttonRows(int[] w) {
+        int avail = width - 2 * SIDE;
+        List<int[]> rows = new ArrayList<>();
+        int from = 0;
+        int rowW = w[0];
+        for (int i = 1; i < CHOICES.length; i++) {
+            if (rowW + BTN_GAP + w[i] > avail) {
+                rows.add(new int[]{from, i});
+                from = i;
+                rowW = w[i];
+            } else {
+                rowW += BTN_GAP + w[i];
+            }
+        }
+        rows.add(new int[]{from, CHOICES.length});
+        return rows;
+    }
+
+    /** 按钮那一片连行间的「抬」与「顿」一共多高 —— 座位轨要按它让出高度。 */
+    private int buttonsH() {
+        int rows = buttonRows(buttonWidths()).size();
+        return rows * buttonHeight() + (rows - 1) * (BTN_GAP + topRoom());
     }
 
     /**
@@ -248,14 +270,13 @@ public final class ActionScreen extends GameScreen {
             String id = seats.get(i);
             boolean here = id.equals(view.actor());
             int x = left + i * cell;
-            context.fill(x + 2, y + textH() + 1, x + cell - 2, y + textH() + 2, here ? GuiLanguage.GOLD : GuiLanguage.GROUND);
-            drawLineIn(context, Text.translatable("heavyseas.character." + id), x + 2, y, cell - 4,
-                    here ? GuiLanguage.GOLD : GuiLanguage.MUTED);
+            drawSeat(context, id, x, y, cell, here ? GuiLanguage.gold() : 0, false,
+                    here ? GuiLanguage.gold() : GuiLanguage.muted(), here ? GuiLanguage.gold() : GuiLanguage.ground());
         }
     }
 
     private int labelColor(Choice c) {
-        int base = c.harmful ? GuiLanguage.CINNABAR : (c == Choice.PASS ? GuiLanguage.MUTED : GuiLanguage.INK);
+        int base = c.harmful ? GuiLanguage.cinnabar() : (c == Choice.PASS ? GuiLanguage.muted() : GuiLanguage.ink());
         return c.enabled(view) ? base : withAlpha(base, DISABLED_TEXT_ALPHA);
     }
 

@@ -58,9 +58,9 @@ public final class ProvisionTargetScreen extends GameScreen {
         int fh = textH();
         int titleY = 48;
         drawLine(context, Text.translatable("heavyseas.target.title", provisionName(view.provisionTargetCard())),
-                width / 2, titleY, GuiLanguage.INK);
+                width / 2, titleY, GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.target.detail"),
-                width / 2, titleY + fh + 3, GuiLanguage.MUTED);
+                width / 2, titleY + fh + 3, GuiLanguage.muted());
 
         List<Text> labels = new ArrayList<>();
         for (HudView.MedicalTarget target : view.provisionTargets()) {
@@ -71,7 +71,7 @@ public final class ProvisionTargetScreen extends GameScreen {
         boxes = layoutButtonRow(labels, buttonsTop, BTN_GAP);
         if (labels.isEmpty()) {
             drawLine(context, Text.translatable("heavyseas.command.nobody_wounded"),
-                    width / 2, buttonsTop, GuiLanguage.MUTED);
+                    width / 2, buttonsTop, GuiLanguage.muted());
         }
         if (mouseActuallyMoved(mouseX, mouseY) && !committed) {
             int hovered = indexAt(boxes, mouseX, mouseY);
@@ -83,12 +83,12 @@ public final class ProvisionTargetScreen extends GameScreen {
         for (int i = 0; i < labels.size(); i++) {
             lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
             drawButton(context, boxes.get(i), labels.get(i), i == focus,
-                    i == focus ? GuiLanguage.VERDIGRIS : GuiLanguage.INK, lift[i]);
+                    i == focus ? GuiLanguage.verdigris() : GuiLanguage.ink(), lift[i]);
         }
 
         int hintY = buttonsTop + Math.max(fh, rowHeight(boxes)) + BTN_GAP;
         drawLine(context, Text.translatable("heavyseas.target.hint"),
-                width / 2, hintY, GuiLanguage.MUTED);
+                width / 2, hintY, GuiLanguage.muted());
         drawIdentity(context, view, identityY());
     }
 

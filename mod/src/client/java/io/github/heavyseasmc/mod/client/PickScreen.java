@@ -144,14 +144,14 @@ public final class PickScreen extends GameScreen {
         drawCountdown(context, now, c.deadlineMs(), c.windowMs(),
                 l.barX(), l.barY(), l.barW(), l.countdownY());
         drawLine(context, Text.translatable("heavyseas.pick.header", nameOf(c.target())),
-                width / 2, l.headerY(), GuiLanguage.INK);
+                width / 2, l.headerY(), GuiLanguage.ink());
         // 说明只跟高亮走一行 —— 把每一张都摊开就变成读说明书了（与补给箱同一条）。
         drawLine(context, isHandOption(highlight)
                         ? Text.translatable("heavyseas.pick.from_hand", c.victimHand())
                         : Text.translatable("heavyseas.provision." + c.victimFront().get(highlight)),
-                width / 2, l.hintY(), GuiLanguage.INK);
+                width / 2, l.hintY(), GuiLanguage.ink());
         drawLine(context, Text.translatable("heavyseas.pick.hint"),
-                width / 2, l.keysY(), GuiLanguage.MUTED);
+                width / 2, l.keysY(), GuiLanguage.muted());
         drawIdentity(context, view, l.identityY());
     }
 
