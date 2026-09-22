@@ -36,6 +36,9 @@ public final class LobbyBoat {
         if (!(rawWorld instanceof ServerWorld world) || !(rawPlayer instanceof ServerPlayerEntity player)) {
             return ActionResult.PASS;
         }
+        if (player.isSpectator() || !player.canModifyAt(world, pos)) {
+            return ActionResult.FAIL;
+        }
         if (!world.getRegistryKey().equals(World.OVERWORLD)) {
             player.sendMessage(Text.translatable("heavyseas.lobby.overworld_only"), true);
             return ActionResult.FAIL;
@@ -80,10 +83,16 @@ public final class LobbyBoat {
 
     /** 收到面板确认包后重新核对船、座位、人数与阵容，再真正敲铃开局。 */
     public static void launch(ServerPlayerEntity player, StartVoyageC2S request) {
+        if (player.isSpectator()) {
+            return;
+        }
         if (!(player.getWorld() instanceof ServerWorld world) || !world.getRegistryKey().equals(World.OVERWORLD)) {
             return;
         }
         BlockPos pos = BlockPos.fromLong(request.anchor());
+        if (!player.canModifyAt(world, pos)) {
+            return;
+        }
         BlockState state = world.getBlockState(pos);
         if (!state.isOf(LobbyBoatBlock.BLOCK)) {
             return;
@@ -130,30 +139,42 @@ public final class LobbyBoat {
             seat.removeAllPassengers();
             seat.discard();
         }
+        for (LobbyBoatEntity hull : hullsAt(world, pos)) {
+            hull.discard();
+        }
+    }
+
+    /** Rebuild only disposable interaction state; merely loading a boat must not create registrations. */
+    public static void maintain(ServerWorld world, BlockPos anchor, Direction facing) {
+        List<LobbyBoatEntity> hulls = hullsAt(world, anchor);
+        LobbyBoatEntity hull;
+        if (hulls.isEmpty()) {
+            hull = new LobbyBoatEntity(LobbyBoatEntity.TYPE, world);
+            hull.place(anchor, facing);
+            world.spawnEntity(hull);
+        } else {
+            hull = hulls.getFirst();
+            hull.place(anchor, facing);
+            hulls.stream().skip(1).forEach(Entity::discard);
+        }
+        reconcileSeats(world, anchor, facing);
     }
 
     private static List<SeatEntity> ensureSeats(ServerWorld world, BlockPos anchor, Direction facing) {
-        List<SeatEntity> found = seatsAt(world, anchor);
-        boolean[] occupied = new boolean[8];
+        List<SeatEntity> found = reconcileSeats(world, anchor, facing);
+        boolean[] occupied = new boolean[LobbyBoatGeometry.SEAT_COUNT];
         for (SeatEntity seat : found) {
-            if (seat.index() >= 0 && seat.index() < occupied.length) {
-                occupied[seat.index()] = true;
-            }
+            occupied[seat.index()] = true;
         }
-        Vec3d forward = Vec3d.of(facing.getVector());
-        Vec3d right = new Vec3d(-forward.z, 0, forward.x);
-        Vec3d center = Vec3d.ofBottomCenter(anchor).add(0, 0.35, 0);
-        for (int index = 0; index < 8; index++) {
+        for (int index = 0; index < occupied.length; index++) {
             if (occupied[index]) {
                 continue;
             }
-            int row = index / 2;
-            double side = index % 2 == 0 ? -0.62 : 0.62;
-            Vec3d at = center.add(forward.multiply(row - 1.5)).add(right.multiply(side));
+            Vec3d at = LobbyBoatGeometry.seatAt(anchor, facing, index);
             SeatEntity seat = new SeatEntity(SeatEntity.TYPE, world);
             seat.setIndex(index);
             seat.markLobby(anchor);
-            seat.refreshPositionAndAngles(at.x, at.y, at.z, facing.asRotation() + 180f, 0f);
+            seat.refreshPositionAndAngles(at.x, at.y, at.z, facing.asRotation(), 0f);
             if (world.spawnEntity(seat)) {
                 found.add(seat);
             }
@@ -162,8 +183,36 @@ public final class LobbyBoat {
         return found;
     }
 
+    private static List<SeatEntity> reconcileSeats(ServerWorld world, BlockPos anchor, Direction facing) {
+        List<SeatEntity> found = seatsAt(world, anchor);
+        found.sort(Comparator.comparing((SeatEntity seat) -> !seat.hasPassengers()));
+        boolean[] occupied = new boolean[LobbyBoatGeometry.SEAT_COUNT];
+        List<SeatEntity> retained = new ArrayList<>();
+        for (SeatEntity seat : found) {
+            int index = seat.index();
+            if (index < 0 || index >= occupied.length || occupied[index]) {
+                seat.removeAllPassengers();
+                seat.discard();
+                continue;
+            }
+            occupied[index] = true;
+            Vec3d expected = LobbyBoatGeometry.seatAt(anchor, facing, index);
+            if (seat.squaredDistanceTo(expected) > 0.0001 || seat.getYaw() != facing.asRotation()) {
+                seat.refreshPositionAndAngles(expected.x, expected.y, expected.z, facing.asRotation(), 0f);
+            }
+            retained.add(seat);
+        }
+        retained.sort(Comparator.comparingInt(SeatEntity::index));
+        return retained;
+    }
+
+    private static List<LobbyBoatEntity> hullsAt(ServerWorld world, BlockPos anchor) {
+        return new ArrayList<>(world.getEntitiesByType(LobbyBoatEntity.TYPE,
+                LobbyBoatGeometry.searchBounds(anchor), hull -> hull.anchor().equals(anchor)));
+    }
+
     private static List<SeatEntity> seatsAt(ServerWorld world, BlockPos anchor) {
-        Box area = new Box(anchor).expand(6.0, 3.0, 6.0);
+        Box area = LobbyBoatGeometry.searchBounds(anchor);
         return new ArrayList<>(world.getEntitiesByType(SeatEntity.TYPE, area,
                 seat -> seat.lobby() && seat.lobbyAnchor().equals(anchor)));
     }
@@ -172,7 +221,7 @@ public final class LobbyBoat {
         List<ServerPlayerEntity> players = new ArrayList<>();
         for (SeatEntity seat : seats) {
             for (Entity passenger : seat.getPassengerList()) {
-                if (passenger instanceof ServerPlayerEntity player) {
+                if (passenger instanceof ServerPlayerEntity player && !player.isSpectator()) {
                     players.add(player);
                 }
             }

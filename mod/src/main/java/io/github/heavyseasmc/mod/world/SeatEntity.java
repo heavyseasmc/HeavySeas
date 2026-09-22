@@ -4,13 +4,20 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnGroup;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+
+import java.util.Optional;
 
 /**
  * 一个座位（ADR-0024）。玩家骑在它上面，于是「位次」第一次成了世界里的空间关系（决策 ①）。
@@ -42,11 +49,13 @@ public final class SeatEntity extends Entity {
      * 而且我们只想清自己这一局摆下的那些。
      */
     private static final String GAME_TAG = "heavyseas_seat";
+    private static final TrackedData<Boolean> LOBBY =
+            DataTracker.registerData(SeatEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final TrackedData<BlockPos> LOBBY_ANCHOR =
+            DataTracker.registerData(SeatEntity.class, TrackedDataHandlerRegistry.BLOCK_POS);
 
     /** 这个座位是船头数过来第几个（0 起）。只用于日志与排错，规则一侧不读它。 */
     private int index;
-    private boolean lobby;
-    private BlockPos lobbyAnchor = BlockPos.ORIGIN;
 
     public static final EntityType<SeatEntity> TYPE = EntityType.Builder
             .<SeatEntity>create(SeatEntity::new, SpawnGroup.MISC)
@@ -89,40 +98,55 @@ public final class SeatEntity extends Entity {
     }
 
     public boolean lobby() {
-        return lobby;
+        return dataTracker.get(LOBBY);
     }
 
     public BlockPos lobbyAnchor() {
-        return lobbyAnchor;
+        return dataTracker.get(LOBBY_ANCHOR);
     }
 
     public void markLobby(BlockPos anchor) {
         markOurs();
-        lobby = true;
-        lobbyAnchor = anchor.toImmutable();
+        dataTracker.set(LOBBY, true);
+        dataTracker.set(LOBBY_ANCHOR, anchor.toImmutable());
     }
 
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
-        // 没有要同步的字段：座位本身看不见，客户端只需要知道它在哪、自己骑没骑着。
+        builder.add(LOBBY, false);
+        builder.add(LOBBY_ANCHOR, BlockPos.ORIGIN);
     }
 
     @Override
     protected void readCustomDataFromNbt(NbtCompound nbt) {
         index = nbt.getInt("Index");
-        lobby = nbt.getBoolean("Lobby");
-        if (lobby) {
-            lobbyAnchor = BlockPos.fromLong(nbt.getLong("LobbyAnchor"));
+        dataTracker.set(LOBBY, nbt.getBoolean("Lobby"));
+        if (lobby()) {
+            dataTracker.set(LOBBY_ANCHOR, BlockPos.fromLong(nbt.getLong("LobbyAnchor")));
         }
     }
 
     @Override
     protected void writeCustomDataToNbt(NbtCompound nbt) {
         nbt.putInt("Index", index);
-        nbt.putBoolean("Lobby", lobby);
-        if (lobby) {
-            nbt.putLong("LobbyAnchor", lobbyAnchor.asLong());
+        nbt.putBoolean("Lobby", lobby());
+        if (lobby()) {
+            nbt.putLong("LobbyAnchor", lobbyAnchor().asLong());
         }
+    }
+
+    @Override
+    public Vec3d updatePassengerForDismount(LivingEntity passenger) {
+        Optional<Vec3d> landing = lobbyLanding(passenger);
+        if (landing.isPresent()) {
+            return landing.orElseThrow();
+        }
+        return super.updatePassengerForDismount(passenger);
+    }
+
+    public Optional<Vec3d> lobbyLanding(LivingEntity passenger) {
+        return lobby() ? LobbyBoatLanding.find(getWorld(), passenger.getType(), lobbyAnchor(),
+                Direction.fromRotation(getYaw())) : Optional.empty();
     }
 
     /**

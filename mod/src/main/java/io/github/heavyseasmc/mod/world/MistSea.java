@@ -188,10 +188,15 @@ public final class MistSea {
         if (component.hasVoyageEscrow(player.getUuid())) {
             throw new IllegalStateException(player.getGameProfile().getName() + " 已有一份未恢复的雾海托管");
         }
+        Vec3d returnPoint = player.getPos();
+        if (player.getVehicle() instanceof SeatEntity seat && seat.ours() && seat.lobby()) {
+            returnPoint = seat.lobbyLanding(player).orElseThrow(
+                    () -> new IllegalStateException("大厅游轮附近没有安全的返回地面，无法开航"));
+        }
         NbtList inventory = player.getInventory().writeNbt(new NbtList());
         component.putVoyageEscrow(new GameComponent.VoyageEscrow(player.getUuid(),
                 player.getWorld().getRegistryKey().getValue().toString(),
-                player.getX(), player.getY(), player.getZ(), player.getYaw(), player.getPitch(), inventory));
+                returnPoint.x, returnPoint.y, returnPoint.z, player.getYaw(), player.getPitch(), inventory));
         player.getInventory().clear();
         player.getInventory().markDirty();
         player.playerScreenHandler.sendContentUpdates();

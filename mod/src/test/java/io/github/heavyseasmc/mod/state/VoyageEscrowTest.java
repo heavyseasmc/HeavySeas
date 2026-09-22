@@ -31,6 +31,8 @@ final class VoyageEscrowTest {
         GameComponent.VoyageEscrow restored = loaded.removeVoyageEscrow(player).orElseThrow();
         assertEquals("minecraft:overworld", restored.dimension());
         assertEquals(12.5, restored.x());
+        assertEquals(70.0, restored.y());
+        assertEquals(-4.5, restored.z());
         assertEquals("minecraft:stone", restored.inventory().getCompound(0).getString("id"));
     }
 }
