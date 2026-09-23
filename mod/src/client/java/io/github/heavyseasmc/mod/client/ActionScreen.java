@@ -56,8 +56,16 @@ public final class ActionScreen extends GameScreen {
             this.harmful = harmful;
         }
 
+        /**
+         * 这一件现在按不按得动。
+         *
+         * <p>❗2026-09-23 之前这里写的是 {@code kind != null || this == USE} —— 五件事**永远都可按**，
+         * 参数 {@code view} 一次都没被读过，而 {@link #select} 里那条「按不动就不发包」的分支
+         * 从来没有执行过。屏幕上看不出来：无风那一天界面照样给出「划船」，按下去才被服务端拒
+         * （`风平浪静时没有航海阶段，不能划船`）。**界面给出一件必然失败的事，比不给更糟**。
+         */
         boolean enabled(HudView view) {
-            return kind != null || this == USE;
+            return this != ROW || view.canRow();
         }
     }
 
@@ -113,6 +121,9 @@ public final class ActionScreen extends GameScreen {
             return;                           // 这一帧什么都不画，tick 会把它收起来
         }
         renderBackdrop(context, mouseX, mouseY, delta);
+        if (!CHOICES[focus].enabled(view)) {
+            focus = firstEnabled();           // 开面那一下，或天候变了之后：焦点不该停在按不动的那一件上
+        }
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
 
@@ -147,7 +158,7 @@ public final class ActionScreen extends GameScreen {
                     c.enabled(view) ? GuiLanguage.ground() : withAlpha(GuiLanguage.ground(), DISABLED_FILL_ALPHA),
                     rise, scale);
         }
-        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")), now,
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(confirm("Enter")), now,
                 new Countdown(view.actionDeadlineMs(), view.actionWindowMs(), rowWidth(buttons)));
     }
 
@@ -255,11 +266,11 @@ public final class ActionScreen extends GameScreen {
         if (!decided()) {
             switch (keyCode) {
                 case GLFW.GLFW_KEY_LEFT -> {
-                    focus = Math.max(0, focus - 1);
+                    focus = step(-1);
                     return true;
                 }
                 case GLFW.GLFW_KEY_RIGHT -> {
-                    focus = Math.min(CHOICES.length - 1, focus + 1);
+                    focus = step(1);
                     return true;
                 }
                 case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_SPACE -> {
@@ -271,6 +282,31 @@ public final class ActionScreen extends GameScreen {
             }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    /**
+     * 往一边挪一格，**跳过按不动的那几件**。挪不动就留在原地。
+     *
+     * <p>焦点停在一件按不动的东西上，按 Enter 什么也不会发生 —— 而「按了没反应」与「界面卡住了」
+     * 在屏幕上长得一样。无风那一天「划船」正是这一档（2026-09-23 实拍）。
+     */
+    private int step(int dir) {
+        for (int i = focus + dir; i >= 0 && i < CHOICES.length; i += dir) {
+            if (CHOICES[i].enabled(view)) {
+                return i;
+            }
+        }
+        return focus;
+    }
+
+    /** 开面那一下，焦点落在第一件按得动的事上。 */
+    private int firstEnabled() {
+        for (int i = 0; i < CHOICES.length; i++) {
+            if (CHOICES[i].enabled(view)) {
+                return i;
+            }
+        }
+        return 0;
     }
 
     private void confirm() {

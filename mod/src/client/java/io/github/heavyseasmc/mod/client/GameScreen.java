@@ -51,7 +51,67 @@ public abstract class GameScreen extends Screen {
      * <p>原先这里是写死的 34，而实际用掉的只有「一行字 + 10」—— 界面尺寸自动时白白空掉 15 个单位，
      * 而舞台正缺这 15 个（总纲 §7.8：牌是主体）。改成按实际行高算，上带于是只占它真正用到的那么高。
      */
-    protected static final int TOP_BAND_H = 14;
+    protected static final int TOP_BAND_H = 8;
+    /**
+     * 上带那一排图标多高（GUI 单位）。
+     *
+     * <p>❗2026-09-23 实拍从 12 提到 16：一行字换成一排图标之后，12 个单位的线稿在 1280×720 上
+     * 只有 36 物理像素，整条带读起来是几个灰点 —— <b>图标替掉字，就得占到字那一档的分量</b>，
+     * 否则「少说」变成了「说不清」。
+     */
+    protected static final int ICON_H = 16;
+
+    /**
+     * 密度档：小窗<b>少说</b>，不是<b>缩小</b>（用户 2026-09-22，ADR-0037 §7.13）。
+     *
+     * <p>原话：「适配分辨率不是说适配缩放，而是说在小窗下我们要简化或者藏起来多少信息，
+     * 玩家想看更详细信息，自然要放大窗口」。取舍次序取自 §7.8：
+     * <b>牌 → 你能按的 → 公开状态 → 说明</b>，小窗从后往前砍。
+     *
+     * <p>这一档哪些件出场，只此一处：
+     * <table>
+     *   <tr><th></th><th>FULL</th><th>MEDIUM</th><th>COMPACT</th></tr>
+     *   <tr><td>牌 · 阶段轮盘 · 确认那一件</td><td>有</td><td>有</td><td>有</td></tr>
+     *   <tr><td>次要按键提示（查看 / 收起）</td><td>有</td><td>—</td><td>—</td></tr>
+     *   <tr><td>上带的天候与海鸥</td><td>有</td><td>有</td><td>—</td></tr>
+     *   <tr><td>座位轨上的名字</td><td>有</td><td>有</td><td>—</td></tr>
+     * </table>
+     *
+     * <p>❗<b>带位不许随档变</b>：{@link #bands()} 一个字都不问密度。
+     * 档只改「某一格里画不画某件」，不改格子本身 —— 否则跨过档的边界那一下整屏都会跳，
+     * 而割裂感正是来自东西挪了位置，不是来自东西少了。判据在 GuiConsistencyTest。
+     */
+    protected enum Density {
+        FULL, MEDIUM, COMPACT;
+
+        /** 这一档够不够格显示「至少要 {@code least} 档才给看」的那件东西。 */
+        boolean atLeast(Density least) {
+            return ordinal() <= least.ordinal();
+        }
+    }
+
+    /**
+     * 这一帧属于哪一档。
+     *
+     * <p>❗按<b>物理像素</b>切，不按 GUI 单位 —— 与「清晰度按物理像素判」同一条：
+     * 界面尺寸设成 1 时一个单位是一个像素，设成 4 时是四个，同样的单位数在屏幕上差四倍。
+     */
+    protected Density density() {
+        int physical = (int) Math.round(height * net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaleFactor());
+        if (physical >= DENSITY_FULL_PX) {
+            return Density.FULL;
+        }
+        return physical >= DENSITY_MEDIUM_PX ? Density.MEDIUM : Density.COMPACT;
+    }
+
+    /** 物理高到这个数才是满档（1280×720 正好落在这一档）。 */
+    private static final int DENSITY_FULL_PX = 720;
+    /** 物理高到这个数才是中档（854×480 落在这一档）。 */
+    private static final int DENSITY_MEDIUM_PX = 480;
+    /** 同一组图标之间（四只海鸥之间）。 */
+    private static final int ICON_GAP = 4;
+    /** 三组之间：天候 | 阶段轮盘 | 海鸥。比组内宽，才读得出是三件事。 */
+    private static final int ICON_GROUP_GAP = 14;
     /** 相邻两条带之间。 */
     protected static final int BAND_GAP = 5;
     /**
@@ -716,14 +776,22 @@ public abstract class GameScreen extends Screen {
                     faded ? SEAT_FADED : 1f);
         }
         int nameY = y + blockOf(full);
-        drawLineIn(context, nameOf(characterId), x + 2, nameY, cell - 4, nameColor);
+        if (density().atLeast(Density.MEDIUM)) {
+            drawLineIn(context, nameOf(characterId), x + 2, nameY, cell - 4, nameColor);
+        }
         context.fill(x + 2, nameY + textH() + 1, x + cell - 2, nameY + textH() + 2, lineColor);
         return nameY;
     }
 
-    /** 上带多高：一行字加 {@link #TOP_BAND_H}（海鸥格那一排与留白）。 */
+    /**
+     * 上带多高：一排图标加上下留白。
+     *
+     * <p>2026-09-23 之前这里是「一行字 + 海鸥格」—— 稿子上的上带<b>一个字没有</b>：
+     * 天候 · 阶段轮盘 · 四只海鸥。回合数与阶段名仍在主画面 HUD 上，
+     * 界面里再印一遍只是把舞台让出去（用户 2026-09-22：「整体偏离设计稿」）。
+     */
     protected static int topBandH() {
-        return textH() + TOP_BAND_H;
+        return ICON_H + TOP_BAND_H;
     }
 
     /** 一行正文多高，GUI 单位。版面里凡是「一行字」都用它 —— 界面尺寸小的时候有字号地板，一行不止 9 个单位。 */
@@ -782,7 +850,14 @@ public abstract class GameScreen extends Screen {
     // ------------------------------------------------------------------ 按键提示：键帽 + 一句话（ADR-0037）
 
     /** 一条按键提示：几枚键帽，后面跟一句话。{@code keys} 为空就只是一句话 —— 它与带键帽的提示排在同一行里。 */
-    protected record KeyHint(List<String> keys, Text label) {
+    /**
+     * 一条按键提示。{@code primary} 那一条画成**搪瓷按钮**：键帽与那句话一起印在一块搪瓷牌上，
+     * 外面一圈金（金 = 你 · 轮到你）。
+     *
+     * <p>稿子上「确认」本来就是一枚按钮，而不是一枚裸键帽加两个字 —— 一屏上总要有一件东西
+     * 看上去是<b>可以按下去的那一件</b>，其余只是说明。
+     */
+    protected record KeyHint(List<String> keys, Text label, boolean primary) {
     }
 
     /** 同一条提示里相邻两枚键帽之间、键帽与那句话之间。 */
@@ -816,7 +891,7 @@ public abstract class GameScreen extends Screen {
     }
 
     private int keyHintW(KeyHint hint) {
-        int w = 0;
+        int w = hint.primary() ? 2 * PRIMARY_PAD_X : 0;
         for (String key : hint.keys()) {
             w += keycapW(key) + KEY_GAP;
         }
@@ -872,6 +947,11 @@ public abstract class GameScreen extends Screen {
         int rowH = keyHintRowH();
         for (KeyHint hint : hints) {
             int end = x + keyHintW(hint);
+            if (hint.primary()) {
+                GuiMaterial.plate(context, x, y - PLATE_PAD_Y, end - x, rowH + 2 * PLATE_PAD_Y, -1);
+                context.drawBorder(x, y - PLATE_PAD_Y, end - x, rowH + 2 * PLATE_PAD_Y, GuiLanguage.gold());
+                x += PRIMARY_PAD_X;
+            }
             for (String key : hint.keys()) {
                 int w = keycapW(key);
                 GuiMaterial.keycap(context, x, y, w, rowH);
@@ -882,8 +962,10 @@ public abstract class GameScreen extends Screen {
             if (!hint.keys().isEmpty()) {
                 x += KEY_TO_LABEL - KEY_GAP;
             }
-            GuiText.line(context, hint.label(), x, y + GuiMaterial.KEY_PAD_TOP, Math.max(1, end - x), GuiText.BODY, false,
-                    color, GuiText.Align.LEFT);
+            // ❗牌上的字一律走 onTag：搪瓷牌永远是浅底，深色主题那一档的浅字压上去就糊（实拍过）。
+            GuiText.line(context, hint.label(), x, y + GuiMaterial.KEY_PAD_TOP,
+                    Math.max(1, end - x - (hint.primary() ? PRIMARY_PAD_X : 0)), GuiText.BODY, false,
+                    hint.primary() ? GuiLanguage.onTag(GuiLanguage.ink()) : color, GuiText.Align.LEFT);
             x = end + HINT_SPACING;
         }
     }
@@ -942,8 +1024,25 @@ public abstract class GameScreen extends Screen {
 
     /** 一条提示：几枚键帽加一个短词。 */
     protected static KeyHint keys(String label, String... caps) {
-        return new KeyHint(List.of(caps), Text.translatable("heavyseas.keys." + label));
+        return new KeyHint(List.of(caps), Text.translatable("heavyseas.keys." + label), false);
     }
+
+    /**
+     * 「确认」那一条：画成搪瓷按钮。一屏只该有一件东西看上去能按。
+     *
+     * <p>各面确认那一下叫什么不一样（确认 · 打出 · 留下 · 押上），所以按<b>标签</b>指名，
+     * 不按键名 —— 换掉标签的那一面照样是那一件能按的东西。
+     */
+    protected static KeyHint primary(String label, String... caps) {
+        return new KeyHint(List.of(caps), Text.translatable("heavyseas.keys." + label), true);
+    }
+
+    protected static KeyHint confirm(String... caps) {
+        return primary("confirm", caps);
+    }
+
+    /** 这一条提示外面那圈搪瓷牌左右各留多少。 */
+    private static final int PRIMARY_PAD_X = 6;
 
     /**
      * 物资牌的牌名与那一句效果。
@@ -1076,12 +1175,18 @@ public abstract class GameScreen extends Screen {
 
     /** 这一面的按键提示右头：确认那一件，加一枚「Tab 查看 / 收起」。 */
     protected java.util.List<KeyHint> inspectHints(String confirm) {
-        return List.of(keys(confirm, "Enter"), keys(inspecting ? "close" : "inspect", "Tab"));
+        if (!density().atLeast(Density.FULL)) {
+            return List.of(primary(confirm, "Enter"));      // 查看那一条是说明，小窗第一个砍
+        }
+        return List.of(primary(confirm, "Enter"), keys(inspecting ? "close" : "inspect", "Tab"));
     }
 
     /** 同上，中间多一件（挂武器那面的「Esc 不押」）。 */
     protected java.util.List<KeyHint> inspectHints(String confirm, KeyHint extra) {
-        return List.of(keys(confirm, "Enter"), extra, keys(inspecting ? "close" : "inspect", "Tab"));
+        if (!density().atLeast(Density.FULL)) {
+            return List.of(primary(confirm, "Enter"), extra);
+        }
+        return List.of(primary(confirm, "Enter"), extra, keys(inspecting ? "close" : "inspect", "Tab"));
     }
 
     /** 那一叠牌与签子之间。 */
@@ -1145,18 +1250,25 @@ public abstract class GameScreen extends Screen {
      * 上带：回合 · 阶段 · 海鸥。全船都知道的东西 —— 每一面都要、而且必须长得一样，所以放在这里。
      */
     protected void drawPublicBand(DrawContext context, HudView view, int y) {
-        drawLine(context, Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
-                        view.gulls(), GameState.GULLS_TO_LAND),
-                width / 2, y, GuiLanguage.muted());
-        // 海鸥画成格子而不是数字：够不够 4 只是一眼的事，不该让人去读。
-        int pip = 7;
-        int gap = 4;
-        int span = GameState.GULLS_TO_LAND * pip + (GameState.GULLS_TO_LAND - 1) * gap;
+        boolean rich = density().atLeast(Density.MEDIUM);    // COMPACT 只剩阶段轮盘：天候与海鸥都在 HUD 上有
+        boolean weather = rich && !view.weather().isEmpty();  // 第一张天候翻开之前也没有它，那一格就空着
+        int gulls = rich ? GameState.GULLS_TO_LAND * ICON_H + (GameState.GULLS_TO_LAND - 1) * ICON_GAP : 0;
+        int span = ICON_H + (rich ? ICON_GROUP_GAP + gulls : 0) + (weather ? ICON_H + ICON_GROUP_GAP : 0);
         int x = (width - span) / 2;
+        if (weather) {
+            GuiMaterial.icon(context, "weather_" + view.weather(), x, y, ICON_H, GuiLanguage.ink());
+            x += ICON_H + ICON_GROUP_GAP;
+        }
+        // 阶段轮盘：一圈四格，当前那格粗而实。每一格一张贴图 —— 单色着色挑不出其中一格。
+        GuiMaterial.icon(context, "phase_" + view.phase().ordinal(), x, y, ICON_H, GuiLanguage.verdigris());
+        if (!rich) {
+            return;
+        }
+        x += ICON_H + ICON_GROUP_GAP;
+        // 海鸥：够不够 4 只是一眼的事，不该让人去读数字。
         for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
-            int left = x + i * (pip + gap);
-            context.fill(left, y + textH() + 3, left + pip, y + textH() + 3 + pip,
-                    i < view.gulls() ? GuiLanguage.verdigris() : GuiLanguage.ground());
+            GuiMaterial.icon(context, "gull", x + i * (ICON_H + ICON_GAP), y, ICON_H,
+                    i < view.gulls() ? GuiLanguage.verdigris() : GuiLanguage.dim());
         }
     }
 

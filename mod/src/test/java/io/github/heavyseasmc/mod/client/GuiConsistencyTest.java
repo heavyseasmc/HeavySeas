@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -78,6 +79,44 @@ class GuiConsistencyTest {
             }
         }
         assertTrue(problems.isEmpty(), "GUI 定义不再只有一份（ADR-0033）：\n  " + String.join("\n  ", problems));
+    }
+
+    /**
+     * 带位<b>不许随密度档变</b>（ADR-0037 §7.13）。
+     *
+     * <p>小窗少说不是小窗缩小：档只改「某一格里画不画某件」，不改格子本身。
+     * 一旦 {@code bands()} 去问密度，跨过档的边界那一下整屏都会跳 —— 而割裂感正是来自
+     * 东西挪了位置，不是来自东西少了。屏幕上不报错，只在改窗口大小时看得见。
+     *
+     * <p>判法：把 {@code bands()} 的方法体与 {@code Bands} 那条记录整段取出来，里面一个
+     * {@code Density} 都不许有；并做正向对照 —— 文件里别处必须真的用着密度档，
+     * 否则这条只是在查一段根本没人写的代码。
+     */
+    @Test
+    @DisplayName("带位只由窗口算，不问密度档")
+    void bandsDoNotDependOnDensity() throws IOException {
+        String source = Files.readString(CLIENT_DIR.resolve("GameScreen.java"), StandardCharsets.UTF_8);
+        assertTrue(source.contains("density()"), "GameScreen 里一处密度档都没用 —— 这条判据在查一段没人写的代码");
+        String body = block(source, "protected Bands bands() {") + block(source, "protected record Bands(");
+        assertTrue(body.contains("gaugeY"), "没取到 bands() 的方法体 —— 没在扫，不是干净");
+        assertFalse(body.contains("Density") || body.contains("density("),
+                "带位去问密度档了（ADR-0037 §7.13：档只改画不画某件，不改格子本身）：\n" + body);
+    }
+
+    /** 从 {@code head} 那一行起，按花括号配对取出整段。 */
+    private static String block(String source, String head) {
+        int at = source.indexOf(head);
+        assertTrue(at >= 0, "源码里找不到：" + head);
+        int depth = 0;
+        for (int i = source.indexOf('{', at); i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}' && --depth == 0) {
+                return source.substring(at, i + 1);
+            }
+        }
+        throw new AssertionError("括号没配上：" + head);
     }
 
     /**

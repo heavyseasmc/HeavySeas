@@ -111,7 +111,7 @@ public final class StanceScreen extends GameScreen {
                     i == WATCH ? GuiLanguage.muted() : GuiLanguage.ink(), lift[i]);
         }
 
-        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")), now,
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(confirm("Enter")), now,
                 new Countdown(c.deadlineMs(), c.windowMs(), rowWidth(boxes)));
     }
 

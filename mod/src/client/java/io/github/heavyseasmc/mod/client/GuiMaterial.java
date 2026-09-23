@@ -46,6 +46,29 @@ final class GuiMaterial {
 
     /** 倒计时多高，GUI 单位。版面里的 {@code BAR_H} 取它。 */
     static final int GAUGE_H = GAUGE_H_TEXELS / TEXELS_PER_UNIT;
+    /**
+     * 上带那一排图标的母版多大（贴图像素）。
+     *
+     * <p>图标是**白线稿透明底**，颜色由调用方给 —— 与 {@code ring_mark} 同一条路数，
+     * 所以它们与主题无关，不放在 {@code material/<主题>/} 下面。
+     */
+    static final int ICON_TEXELS = 64;
+
+    /**
+     * 一枚图标：白线稿按 {@code color} 着色画出来。
+     *
+     * <p>❗尺寸按<b>物理像素</b>判：屏幕上约 12 个 GUI 单位，界面尺寸 3 时 36 物理像素，
+     * 母版 64 给了 5 倍余量，缩下去走与牌面同一套载入方式（多级纹理 + 线性过滤）。
+     */
+    static void icon(DrawContext context, String name, int x, int y, int size, int color) {
+        Identifier id = CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, "textures/gui/icon/" + name + ".png"));
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.setShaderColor(((color >> 16) & 0xFF) / 255f, ((color >> 8) & 0xFF) / 255f,
+                (color & 0xFF) / 255f, ((color >>> 24) & 0xFF) / 255f);
+        context.drawTexture(id, x, y, size, size, 0f, 0f, ICON_TEXELS, ICON_TEXELS, ICON_TEXELS, ICON_TEXELS);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
     /** 材质板离舞台四边多远。 */
     static final int SHEET_MARGIN = 5;
     /** 材质板的框线从板边往里多远 —— 内容别画到这条线外面去。 */

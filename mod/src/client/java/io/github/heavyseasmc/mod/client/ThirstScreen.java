@@ -130,7 +130,7 @@ public final class ThirstScreen extends GameScreen {
                         ? Text.translatable("heavyseas.thirst.none")
                         : Text.translatable("heavyseas.thirst.drink", chosen, hurt),
                 width / 2, l.hintY(), hurt > 0 ? GuiLanguage.cinnabar() : GuiLanguage.verdigris());
-        drawFootBand(context, b, List.of(keys("amount", "←", "→")), List.of(keys("confirm", "Enter")), now,
+        drawFootBand(context, b, List.of(keys("amount", "←", "→")), List.of(confirm("Enter")), now,
                 new Countdown(deadlineMs, ThirstPhase.CHOOSE_MILLIS, l.rowW()));
     }
 

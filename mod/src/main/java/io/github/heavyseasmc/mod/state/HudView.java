@@ -60,7 +60,8 @@ import java.util.Optional;
  * @param front     收件人自己<b>亮在面前</b>的牌。规则上这一区是公开的，但别人的那份这一版还没发 ——
  *                  要等头顶信息条（决策 ⑥）才有地方显示
  */
-public record HudView(boolean active, int turn, Phase phase, int gulls, String weather, Fog fog, List<Text> notifications,
+public record HudView(boolean active, int turn, Phase phase, int gulls, String weather, boolean canRow,
+                      Fog fog, List<Text> notifications,
                       List<String> seats, List<String> removed, String actor, Sea sea, Thirst thirstPrompt,
                       Endgame endgame, ContestView contest, boolean seated, String character,
                       int health, int maxHealth, Condition condition, int thirst, String love, String hate,
@@ -91,7 +92,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
-            false, 0, Phase.PROVISION, 0, "", Fog.NONE, List.of(), List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
+            false, 0, Phase.PROVISION, 0, "", false, Fog.NONE, List.of(), List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
             ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, 0L, 0L, false, 0L,
             "", List.of(), 0, List.of(), List.of(), Score.NONE);
 

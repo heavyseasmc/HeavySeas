@@ -35,6 +35,8 @@ class GuiMaterialTexturesTest {
     private static final Path GUI_MATERIAL = Path.of("src", "client", "java", "io", "github", "heavyseasmc", "mod", "client", "GuiMaterial.java");
     private static final Path PORTRAIT_DIR = Path.of("src", "main", "resources", "assets", "heavyseas", "textures", "gui", "portrait");
     private static final Path ROSTER = Path.of("..", "data", "roster", "default.json");
+    private static final Path ICON_DIR = Path.of("src", "main", "resources", "assets", "heavyseas", "textures", "gui", "icon");
+    private static final Path WEATHER = Path.of("..", "data", "weather", "default.json");
     /** 每个主题至少这么多张；少于它就是没读到，不是对上了。 */
     private static final int MIN_TEXTURES = 8;
     /** 角色至少这么多个；少于它就是没读到。 */
@@ -43,6 +45,10 @@ class GuiMaterialTexturesTest {
     private static final int MIN_PORTRAIT = 144;
     /** 至少这么多张贴图的 alpha 版图上真有东西（有透明也有不透明）；少于它，同形那一条就是在比空气。 */
     private static final int MIN_SHAPED = 4;
+    /** 天候至少这么多种；少于它就是没读到。 */
+    private static final int MIN_WEATHER = 8;
+    /** 上带图标画到 12 个 GUI 单位，界面尺寸 4 时 48 物理像素 —— 贴图不小于它。 */
+    private static final int MIN_ICON = 48;
 
     @Test
     @DisplayName("浅色与深色是同一份贴图清单、同样的尺寸，且与 GuiMaterial 的常量一致")
@@ -138,6 +144,39 @@ class GuiMaterialTexturesTest {
                 int w = in.readInt();
                 int h = in.readInt();
                 assertTrue(w == h && w >= MIN_PORTRAIT, id + ".png 是 " + w + "x" + h + "：头像要是方的，且不小于 " + MIN_PORTRAIT);
+            }
+        }
+    }
+
+    /**
+     * 上带那一排图标：每一种天候一枚，阶段轮盘每一格一张，外加海鸥（ADR-0037 §7.12 第 2 条）。
+     *
+     * <p>缺一枚 Minecraft <b>不报错</b> —— 只在翻到那一张天候时画出一块紫黑格，而开发时未必翻得到它。
+     * 轮盘那几格的张数<b>从 {@code Phase.values().length} 取</b>，不写死：
+     * 判据里的每个字面量都是一颗定时器，而阶段是加得了的。
+     */
+    @Test
+    @DisplayName("每一种天候都有图标，阶段轮盘的格数跟着 Phase 走")
+    void topBandIconsAreComplete() throws IOException {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        com.google.gson.JsonParser.parseString(Files.readString(WEATHER, StandardCharsets.UTF_8)).getAsJsonObject()
+                .getAsJsonArray("cards").forEach(c -> ids.add(c.getAsJsonObject().get("id").getAsString()));
+        assertTrue(ids.size() >= MIN_WEATHER, "data/weather 里只读到 " + ids.size() + " 种天候 —— 没在查");
+
+        java.util.List<String> want = new java.util.ArrayList<>();
+        ids.forEach(id -> want.add("weather_" + id));
+        for (int i = 0; i < io.github.heavyseasmc.engine.state.Phase.values().length; i++) {
+            want.add("phase_" + i);
+        }
+        want.add("gull");
+        for (String name : want) {
+            Path p = ICON_DIR.resolve(name + ".png");
+            assertTrue(Files.isRegularFile(p), "缺图标：" + name + ".png（重跑管线的 build_gui_material.py）");
+            try (DataInputStream in = new DataInputStream(Files.newInputStream(p))) {
+                in.skipBytes(16);
+                int w = in.readInt();
+                int h = in.readInt();
+                assertTrue(w == h && w >= MIN_ICON, name + ".png 是 " + w + "x" + h + "：图标要是方的，且不小于 " + MIN_ICON);
             }
         }
     }

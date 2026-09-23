@@ -421,7 +421,7 @@ public final class SeasCommand {
     }
 
     /** 今天有没有航海阶段。按**效果**判、不按天候 id：数据包可以给任何 id 配这个效果（ADR-0032 #2 · #3）。 */
-    static boolean skipsNavigation(Optional<WeatherCard> weather) {
+    public static boolean skipsNavigation(Optional<WeatherCard> weather) {
         return weather.map(WeatherCard::effect).filter(e -> e == WeatherEffect.SKIP_NAVIGATION).isPresent();
     }
 

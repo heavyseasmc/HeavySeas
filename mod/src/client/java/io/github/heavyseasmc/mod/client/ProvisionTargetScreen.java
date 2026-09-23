@@ -89,7 +89,7 @@ public final class ProvisionTargetScreen extends GameScreen {
         }
 
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
-                List.of(keys("confirm", "Enter"), keys("cancel", "Esc")), now, null);
+                List.of(confirm("Enter"), keys("cancel", "Esc")), now, null);
     }
 
     @Override

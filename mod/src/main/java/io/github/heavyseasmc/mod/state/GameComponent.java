@@ -173,6 +173,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeEnumConstant(g.phase());
         buf.writeVarInt(g.gulls());
         buf.writeString(session.currentWeather().map(card -> card.id()).orElse(""));
+        // 今天有没有航海阶段。❗按**效果**判、不按天候 id（数据包可以给任何 id 配这个效果，ADR-0032 #2）。
+        // 客户端拿它把「划船」画成按不动的那一档 —— 否则界面照样给出这件事，按下去才被服务端拒：
+        // 2026-09-23 实拍，navigation_test 因此干等 6 秒后报「划船一面该自己弹」，病根却在天候。
+        buf.writeBoolean(!io.github.heavyseasmc.mod.command.SeasCommand.skipsNavigation(session.currentWeather()));
         // 今天的雾（ADR-0034 §5.1.2）：服务端查表算好再发，雾散之后是 0/0。公开，全船同一片。
         HudView.Fog fog = currentFog();
         buf.writeVarInt(fog.start());
@@ -469,6 +473,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         Phase phase = buf.readEnumConstant(Phase.class);
         int gulls = buf.readVarInt();
         String weather = buf.readString();
+        boolean canRow = buf.readBoolean();
         HudView.Fog fog = new HudView.Fog(buf.readVarInt(), buf.readVarInt());
         int notificationCount = buf.readVarInt();
         List<Text> notifications = new ArrayList<>(notificationCount);
@@ -537,7 +542,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                         attackSide, defendSide, attackPower, defendPower, List.of(), 0, List.of(), 0)
                 : ContestView.NONE;
         if (!buf.readBoolean()) {
-            return new HudView(true, turn, phase, gulls, weather, fog, notifications, seats, removed, actor,
+            return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
                     false, 0L, 0L, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
@@ -597,7 +602,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     attackSide, defendSide, attackPower, defendPower, myWeapons, myCommitted,
                     victimFront, victimHand);
         }
-        return new HudView(true, turn, phase, gulls, weather, fog, notifications, seats, removed, actor,
+        return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, seats, removed, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
                 love, hate, yourTurn, actionDeadline, actionWindow, designating, designateUntil,

@@ -109,7 +109,7 @@ public final class ConsentScreen extends GameScreen {
                     i == 1 ? GuiLanguage.cinnabar() : GuiLanguage.ink(), lift[i]);
         }
 
-        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")), now,
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(confirm("Enter")), now,
                 new Countdown(deadlineMs, view.contest().windowMs(), rowWidth(boxes)));
     }
 
