@@ -19,6 +19,7 @@ import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
+import io.github.heavyseasmc.mod.net.CatalogS2C;
 import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.net.StartVoyageC2S;
 import io.github.heavyseasmc.mod.net.ThirstActionC2S;
@@ -90,7 +91,18 @@ public final class HeavySeasMod implements ModInitializer {
         });
         // M4 crash recovery: the match itself is intentionally ephemeral, but escrowed real inventories are not.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
-                server.execute(() -> MistSea.recover(handler.player)));
+                server.execute(() -> {
+                    MistSea.recover(handler.player);
+                    // 牌的目录（类别 · 张数）：这些是牌自己的属性，数据包说了算 ——
+                    // 客户端的提示签要写它们，而在这个包之前那两栏根本拿不到数据。
+                    // ❗发失败不是致命的：提示签少两栏，牌照样能玩。所以只记一句，不打断进服。
+                    try {
+                        ServerPlayNetworking.send(handler.player,
+                                CatalogS2C.of(GameDataLoader.require().provisions().all()));
+                    } catch (RuntimeException e) {
+                        LOGGER.warn("牌目录没发出去（提示签上会少「类别 · 共几张」）：{}", e.toString());
+                    }
+                }));
         // 指定模式（ADR-0025）：世界里右键一个人就是「我要对他动手」。
         // ❗只在指定模式里才作数，其余一律放行 —— 吃掉别人的右键会让人觉得「右键偶尔失灵」。
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) ->
@@ -103,6 +115,7 @@ public final class HeavySeasMod implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(ProvisionUpdateS2C.ID, ProvisionUpdateS2C.CODEC);
         PayloadTypeRegistry.playS2C().register(ProvisionAutoPickS2C.ID, ProvisionAutoPickS2C.CODEC);
         PayloadTypeRegistry.playS2C().register(RosterConfigS2C.ID, RosterConfigS2C.CODEC);
+        PayloadTypeRegistry.playS2C().register(CatalogS2C.ID, CatalogS2C.CODEC);
         PayloadTypeRegistry.playC2S().register(StartVoyageC2S.ID, StartVoyageC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(StartVoyageC2S.ID,
                 (payload, context) -> context.player().server.execute(

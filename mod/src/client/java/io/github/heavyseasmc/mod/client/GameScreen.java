@@ -1063,6 +1063,19 @@ public abstract class GameScreen extends Screen {
         return Text.translatable("heavyseas.provision." + id + ".effect");
     }
 
+    /**
+     * 提示签最上面那一小行：这张牌属于哪一类、牌堆里一共几张。
+     *
+     * <p>❗数据来自服务端发来的目录包（{@link Catalog}），不在客户端算 ——
+     * 张数是数据包定的，抄一份到客户端，换数据包时两边就分家，而分家之后屏幕上照样有数字，只是错的。
+     * 目录还没到就返回 {@code null}：那一栏**空着**，不编一个数字顶上。
+     */
+    protected static Text provisionCaption(String id) {
+        io.github.heavyseasmc.mod.net.CatalogS2C.Provisions entry = Catalog.provision(id);
+        return entry == null ? null : Text.translatable("heavyseas.plate.caption",
+                Text.translatable("heavyseas.category." + entry.category()), entry.count());
+    }
+
     // ------------------------------------------------------------ 提示签：牌自己的内容（ADR-0037 §7.12）
 
     /** 提示签的内边距与两行之间。 */

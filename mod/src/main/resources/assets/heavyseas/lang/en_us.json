@@ -140,6 +140,7 @@
   "heavyseas.provision.fine_art_2.effect": "2 points ashore. Doubled for the Collector.",
   "heavyseas.provision.fine_art_3a.effect": "3 points ashore. Doubled for the Collector.",
   "heavyseas.provision.fine_art_3b.effect": "3 points ashore. Doubled for the Collector.",
+  "heavyseas.plate.caption": "%s · %s in deck",
   "heavyseas.category.consumable": "Consumable",
   "heavyseas.category.equipment": "Equipment",
   "heavyseas.category.weapon": "Weapon",

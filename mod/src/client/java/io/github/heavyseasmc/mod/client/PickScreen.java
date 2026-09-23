@@ -143,7 +143,7 @@ public final class PickScreen extends GameScreen {
         if (gathered > 0f && highlight >= 0 && highlight < count && !isHandOption(highlight)) {
             String card = c.victimFront().get(highlight);
             drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
-                    null, provisionName(card), provisionEffect(card));
+                    provisionCaption(card), provisionName(card), provisionEffect(card));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("take"), now,
                 new Countdown(c.deadlineMs(), c.windowMs(), l.rowW()));

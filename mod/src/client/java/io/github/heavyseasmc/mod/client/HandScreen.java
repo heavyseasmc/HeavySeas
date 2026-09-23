@@ -196,7 +196,7 @@ public final class HandScreen extends GameScreen {
         if (gathered > 0f && selected >= 0 && selected < hand.size()) {
             String card = hand.get(selected);
             drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
-                    null, provisionName(card), provisionEffect(card));
+                    provisionCaption(card), provisionName(card), provisionEffect(card));
         }
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
         //   与 HUD 那一行「按绑定键查看」同一条理由。这一面没有倒计时，提示就排在那一条空着的带上。

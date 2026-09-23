@@ -124,7 +124,7 @@ public final class WeaponScreen extends GameScreen {
         if (gathered > 0f && highlight >= 0 && highlight < weapons.size()) {
             String card = weapons.get(highlight);
             drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
-                    null, provisionName(card), provisionEffect(card));
+                    provisionCaption(card), provisionName(card), provisionEffect(card));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
                 inspectHints("commit", keys("skip", "Esc")), now,

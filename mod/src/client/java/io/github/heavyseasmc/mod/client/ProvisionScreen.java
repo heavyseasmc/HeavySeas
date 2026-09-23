@@ -217,7 +217,7 @@ public final class ProvisionScreen extends GameScreen {
         if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
             String card = offer.get(highlight);
             drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
-                    null, provisionName(card), provisionEffect(card));
+                    provisionCaption(card), provisionName(card), provisionEffect(card));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
                 new Countdown(data.deadlineMs(),
