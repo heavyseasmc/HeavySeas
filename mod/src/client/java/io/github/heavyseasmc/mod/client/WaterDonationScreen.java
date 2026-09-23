@@ -93,8 +93,8 @@ public final class WaterDonationScreen extends GameScreen {
         button = layoutButtonRow(List.of(label), buttonY, BTN_GAP).getFirst();
         buttonLift = GuiLanguage.approach(buttonLift, awaiting ? 0f : GuiLanguage.LIFT_PX, dt);
         drawButton(context, button, label, !awaiting, GuiLanguage.verdigris(), buttonLift);
-        drawEdgeHints(context, b, List.of(), List.of(keys("give", "Enter"), keys("cancel", "Esc")));
-        drawCountdown(context, b, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS, cardW);
+        drawFootBand(context, b, List.of(), List.of(keys("give", "Enter"), keys("cancel", "Esc")), now,
+                new Countdown(deadlineMs, ThirstPhase.CHOOSE_MILLIS, cardW));
     }
 
     @Override

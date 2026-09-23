@@ -111,8 +111,8 @@ public final class StanceScreen extends GameScreen {
                     i == WATCH ? GuiLanguage.muted() : GuiLanguage.ink(), lift[i]);
         }
 
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
-        drawCountdown(context, b, now, c.deadlineMs(), c.windowMs(), rowWidth(boxes));
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")), now,
+                new Countdown(c.deadlineMs(), c.windowMs(), rowWidth(boxes)));
     }
 
     /** 一边站了谁。一个人都没有时写一道破折号 —— 空白与「还没读到」长得一样。 */

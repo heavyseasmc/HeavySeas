@@ -125,14 +125,17 @@ public final class HelmScreen extends GameScreen {
         long dt = frameDelta(now);
         Bands b = drawChrome(context, view);
         Layout l = layout(b);
+        Inspect ins = inspect(b, l.seaY() + lineStep());
+        float gathered = gathered(now);
         float snapP = GuiLanguage.snap(now, snapAt);
 
         // 划船堆几张 · 舵手是谁：这一面才要，所以排在舞台里，不占共有的带。
         drawSeaLine(context, view, l.seaY(), offer.size());
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向）。定了之后鼠标与键盘都不再改高亮。
+        // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
-        if (moved && !decided()) {
+        if (moved && !decided() && !inspecting()) {
             int hovered = indexAt(mouseX, mouseY, l);
             if (hovered >= 0) {
                 setHighlight(hovered);
@@ -152,20 +155,30 @@ public final class HelmScreen extends GameScreen {
                 rise += GuiLanguage.snapRise(snapP);
                 scale *= GuiLanguage.snapScale(snapP);
             }
+            CardPose pose = cardPose(ins, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(),
+                    hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight)));
             context.getMatrices().push();
-            context.getMatrices().translate(l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h() - lift[i] + rise, 0);
+            context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
             context.getMatrices().scale(scale, scale, 1f);
-            context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
-            CardTexture.drawNav(context, offer.get(i).id(), 0, 0, l.w(), l.h());
+            context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+            CardTexture.drawNav(context, offer.get(i).id(), 0, 0, pose.w(), pose.h());
             if (hi) {
-                drawCardFrame(context, l.w(), l.h());
+                drawCardFrame(context, pose.w(), pose.h());
             }
             context.getMatrices().pop();
         }
 
-        drawHint(context, l);
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
-        drawCountdown(context, b, now, deadlineMs, NavigationPhase.PICK_MILLIS, l.rowW());
+        // 说明只写一处：查看态里它在签子上，摊开时它在舞台底下。
+        if (gathered <= 0f) {
+            drawHint(context, l);
+        }
+        // 航海牌没有牌名，签子上只有说明。
+        if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
+            drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
+                    null, null, NavCardText.describe(offer.get(highlight), view.seats()));
+        }
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
+                new Countdown(deadlineMs, NavigationPhase.PICK_MILLIS, l.rowW()));
     }
 
     /**
@@ -221,7 +234,10 @@ public final class HelmScreen extends GameScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!decided()) {
+        if (inspectClick(button)) {
+            return true;
+        }
+        if (!decided() && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
                 setHighlight(i);

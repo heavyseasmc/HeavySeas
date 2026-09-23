@@ -93,34 +93,59 @@ public final class WeaponScreen extends GameScreen {
         }
         Bands b = drawChrome(context, view);
         Layout l = layout(b, weapons.size());
+        Inspect in = inspect(b);
+        float gathered = gathered(now);
 
+        // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
-        if (moved) {
+        if (moved && !inspecting()) {
             int hovered = indexAt(mouseX, mouseY, l, weapons.size());
             if (hovered >= 0) {
                 highlight = hovered;
             }
         }
+        // 高亮那一张最后画：收成一叠时它在堆顶，摊开时它抬起来。
         for (int i = 0; i < weapons.size(); i++) {
-            lift[i] = GuiLanguage.approach(lift[i], i == highlight ? GuiLanguage.LIFT_PX : 0f, dt);
-            context.getMatrices().push();
-            context.getMatrices().translate(l.cardX(i), l.cardsTop() - lift[i], 0);
-            CardTexture.drawProvision(context, weapons.get(i), 0, 0, l.w(), l.h());
-            if (i == highlight) {
-                drawCardFrame(context, l.w(), l.h());
+            if (i != highlight) {
+                drawOne(context, dt, l, in, gathered, weapons, i);
             }
-            context.getMatrices().pop();
+        }
+        if (highlight >= 0 && highlight < weapons.size()) {
+            drawOne(context, dt, l, in, gathered, weapons, highlight);
         }
 
-        drawCountdown(context, b, now, c.deadlineMs(), c.windowMs(), l.rowW());
+
         drawLine(context, Text.translatable("heavyseas.weapon.header"),
                 width / 2, l.headerY(), GuiLanguage.ink());
         drawLine(context, c.myCommitted() == 0
                         ? Text.translatable("heavyseas.weapon.none")
                         : Text.translatable("heavyseas.weapon.committed", c.myCommitted()),
                 width / 2, l.committedY(), c.myCommitted() == 0 ? GuiLanguage.muted() : GuiLanguage.verdigris());
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")),
-                List.of(keys("commit", "Enter"), keys("skip", "Esc")));
+        if (gathered > 0f && highlight >= 0 && highlight < weapons.size()) {
+            String card = weapons.get(highlight);
+            drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
+                    null, provisionName(card), provisionEffect(card));
+        }
+        drawFootBand(context, b, List.of(keys("select", "←", "→")),
+                inspectHints("commit", keys("skip", "Esc")), now,
+                new Countdown(c.deadlineMs(), c.windowMs(), l.rowW()));
+    }
+
+    /** 画一张：位置与大小在「摊成一排」与「收成一叠」之间按 {@code gathered} 插值。 */
+    private void drawOne(DrawContext context, long dt, Layout l, Inspect in, float gathered,
+                         List<String> weapons, int i) {
+        boolean hi = i == highlight;
+        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
+        CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(),
+                hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight)));
+        context.getMatrices().push();
+        context.getMatrices().translate(pose.cx() - pose.w() / 2f,
+                pose.bottom() - pose.h() - lift[i] * (1f - gathered), 0);
+        CardTexture.drawProvision(context, weapons.get(i), 0, 0, pose.w(), pose.h());
+        if (hi) {
+            drawCardFrame(context, pose.w(), pose.h());
+        }
+        context.getMatrices().pop();
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l, int count) {
@@ -145,8 +170,11 @@ public final class WeaponScreen extends GameScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (inspectClick(button)) {
+            return true;
+        }
         List<String> weapons = view.contest().myWeapons();
-        if (!weapons.isEmpty()) {
+        if (!weapons.isEmpty() && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands(), weapons.size()), weapons.size());
             if (i >= 0) {
                 highlight = i;
@@ -159,6 +187,9 @@ public final class WeaponScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (inspectKey(keyCode)) {
+            return true;
+        }
         int count = view.contest().myWeapons().size();
         switch (keyCode) {
             case GLFW.GLFW_KEY_LEFT -> {

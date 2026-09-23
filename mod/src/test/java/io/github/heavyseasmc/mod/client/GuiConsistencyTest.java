@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -77,6 +78,43 @@ class GuiConsistencyTest {
             }
         }
         assertTrue(problems.isEmpty(), "GUI 定义不再只有一份（ADR-0033）：\n  " + String.join("\n  ", problems));
+    }
+
+    /**
+     * 两个主题只许差<b>颜色</b>，不许差形制（ADR-0037 §7.12）。
+     *
+     * <p>2026-09-23 之前：浅色照 A 稿（海图纸 · 罗经花 · 三角压角 · 比例尺），深色照 B 稿（船舱木作 · 灯光 · 液位管）——
+     * 同一件东西两种画法。贴图那边已经并成一套形制，但<b>画法也会分叉</b>：
+     * 同一批改动里实测到浅色仍在画比例尺的墨块与刻度，而贴图早已是液位管，于是刻度压在管子外面。
+     * 并了贴图没并画法，等于只并了一半。
+     *
+     * <p>判法：{@code GuiMaterial} 里每一处按主题分叉，那一行必须要么在挑贴图目录、要么在定颜色或明暗。
+     * 别的一律算形制分叉 —— 一个三元运算符就能让两个主题的尺寸、坐标、圈数分家，而屏幕上不报错。
+     */
+    @Test
+    void themesDifferOnlyInColour() throws IOException {
+        Path file = CLIENT_DIR.resolve("GuiMaterial.java");
+        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        List<String> branches = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            String code = lines.get(i).strip();
+            if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*") || !code.contains("Theme.DARK")) {
+                continue;
+            }
+            branches.add(code);
+            // ❗认的是分叉的**两个分支**，不是分叉的条件：第一版把 GuiLanguage. 也当成「这是在取颜色」，
+            //   而每一处主题判断写的都是 GuiLanguage.theme() —— 于是什么都放行，红测当场是绿的（2026-09-23）。
+            boolean picksTexture = code.contains("\"dark\"");
+            boolean picksColour = code.contains("setShaderColor");
+            if (!picksTexture && !picksColour) {
+                problems.add("GuiMaterial.java:" + (i + 1) + "  " + code);
+            }
+        }
+        assertFalse(branches.isEmpty(), "GuiMaterial 里一处按主题分叉都没找到 —— 没在扫，不是干净"
+                + "（挑贴图目录那一处总该在）");
+        assertTrue(problems.isEmpty(), "两个主题分叉在了形制上（只许差颜色，ADR-0037 §7.12）：\n  "
+                + String.join("\n  ", problems));
     }
 
     /** 材质相关的写法：只许出现在 {@code GuiMaterial} 里（ADR-0037 第二刀）。 */

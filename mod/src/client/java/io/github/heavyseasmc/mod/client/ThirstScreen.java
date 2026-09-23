@@ -118,7 +118,7 @@ public final class ThirstScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        drawCountdown(context, b, now, deadlineMs, ThirstPhase.CHOOSE_MILLIS, l.rowW());
+
         HudView.Thirst prompt = view.thirstPrompt();
         int hurt = Math.max(0, remaining - (prompt.donated() + chosen) / waterPerSource);
         drawLine(context, Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
@@ -130,7 +130,8 @@ public final class ThirstScreen extends GameScreen {
                         ? Text.translatable("heavyseas.thirst.none")
                         : Text.translatable("heavyseas.thirst.drink", chosen, hurt),
                 width / 2, l.hintY(), hurt > 0 ? GuiLanguage.cinnabar() : GuiLanguage.verdigris());
-        drawEdgeHints(context, b, List.of(keys("amount", "←", "→")), List.of(keys("confirm", "Enter")));
+        drawFootBand(context, b, List.of(keys("amount", "←", "→")), List.of(keys("confirm", "Enter")), now,
+                new Countdown(deadlineMs, ThirstPhase.CHOOSE_MILLIS, l.rowW()));
     }
 
     private Layout layout(Bands b) {
