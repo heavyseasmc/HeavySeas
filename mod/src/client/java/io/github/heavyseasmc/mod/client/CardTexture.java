@@ -124,6 +124,14 @@ public final class CardTexture extends AbstractTexture {
     /** 小到这个地步就不画：一两个像素高的字不是「小字」，是噪点。 */
     private static final int NAME_MIN_SIZE = 5;
 
+    /** 母版上牌名那一格有多宽（右上角那个框已经让开）。牌名闸门按它折算每一级字号的可用宽。 */
+    static int nameBoxMaster(boolean landscape) {
+        return (landscape ? MASTER_W_LANDSCAPE : MASTER_W) - NAME_BOX_ROOM - NAME_X;
+    }
+
+    /** 母版上牌名的字号。与 {@link #nameBoxMaster} 一起随牌缩放，所以两者的比值与窗口、界面尺寸都无关。 */
+    static final int NAME_SIZE_MASTER = NAME_SIZE;
+
     /**
      * 把牌名按当前语言排到牌面上。贴图是<b>无字画层</b>（管线 {@code --textless}：母版里每一处中文都不烘），
      * 牌上的字改由这里实时排 —— 于是同一批贴图对每种语言都成立，小尺寸下也按屏幕分辨率排、不会糊。

@@ -148,7 +148,12 @@ public final class HeavySeasClient implements ClientModInitializer {
 
         // 进服就把卡面载好：补给箱第一次打开时现场载，「发」的动画会在那一帧卡掉一截。
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
-                client.execute(() -> CardTexture.preload(client)));
+                client.execute(() -> {
+                    CardTexture.preload(client);
+                    // 每种语言 × 每张牌的名字，都要放得进牌上那一格。截断了的名字与短名字在屏幕上
+                    // 长得一样，没有任何机器判据看得见它 —— 所以在这里用 MC 自己的度量当场查一遍。
+                    CardNameFit.check();
+                }));
 
         // ❗必须在客户端也注册接收器：类型只在一端注册的话，包会被安静地丢掉，不报错。
         ClientPlayNetworking.registerGlobalReceiver(ProvisionUpdateS2C.ID, (payload, context) ->

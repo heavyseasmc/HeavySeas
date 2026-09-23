@@ -168,6 +168,16 @@ final class GuiText {
         return ceilDiv(client.textRenderer.getWidth(styled(text, bold, px)), scale);
     }
 
+    /**
+     * 这一级字号（**物理像素**）上，这行字有多宽（物理像素）。
+     *
+     * <p>给牌名闸门用：字号梯子是离散的，「在某个尺寸下放得下」推不出「每个尺寸下都放得下」，
+     * 所以要逐级各查一遍。界面自己别用它 —— 界面要的是 GUI 单位，用 {@link #width}。
+     */
+    static int widthAtPx(String text, int px, boolean bold) {
+        return MinecraftClient.getInstance().textRenderer.getWidth(styled(text, bold, px));
+    }
+
     private static int linePx(int px) {
         return (int) Math.ceil(px * LINE_RATIO);
     }
