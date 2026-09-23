@@ -143,12 +143,6 @@ public final class ScoreScreen extends GameScreen {
     protected void drawRailBand(DrawContext context, HudView v, Bands b) {
     }
 
-    /** 旁观的人没有身份可写。 */
-    @Override
-    protected boolean showsIdentity() {
-        return view.seated();
-    }
-
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         // 用哪个键开的，就用哪个键收起来（理由同行动一面：写死的键，玩家改了键位就收不起来）。

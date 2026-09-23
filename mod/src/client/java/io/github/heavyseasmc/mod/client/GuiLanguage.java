@@ -333,6 +333,37 @@ public final class GuiLanguage {
         return startedAt > 0L && now - startedAt < SLIDE_MS;
     }
 
+    // ---------------------------------------------------------------- 堆 Gather
+
+    /**
+     * 堆：要看清某一张时，其余的牌收成一叠，被看的那张在堆顶。340ms，不过冲。
+     *
+     * <p>为什么另起一个动词：它说的是「这一排暂时收起来了」，与「发」（新东西到你面前）、
+     * 「飞」（牌离开你）都不是一回事。用户 2026-09-22 定下这一层：牌面留给画，
+     * 文字等你要 —— 按 U / 右键才堆起来并在旁边展开说明。
+     *
+     * <p>缓动用「抛」式的 {@code cubic-bezier(.2,.8,.3,1)}：起步快、落定稳，一叠牌落下去应该是“收住”而不是“弹一下”。
+     */
+    public static final long GATHER_MS = 340L;
+
+    private static final float GATHER_X1 = .2f;
+    private static final float GATHER_Y1 = .8f;
+    private static final float GATHER_X2 = .3f;
+    private static final float GATHER_Y2 = 1f;
+
+    /**
+     * 堆到哪了：0 = 还在一排里，1 = 已经收成一叠。
+     *
+     * @param startedAt 这一次切换从什么时候开始；{@code <= 0} 表示没在切，返回 1
+     */
+    public static float gather(long now, long startedAt) {
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) GATHER_MS, 0f, 1f);
+        return cubicBezier(x, GATHER_X1, GATHER_Y1, GATHER_X2, GATHER_Y2);
+    }
+
     // ---------------------------------------------------------------- 翻 Flip
 
     /** 翻：暗牌变明牌。全局唯一的「信息状态改变」，400ms，中点换面。 */

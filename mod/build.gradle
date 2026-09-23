@@ -132,7 +132,8 @@ def checkLangKeys = tasks.register('checkLangKeys') {
     def sources = files(sourceSets.main.allJava, sourceSets.client.allJava)
     def langDir = file('src/main/resources/assets/heavyseas/lang')
     def rosterFile = rootProject.file('data/roster/default.json')
-    inputs.files(sources, rosterFile)
+    def provisionFile = rootProject.file('data/provisions/default.json')
+    inputs.files(sources, rosterFile, provisionFile)
     inputs.dir(langDir)
     doLast {
         def slurper = new groovy.json.JsonSlurper()
@@ -179,12 +180,28 @@ def checkLangKeys = tasks.register('checkLangKeys') {
             }
         }
 
+        // 物资那一族同理：牌名与**提示签上那一句效果**都是拼出来的键，上面那一轮正则扫不到。
+        // ❗加一张牌而忘了写那一句，屏幕上只会出现键名原文 —— 不报错，只是没人知道这张牌做什么。
+        def provisions = slurper.parse(provisionFile, 'UTF-8') as Map
+        provisions.cards.each { c ->
+            ["heavyseas.provision.${c.id}".toString(),
+             "heavyseas.provision.${c.id}.effect".toString()].each { key ->
+                if (!zh.containsKey(key)) {
+                    problems << "data/provisions 有 ${c.id}，但 lang 里没有 ${key}"
+                }
+            }
+            def cat = "heavyseas.category.${c.category}".toString()
+            if (!zh.containsKey(cat)) {
+                problems << "data/provisions 里的类别 ${c.category} 在 lang 里没有 ${cat}"
+            }
+        }
+
         if (problems) {
             throw new GradleException((['lang 键核对失败：'] + problems.collect { '  - ' + it })
                     .join(System.lineSeparator()))
         }
         logger.lifecycle("lang 键核对通过：代码用到 ${used.size()} 个，两份 lang 各 ${zh.size()} 个，" +
-                "角色 ${roster.characters.size()} 个都有译名")
+                "角色 ${roster.characters.size()} 个都有译名，物资 ${provisions.cards.size()} 张都有牌名与效果句")
     }
 }
 

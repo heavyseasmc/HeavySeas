@@ -79,7 +79,7 @@ public final class RosterScreen extends GameScreen {
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
 
-        // 还没入座，所以上带写标题、座位轨那一条带写人数，身份行空着（showsIdentity = false）。
+        // 还没入座，所以上带写标题、座位轨那一条带写人数。
         Bands b = drawChrome(context, projection());
 
         // 三片按钮自上而下：角色格 · 预设 · 开航与取消。每片顶上都留出「抬」的高度。
@@ -155,12 +155,6 @@ public final class RosterScreen extends GameScreen {
     protected void drawRailBand(DrawContext context, HudView view, Bands b) {
         drawLine(context, Text.translatable("heavyseas.roster.detail", config.players(), selected.size()),
                 width / 2, b.railY(), GuiLanguage.muted());
-    }
-
-    /** 还没入座，没有身份可写。 */
-    @Override
-    protected boolean showsIdentity() {
-        return false;
     }
 
     private void toggle(String id) {

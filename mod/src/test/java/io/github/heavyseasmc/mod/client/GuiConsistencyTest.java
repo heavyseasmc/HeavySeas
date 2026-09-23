@@ -125,7 +125,7 @@ class GuiConsistencyTest {
     /**
      * 自己算带位的写法：只许出现在 {@code GameScreen} 里（ADR-0037 §7.10 第四刀）。
      *
-     * <p>名字前面带点的（{@code b.railH()} · {@code b.identityY()}）是<b>从 Bands 里取</b>，放行；
+     * <p>名字前面带点的（{@code b.railH()} · {@code b.stageTop()}）是<b>从 Bands 里取</b>，放行；
      * 裸写的是自己又算了一遍，红。
      */
     private static final List<Pattern> OWN_BANDS = List.of(

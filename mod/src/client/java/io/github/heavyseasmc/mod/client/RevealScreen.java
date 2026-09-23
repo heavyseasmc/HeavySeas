@@ -149,15 +149,8 @@ public final class RevealScreen extends GameScreen {
             drawLine(context, Text.translatable("heavyseas.reveal.yours",
                     nameOf(view.hate()), nameOf(view.love())), width / 2, ownY, GuiLanguage.muted());
         } else {
-            drawLine(context, Text.translatable("heavyseas.endgame.spectating"),
-                    width / 2, b.identityY(), GuiLanguage.muted());
+            drawLine(context, Text.translatable("heavyseas.endgame.spectating"), width / 2, ownY, GuiLanguage.muted());
         }
-    }
-
-    /** 旁观的人没有身份可写，那一行改写「旁观中」（在 {@link #render} 里）。 */
-    @Override
-    protected boolean showsIdentity() {
-        return view.seated();
     }
 
     /**

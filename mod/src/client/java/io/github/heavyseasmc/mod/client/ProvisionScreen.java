@@ -60,6 +60,14 @@ public final class ProvisionScreen extends GameScreen {
     /** 见过一次「对局还在」的投影没有。见 {@link #tick()}。 */
     private boolean sawGame;
 
+    /**
+     * 查看态：牌收成一叠，说明出现在右边（用户 2026-09-22）。默认<b>关</b> ——
+     * 牌做什么是冷信息，玩一两次就记住了，不该常驻占着舞台。
+     */
+    private boolean inspecting;
+    /** 这一次进 / 出查看态的起点，喂给「堆」。 */
+    private long inspectAt;
+
     public ProvisionScreen(ProvisionUpdateS2C data) {
         super(Text.translatable("heavyseas.provision.title"));
         apply(data);
@@ -140,8 +148,8 @@ public final class ProvisionScreen extends GameScreen {
         int n = Math.max(1, data.offer().size());
         // ❗牌名不再单占一行：第三刀之后它印在牌上（CardTexture 实时排字）。
         // 同一个名字在屏幕上出现两次是这一刀带出来的重复，省下的高度全还给牌 —— 用户 2026-09-22：「卡牌太小」。
-        // 舞台整格都给牌：键位排到倒计时那一条带的两头，规矩那一句拿掉了
-        // （用户 2026-09-22：「GUI 文字不是用来教玩家怎么玩游戏的」—— 箱子怎么传，动效已经演出来了）。
+        // 舞台整格都给牌：规矩那一句拿掉了（箱子怎么传，动效已经演出来了），
+        // 牌自己的内容藏在查看态里（按 U / 右键）。
         int bottom = b.stageBottom();
         int avail = bottom - b.stageTop();
         // 卡顶要留多少空，取决于卡有多高（「顿」放大 7%，绕底边，长出来的那一截全在上面）；
@@ -184,14 +192,20 @@ public final class ProvisionScreen extends GameScreen {
         long dt = frameDelta(now);
         Bands b = drawChrome(context, projection());
         Layout l = layout(b);
+        Inspect in = inspect(b);
+        // 「堆」走到哪了：0 = 还摊成一排，1 = 已经收成一叠。进与出走同一条曲线，只是方向相反。
+        float gathered = inspecting ? GuiLanguage.gather(now, inspectAt) : 1f - GuiLanguage.gather(now, inspectAt);
         float snapP = GuiLanguage.snap(now, snapAt);
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         // ❗即使这一轮已经定了也要每帧调一次：它记的是上一帧指针在哪，停一帧就会漏掉一次移动。
         // 「顿」一开始决定就定了，之后鼠标与键盘都不该再改高亮 —— 所以判的是 decided()，
         // 不是「还在播」：播完到界面收掉之间那几帧，同样不许再改。
+        // ❗查看态里不认悬停：牌都叠在一起了，命中框却还在摊开时那一排的位置上 ——
+        //   指针没动、看的牌却被「指」到了别处，与「停着的指针不算指向」同一类。
+        //   查看态里换牌只走 ←→（与摊开时同一个键，同一件事）。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
-        if (moved && !decided()) {
+        if (moved && !decided() && !inspecting) {
             int hovered = indexAt(mouseX, mouseY, l);
             if (hovered >= 0 && hovered != highlight) {
                 setHighlight(hovered);    // 超时认高亮，鼠标与键盘两套指示不能各说各话
@@ -199,36 +213,23 @@ public final class ProvisionScreen extends GameScreen {
         }
 
         List<String> offer = data.offer();
+        // 高亮那一张最后画：收成一叠时它在堆顶，摊开时它抬起来 —— 两种状态下它都必须压在别人上面。
         for (int i = 0; i < offer.size(); i++) {
-            float in = GuiLanguage.deal(now, dealAt, i);
-            if (in <= 0f) {
-                continue;
+            if (i != highlight) {
+                drawOne(context, now, dt, l, in, gathered, snapP, offer, i);
             }
-            boolean hi = i == highlight;
-            lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
-
-            context.getMatrices().push();
-            // 入场：从下方抬起 + 轻微放大。全部走矩阵，不碰布局。
-            float rise = (1f - in) * GuiLanguage.DEAL_RISE;
-            float scale = GuiLanguage.dealScale(in);
-            if (i == snapIndex) {
-                // 「顿」：带过冲地弹一下再回原位。叠在「抬」之上 —— 服务端挑的要是另一张，
-                // 这一下正好连「高亮挪过去了」一起说清楚。
-                rise += GuiLanguage.snapRise(snapP);
-                scale *= GuiLanguage.snapScale(snapP);
-            }
-            context.getMatrices().translate(l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h() - lift[i] + rise, 0);
-            context.getMatrices().scale(scale, scale, 1f);
-            context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
-            CardTexture.drawProvision(context, offer.get(i), 0, 0, l.w(), l.h());
-            if (hi) {
-                // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
-                drawCardFrame(context, l.w(), l.h());
-            }
-            context.getMatrices().pop();
+        }
+        if (highlight >= 0 && highlight < offer.size()) {
+            drawOne(context, now, dt, l, in, gathered, snapP, offer, highlight);
         }
 
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
+        if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
+            String card = offer.get(highlight);
+            drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
+                    null, provisionName(card), provisionEffect(card));
+        }
+        drawEdgeHints(context, b, List.of(keys("select", "←", "→")),
+                List.of(keys(inspecting ? "close" : "inspect", "U"), keys("confirm", "Enter")));
         drawCountdown(context, b, now, data.deadlineMs(),
                 Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD, l.rowW());
     }
@@ -260,6 +261,53 @@ public final class ProvisionScreen extends GameScreen {
         }
     }
 
+    /**
+     * 画一张牌：位置与大小在「摊成一排」与「收成一叠」之间按 {@code gathered} 插值。
+     *
+     * <p>❗版面本身不动 —— 命中判定照旧按摊开那一排算。收起来时点牌没有意义（都叠在一起了），
+     * 所以查看态里鼠标点击不再当作留牌。
+     */
+    private void drawOne(DrawContext context, long now, long dt, Layout l, Inspect in, float gathered,
+                         float snapP, List<String> offer, int i) {
+        float entered = GuiLanguage.deal(now, dealAt, i);
+        if (entered <= 0f) {
+            return;                       // 还没轮到它入场
+        }
+        boolean hi = i == highlight;
+        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
+
+        // 一叠牌不是叠得严丝合缝：每张错开一点点，才看得出是一叠而不是一张。
+        int depth = hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight));
+        float stackX = in.cardX() + Math.min(depth, 6) * 1.6f;
+        float stackBottom = in.cardY() + in.cardH() + Math.min(depth, 6) * 1.2f;
+        float w = l.w() + (in.cardW() - l.w()) * gathered;
+        float h = l.h() + (in.cardH() - l.h()) * gathered;
+        float rowCx = l.cardX(i) + l.w() / 2f;
+        float cx = rowCx + (stackX + in.cardW() / 2f - rowCx) * gathered;
+        float rowBottom = l.cardsTop() + l.h();
+        float bottom = rowBottom + (stackBottom - rowBottom) * gathered;
+
+        context.getMatrices().push();
+        // 入场：从下方抬起 + 轻微放大。全部走矩阵，不碰布局。
+        float rise = (1f - entered) * GuiLanguage.DEAL_RISE;
+        float scale = GuiLanguage.dealScale(entered);
+        if (i == snapIndex) {
+            // 「顿」：带过冲地弹一下再回原位。叠在「抬」之上 —— 服务端挑的要是另一张，
+            // 这一下正好连「高亮挪过去了」一起说清楚。
+            rise += GuiLanguage.snapRise(snapP);
+            scale *= GuiLanguage.snapScale(snapP);
+        }
+        context.getMatrices().translate(cx, bottom - lift[i] * (1f - gathered) + rise, 0);
+        context.getMatrices().scale(scale, scale, 1f);
+        context.getMatrices().translate(-w / 2f, -h, 0);
+        CardTexture.drawProvision(context, offer.get(i), 0, 0, Math.round(w), Math.round(h));
+        if (hi) {
+            // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
+            drawCardFrame(context, Math.round(w), Math.round(h));
+        }
+        context.getMatrices().pop();
+    }
+
     private int indexAt(int mouseX, int mouseY, Layout l) {
         return cardIndexAt(mouseX, mouseY, l.left(), l.cardsTop(), l.w(), l.h(), data.offer().size());
     }
@@ -283,9 +331,19 @@ public final class ProvisionScreen extends GameScreen {
         return snapAt > 0L;
     }
 
+    /** 进 / 出查看态。同一个动作两边都通，收起来时也照旧能确认。 */
+    private void toggleInspect() {
+        inspecting = !inspecting;
+        inspectAt = System.currentTimeMillis();
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (data != null && !data.offer().isEmpty() && !decided()) {
+        if (button == 1) {
+            toggleInspect();              // 右键 = 查看（与 U 同一件事）
+            return true;
+        }
+        if (data != null && !data.offer().isEmpty() && !decided() && !inspecting) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
                 send(i, true);
@@ -301,6 +359,19 @@ public final class ProvisionScreen extends GameScreen {
             return super.keyPressed(keyCode, scanCode, modifiers);
         }
         switch (keyCode) {
+            case GLFW.GLFW_KEY_U -> {
+                toggleInspect();
+                return true;
+            }
+            case GLFW.GLFW_KEY_ESCAPE -> {
+                if (inspecting) {
+                    toggleInspect();      // 查看态里 Esc 只收这一层，不试图关界面（选牌本来也逃不掉）
+                    return true;
+                }
+                return super.keyPressed(keyCode, scanCode, modifiers);
+            }
+            // ←→ 在两个状态里是同一件事：换哪一张。查看态里换的是堆顶那张与右边那段字，
+            // 而它照旧上报服务端 —— 你正在看的，就是超时会替你留下的（决策 ⑨）。
             case GLFW.GLFW_KEY_LEFT -> {
                 setHighlight(Math.max(0, highlight - 1));
                 return true;

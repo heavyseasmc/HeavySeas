@@ -142,8 +142,4 @@ public final class ProvisionTargetScreen extends GameScreen {
         ClientPlayNetworking.send(UseProvisionC2S.target(view.provisionTargetCard(), target));
         LOGGER.info("特殊物资：{} 挑了目标 {}", view.provisionTargetCard(), target);
     }
-
-    private static Text provisionName(String card) {
-        return Text.translatable("heavyseas.provision." + card);
-    }
 }

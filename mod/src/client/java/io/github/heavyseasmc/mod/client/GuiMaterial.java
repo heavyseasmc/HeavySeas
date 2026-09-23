@@ -133,38 +133,21 @@ final class GuiMaterial {
         }
     }
 
-    /** 舞台角标的两条臂各多长，GUI 单位。 */
-    static final int STAGE_MARK = 24;
-
     /**
-     * 舞台四角的角标：每角一横一竖两条短臂，标出「牌与按钮在这一格里」。
+     * 座位轨与舞台之间那一道**通栏线**（样张里是木板之间的一道缝）。
      *
-     * <p>❗<b>不通栏。</b> 一条横贯全屏的线会把版面切断 —— 收倒计时那一刀（`7c08a1a`）就是为这个，
-     * 用户当时的话是「横向利用得很满，纵向是否能分担一些」。角标只在四个角上，各面共用同一个矩形，
-     * 于是换面时这四个角一个像素都不动。
+     * <p>它取代了第四刀为截图判据加的舞台角标 —— 角标是我加的，稿子里没有（§7.12）。
+     * 这道线稿子里本来就有，而且**只在这一处出现一次**，所以 `band_check.py` 改认它：
+     * 一整行同一个颜色、跨满舞台宽，别的地方不会有。
      *
-     * <p>用 {@link GuiLanguage#rim()}（板最外一圈那个色）：它不与任何一处的字同色，
-     * 所以截图判据数得出这四条臂在第几行 —— 与墨色同色的话，每一行正文都会混进来。
+     * <p>用 {@link GuiLanguage#rim()}（板最外一圈那个色）：它不与任何一处的字同色 ——
+     * 与墨色同色的话，每一行正文都会混进判据里。
      */
-    static void stageMarks(DrawContext context, int x, int y, int w, int h) {
-        if (w < 4 * STAGE_MARK || h < 2 * STAGE_MARK) {
-            return;                                           // 舞台比角标还小：画出来只剩一个框
+    static void bandRule(DrawContext context, int x, int y, int w) {
+        if (w <= 0) {
+            return;
         }
-        int c = GuiLanguage.rim();
-        int arm = STAGE_MARK;
-        int leg = STAGE_MARK / 3;
-        for (int[] corner : new int[][]{{x, y, 1, 1}, {x + w, y, -1, 1}, {x, y + h, 1, -1}, {x + w, y + h, -1, -1}}) {
-            int cx = corner[0];
-            int cy = corner[1];
-            int sx = corner[2];
-            int sy = corner[3];
-            int x0 = sx > 0 ? cx : cx - arm;
-            int y0 = sy > 0 ? cy : cy - 1;
-            context.fill(x0, y0, x0 + arm, y0 + 1, c);
-            int lx = sx > 0 ? cx : cx - 1;
-            int ly = sy > 0 ? cy : cy - leg;
-            context.fill(lx, ly, lx + 1, ly + leg, c);
-        }
+        context.fill(x, y, x + w, y + 1, GuiLanguage.rim());
     }
 
     /**
@@ -177,6 +160,37 @@ final class GuiMaterial {
         }
         context.fill(x + 1, y + 2, x + w + 1, y + h + 2, 0x55000000);                 // 标签落在板上的影子
         nineSlice(context, texture("tag"), x, y, w, h, TAG_TEXELS, TAG_BORDER_TEXELS);
+    }
+
+    /** 提示签上那个尖角多高、多宽（宽 = 2 倍高），GUI 单位。 */
+    static final int PLATE_POINT = 5;
+
+    /**
+     * 提示签：一块标签，顶上伸出一个指着牌的尖角（样张里牌下面吊的那张白搪瓷牌）。
+     *
+     * <p>❗尖角不另取颜色，而是<b>一条一条地画标签贴图正中那一个纹素</b> ——
+     * 标签是九宫格贴图，浅深两个主题各一张，另起一个色值迟早与贴图漂开
+     * （「同一件东西两种画法」正是 §7.12 要收掉的毛病）。从贴图上取，换主题时它自己就跟着换。
+     *
+     * @param pointX 尖角尖端的 x（一般是那张牌的横中线），会被夹进签子自己的宽度里；
+     *               {@code < 0} 表示不要尖角（签子在牌<b>旁边</b>而不是下面时就是这样）
+     */
+    static void plate(DrawContext context, int x, int y, int w, int h, int pointX) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        if (pointX < 0) {
+            tag(context, x, y, w, h);
+            return;
+        }
+        int tip = Math.max(x + PLATE_POINT + 1, Math.min(x + w - PLATE_POINT - 1, pointX));
+        Identifier id = texture("tag");
+        int mid = TAG_TEXELS / 2;
+        for (int i = 0; i < PLATE_POINT; i++) {
+            int half = PLATE_POINT - i;
+            context.drawTexture(id, tip - half, y - PLATE_POINT + i, 2 * half, 1, mid, mid, 1, 1, TAG_TEXELS, TAG_TEXELS);
+        }
+        tag(context, x, y, w, h);
     }
 
     /**

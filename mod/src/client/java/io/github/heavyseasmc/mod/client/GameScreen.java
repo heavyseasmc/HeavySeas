@@ -320,8 +320,8 @@ public abstract class GameScreen extends Screen {
      *
      * @param avatar 座位轨上头像的直径；{@code 0} = 这一档窗口放不下头像（退回只有名字的轨）
      */
-    protected record Bands(int topY, int railY, int railH, int avatar, int stageTop, int stageBottom,
-                           int gaugeY, int identityY) {
+    protected record Bands(int topY, int railY, int railH, int avatar, int ruleY, int stageTop, int stageBottom,
+                           int gaugeY) {
 
         /** 舞台那一格有多高。 */
         int stageH() {
@@ -342,9 +342,9 @@ public abstract class GameScreen extends Screen {
      */
     protected Bands bands() {
         int text = textH();
-        // 身份行：贴底，留出屏幕高的 5%（至少 8 单位）。
-        int identityY = height - Math.max(8, Math.round(height * 0.05f)) - text;
-        int gaugeY = identityY - BAND_GAP - Math.max(BAR_H, text);
+        // ❗没有身份行了（用户 2026-09-22：「按稿子去掉，交给 HUD」）—— 体力与口渴主画面 HUD 上有，
+        //   界面里再写一遍是重复，而那一条带是牌最缺的二十个单位。倒计时于是直接贴底。
+        int gaugeY = height - Math.max(8, Math.round(height * 0.05f)) - Math.max(BAR_H, text);
         int railY = TOP_BAND_Y + topBandH();
         int stageBottom = gaugeY - BAND_GAP;
         int middle = Math.max(0, stageBottom - railY);           // 座位轨与舞台分这一段
@@ -352,8 +352,9 @@ public abstract class GameScreen extends Screen {
         int room = Math.round(middle * RAIL_MAX_SHARE);
         int avatar = bare > room ? 0 : avatarDiameter(room - bare);
         int railH = bare > room ? 0 : bare + blockOf(avatar);
-        int stageTop = railY + (railH > 0 ? railH + BAND_GAP : 0);
-        return new Bands(TOP_BAND_Y, railY, railH, avatar, stageTop, stageBottom, gaugeY, identityY);
+        int ruleY = railY + (railH > 0 ? railH : 0);
+        int stageTop = ruleY + (railH > 0 ? BAND_GAP : 0);
+        return new Bands(TOP_BAND_Y, railY, railH, avatar, ruleY, stageTop, stageBottom, gaugeY);
     }
 
     /**
@@ -383,10 +384,12 @@ public abstract class GameScreen extends Screen {
         Bands b = bands();
         drawTopBand(context, view, b);
         drawRailBand(context, view, b);
-        GuiMaterial.stageMarks(context, SIDE, b.stageTop(), width - 2 * SIDE, b.stageH());
-        if (showsIdentity()) {
-            drawIdentity(context, view, b.identityY());
+        // 两道通栏线把舞台夹出来：座位轨与舞台之间、舞台与倒计时之间（样张里是木板之间的缝）。
+        // 截图判据认的就是它们 —— 两条都在，才量得出「舞台上下沿都没动」。
+        if (b.railH() > 0) {
+            GuiMaterial.bandRule(context, SIDE, b.ruleY(), width - 2 * SIDE);
         }
+        GuiMaterial.bandRule(context, SIDE, b.stageBottom(), width - 2 * SIDE);
         return b;
     }
 
@@ -420,11 +423,6 @@ public abstract class GameScreen extends Screen {
         return (width - 2 * SIDE) / Math.max(1, seats);
     }
 
-    /** 这一面画不画身份行。阵容那一面还没入座，没有身份可写。 */
-    protected boolean showsIdentity() {
-        return true;
-    }
-
     /** 一个按钮排在哪。 */
     protected record Box(int x, int y, int w, int h) {
 
@@ -453,10 +451,17 @@ public abstract class GameScreen extends Screen {
         Text seconds = Text.literal(String.format("%.1f", left / 1000f));
         int textW = textW(seconds);
         int gap = 2 * BAR_TO_TEXT;
-        // 两头的按键提示先占位：倒计时绝不压到它们（窄窗口下会真的撞上）。
-        int free = width - 2 * SIDE - edgeLeftW - edgeRightW - 2 * HINT_SPACING;
-        int barW = countdownWidth(Math.min(Math.max(0, stageW - textW - gap), Math.max(0, free - textW - gap)));
-        int x = (width - (barW + gap + textW)) / 2;
+        // 两头的按键提示先占位：倒计时绝不压到它们。
+        // ❗最后这一下 min 不能省：countdownWidth 里有个 MIN_COUNTDOWN_W 的下限，
+        //   光把窄一点的宽度传进去是拦不住的 —— 实拍到秒数压在「U 收起」那枚键帽上（2026-09-22）。
+        //   宁可横杠短一截，也不许两件东西叠在一起。
+        // ❗在**两头让出的那一段里**居中，不是按全屏居中：左右两头的提示不一样宽，
+        //   按全屏居中会整块偏向窄的那一头，压上另一头（实拍：秒数压在「U 收起」上）。
+        int from = SIDE + edgeLeftW + (edgeLeftW > 0 ? HINT_SPACING : 0);
+        int to = width - SIDE - edgeRightW - (edgeRightW > 0 ? HINT_SPACING : 0);
+        int free = Math.max(0, to - from);
+        int barW = Math.min(countdownWidth(Math.max(0, stageW - textW - gap)), Math.max(0, free - textW - gap));
+        int x = from + Math.max(0, (free - (barW + gap + textW)) / 2);
         GuiMaterial.gauge(context, x, b.gaugeY() + (b.gaugeH() - BAR_H) / 2, barW, frac, urgent);
         drawLineLeft(context, seconds, x + barW + gap, b.gaugeY() + (b.gaugeH() - textH()) / 2,
                 urgent ? GuiLanguage.cinnabar() : GuiLanguage.ink());
@@ -871,6 +876,92 @@ public abstract class GameScreen extends Screen {
         return new KeyHint(List.of(caps), Text.translatable("heavyseas.keys." + label));
     }
 
+    /**
+     * 物资牌的牌名与那一句效果。
+     *
+     * <p>❗这两条与角色名一样是<b>拼出来</b>的 lang 键（物资 id 来自 {@code data/provisions}，代码里没有那张表），
+     * 所以构建期的 {@code checkLangKeys} 单独按数据核对这一族 —— 加一张牌而忘了写那一句，会在构建时红。
+     */
+    protected static Text provisionName(String id) {
+        return Text.translatable("heavyseas.provision." + id);
+    }
+
+    protected static Text provisionEffect(String id) {
+        return Text.translatable("heavyseas.provision." + id + ".effect");
+    }
+
+    // ------------------------------------------------------------ 提示签：牌自己的内容（ADR-0037 §7.12）
+
+    /** 提示签的内边距与两行之间。 */
+    private static final int PLATE_PAD_X = 10;
+    private static final int PLATE_PAD_Y = 4;
+    /** 效果那一段固定按两行留位：签子的高度不许随牌换来换去，否则牌会跟着上下跳。 */
+    private static final int PLATE_BODY_LINES = 2;
+    /** 签子最宽占舞台的几成。 */
+    private static final float PLATE_MAX_SHARE = 0.46f;
+    private static final int PLATE_MIN_W = 120;
+
+    /**
+     * 查看态的版面：牌收成一叠在左，说明在右。
+     *
+     * <p>❗<b>默认态一个字都没有。</b> 牌做什么是<b>冷信息</b> —— 玩一两次就记住了，
+     * 不该天天占着舞台；轮到谁、还剩几秒才是热的，那些常驻在共有的带上。
+     * 用户 2026-09-22：「藏一层右键 / U 键查看，然后做个把牌堆起来的动效，堆顶为查看的这张牌，
+     * 右边为描述文字，这样一下子就宽敞了」。省下的不只是一行字，是整整一块签子的高度。
+     *
+     * <p>说明放<b>右边</b>而不是下面：这一排牌横着已经铺满，而牌一收成叠，横向立刻空出一大片 ——
+     * 纵向本来就是最紧的那一维（§7.8）。
+     */
+    protected record Inspect(int cardX, int cardY, int cardW, int cardH, int plateX, int plateY, int plateW) {
+    }
+
+    /** 查看态里那一叠牌与那张签子各在哪。只由带位与窗口算，与这一面有几张牌无关。 */
+    protected Inspect inspect(Bands b) {
+        int h = Math.min(b.stageH(), Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO)));
+        int w = GuiLanguage.cardWidth(h);
+        int stage = width - 2 * SIDE;
+        int plateW = Math.max(PLATE_MIN_W, Math.min(Math.round(stage * PLATE_MAX_SHARE), stage - w - PLATE_GAP));
+        int total = w + PLATE_GAP + plateW;
+        int left = (width - total) / 2;
+        int top = b.stageTop() + Math.max(0, (b.stageH() - h) / 2);
+        return new Inspect(left, top, w, h, left + w + PLATE_GAP, top, plateW);
+    }
+
+    /** 那一叠牌与签子之间。 */
+    private static final int PLATE_GAP = 14;
+
+    /**
+     * 签子上写什么：<b>类别 · 牌堆里共几张 / 牌名 / 一句效果</b>。
+     *
+     * <p>它就是「承担讲规矩那件事的另有它物」（用户 2026-09-22：「GUI 文字不是用来教玩家怎么玩游戏的」）。
+     *
+     * @param pointX  尖角指着哪儿；{@code < 0} = 不要尖角（签子在牌旁边时）
+     * @param caption 题头，可为 {@code null}（类别与张数还没送到客户端时就是这样）
+     */
+    protected void drawCardPlate(DrawContext context, int x, int top, int w, int pointX,
+                                 Text caption, Text name, Text body) {
+        int tw = w - 2 * PLATE_PAD_X;
+        int capH = caption == null ? 0 : GuiText.lineHeight(GuiText.CAPTION, false) + 2;
+        // 签子按**这一句实际排几行**画：短句的签子就矮一点。查看态里它在牌旁边，
+        // 高矮不影响牌的位置，所以不必像常驻那版那样按最大值留位。
+        int bodyH = Math.min(PLATE_BODY_LINES * textH(), GuiText.height(body.getString(), tw, GuiText.BODY, false, PLATE_BODY_LINES));
+        int h = 2 * PLATE_PAD_Y + capH + GuiText.lineHeight(GuiText.NAME, true) + 2 + bodyH;
+        GuiMaterial.plate(context, x, top, w, h, pointX);
+
+        int tx = x + PLATE_PAD_X;
+        int y = top + PLATE_PAD_Y;
+        int ink = GuiLanguage.onTag(GuiLanguage.ink());
+        if (caption != null) {
+            GuiText.line(context, caption, tx, y, tw, GuiText.CAPTION, false,
+                    GuiLanguage.onTag(GuiLanguage.muted()), GuiText.Align.LEFT);
+            y += capH;
+        }
+        GuiText.line(context, name, tx, y, tw, GuiText.NAME, true, ink, GuiText.Align.LEFT);
+        y += GuiText.lineHeight(GuiText.NAME, true) + 2;
+        GuiText.draw(context, body.getString(), tx, y, tw, GuiText.BODY, false, ink,
+                GuiText.Align.LEFT, PLATE_BODY_LINES);
+    }
+
     /** 把一个 ARGB 色换成另一个不透明度。按不动的东西靠它淡下去，不另起颜色：语义色只有三个。 */
     protected static int withAlpha(int argb, int alpha) {
         return (alpha << 24) | (argb & 0xFFFFFF);
@@ -907,31 +998,6 @@ public abstract class GameScreen extends Screen {
             context.fill(left, y + textH() + 3, left + pip, y + textH() + 3 + pip,
                     i < view.gulls() ? GuiLanguage.verdigris() : GuiLanguage.ground());
         }
-    }
-
-    /**
-     * 身份行：你是谁、还剩多少。
-     *
-     * <p>两段颜色不同（身份是金，体力可能是朱砂），所以分两次画；
-     * 位置按 {@code textRenderer} 量出来的宽度排，不写死偏移量 ——
-     * 译名长度各语言不同，写死的那一版只在中文下看着是居中的。
-     */
-    protected void drawIdentity(DrawContext context, HudView view, int y) {
-        Text who = Text.translatable("heavyseas.character." + view.character());
-        Text vitals = Text.translatable("heavyseas.hand.vitals", view.health(), view.maxHealth(),
-                conditionName(view.condition()), view.thirst());
-        Text sep = Text.literal("·");
-        int gap = 4;                                             // 分隔符两边的空：排字会剥掉前后空格，间距要自己给
-        int wWho = textW(who) + gap;
-        int wSep = textW(sep) + gap;
-        int x = (width - (wWho + wSep + textW(vitals))) / 2;
-        drawLineLeft(context, who, x, y, GuiLanguage.gold());
-        drawLineLeft(context, sep, x + wWho, y, GuiLanguage.dim());
-        // 体力见底或者已经昏迷才用朱砂 —— 它只给紧迫与伤害，
-        // 当强调色用的话，真紧迫那一刻就喊不动了。
-        drawLineLeft(context, vitals, x + wWho + wSep, y,
-                view.health() <= 1 || view.condition() != Condition.CONSCIOUS
-                        ? GuiLanguage.cinnabar() : GuiLanguage.muted());
     }
 
     /**
