@@ -96,9 +96,21 @@ final class GuiText {
      */
     static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
                     int color, Align align, int maxLines, boolean shadow, boolean ink) {
+        return draw(context, text, x, y, boxW, guiSize, bold, color, align, maxLines, shadow, ink, 0);
+    }
+
+    /**
+     * 同上，但倍率由调用方给。
+     *
+     * <p>{@code scaleOverride <= 0} 时用窗口的界面尺寸（界面上的字一律走这条）。
+     * 给正数是**合成进牌自己的纹理**那一路（{@link CardComposite}）：那时排字的坐标系是<b>贴图自己的像素</b>，
+     * 与窗口多大、界面尺寸设成几，一点关系都没有 —— 传窗口的倍率进去，同一张牌在不同窗口下会合成出不同的字号。
+     */
+    static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
+                    int color, Align align, int maxLines, boolean shadow, boolean ink, int scaleOverride) {
         MinecraftClient client = MinecraftClient.getInstance();
         TextRenderer renderer = client.textRenderer;
-        int scale = scale(client);
+        int scale = scaleOverride > 0 ? scaleOverride : scale(client);
         TextFit.Result fit = fit(renderer, text, boxW, guiSize, bold, maxLines, scale);
         int linePx = linePx(fit.size());
         int baseline = Math.round((linePx - fit.size()) / 2f + fit.size() * IDEOGRAPH_ASCENT);

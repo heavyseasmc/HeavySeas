@@ -155,6 +155,7 @@ public final class HeavySeasClient implements ClientModInitializer {
             while (themeKey.wasPressed()) {
                 ClientPrefs.toggleTheme();
             }
+            CardComposite.tick(client);      // 一 tick 合成一张牌；渲染中途不动帧缓冲
             while (logKey.wasPressed()) {
                 SidebarReveal.togglePin();
                 LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");

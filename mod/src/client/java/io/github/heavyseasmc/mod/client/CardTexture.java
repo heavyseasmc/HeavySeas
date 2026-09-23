@@ -138,33 +138,105 @@ public final class CardTexture extends AbstractTexture {
      *
      * <p>色用 {@link GuiLanguage#CARD_INK} 而不是主题的墨：牌面永远是纸，深色主题下也一样。
      */
+    /** 牌名用哪一档版式。牌小到表头读不出时换成放大居中，再小就不画（ADR-0020 §8）。 */
+    enum NameLayout {
+        HEADER, BIG, NONE
+    }
+
+    /**
+     * 这么大的牌，牌名该用哪一档。
+     *
+     * <p>❗按**屏幕上画多大**判，不按贴图多大。合成（{@link CardComposite}）是在贴图的像素空间里画的，
+     * 若让它自己判，就永远是表头那一档 —— 牌缩到一枚图标时本该换成放大牌名的那一路会整个失效
+     * （2026-09-24 第三次实拍抓到：八张小牌全变成了表头版式）。**合成只该改采样时机，不该改版式。**
+     */
+    static NameLayout nameLayout(int w, int h, int masterW, int masterH) {
+        float fx = w / (float) masterW;
+        float fy = h / (float) masterH;
+        if (Math.round(NAME_SIZE * fy) >= NAME_HEADER_MIN
+                && Math.round((masterW - NAME_BOX_ROOM - NAME_X) * fx) >= NAME_MIN_SIZE) {
+            return NameLayout.HEADER;
+        }
+        int big = Math.round(Math.min(BIG_NAME_SIZE, (BIG_NAME_BOTTOM - BIG_NAME_TOP) / 1.25f) * fy);
+        int side = Math.round(BIG_NAME_SIDE * fx);
+        return big < NAME_MIN_SIZE || w - 2 * side < NAME_MIN_SIZE ? NameLayout.NONE : NameLayout.BIG;
+    }
+
+    /**
+     * 把牌名排进**贴图自己的像素空间**（{@link CardComposite} 用）。
+     *
+     * <p>版式由调用方给 —— 它是按屏幕上的大小定的。这里只负责按贴图分辨率把那一档画出来，倍率固定 1。
+     */
+    static void drawNameInto(DrawContext context, String key, String id, int texW, int texH, NameLayout layout) {
+        boolean landscape = texW > texH;
+        drawName(context, key, id, 0, 0, texW, texH,
+                landscape ? MASTER_W_LANDSCAPE : MASTER_W, landscape ? MASTER_H_LANDSCAPE : MASTER_H, 1, layout);
+    }
+
     private static void drawName(DrawContext context, String key, String id,
                                  int x, int y, int w, int h, int masterW, int masterH) {
+        drawName(context, key, id, x, y, w, h, masterW, masterH, 0,
+                nameLayout(w, h, masterW, masterH));
+    }
+
+    private static void drawName(DrawContext context, String key, String id,
+                                 int x, int y, int w, int h, int masterW, int masterH,
+                                 int textScale, NameLayout layout) {
+        // ❗「墨洇」（GuiText 的 ink）当初是**治标**：锐字压在柔化过的牌上像贴纸，于是在四周压一道
+        //   极淡的同色假装边缘洇开（§7.10 第 1 条）。合成之后字与画层共享同一次缩放与过滤，
+        //   真正的软边由采样给出 —— 这时再叠一层洇，只会糊。所以合成那一路把它关掉。
+        boolean ink = textScale <= 0;
         String name = Text.translatable(key + id).getString();
         float fx = w / (float) masterW;
         float fy = h / (float) masterH;
         int header = Math.round(NAME_SIZE * fy);
         int boxW = Math.round((masterW - NAME_BOX_ROOM - NAME_X) * fx);
-        if (header >= NAME_HEADER_MIN && boxW >= NAME_MIN_SIZE) {
+        if (layout == NameLayout.NONE) {
+            return;                      // 这张牌已经小到一枚图标，名字由界面自己在牌外写
+        }
+        if (layout == NameLayout.HEADER) {
             GuiText.draw(context, name, x + Math.round(NAME_X * fx), y + Math.round(NAME_TOP * fy),
-                    boxW, header, true, GuiLanguage.CARD_INK, GuiText.Align.LEFT, 1, false, true);
+                    boxW, header, true, GuiLanguage.CARD_INK, GuiText.Align.LEFT, 1, false, ink, textScale);
             return;
         }
         // 行框高是字号的 1.25 倍（GuiText 的度量），所以字号还要被那条带的高卡一道 —— 名字绝不许探出带外。
         int big = Math.round(Math.min(BIG_NAME_SIZE, (BIG_NAME_BOTTOM - BIG_NAME_TOP) / 1.25f) * fy);
         int side = Math.round(BIG_NAME_SIDE * fx);
-        if (big < NAME_MIN_SIZE || w - 2 * side < NAME_MIN_SIZE) {
-            return;                      // 这张牌已经小到一枚图标，名字由界面自己在牌外写
-        }
         GuiText.draw(context, name, x + side, y + Math.round(BIG_NAME_TOP * fy),
-                w - 2 * side, big, true, GuiLanguage.CARD_INK, GuiText.Align.CENTER, 1, false, true);
+                w - 2 * side, big, true, GuiLanguage.CARD_INK, GuiText.Align.CENTER, 1, false, ink, textScale);
     }
 
     /** 画一张物资卡面。 */
+    /** 无字画层烘出来多大。合成要照这个尺寸开帧缓冲 —— 合成的分辨率就是牌自己的分辨率。 */
+    private static final int TEX_W = 600;
+    private static final int TEX_H = 840;
+
+    /**
+     * 画一张牌：**有合成好的就整体画它**，没有就照旧（画层 + 现排的牌名）。
+     *
+     * <p>合成好的那一张里，字与画层共享同一次缩放与同一次过滤 —— 治的是「锐压软，读成贴纸」
+     * （ADR-0037 §7.10 第 1 条）。合成是异步的，所以这里**一定要有老路可退**：
+     * 合成没好、合成失败、显卡不给帧缓冲，都只是回到今天的样子，不是空白。
+     */
+    private static void drawCard(DrawContext context, String kind, String nameKey, String id,
+                                 Identifier art, int x, int y, int w, int h,
+                                 int masterW, int masterH, int texW, int texH) {
+        NameLayout layout = nameLayout(w, h, masterW, masterH);
+        // ❗版式进缓存键：同一张牌在两个尺寸下可能用两档版式，合成也就要两张。
+        Identifier composed = CardComposite.of(kind + "/" + id + "/" + layout.name().toLowerCase(java.util.Locale.ROOT),
+                ensure(art), nameKey, id, texW, texH, layout);
+        if (composed != null) {
+            context.drawTexture(composed, x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+            return;
+        }
+        context.drawTexture(ensure(art), x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+        drawName(context, nameKey, id, x, y, w, h, masterW, masterH);
+    }
+
     public static void drawProvision(DrawContext context, String cardId, int x, int y, int w, int h) {
         // 区域取整张贴图：UV 只看比值，写 1/1 就不必知道贴图烘成了多大。
-        context.drawTexture(ensure(provisionId(cardId)), x, y, w, h, 0f, 0f, 1, 1, 1, 1);
-        drawName(context, "heavyseas.provision.", cardId, x, y, w, h, MASTER_W, MASTER_H);
+        drawCard(context, "provision", "heavyseas.provision.", cardId, provisionId(cardId),
+                x, y, w, h, MASTER_W, MASTER_H, TEX_W, TEX_H);
     }
 
     /**
@@ -173,9 +245,9 @@ public final class CardTexture extends AbstractTexture {
      * <p>id 就是 {@code data/roster} 的角色 id —— 贴图与数据共用一套主键，中间没有映射表。
      */
     public static void drawCharacter(DrawContext context, String characterId, int x, int y, int w, int h) {
-        context.drawTexture(ensure(Identifier.of(HeavySeasMod.MOD_ID, CHARACTER_DIR + "/" + characterId + ".png")),
-                x, y, w, h, 0f, 0f, 1, 1, 1, 1);
-        drawName(context, "heavyseas.character.", characterId, x, y, w, h, MASTER_W, MASTER_H);
+        drawCard(context, "character", "heavyseas.character.", characterId,
+                Identifier.of(HeavySeasMod.MOD_ID, CHARACTER_DIR + "/" + characterId + ".png"),
+                x, y, w, h, MASTER_W, MASTER_H, TEX_W, TEX_H);
     }
 
     /** 画一张牌背。终局翻牌的暗牌用 {@code secret} —— 爱恨卡的背面。 */
@@ -186,9 +258,9 @@ public final class CardTexture extends AbstractTexture {
 
     /** 天候卡是横版 7:5；调用方负责按该比例排版。 */
     public static void drawWeather(DrawContext context, String weatherId, int x, int y, int w, int h) {
-        context.drawTexture(ensure(Identifier.of(HeavySeasMod.MOD_ID, WEATHER_DIR + "/" + weatherId + ".png")),
-                x, y, w, h, 0f, 0f, 1, 1, 1, 1);
-        drawName(context, "heavyseas.weather.", weatherId, x, y, w, h, MASTER_W_LANDSCAPE, MASTER_H_LANDSCAPE);
+        drawCard(context, "weather", "heavyseas.weather.", weatherId,
+                Identifier.of(HeavySeasMod.MOD_ID, WEATHER_DIR + "/" + weatherId + ".png"),
+                x, y, w, h, MASTER_W_LANDSCAPE, MASTER_H_LANDSCAPE, TEX_H, TEX_W);
     }
 
     /**
