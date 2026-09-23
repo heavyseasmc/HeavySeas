@@ -8,12 +8,16 @@ import net.minecraft.util.Identifier;
  * GUI 的材质：界面不再是「模糊背景上的一层半透明黑」，而是一件画出来的东西（ADR-0037）。
  * 材质只在这里定义 —— 与颜色只在 {@link GuiLanguage}、版面常量只在 {@code GameScreen} 是同一条规矩。
  *
- * <p>两个主题共用一份版面骨架，只换这张材质表：
- * <ul>
- *   <li>浅色 · 海图桌：海图纸（经纬细线、右下一枚罗经花）、双线墨框、黄铜压角；标签是同一种纸。</li>
- *   <li>深色 · 船舱木作：上过油的柚木板、旧青铜包角（刻意做暗 —— 亮金只留给「你」）、一汪灯光；
- *       要印字的地方一律是白搪瓷牌，字不直接压在木纹上。</li>
- * </ul>
+ * <p><b>形制只有一套</b>（船舱木作）：上过油的柚木板、金属包角、一汪灯光、玻璃液位管、金属头像圈；
+ * 要印字的地方一律是搪瓷牌，字不直接压在木纹上。两个主题只差颜色 ——
+ * 深色是夜里的舱，浅色是同一条船白天的舱。
+ *
+ * <p>2026-09-23 之前不是这样：浅色照 A 稿（海图纸 · 罗经花 · 三角压角 · 比例尺），深色照 B 稿，
+ * 同一件东西两种画法 —— <b>两套设计各做一半</b>。代价是每次改动都要做两遍，而实拍一次只看得了一个主题，
+ * §7.7「深色液位管看不出水位」就是这么漏过去的。用户 2026-09-22：
+ * 「深色模式和浅色模式不要维护两套 ui，ui 统一用 B，只改变颜色，这样不会乱」。
+ * ❗所以这个类里<b>不应该再出现按主题分叉的形状</b>：分叉只许发生在颜色上（{@link GuiLanguage}）
+ * 与贴图目录名上。GuiConsistencyTest 盯着这一条。
  *
  * <p>贴图由内部管线的 {@code build_gui_material.py} 从 {@code art/gui/} 的母版烘出，基准是
  * <b>4 个贴图像素 = 1 个 GUI 单位</b>，与牌面同一套载入方式（多级纹理 + 线性过滤），缩放是平滑的。
@@ -42,17 +46,6 @@ final class GuiMaterial {
 
     /** 倒计时多高，GUI 单位。版面里的 {@code BAR_H} 取它。 */
     static final int GAUGE_H = GAUGE_H_TEXELS / TEXELS_PER_UNIT;
-    /**
-     * 浅色比例尺一格多长，GUI 单位。
-     *
-     * <p>❗照样张取：那边一格 40 物理像素（1280×720 · 界面尺寸 3 → 约 13 个单位）。
-     * 原先写的 8 只有它的六成，格子密到整条读成一块实心黑 —— 用户 2026-09-22 看实拍时说
-     * 「倒计时带怎么和设计稿里的出入那么大」，这是其中一条。
-     */
-    private static final int GAUGE_BLOCK = 13;
-    /** 比例尺上墨块的不透明度：满格时整条曾是全屏最重的一块。朱砂那一档不走它。 */
-    private static final int GAUGE_BLOCK_ALPHA = 0xC8;
-
     /** 材质板离舞台四边多远。 */
     static final int SHEET_MARGIN = 5;
     /** 材质板的框线从板边往里多远 —— 内容别画到这条线外面去。 */
@@ -95,14 +88,19 @@ final class GuiMaterial {
         corners(context, x, y, w, h);
     }
 
-    /** 点缀：浅色是右下角的罗经花，深色是桌面中间那一汪灯光。都很淡，不压字。 */
+    /**
+     * 点缀：舱里那盏灯照在桌面中间。很淡，不压字。
+     *
+     * <p>位置与大小两个主题相同 —— 这里是<b>形</b>。只有亮到什么程度按主题：深色底上它是光源，再亮就吃掉
+     * 压在它上面的字（实拍过）；浅色底上它只是一点暖意，同样的亮度会把本就浅的底再提亮一档，
+     * 字与底的差就没了 —— 2026-09-23 用户说浅色读不出来，底上每多一层东西都要按这一条算账。
+     */
     private static void accent(DrawContext context, int x, int y, int w, int h) {
-        boolean dark = GuiLanguage.theme() == GuiLanguage.Theme.DARK;
-        int size = dark ? Math.max(w, h) : Math.min(w, h) * 2 / 5;
-        int ax = dark ? x + (w - size) / 2 : x + w - size * 3 / 4;       // 罗经花只露大半个，压在右下角的框线里
-        int ay = dark ? y + (h - size) / 2 : y + h - size * 3 / 4;
+        int size = Math.max(w, h);
+        int ax = x + (w - size) / 2;
+        int ay = y + (h - size) / 2;
         context.enableScissor(x, y, x + w, y + h);
-        context.setShaderColor(1f, 1f, 1f, dark ? 0.30f : 0.07f);      // 深色那汪灯光再亮就吃掉压在它上面的字（实拍过）
+        context.setShaderColor(1f, 1f, 1f, GuiLanguage.theme() == GuiLanguage.Theme.DARK ? 0.30f : 0.12f);
         com.mojang.blaze3d.systems.RenderSystem.enableBlend();
         context.drawTexture(texture("accent"), ax, ay, size, size, 0f, 0f, 1, 1, 1, 1);
         context.setShaderColor(1f, 1f, 1f, 1f);
@@ -228,10 +226,10 @@ final class GuiMaterial {
     }
 
     /**
-     * 倒计时：浅色是海图比例尺（墨块一格一格被吃掉，上沿一排刻度），深色是青铜框玻璃液位管（液面往左退）。
-     * 贴图只是盖在上面的那个框；剩多少用代码填 —— 整数个 GUI 单位的矩形在任何界面尺寸下都是锐利的。
+     * 倒计时：玻璃液位管，液面往左退。贴图只是盖在上面的那个金属框；剩多少用代码填在框底下 ——
+     * 整数个 GUI 单位的矩形在任何界面尺寸下都是锐利的，而液体只从管腔里那条<b>整个透明</b>的带子透出来。
      *
-     * <p>❗语义照旧：最后一段用朱砂（{@code urgent}），它只给紧迫。平时浅色用墨、深色用铜绿 —— 比例尺本来就是墨印的。
+     * <p>❗语义照旧：平时铜绿，最后一段朱砂（{@code urgent}）—— 朱砂只给紧迫。
      *
      * @param frac 还剩多少，0–1
      */
@@ -241,33 +239,13 @@ final class GuiMaterial {
         if (w < 2 * cap) {
             return;                                            // 两头都放不下就不画：画出半个框比不画更怪
         }
-        boolean dark = GuiLanguage.theme() == GuiLanguage.Theme.DARK;
         int ix = x + inset;
         int iy = y + inset;
         int iw = w - 2 * inset;
         int ih = GAUGE_H - 2 * inset;
         int left = Math.round(iw * Math.max(0f, Math.min(1f, frac)));
-        int color = urgent ? GuiLanguage.cinnabar() : dark ? GuiLanguage.verdigris() : GuiLanguage.ink();
-        if (dark) {
-            context.fill(ix, iy, ix + iw, iy + ih, GuiLanguage.ground());
-            context.fill(ix, iy, ix + left, iy + ih, color);
-        } else {
-            // 满格那一刻整条比例尺是全屏最重的一块（2026-09-22 实拍），所以墨块压淡一档；
-            // 紧迫的朱砂不淡 —— 它要压得住，那正是这个语义要做的事。
-            int block = urgent ? color : (color & 0xFFFFFF) | (GAUGE_BLOCK_ALPHA << 24);
-            for (int bx = 0; bx < left; bx += 2 * GAUGE_BLOCK) {
-                context.fill(ix + bx, iy, ix + Math.min(bx + GAUGE_BLOCK, left), iy + ih, block);
-            }
-            if (left > 0 && left < iw) {
-                context.fill(ix + left - 1, iy, ix + left, iy + ih, color);      // 吃到哪了：空白格里也看得出
-            }
-            // 刻度：每半格一道短的、每一格一道长的，压在框线上沿。只往上探 1 个单位。
-            int half = GAUGE_BLOCK / 2;
-            for (int k = 0; k * half <= iw; k++) {
-                int tx = Math.min(ix + k * half, ix + iw - 1);
-                context.fill(tx, k % 2 == 0 ? y - 1 : y, tx + 1, y + 1, GuiLanguage.frame());
-            }
-        }
+        context.fill(ix, iy, ix + iw, iy + ih, GuiLanguage.ground());
+        context.fill(ix, iy, ix + left, iy + ih, urgent ? GuiLanguage.cinnabar() : GuiLanguage.verdigris());
         Identifier id = texture("gauge");
         int[] xs = {x, x + cap, x + w - cap};
         int[] ws = {cap, w - 2 * cap, cap};

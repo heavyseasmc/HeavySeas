@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod.client;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.imageio.ImageIO;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,11 @@ import org.junit.jupiter.api.Test;
  *
  * <p>客户端换主题只换目录名。某个主题少一张，Minecraft <b>不报错</b> —— 只在那个主题下画出一块紫黑格，
  * 而平时开发看的多半是另一个主题。尺寸对不上则更隐蔽：九宫格切歪、平铺接缝错位，看上去只是「有点怪」。
+ *
+ * <p>还有一条比清单更根本的：<b>两个主题只许差颜色，不许差形制</b>（ADR-0037 §7.12）。
+ * 2026-09-23 之前不是这样 —— 浅色照 A 稿（罗经花 · 三角压角 · 比例尺）、深色照 B 稿（灯光 · L 形包角 · 液位管），
+ * 同一件东西两种画法。代价是每次改动都要做两遍，而实拍一次只看得了一个主题：
+ * §7.7「深色液位管看不出水位」就是这么漏过去的。
  */
 class GuiMaterialTexturesTest {
 
@@ -34,6 +41,8 @@ class GuiMaterialTexturesTest {
     private static final int MIN_CHARACTERS = 6;
     /** 头像最大画到 72 物理像素，贴图不小于它的两倍。 */
     private static final int MIN_PORTRAIT = 144;
+    /** 至少这么多张贴图的 alpha 版图上真有东西（有透明也有不透明）；少于它，同形那一条就是在比空气。 */
+    private static final int MIN_SHAPED = 4;
 
     @Test
     @DisplayName("浅色与深色是同一份贴图清单、同样的尺寸，且与 GuiMaterial 的常量一致")
@@ -64,6 +73,45 @@ class GuiMaterialTexturesTest {
         assertTrue(constant(source, "RING_PORTRAIT_TEXELS") < constant(source, "RING_TEXELS"), "头像比头像圈还大：圈会画进头像里面");
         expect(light, "key.png", constant(source, "KEY_TEXELS"));
         nineSliceBorder(source, "KEY_TEXELS", "KEY_BORDER_TEXELS", unit);
+    }
+
+    /**
+     * 两个主题的贴图<b>逐像素同形</b>：alpha 版图必须一个比特不差，颜色随便。
+     *
+     * <p>⚠️它只查得了 alpha —— 不透明区域里的形状差异（比如一条线挪了位置）它看不见。
+     * 真正把关的是管线里的 {@code check_one_shape()}：同一份生成器代入两套调色板，
+     * 必须逐字节还原出两个主题的母版。这一条是**出货那一侧**的对照 —— 管线不在这个仓库里，
+     * 而玩家拿到的正是贴图。
+     */
+    @Test
+    @DisplayName("两个主题的贴图逐像素同形：只有颜色不同")
+    void themesDifferOnlyInShape() throws IOException {
+        Map<String, int[]> light = sizes("light");
+        assertTrue(light.size() >= MIN_TEXTURES, "浅色主题只读到 " + light.size() + " 张贴图 —— 没在查");
+        int informative = 0;
+        for (String name : new java.util.TreeSet<>(light.keySet())) {
+            BufferedImage a = ImageIO.read(MATERIAL_DIR.resolve("light").resolve(name).toFile());
+            BufferedImage b = ImageIO.read(MATERIAL_DIR.resolve("dark").resolve(name).toFile());
+            assertTrue(a != null && b != null, name + "：读不出来");
+            assertEquals(a.getWidth() + "x" + a.getHeight(), b.getWidth() + "x" + b.getHeight(), name + "：两个主题的尺寸不一样");
+            boolean sawClear = false;
+            boolean sawInk = false;
+            for (int y = 0; y < a.getHeight(); y++) {
+                for (int x = 0; x < a.getWidth(); x++) {
+                    int pa = a.getRGB(x, y) >>> 24;
+                    int pb = b.getRGB(x, y) >>> 24;
+                    assertEquals(pa, pb, name + " 第 " + x + "," + y + " 个像素：两个主题的形制不一样（alpha " + pa + " vs " + pb
+                            + "）。只许换颜色 —— 形制改了就得两个主题一起改，重跑管线的 build_gui_material.py");
+                    sawClear |= pa == 0;
+                    sawInk |= pa == 255;
+                }
+            }
+            if (sawClear && sawInk) {
+                informative++;                            // 这一张的 alpha 版图真的画出了东西，不是一整片不透明
+            }
+        }
+        assertTrue(informative >= MIN_SHAPED, "只有 " + informative + " 张贴图有透明区 —— 这一条等于什么都没查"
+                + "（全是不透明的话，逐像素比 alpha 永远成立）");
     }
 
     private static void nineSliceBorder(String source, String texels, String border, int unit) {

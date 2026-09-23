@@ -110,39 +110,64 @@ public final class PickScreen extends GameScreen {
         }
         Bands b = drawChrome(context, view);
         Layout l = layout(b, count);
+        Inspect in = inspect(b);
+        float gathered = gathered(now);
 
+        // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
-        if (moved && !committed) {
+        if (moved && !committed && !inspecting()) {
             int hovered = indexAt(mouseX, mouseY, l, count);
             if (hovered >= 0) {
                 highlight = hovered;
             }
         }
+        // 高亮那一张最后画：收成一叠时它在堆顶，摊开时它抬起来 —— 两种状态下都要压在别人上面。
         for (int i = 0; i < count; i++) {
-            lift[i] = GuiLanguage.approach(lift[i], i == highlight ? GuiLanguage.LIFT_PX : 0f, dt);
-            context.getMatrices().push();
-            context.getMatrices().translate(l.cardX(i), l.cardsTop() - lift[i], 0);
-            if (isHandOption(i)) {
-                // 牌背：手牌是暗的，抽到哪张不由你定。
-                CardTexture.drawBack(context, "provision", 0, 0, l.w(), l.h());
-            } else {
-                CardTexture.drawProvision(context, c.victimFront().get(i), 0, 0, l.w(), l.h());
+            if (i != highlight) {
+                drawOne(context, dt, l, in, gathered, c, i);
             }
-            if (i == highlight) {
-                drawCardFrame(context, l.w(), l.h());
-            }
-            context.getMatrices().pop();
+        }
+        if (highlight >= 0 && highlight < count) {
+            drawOne(context, dt, l, in, gathered, c, highlight);
         }
 
-        drawCountdown(context, b, now, c.deadlineMs(), c.windowMs(), l.rowW());
+
         drawLine(context, Text.translatable("heavyseas.pick.header", nameOf(c.target())),
                 width / 2, l.headerY(), GuiLanguage.ink());
         // 说明只跟高亮走一行 —— 把每一张都摊开就变成读说明书了（与补给箱同一条）。
         drawLine(context, isHandOption(highlight)
                         ? Text.translatable("heavyseas.pick.from_hand", c.victimHand())
-                        : Text.translatable("heavyseas.provision." + c.victimFront().get(highlight)),
+                        : provisionName(c.victimFront().get(highlight)),
                 width / 2, l.hintY(), GuiLanguage.ink());
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("take", "Enter")));
+        // 牌背那一格没有说明可看 —— 抽到哪张不由你定，说出来就等于泄了底。
+        if (gathered > 0f && highlight >= 0 && highlight < count && !isHandOption(highlight)) {
+            String card = c.victimFront().get(highlight);
+            drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
+                    null, provisionName(card), provisionEffect(card));
+        }
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("take"), now,
+                new Countdown(c.deadlineMs(), c.windowMs(), l.rowW()));
+    }
+
+    /** 画一张：位置与大小在「摊成一排」与「收成一叠」之间按 {@code gathered} 插值。 */
+    private void drawOne(DrawContext context, long dt, Layout l, Inspect in, float gathered, ContestView c, int i) {
+        boolean hi = i == highlight;
+        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
+        CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(),
+                hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight)));
+        context.getMatrices().push();
+        context.getMatrices().translate(pose.cx() - pose.w() / 2f,
+                pose.bottom() - pose.h() - lift[i] * (1f - gathered), 0);
+        if (isHandOption(i)) {
+            // 牌背：手牌是暗的，抽到哪张不由你定。
+            CardTexture.drawBack(context, "provision", 0, 0, pose.w(), pose.h());
+        } else {
+            CardTexture.drawProvision(context, c.victimFront().get(i), 0, 0, pose.w(), pose.h());
+        }
+        if (hi) {
+            drawCardFrame(context, pose.w(), pose.h());
+        }
+        context.getMatrices().pop();
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l, int count) {
@@ -170,8 +195,11 @@ public final class PickScreen extends GameScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (inspectClick(button)) {
+            return true;
+        }
         int count = options(view.contest());
-        if (!committed && count > 0) {
+        if (!committed && count > 0 && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands(), count), count);
             if (i >= 0) {
                 highlight = i;
@@ -184,6 +212,9 @@ public final class PickScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (inspectKey(keyCode)) {
+            return true;
+        }
         if (committed) {
             return super.keyPressed(keyCode, scanCode, modifiers);
         }

@@ -10,6 +10,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
+import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,8 @@ public abstract class GameScreen extends Screen {
     protected static final int BAR_TO_TEXT = 3;
     /** 舞台里两段内容之间。 */
     protected static final int HINT_GAP = 5;
+    /** 最下面那一栏里，最高的那一件上下各留多少。 */
+    protected static final int FOOT_PAD = 4;
     /**
      * 倒计时有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。
      * 它现在是一件材质（比例尺 / 液位管，ADR-0037），高度由材质定 —— 各面的版面照旧只引用这一个数。
@@ -328,9 +331,17 @@ public abstract class GameScreen extends Screen {
             return Math.max(0, stageBottom - stageTop);
         }
 
-        /** 倒计时那一条带多高：横杠与它旁边那行秒数，谁高算谁。 */
+        /**
+         * 最下面那一栏多高。
+         *
+         * <p>❗它装的不只是横杠与秒数，还有两头的键帽 —— 而键帽行比一行字高
+         * （{@link #keyHintRowH()} = 行高 + 键帽自己的上下边）。原先只按「横杠与秒数谁高」算，
+         * 键帽两头各顶出去 2 个单位，读起来就是挤（用户 2026-09-23：「下方那一栏太拥挤了，
+         * 中间太空了」）。现在按最高的那一件算，再加一圈留白 —— 多出来的高度从舞台里出，
+         * 那正是空着的地方。
+         */
         int gaugeH() {
-            return Math.max(BAR_H, textH());
+            return Math.max(Math.max(BAR_H, textH()), keyHintRowH()) + 2 * FOOT_PAD;
         }
     }
 
@@ -344,7 +355,8 @@ public abstract class GameScreen extends Screen {
         int text = textH();
         // ❗没有身份行了（用户 2026-09-22：「按稿子去掉，交给 HUD」）—— 体力与口渴主画面 HUD 上有，
         //   界面里再写一遍是重复，而那一条带是牌最缺的二十个单位。倒计时于是直接贴底。
-        int gaugeY = height - Math.max(8, Math.round(height * 0.05f)) - Math.max(BAR_H, text);
+        int footH = Math.max(Math.max(BAR_H, text), keyHintRowH()) + 2 * FOOT_PAD;
+        int gaugeY = height - Math.max(8, Math.round(height * 0.05f)) - footH;
         int railY = TOP_BAND_Y + topBandH();
         int stageBottom = gaugeY - BAND_GAP;
         int middle = Math.max(0, stageBottom - railY);           // 座位轨与舞台分这一段
@@ -440,7 +452,7 @@ public abstract class GameScreen extends Screen {
      * <p>「什么时候算紧迫」取自 {@link GuiLanguage#urgencyThreshold}：朱砂只给最后一段，
      * 一直红着就喊不动了。
      */
-    protected void drawCountdown(DrawContext context, Bands b, long now, long deadlineMs, long totalMs, int stageW) {
+    private void drawCountdown(DrawContext context, Bands b, long now, long deadlineMs, long totalMs, int stageW) {
         long left = Math.max(0L, deadlineMs - now);
         long total = Math.max(1L, totalMs);
         float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
@@ -449,7 +461,10 @@ public abstract class GameScreen extends Screen {
         //   省下来的十几个单位全归舞台（总纲 §7.8）。
         // 样张里这个数是墨色的、没有 s 后缀 —— 它是这一条带上唯一要读的东西，不该比刻度还淡。
         Text seconds = Text.literal(String.format("%.1f", left / 1000f));
-        int textW = textW(seconds);
+        // ❗秒数占的宽按**这一局最宽的那一种写法**算，不按这一帧真正要印的那几个字：
+        //   「12.0」比「9.8」宽，而整块是居中的 —— 按当帧宽度算，每跨过一个数位整根管子就横着跳一下
+        //   （用户 2026-09-23：「在倒计时的时候管子会左右横移」）。定宽之后管子一动不动，只有数字在变。
+        int textW = secondsFieldW(total);
         int gap = 2 * BAR_TO_TEXT;
         // 两头的按键提示先占位：倒计时绝不压到它们。
         // ❗最后这一下 min 不能省：countdownWidth 里有个 MIN_COUNTDOWN_W 的下限，
@@ -457,14 +472,34 @@ public abstract class GameScreen extends Screen {
         //   宁可横杠短一截，也不许两件东西叠在一起。
         // ❗在**两头让出的那一段里**居中，不是按全屏居中：左右两头的提示不一样宽，
         //   按全屏居中会整块偏向窄的那一头，压上另一头（实拍：秒数压在「U 收起」上）。
-        int from = SIDE + edgeLeftW + (edgeLeftW > 0 ? HINT_SPACING : 0);
-        int to = width - SIDE - edgeRightW - (edgeRightW > 0 ? HINT_SPACING : 0);
+        int from = SIDE + edgeLeftW + (edgeLeftW > 0 ? FOOT_GUTTER : 0);
+        int to = width - SIDE - edgeRightW - (edgeRightW > 0 ? FOOT_GUTTER : 0);
         int free = Math.max(0, to - from);
         int barW = Math.min(countdownWidth(Math.max(0, stageW - textW - gap)), Math.max(0, free - textW - gap));
         int x = from + Math.max(0, (free - (barW + gap + textW)) / 2);
-        GuiMaterial.gauge(context, x, b.gaugeY() + (b.gaugeH() - BAR_H) / 2, barW, frac, urgent);
-        drawLineLeft(context, seconds, x + barW + gap, b.gaugeY() + (b.gaugeH() - textH()) / 2,
+        int mid = footMidY(b);
+        GuiMaterial.gauge(context, x, mid - BAR_H / 2, barW, frac, urgent);
+        drawLineLeft(context, seconds, x + barW + gap, mid - textH() / 2,
                 urgent ? GuiLanguage.cinnabar() : GuiLanguage.ink());
+    }
+
+    /**
+     * 秒数那一栏留多宽：把这一局的总秒数每一位都换成最宽的那个数字去量。
+     *
+     * <p>不直接量「12.0」，是因为哪个数字最宽取决于字体 —— 量一遍十个数字，别猜。
+     */
+    private int secondsFieldW(long totalMs) {
+        int digit = 0;
+        for (char c = '0'; c <= '9'; c++) {
+            digit = Math.max(digit, textW(Text.literal(String.valueOf(c))));
+        }
+        String widest = String.format("%.1f", totalMs / 1000f);
+        int w = 0;
+        for (int i = 0; i < widest.length(); i++) {
+            char c = widest.charAt(i);
+            w += Character.isDigit(c) ? digit : textW(Text.literal(String.valueOf(c)));
+        }
+        return w;
     }
 
     /**
@@ -753,8 +788,22 @@ public abstract class GameScreen extends Screen {
     /** 同一条提示里相邻两枚键帽之间、键帽与那句话之间。 */
     private static final int KEY_GAP = 2;
     private static final int KEY_TO_LABEL = 4;
-    /** 相邻两条提示之间，也是提示与倒计时之间。 */
+    /** 相邻两条提示之间。 */
     private static final int HINT_SPACING = 12;
+    /** 两头的提示与中间倒计时之间 —— 比提示之间更宽，才分得出「这是两件事」。 */
+    private static final int FOOT_GUTTER = 24;
+
+    /**
+     * 下面那一栏里，那一行字的中线 —— 栏里每一件东西都按它对齐，而不是各按各的盒子居中。
+     *
+     * <p>❗键帽的盒子底下带一道暗边（{@link GuiMaterial#KEY_PAD_BOTTOM} 比上边厚），
+     * 所以「盒子居中」与「看上去居中」差着一两个单位：三件东西各按自己的盒子算，
+     * 横杠就比旁边的键帽低一截（用户 2026-09-23：「管子的位置太偏下了」）。
+     * 按字线对齐之后，字、键帽上的字、秒数、横杠的中心都落在同一条线上。
+     */
+    protected int footMidY(Bands b) {
+        return b.gaugeY() + (b.gaugeH() - keyHintRowH()) / 2 + GuiMaterial.KEY_PAD_TOP + textH() / 2;
+    }
 
     /** 一枚键帽多高：一行字加键帽自己的边与底下那道厚边。按键提示那一行就这么高。 */
     protected static int keyHintRowH() {
@@ -863,12 +912,32 @@ public abstract class GameScreen extends Screen {
      * <p>文案一律短到两个字（{@code heavyseas.keys.*} 一处定义）：动效已经把「依次传、选一张」演出来了，
      * 不必再用一句话讲一遍。
      */
-    protected void drawEdgeHints(DrawContext context, Bands b, List<KeyHint> left, List<KeyHint> right) {
+    private void drawEdgeHints(DrawContext context, Bands b, List<KeyHint> left, List<KeyHint> right) {
         edgeLeftW = runWidth(left);
         edgeRightW = runWidth(right);
-        int y = b.gaugeY() + (b.gaugeH() - keyHintRowH()) / 2;
+        int y = footMidY(b) - GuiMaterial.KEY_PAD_TOP - textH() / 2;
         drawHintRun(context, left, SIDE, y, GuiLanguage.muted());
         drawHintRun(context, right, width - SIDE - edgeRightW, y, GuiLanguage.muted());
+    }
+
+    /** 一段倒计时要知道的三件事。{@code null} = 这一面不会超时，那一格只有两头的提示。 */
+    protected record Countdown(long deadlineMs, long totalMs, int stageW) {
+    }
+
+    /**
+     * 倒计时那一条带<b>一次画完</b>：左边怎么选、右边怎么定，中间是倒计时。
+     *
+     * <p>❗为什么合成一个方法：倒计时要为两头的提示让位，而让多少只有画过提示才知道。
+     * 拆成两次调用就多了一条「先画提示、再画倒计时」的约定 —— 2026-09-23 实拍到挂武器一面写反了，
+     * 秒数与「Esc 不押」叠在一起。<b>靠调用顺序才成立的约定，迟早有人写反，而屏幕上不报错。</b>
+     * 合成一个之后顺序在结构上不可能错。
+     */
+    protected void drawFootBand(DrawContext context, Bands b, List<KeyHint> left, List<KeyHint> right,
+                                long now, Countdown countdown) {
+        drawEdgeHints(context, b, left, right);
+        if (countdown != null) {
+            drawCountdown(context, b, now, countdown.deadlineMs(), countdown.totalMs(), countdown.stageW());
+        }
     }
 
     /** 一条提示：几枚键帽加一个短词。 */
@@ -917,14 +986,102 @@ public abstract class GameScreen extends Screen {
 
     /** 查看态里那一叠牌与那张签子各在哪。只由带位与窗口算，与这一面有几张牌无关。 */
     protected Inspect inspect(Bands b) {
-        int h = Math.min(b.stageH(), Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO)));
+        return inspect(b, b.stageTop());
+    }
+
+    /**
+     * 同上，但舞台顶由调用方给。
+     *
+     * <p>❗划船与舵手两面的舞台<b>第一行是「划船堆 N 张 · 舵手 X」</b>，按整个舞台居中的话
+     * 签子会压住它（2026-09-23 实拍）。那一行是热信息，不该被查看态盖掉。
+     */
+    protected Inspect inspect(Bands b, int stageTop) {
+        int room = Math.max(0, b.stageBottom() - stageTop);
+        int h = Math.min(room, Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO)));
         int w = GuiLanguage.cardWidth(h);
         int stage = width - 2 * SIDE;
         int plateW = Math.max(PLATE_MIN_W, Math.min(Math.round(stage * PLATE_MAX_SHARE), stage - w - PLATE_GAP));
         int total = w + PLATE_GAP + plateW;
         int left = (width - total) / 2;
-        int top = b.stageTop() + Math.max(0, (b.stageH() - h) / 2);
+        int top = stageTop + Math.max(0, (room - h) / 2);
         return new Inspect(left, top, w, h, left + w + PLATE_GAP, top, plateW);
+    }
+
+    /**
+     * 查看态开着没有。**状态只在这里存一份** —— 六个牌面各存各的，迟早有一面忘了关。
+     */
+    private boolean inspecting;
+    /** 这一次进 / 出查看态的起点，喂给「堆」。 */
+    private long inspectAt;
+
+    protected boolean inspecting() {
+        return inspecting;
+    }
+
+    /** 「堆」走到哪了：0 = 还摊成一排，1 = 已经收成一叠。进与出走同一条曲线，只是方向相反。 */
+    protected float gathered(long now) {
+        return inspecting ? GuiLanguage.gather(now, inspectAt) : 1f - GuiLanguage.gather(now, inspectAt);
+    }
+
+    protected void toggleInspect() {
+        inspecting = !inspecting;
+        inspectAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 进 / 出查看态的键。各面的 {@code keyPressed} 开头调它，返回 {@code true} 就别再往下走。
+     *
+     * <p>❗<b>统一用 Tab，不用 U</b>：手牌一面的 U 已经是「打出」（花掉一次行动）。
+     * 一个动词配两个键、还要按面区分，正是这一轮在收的那种乱。右键是同一件事的鼠标版。
+     */
+    protected boolean inspectKey(int keyCode) {
+        if (keyCode == GLFW.GLFW_KEY_TAB) {
+            toggleInspect();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && inspecting) {
+            toggleInspect();          // 查看态里 Esc 只收这一层，不去关界面
+            return true;
+        }
+        return false;
+    }
+
+    /** 右键 = 查看（与 Tab 同一件事）。各面的 {@code mouseClicked} 开头调它。 */
+    protected boolean inspectClick(int button) {
+        if (button == 1) {
+            toggleInspect();
+            return true;
+        }
+        return false;
+    }
+
+    /** 一张牌这一帧落在哪、多大。 */
+    protected record CardPose(float cx, float bottom, int w, int h) {
+    }
+
+    /**
+     * 一张牌在「摊成一排」与「收成一叠」之间的落位。
+     *
+     * @param depth 这张在叠里排第几层（被看的那张是 0）；一叠牌要错开一点点，才看得出是一叠而不是一张
+     */
+    protected CardPose cardPose(Inspect in, float g, float rowCx, float rowBottom, int rowW, int rowH, int depth) {
+        int d = Math.min(Math.max(0, depth), 6);
+        float stackX = in.cardX() + d * 1.6f;
+        float stackBottom = in.cardY() + in.cardH() + d * 1.2f;
+        return new CardPose(rowCx + (stackX + in.cardW() / 2f - rowCx) * g,
+                rowBottom + (stackBottom - rowBottom) * g,
+                Math.round(rowW + (in.cardW() - rowW) * g),
+                Math.round(rowH + (in.cardH() - rowH) * g));
+    }
+
+    /** 这一面的按键提示右头：确认那一件，加一枚「Tab 查看 / 收起」。 */
+    protected java.util.List<KeyHint> inspectHints(String confirm) {
+        return List.of(keys(confirm, "Enter"), keys(inspecting ? "close" : "inspect", "Tab"));
+    }
+
+    /** 同上，中间多一件（挂武器那面的「Esc 不押」）。 */
+    protected java.util.List<KeyHint> inspectHints(String confirm, KeyHint extra) {
+        return List.of(keys(confirm, "Enter"), extra, keys(inspecting ? "close" : "inspect", "Tab"));
     }
 
     /** 那一叠牌与签子之间。 */
@@ -945,7 +1102,7 @@ public abstract class GameScreen extends Screen {
         // 签子按**这一句实际排几行**画：短句的签子就矮一点。查看态里它在牌旁边，
         // 高矮不影响牌的位置，所以不必像常驻那版那样按最大值留位。
         int bodyH = Math.min(PLATE_BODY_LINES * textH(), GuiText.height(body.getString(), tw, GuiText.BODY, false, PLATE_BODY_LINES));
-        int h = 2 * PLATE_PAD_Y + capH + GuiText.lineHeight(GuiText.NAME, true) + 2 + bodyH;
+        int h = 2 * PLATE_PAD_Y + capH + (name == null ? 0 : GuiText.lineHeight(GuiText.NAME, true) + 2) + bodyH;
         GuiMaterial.plate(context, x, top, w, h, pointX);
 
         int tx = x + PLATE_PAD_X;
@@ -956,8 +1113,11 @@ public abstract class GameScreen extends Screen {
                     GuiLanguage.onTag(GuiLanguage.muted()), GuiText.Align.LEFT);
             y += capH;
         }
-        GuiText.line(context, name, tx, y, tw, GuiText.NAME, true, ink, GuiText.Align.LEFT);
-        y += GuiText.lineHeight(GuiText.NAME, true) + 2;
+        if (name != null) {
+            // 航海牌没有牌名（id 形如 nav_07，不是给人读的），它的身份就是下面那一句。
+            GuiText.line(context, name, tx, y, tw, GuiText.NAME, true, ink, GuiText.Align.LEFT);
+            y += GuiText.lineHeight(GuiText.NAME, true) + 2;
+        }
         GuiText.draw(context, body.getString(), tx, y, tw, GuiText.BODY, false, ink,
                 GuiText.Align.LEFT, PLATE_BODY_LINES);
     }

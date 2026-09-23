@@ -88,8 +88,8 @@ public final class ProvisionTargetScreen extends GameScreen {
                     i == focus ? GuiLanguage.verdigris() : GuiLanguage.ink(), lift[i]);
         }
 
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")),
-                List.of(keys("confirm", "Enter"), keys("cancel", "Esc")));
+        drawFootBand(context, b, List.of(keys("select", "←", "→")),
+                List.of(keys("confirm", "Enter"), keys("cancel", "Esc")), now, null);
     }
 
     @Override

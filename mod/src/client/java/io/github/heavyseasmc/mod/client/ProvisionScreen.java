@@ -60,14 +60,6 @@ public final class ProvisionScreen extends GameScreen {
     /** 见过一次「对局还在」的投影没有。见 {@link #tick()}。 */
     private boolean sawGame;
 
-    /**
-     * 查看态：牌收成一叠，说明出现在右边（用户 2026-09-22）。默认<b>关</b> ——
-     * 牌做什么是冷信息，玩一两次就记住了，不该常驻占着舞台。
-     */
-    private boolean inspecting;
-    /** 这一次进 / 出查看态的起点，喂给「堆」。 */
-    private long inspectAt;
-
     public ProvisionScreen(ProvisionUpdateS2C data) {
         super(Text.translatable("heavyseas.provision.title"));
         apply(data);
@@ -193,8 +185,7 @@ public final class ProvisionScreen extends GameScreen {
         Bands b = drawChrome(context, projection());
         Layout l = layout(b);
         Inspect in = inspect(b);
-        // 「堆」走到哪了：0 = 还摊成一排，1 = 已经收成一叠。进与出走同一条曲线，只是方向相反。
-        float gathered = inspecting ? GuiLanguage.gather(now, inspectAt) : 1f - GuiLanguage.gather(now, inspectAt);
+        float gathered = gathered(now);
         float snapP = GuiLanguage.snap(now, snapAt);
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
@@ -205,7 +196,7 @@ public final class ProvisionScreen extends GameScreen {
         //   指针没动、看的牌却被「指」到了别处，与「停着的指针不算指向」同一类。
         //   查看态里换牌只走 ←→（与摊开时同一个键，同一件事）。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
-        if (moved && !decided() && !inspecting) {
+        if (moved && !decided() && !inspecting()) {
             int hovered = indexAt(mouseX, mouseY, l);
             if (hovered >= 0 && hovered != highlight) {
                 setHighlight(hovered);    // 超时认高亮，鼠标与键盘两套指示不能各说各话
@@ -228,10 +219,9 @@ public final class ProvisionScreen extends GameScreen {
             drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
                     null, provisionName(card), provisionEffect(card));
         }
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")),
-                List.of(keys(inspecting ? "close" : "inspect", "U"), keys("confirm", "Enter")));
-        drawCountdown(context, b, now, data.deadlineMs(),
-                Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD, l.rowW());
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
+                new Countdown(data.deadlineMs(),
+                        Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD, l.rowW()));
     }
 
     /**
@@ -276,16 +266,8 @@ public final class ProvisionScreen extends GameScreen {
         boolean hi = i == highlight;
         lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
 
-        // 一叠牌不是叠得严丝合缝：每张错开一点点，才看得出是一叠而不是一张。
         int depth = hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight));
-        float stackX = in.cardX() + Math.min(depth, 6) * 1.6f;
-        float stackBottom = in.cardY() + in.cardH() + Math.min(depth, 6) * 1.2f;
-        float w = l.w() + (in.cardW() - l.w()) * gathered;
-        float h = l.h() + (in.cardH() - l.h()) * gathered;
-        float rowCx = l.cardX(i) + l.w() / 2f;
-        float cx = rowCx + (stackX + in.cardW() / 2f - rowCx) * gathered;
-        float rowBottom = l.cardsTop() + l.h();
-        float bottom = rowBottom + (stackBottom - rowBottom) * gathered;
+        CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(), depth);
 
         context.getMatrices().push();
         // 入场：从下方抬起 + 轻微放大。全部走矩阵，不碰布局。
@@ -297,13 +279,13 @@ public final class ProvisionScreen extends GameScreen {
             rise += GuiLanguage.snapRise(snapP);
             scale *= GuiLanguage.snapScale(snapP);
         }
-        context.getMatrices().translate(cx, bottom - lift[i] * (1f - gathered) + rise, 0);
+        context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
-        context.getMatrices().translate(-w / 2f, -h, 0);
-        CardTexture.drawProvision(context, offer.get(i), 0, 0, Math.round(w), Math.round(h));
+        context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+        CardTexture.drawProvision(context, offer.get(i), 0, 0, pose.w(), pose.h());
         if (hi) {
             // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
-            drawCardFrame(context, Math.round(w), Math.round(h));
+            drawCardFrame(context, pose.w(), pose.h());
         }
         context.getMatrices().pop();
     }
@@ -331,19 +313,12 @@ public final class ProvisionScreen extends GameScreen {
         return snapAt > 0L;
     }
 
-    /** 进 / 出查看态。同一个动作两边都通，收起来时也照旧能确认。 */
-    private void toggleInspect() {
-        inspecting = !inspecting;
-        inspectAt = System.currentTimeMillis();
-    }
-
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 1) {
-            toggleInspect();              // 右键 = 查看（与 U 同一件事）
+        if (inspectClick(button)) {
             return true;
         }
-        if (data != null && !data.offer().isEmpty() && !decided() && !inspecting) {
+        if (data != null && !data.offer().isEmpty() && !decided() && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
                 send(i, true);
@@ -358,18 +333,10 @@ public final class ProvisionScreen extends GameScreen {
         if (data == null || data.offer().isEmpty() || decided()) {
             return super.keyPressed(keyCode, scanCode, modifiers);
         }
+        if (inspectKey(keyCode)) {
+            return true;
+        }
         switch (keyCode) {
-            case GLFW.GLFW_KEY_U -> {
-                toggleInspect();
-                return true;
-            }
-            case GLFW.GLFW_KEY_ESCAPE -> {
-                if (inspecting) {
-                    toggleInspect();      // 查看态里 Esc 只收这一层，不试图关界面（选牌本来也逃不掉）
-                    return true;
-                }
-                return super.keyPressed(keyCode, scanCode, modifiers);
-            }
             // ←→ 在两个状态里是同一件事：换哪一张。查看态里换的是堆顶那张与右边那段字，
             // 而它照旧上报服务端 —— 你正在看的，就是超时会替你留下的（决策 ⑨）。
             case GLFW.GLFW_KEY_LEFT -> {

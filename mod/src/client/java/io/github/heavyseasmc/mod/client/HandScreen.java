@@ -142,6 +142,8 @@ public final class HandScreen extends GameScreen {
         List<String> hand = view.hand();
         // 共有的四条带在 GameScreen 里排定（这一面没有倒计时，那一格空着 —— 空着与挪位置是两回事）。
         Bands b = drawChrome(context, view);
+        Inspect ins = inspect(b);
+        float gathered = gathered(now);
 
         // 爱恨那一行只有你看得到（全程保密，规则里也不许亮出来证明自己）；键位那一行紧贴手牌。
         // 两行都贴舞台底边，且<b>空手时照样让位</b> —— 牌不能因为手上有没有牌就上下跳。
@@ -155,13 +157,6 @@ public final class HandScreen extends GameScreen {
                     width / 2, lineY, GuiLanguage.muted());
             lineY += lineStep();
         }
-        // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
-        //   与 HUD 那一行「按绑定键查看」同一条理由。排在倒计时那一条带的右头，不占舞台。
-        if (!hand.isEmpty()) {
-            drawEdgeHints(context, b, List.of(keys("select", "←", "→")),
-                    List.of(keys("reveal", "Enter"), keys("play", "U")));
-        }
-
         // 手牌摊在舞台里，一排，吃掉舞台减去那两行之后剩下的全部高度。
         int room = liftRoom();
         int avail = linesTop - HINT_GAP - b.stageTop();
@@ -182,7 +177,8 @@ public final class HandScreen extends GameScreen {
         int left = (width - ((hand.size() - 1) * step + cardW)) / 2;
 
         // 鼠标真的动了才换选中（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
-        if (mouseActuallyMoved(mouseX, mouseY)) {
+        // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
+        if (mouseActuallyMoved(mouseX, mouseY) && !inspecting()) {
             int hovered = indexAt(mouseX, mouseY, left, handTop, step, cardW, cardH);
             if (hovered >= 0) {
                 select(hovered);              // 鼠标与键盘指的是同一个东西，不能各说各话
@@ -193,10 +189,20 @@ public final class HandScreen extends GameScreen {
         for (int i = 0; i < hand.size(); i++) {
             lift[i] = GuiLanguage.approach(lift[i], i == selected ? GuiLanguage.LIFT_PX : 0f, dt);
             if (i != selected) {
-                drawHandCard(context, now, hand, i, left + i * step, handTop, cardW, cardH);
+                drawHandCard(context, now, hand, i, left + i * step, handTop, cardW, cardH, ins, gathered);
             }
         }
-        drawHandCard(context, now, hand, selected, left + selected * step, handTop, cardW, cardH);
+        drawHandCard(context, now, hand, selected, left + selected * step, handTop, cardW, cardH, ins, gathered);
+        if (gathered > 0f && selected >= 0 && selected < hand.size()) {
+            String card = hand.get(selected);
+            drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
+                    null, provisionName(card), provisionEffect(card));
+        }
+        // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
+        //   与 HUD 那一行「按绑定键查看」同一条理由。这一面没有倒计时，提示就排在那一条空着的带上。
+        drawFootBand(context, b, List.of(keys("select", "←", "→")),
+                List.of(keys("reveal", "Enter"), keys("play", "U"),
+                        keys(inspecting() ? "close" : "inspect", "Tab")), now, null);
     }
 
     /**
@@ -217,7 +223,7 @@ public final class HandScreen extends GameScreen {
     }
 
     private void drawHandCard(DrawContext context, long now, List<String> hand, int i,
-                              int x, int top, int w, int h) {
+                              int x, int top, int w, int h, Inspect ins, float gathered) {
         float in = GuiLanguage.deal(now, dealtAt, Math.max(0, i - dealtFrom));
         if (i >= dealtFrom && in <= 0f) {
             return;                           // 还没轮到它入场
@@ -226,14 +232,16 @@ public final class HandScreen extends GameScreen {
         float rise = (1f - progress) * GuiLanguage.DEAL_RISE;
         float scale = GuiLanguage.dealScale(progress);
 
+        CardPose pose = cardPose(ins, gathered, x + w / 2f, top + h, w, h,
+                i == selected ? 0 : 1 + Math.abs(i - Math.max(0, selected)));
         context.getMatrices().push();
         // 全部走矩阵，布局本身不动 —— 命中判定因此可以只看落位后的矩形。
-        context.getMatrices().translate(x + w / 2f, top + h - lift[i] + rise, 0);
+        context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
-        context.getMatrices().translate(-w / 2f, -h, 0);
-        CardTexture.drawProvision(context, hand.get(i), 0, 0, w, h);
+        context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+        CardTexture.drawProvision(context, hand.get(i), 0, 0, pose.w(), pose.h());
         if (i == selected) {
-            drawCardFrame(context, w, h);
+            drawCardFrame(context, pose.w(), pose.h());
         }
         context.getMatrices().pop();
     }
@@ -310,6 +318,9 @@ public final class HandScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (inspectKey(keyCode)) {
+            return true;
+        }
         int count = view.hand().size();
         if (count > 0 && (keyCode == GLFW.GLFW_KEY_LEFT || keyCode == GLFW.GLFW_KEY_RIGHT)) {
             select(Math.max(0, Math.min(count - 1,

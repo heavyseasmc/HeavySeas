@@ -147,8 +147,8 @@ public final class ActionScreen extends GameScreen {
                     c.enabled(view) ? GuiLanguage.ground() : withAlpha(GuiLanguage.ground(), DISABLED_FILL_ALPHA),
                     rise, scale);
         }
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")));
-        drawCountdown(context, b, now, view.actionDeadlineMs(), view.actionWindowMs(), rowWidth(buttons));
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), List.of(keys("confirm", "Enter")), now,
+                new Countdown(view.actionDeadlineMs(), view.actionWindowMs(), rowWidth(buttons)));
     }
 
     /**

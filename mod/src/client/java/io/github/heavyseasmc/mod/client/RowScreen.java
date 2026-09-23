@@ -137,12 +137,15 @@ public final class RowScreen extends GameScreen {
         Bands b = drawChrome(context, view);
         Layout l = layout(b);
         layout = l;
+        Inspect ins = inspect(b, l.seaY() + lineStep());
+        float gathered = gathered(now);
 
         // 划船堆几张 · 舵手是谁：这一面才要，所以排在舞台里，不占共有的带。
         drawSeaLine(context, view, l.seaY());
 
         // 鼠标真的动了才把高亮带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
-        if (mouseActuallyMoved(mouseX, mouseY)) {
+        // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
+        if (mouseActuallyMoved(mouseX, mouseY) && !inspecting()) {
             int hovered = cardAt(mouseX, mouseY, l);
             if (hovered >= 0 && fates[hovered] == Session.RowFate.UNDECIDED) {
                 focus = hovered;
@@ -150,13 +153,19 @@ public final class RowScreen extends GameScreen {
         }
 
         for (int i = 0; i < cards.size(); i++) {
-            drawCard(context, now, dt, l, i);
+            drawCard(context, now, dt, l, i, ins, gathered);
         }
-        if (focus >= 0) {
+        // 说明只写一处：查看态里它在签子上，摊开时它在舞台底下 —— 同一句写两遍是这一刀在收的那种重复。
+        if (focus >= 0 && gathered <= 0f) {
             drawHint(context, l);
         }
-        drawEdgeHints(context, b, List.of(keys("select", "←", "→")), List.of(keys("use", "Enter")));
-        drawCountdown(context, b, now, view.actionDeadlineMs(), view.actionWindowMs(), l.rowW());
+        // 航海牌没有牌名（id 形如 nav_07），它的身份就是那一句 —— 所以签子上只有说明。
+        if (gathered > 0f && focus >= 0 && focus < cards.size()) {
+            drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
+                    null, null, NavCardText.describe(cards.get(focus), view.seats()));
+        }
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("use"), now,
+                new Countdown(view.actionDeadlineMs(), view.actionWindowMs(), l.rowW()));
     }
 
     /**
@@ -177,7 +186,7 @@ public final class RowScreen extends GameScreen {
         return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW, seaY, hintY);
     }
 
-    private void drawCard(DrawContext context, long now, long dt, Layout l, int i) {
+    private void drawCard(DrawContext context, long now, long dt, Layout l, int i, Inspect ins, float gathered) {
         float in = GuiLanguage.deal(now, dealAt, i);
         if (in <= 0f) {
             return;                           // 还没轮到它入场
@@ -204,14 +213,16 @@ public final class RowScreen extends GameScreen {
             bottom += (targetBottom - bottom) * p - GuiLanguage.flyArc(p);
             scale *= 1f - (keep ? 0.75f : 0.3f) * p;
         }
+        CardPose pose = cardPose(ins, gathered, cx, bottom, l.w(), l.h(),
+                i == focus ? 0 : 1 + Math.abs(i - Math.max(0, focus)));
         context.getMatrices().push();
         // 绕底边中点缩放，与卡的其余几面同一个做法。
-        context.getMatrices().translate(cx, bottom - lift[i] + rise, 0);
+        context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
-        context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
-        CardTexture.drawNav(context, cards.get(i).id(), 0, 0, l.w(), l.h());
+        context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+        CardTexture.drawNav(context, cards.get(i).id(), 0, 0, pose.w(), pose.h());
         if (undecided && i == focus) {
-            drawCardFrame(context, l.w(), l.h());
+            drawCardFrame(context, pose.w(), pose.h());
         }
         context.getMatrices().pop();
     }
@@ -229,8 +240,11 @@ public final class RowScreen extends GameScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (inspectClick(button)) {
+            return true;
+        }
         Layout l = layout;
-        if (l != null && focus >= 0) {
+        if (l != null && focus >= 0 && !inspecting()) {
             int card = cardAt((int) mouseX, (int) mouseY, l);
             if (card >= 0 && fates[card] == Session.RowFate.UNDECIDED) {
                 // 第一下选中，再点同一张才使用 —— 与补给箱「点一下就定」不同：那一面点错还能等超时，
@@ -248,6 +262,9 @@ public final class RowScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (inspectKey(keyCode)) {
+            return true;
+        }
         // 用哪个键开的，就用哪个键收起来（理由同行动一面：写死的键，玩家改了键位就收不起来）。
         if (HeavySeasClient.actKey().matchesKey(keyCode, scanCode)) {
             close();
