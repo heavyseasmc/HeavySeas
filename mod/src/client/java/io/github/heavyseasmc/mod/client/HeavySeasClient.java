@@ -183,11 +183,11 @@ public final class HeavySeasClient implements ClientModInitializer {
                         screen.autoPicked(payload.index());
                     }
                 }));
-        // 牌的目录（类别 · 张数）：进服时来一次。收不到只是提示签上少两栏，不影响别的。
+        // 牌的目录（类别 · 张数 · 角标）：进服时来一次。收不到只是提示签上少两栏、角标空着，不影响别的。
         ClientPlayNetworking.registerGlobalReceiver(CatalogS2C.ID, (payload, context) ->
                 context.client().execute(() -> {
                     Catalog.accept(payload);
-                    LOGGER.info("牌目录：收到 {} 种物资", Catalog.size());
+                    LOGGER.info("牌目录：收到 {} 种物资、{} 个角色", Catalog.size(), Catalog.characters());
                 }));
         ClientPlayNetworking.registerGlobalReceiver(RosterConfigS2C.ID, (payload, context) ->
                 context.client().execute(() -> context.client().setScreen(new RosterScreen(payload))));

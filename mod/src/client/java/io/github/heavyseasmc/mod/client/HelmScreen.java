@@ -161,7 +161,7 @@ public final class HelmScreen extends GameScreen {
             context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
             context.getMatrices().scale(scale, scale, 1f);
             context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
-            CardTexture.drawNav(context, offer.get(i).id(), 0, 0, pose.w(), pose.h());
+            CardTexture.drawNav(context, offer.get(i), 0, 0, pose.w(), pose.h());
             if (hi) {
                 drawCardFrame(context, pose.w(), pose.h());
             }

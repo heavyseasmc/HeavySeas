@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.VertexSorter;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.card.CardFace;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.LinkedHashMap;
@@ -57,8 +58,7 @@ final class CardComposite {
     private static final float FAR = 21000.0F;
     private static final float DEPTH = -11000.0F;
 
-    private record Job(String key, Identifier art, String nameKey, String id, int texW, int texH,
-                       CardTexture.NameLayout layout) {
+    private record Job(String key, CardFace face, String tier, int texW, int texH) {
     }
 
     private record Baked(Identifier id, Framebuffer framebuffer) {
@@ -76,14 +76,14 @@ final class CardComposite {
     }
 
     /**
-     * 要这张牌合成好的纹理。没有就排队，并返回 {@code null} —— 调用方这一帧照旧走老路画。
+     * 要这张牌在这一档合成好的纹理。没有就排队，并返回 {@code null} —— 调用方这一帧用同一段画法
+     * 直接画上屏幕（{@link CardPainter}），不是空着。
      *
-     * @param key     缓存键：牌的种类 + id（语言变化由 {@link #forget} 统一作废）
-     * @param art     无字画层那张贴图
-     * @param nameKey 牌名的语言键前缀，例如 {@code heavyseas.provision.}
+     * <p>缓存键 = 牌型 · id · 档 · 内容的散列：目录晚到（角标从空变成有）时内容变了，旧的那张自然作废。
+     * 语言变化由 {@link #forget} 统一作废。
      */
-    static Identifier of(String key, Identifier art, String nameKey, String id, int texW, int texH,
-                         CardTexture.NameLayout layout) {
+    static Identifier of(CardFace face, String tier, int texW, int texH) {
+        String key = face.kind() + "/" + face.id() + "/" + tier + "/" + Integer.toHexString(face.hashCode());
         MinecraftClient client = MinecraftClient.getInstance();
         String now = client.getLanguageManager().getLanguage();
         if (!now.equals(language)) {
@@ -99,7 +99,7 @@ final class CardComposite {
                 return null;
             }
         }
-        QUEUE.addLast(new Job(key, art, nameKey, id, texW, texH, layout));
+        QUEUE.addLast(new Job(key, face, tier, texW, texH));
         return null;
     }
 
@@ -170,9 +170,9 @@ final class CardComposite {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        context.drawTexture(job.art(), 0, 0, job.texW(), job.texH(), 0f, 0f, 1, 1, 1, 1);
-        // ❗在**贴图自己的像素空间**里排字：倍率固定给 1，与窗口多大、界面尺寸设成几无关。
-        CardTexture.drawNameInto(context, job.nameKey(), job.id(), job.texW(), job.texH(), job.layout());
+        // ❗在**贴图自己的像素空间**里画：倍率固定给 1，与窗口多大、界面尺寸设成几无关。
+        //   档位由调用方按屏幕上的大小定好了 —— 合成只改采样时机，不改版式。
+        CardPainter.paint(context, job.face(), job.tier(), 0, 0, job.texW(), job.texH(), 1);
         context.draw();
 
         RenderSystem.enableCull();

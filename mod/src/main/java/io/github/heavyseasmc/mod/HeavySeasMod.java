@@ -93,14 +93,15 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 server.execute(() -> {
                     MistSea.recover(handler.player);
-                    // 牌的目录（类别 · 张数）：这些是牌自己的属性，数据包说了算 ——
-                    // 客户端的提示签要写它们，而在这个包之前那两栏根本拿不到数据。
-                    // ❗发失败不是致命的：提示签少两栏，牌照样能玩。所以只记一句，不打断进服。
+                    // 牌的目录（类别 · 张数 · 角标上的数）：这些是牌自己的属性，数据包说了算 ——
+                    // 客户端的提示签与牌面角标要写它们，而在这个包之前根本拿不到数据。
+                    // ❗发失败不是致命的：提示签少两栏、角标空着，牌照样能玩。所以只记一句，不打断进服。
                     try {
+                        var data = GameDataLoader.require();
                         ServerPlayNetworking.send(handler.player,
-                                CatalogS2C.of(GameDataLoader.require().provisions().all()));
+                                CatalogS2C.of(data.provisions().all(), data.roster().characters()));
                     } catch (RuntimeException e) {
-                        LOGGER.warn("牌目录没发出去（提示签上会少「类别 · 共几张」）：{}", e.toString());
+                        LOGGER.warn("牌目录没发出去（提示签上会少「类别 · 共几张」、角标空着）：{}", e.toString());
                     }
                 }));
         // 指定模式（ADR-0025）：世界里右键一个人就是「我要对他动手」。

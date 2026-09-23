@@ -511,84 +511,78 @@ tasks.named('check') {
     dependsOn checkNavigationCards
 }
 
-// Minecraft 不认 SVG —— GUI 里能画的只有 PNG。贴图由内部管线烘出来并**入库**：
-// 生成物入库是有意的，否则一份干净的克隆构建不出能用的 jar。
+// Minecraft 不认 SVG —— GUI 里能画的只有 PNG。牌面的分层素材由内部管线烘出来并**入库**（ADR-0039）：
+// 边框（每牌型每档一张）· 插画（每张牌一张，透明底）· 卡牌图标 · 牌背三档。生成物入库是有意的，
+// 否则一份干净的克隆构建不出能用的 jar。
 //
-// 这道闸门查四件事，四件都是安静的失败：
-//   ① 数据里有这张牌、贴图却没烘 —— 运行时表现是一块紫黑格子，不报错；
+// 这道闸门查的都是安静的失败：
+//   ① 数据里有这张牌、插画却没烘 —— 运行时画一块占位并记一行日志，但构建照样绿；
 //   ② 贴图烘成了 0 字节或不是 PNG —— 无头浏览器那一步失败时正是这样，而它 exit 0；
-//   ③ 贴图小于 600×840 —— GUI 那一侧就得放大着画，字又糊回去
-//      （2026-09-15 真实客户端上看到的，正是 300×420 被拉大）；
-//   ④ 比例不是 5:7 —— 版面按这个比例排，不对就被拉伸，拉伸同样不报错。
+//   ③ 贴图小于应有尺寸 —— 缩到小牌时字与线条糊掉（2026-09-15 真实客户端上看到的）；
+//   ④ 比例不对 —— 版面按比例排，不对就被拉伸，拉伸同样不报错；
+//   ⑤ 插画不是透明底 —— 那就等于又烘了一整张牌，边框被它盖住，而屏幕上「看起来还行」。
+// 应有尺寸取自版面描述（layout.json 的 texture），不在这里另写一份 —— 期望值与被测对象同源证明不了任何事，
+// 而与「烘出来的那一份」正交的来源正是版面描述（证伪表：尺寸检查的期望值与渲染同源那一次）。
 def checkCardTextures = tasks.register('checkCardTextures') {
     group = 'verification'
-    description = '每一种物资、每一个角色都要有对应的 GUI 贴图，终局的秘密牌背也要有：确实是张 PNG、够清楚、比例对'
+    description = '牌面的分层素材：每张牌的插画（透明底）· 每牌型每档的边框 · 秘密牌背三档 · 代码用到的卡牌图标，都在且尺寸、比例对'
     def dataFile = rootProject.file('data/provisions/default.json')
     def rosterFile = rootProject.file('data/roster/default.json')
     def weatherFile = rootProject.file('data/weather/default.json')
     def navFile = rootProject.file('data/navigation/default.json')
-    // 做成任务属性而不是局部变量：红测要能把它们指向一份造坏的目录，而不去改被跟踪的贴图。
-    ext.texDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/provision')
-    ext.charDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/character')
-    ext.backDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/back')
-    ext.weatherDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/weather')
-    // 航海卡三档在同一个目录树下：根目录 LOD0，lod1/、lod2/ 两个子目录（ADR-0020 §8 · ADR-0031）。
-    ext.navDir = file('src/main/resources/assets/heavyseas/textures/gui/cards/nav')
-    def minW = 600
-    def minH = 840
-    inputs.file(dataFile)
-    inputs.file(rosterFile)
-    inputs.file(weatherFile)
-    inputs.file(navFile)
-    inputs.dir(ext.texDir).optional()
-    inputs.dir(ext.charDir).optional()
-    inputs.dir(ext.backDir).optional()
-    inputs.dir(ext.weatherDir).optional()
-    inputs.dir(ext.navDir).optional()
+    def layoutFile = file('src/main/resources/assets/heavyseas/cards/layout.json')
+    // 图标清单取自**用它的那一侧**（拼牌的代码），不是烘它的管线：管线漏烘一枚，这里才看得见。
+    def facesSrc = file('src/main/java/io/github/heavyseasmc/mod/card/CardFaces.java')
+    def painterSrc = file('src/client/java/io/github/heavyseasmc/mod/client/CardPainter.java')
+    // 做成任务属性而不是局部变量：红测要能把它指向一份造坏的目录树，而不去改被跟踪的贴图。
+    ext.cardsDir = file('src/main/resources/assets/heavyseas/textures/gui/cards')
+    inputs.files(dataFile, rosterFile, weatherFile, navFile, layoutFile, facesSrc, painterSrc)
+    inputs.dir(ext.cardsDir).optional()
     doLast {
         def slurper = new groovy.json.JsonSlurper()
-        def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
-        if (ids.isEmpty()) {
-            throw new GradleException('data/provisions 里一个 id 都没读到 —— 判据坏了，不是真的没有牌')
+        def ids = { File f, String key -> (slurper.parse(f, 'UTF-8') as Map)[key].collect { it.id.toString() } }
+        def cards = [
+                provision: ids(dataFile, 'cards'),
+                character: ids(rosterFile, 'characters'),
+                weather  : ids(weatherFile, 'cards'),
+                nav      : ids(navFile, 'cards'),
+        ]
+        cards.each { kind, list ->
+            if (list.isEmpty()) {
+                throw new GradleException("data 里一张 ${kind} 都没读到 —— 判据坏了，不是真的没有牌")
+            }
         }
-        // 角色卡：终局翻牌与手牌一面的爱恨都画它（ADR-0022）。id 取自 data/roster —— 与卡面、lang 共用一套主键。
-        def characters = (slurper.parse(rosterFile, 'UTF-8') as Map).characters.collect { it.id.toString() }
-        if (characters.isEmpty()) {
-            throw new GradleException('data/roster 里一个角色都没读到 —— 判据坏了，不是真的没有角色')
+        def layout = slurper.parse(layoutFile, 'UTF-8') as Map
+        def tiers = layout.tiers.collect { it.toString() }
+        def texOf = { String kind -> layout.shapes[layout.kinds[kind].shape].texture.collect { it as int } }
+        def icons = [] as TreeSet
+        (facesSrc.getText('UTF-8') =~ /public static final String \w+ = "(\w+)";/).each { icons << it[1] }
+        (painterSrc.getText('UTF-8') =~ /icon\("(\w+)"\)/).each { icons << it[1] }
+        if (icons.size() < 8) {
+            throw new GradleException("代码里只认出 ${icons.size()} 枚卡牌图标 —— 判据的正则坏了，不是图标都在")
         }
-        // 牌背：终局翻牌的暗牌只用 secret（爱恨卡的背面）。另两张没有界面在用，不拦 —— 拦一张没人读的贴图只会拦下正确的删除。
-        def backs = ['secret']
-        def weather = (slurper.parse(weatherFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
-        if (weather.isEmpty()) {
-            throw new GradleException('data/weather 里一个 id 都没读到 —— 判据坏了，不是真的没有天候牌')
-        }
-        // 航海卡：划船与舵手两面画它（ADR-0033 接进 GUI 之后，字画的那条路已删 —— 贴图缺一张就是紫黑格子）。
-        def nav = (slurper.parse(navFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
-        if (nav.isEmpty()) {
-            throw new GradleException('data/navigation 里一个 id 都没读到 —— 判据坏了，不是真的没有航海牌')
-        }
+
+        File root = ext.cardsDir
         def problems = []
-        def sizes = [] as Set
+        def sizes = [] as TreeSet
+        int checked = 0
         long bytes = 0
-        // prefix 为空的是物资：报错措辞与以前一字不差，既有的两条红测（太小 · 比例不对）不用改。
-        def checkOne = { File dir, String prefix, String id, int requiredW, int requiredH, int ratioW, int ratioH ->
-            def name = "${prefix}${id}.png"
-            def f = new File(dir, "${id}.png")
+        def checkOne = { String rel, int wantW, int wantH, boolean transparent ->
+            def f = new File(root, rel)
             if (!f.isFile()) {
-                problems << "缺贴图：${name}"
+                problems << "缺贴图：${rel}"
                 return
             }
             if (f.length() == 0) {
-                problems << "${name} 是 0 字节 —— 烘制那一步失败了"
+                problems << "${rel} 是 0 字节 —— 烘制那一步失败了"
                 return
             }
             // PNG 头：前 4 字节是签名 89 50 4E 47；IHDR 里宽在第 16–19 字节、高在 20–23（大端）。
-            // 截图失败时留下的半截文件过不了签名这一关。
             def head = new byte[24]
             int got = f.withInputStream { it.read(head) }
             if (!(got >= 4 && head[0] == (byte) 0x89 && head[1] == (byte) 0x50
                     && head[2] == (byte) 0x4E && head[3] == (byte) 0x47)) {
-                problems << "${name} 不是 PNG（签名对不上）"
+                problems << "${rel} 不是 PNG（签名对不上）"
                 return
             }
             def be = { int at ->
@@ -596,32 +590,51 @@ def checkCardTextures = tasks.register('checkCardTextures') {
             }
             int w = be(16)
             int h = be(20)
-            if (w < requiredW || h < requiredH) {
-                problems << "${name} 只有 ${w}×${h}，低于 ${requiredW}×${requiredH} —— 烘制倍数不对，GUI 上会糊"
-            } else if (w * ratioH != h * ratioW) {
-                problems << "${name} 是 ${w}×${h}，不是 ${ratioW}:${ratioH} —— 版面会把它拉伸"
+            checked++
+            if (w < wantW || h < wantH) {
+                problems << "${rel} 只有 ${w}×${h}，低于 ${wantW}×${wantH} —— 烘制倍数不对，缩小时会糊"
+                return
+            }
+            if ((long) w * wantH != (long) h * wantW) {
+                problems << "${rel} 是 ${w}×${h}，不是 ${wantW}:${wantH} 的比例 —— 版面会把它拉伸"
+                return
+            }
+            if (transparent) {
+                def img = javax.imageio.ImageIO.read(f)
+                if (img == null || ((img.getRGB(2, 2) >>> 24) & 0xff) != 0) {
+                    problems << "${rel} 左上角不透明 —— 插画层带了纸或框，会把边框盖住"
+                    return
+                }
             }
             sizes << "${w}×${h}".toString()
             bytes += f.length()
         }
-        File texDir = ext.texDir
-        File charDir = ext.charDir
-        File backDir = ext.backDir
-        File weatherDir = ext.weatherDir
-        File navDir = ext.navDir
-        ids.each { checkOne(texDir, '', it, minW, minH, 5, 7) }
-        characters.each { checkOne(charDir, 'character/', it, minW, minH, 5, 7) }
-        backs.each { checkOne(backDir, 'back/', it, minW, minH, 5, 7) }
-        weather.each { checkOne(weatherDir, 'weather/', it, 840, 600, 7, 5) }
-        // 三档各是一张独立烘的贴图，各有各的下限：LOD0 600×840 · LOD1 480×672 · LOD2 240×336。
-        nav.each { checkOne(navDir, 'nav/', it, minW, minH, 5, 7) }
-        nav.each { checkOne(new File(navDir, 'lod1'), 'nav/lod1/', it, 480, 672, 5, 7) }
-        nav.each { checkOne(new File(navDir, 'lod2'), 'nav/lod2/', it, 240, 336, 5, 7) }
+        cards.each { kind, list ->
+            def (tw, th) = texOf(kind)
+            list.each { checkOne("art/${kind}/${it}.png", tw, th, true) }
+            tiers.each { checkOne("frame/${kind}/${it}.png", tw, th, false) }
+        }
+        // 牌背：终局翻牌的暗牌只用 secret（爱恨卡的背面），三档各一张。另两张没有界面在用，不拦。
+        def (bw, bh) = texOf('provision')
+        tiers.eachWithIndex { t, i -> checkOne(i == 0 ? 'back/secret.png' : "back/lod${i}/secret.png", bw, bh, false) }
+        // 图标是方的；角标框按版面描述里角标的宽高（44×42）烘成 2 倍，比例取自那里
+        def badge = layout.shapes.portrait.badges
+        icons.each {
+            if (it == 'badge_box') {
+                checkOne("icon/${it}.png", (badge.w as int) * 2, (badge.h as int) * 2, false)
+            } else {
+                checkOne("icon/${it}.png", 64, 64, false)
+            }
+        }
+        // 正向对照：一张都没查到时，「全都对」与「没在查」输出一样。
+        if (checked == 0 && problems.isEmpty()) {
+            throw new GradleException('一张贴图都没查到 —— 判据坏了，不是都对')
+        }
         if (problems) {
             throw new GradleException((['GUI 卡面贴图核对失败：']
                     + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
-        logger.lifecycle("GUI 贴图核对通过：物资 ${ids.size()} 种 · 角色 ${characters.size()} 个 · 牌背 ${backs.size()} 张 · 天候 ${weather.size()} 张 · 航海 ${nav.size()} 张 × 3 档，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
+        logger.lifecycle("GUI 贴图核对通过：插画 物资 ${cards.provision.size()} · 角色 ${cards.character.size()} · 天候 ${cards.weather.size()} · 航海 ${cards.nav.size()}（透明底）· 边框 ${cards.size()} 种 × ${tiers.size()} 档 · 牌背 ${tiers.size()} 档 · 图标 ${icons.size()} 枚，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
     }
 }
 

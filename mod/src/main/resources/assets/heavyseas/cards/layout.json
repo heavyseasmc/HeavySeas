@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "_comment": [
+    "牌面的槽位图（ADR-0039）。管线烘边框、客户端拼整张、闸门查尺寸，三处都只读这一份。",
+    "坐标一律是母版单位：竖版 300×420，横版 420×300。贴图按 2 倍烘。",
+    "三档共用同一张槽位图：换档只会「拿掉」或「在原地放大」，不会把东西搬到别的带里。",
+    "各档的物理宽度下限**不写在这里**：由各槽位的 min_px 与字号现算（ADR-0039 §7.2），写死一个数就是一颗定时器。",
+    "tiers 列出这个槽位在哪几档出现；不列的档里它被拿掉。",
+    "floor_px 是这一形制支持的最小物理宽度：L2 没有下限，闸门就在这个宽度上查 L2 的各槽位。更小的牌不保证可读（ADR-0039 §8）。"
+  ],
+  "tiers": ["l0", "l1", "l2"],
+  "shapes": {
+    "portrait": {
+      "master": [300, 420],
+      "floor_px": 86,
+      "texture": [600, 840],
+      "inner_frame": {"tiers": ["l0"]},
+      "title": {
+        "x": 28, "top": 18, "bottom": 66, "right": 284,
+        "size": {"l0": 25, "l1": 33},
+        "tiers": ["l0", "l1"],
+        "min_px": 16
+      },
+      "rules": {"y": [70, 73], "left": 24, "right": 276, "tiers": ["l0", "l1"]},
+      "badges": {
+        "right": 284, "top": 20, "w": 44, "h": 42, "gap": 4,
+        "digit_size": 22,
+        "icon_size": 16,
+        "icon_tiers": ["l0"],
+        "scale": {"l0": 1.0, "l1": 1.0, "l2": 1.6},
+        "tiers": ["l0", "l1", "l2"],
+        "min_px": 10
+      },
+      "footer": {"y": 391, "half": 104, "emblem": 17, "tiers": ["l0"], "min_px": 10}
+    },
+    "landscape": {
+      "master": [420, 300],
+      "floor_px": 86,
+      "texture": [840, 600],
+      "inner_frame": {"tiers": ["l0"]},
+      "title": {
+        "x": 28, "top": 18, "bottom": 66, "right": 404,
+        "size": {"l0": 25, "l1": 33},
+        "tiers": ["l0", "l1"],
+        "min_px": 16
+      },
+      "rules": {"y": [70, 73], "left": 24, "right": 396, "tiers": ["l0", "l1"]},
+      "badges": {
+        "right": 404, "top": 20, "w": 44, "h": 42, "gap": 4,
+        "digit_size": 22,
+        "icon_size": 16,
+        "icon_tiers": ["l0"],
+        "scale": {"l0": 1.0, "l1": 1.0, "l2": 1.6},
+        "tiers": ["l0", "l1", "l2"],
+        "min_px": 10
+      },
+      "footer": {"y": 281, "half": 150, "emblem": 17, "tiers": ["l0"], "min_px": 10}
+    }
+  },
+  "kinds": {
+    "provision": {"shape": "portrait"},
+    "character": {"shape": "portrait"},
+    "weather": {"shape": "landscape"},
+    "nav": {
+      "shape": "portrait",
+      "roll": {
+        "divider": {"y": 272, "left": 40, "right": 260, "tiers": ["l0", "l1"]},
+        "icon": {"x": 139, "y": 280, "size": 22, "tiers": ["l0", "l1"]},
+        "band": {
+          "l0": {"top": 307, "bottom": 361, "left": 24, "right": 276, "dmax": 54, "gap": 5, "max_rows": 1},
+          "l1": {"top": 307, "bottom": 361, "left": 24, "right": 276, "dmax": 54, "gap": 5, "max_rows": 1},
+          "l2": {"top": 266, "bottom": 404, "left": 16, "right": 284, "dmax": 72, "gap": 6, "max_rows": 2}
+        },
+        "tiers": ["l0", "l1", "l2"],
+        "min_px": 14
+      }
+    }
+  }
+}
