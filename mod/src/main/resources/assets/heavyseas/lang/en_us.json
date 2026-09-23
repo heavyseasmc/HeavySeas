@@ -208,6 +208,7 @@
   "key.heavyseas.hand": "Your hand",
   "key.heavyseas.act": "Act",
   "key.heavyseas.theme": "Toggle UI theme (light / dark)",
+  "key.heavyseas.log": "Pin / unpin the voyage log",
   "heavyseas.game.thirst_choose": "Thirst: %s must decide how much water to drink (%s left to answer for).",
   "heavyseas.game.thirst_ask_donors": "Thirst: %s cannot play water; others have %s thirst to help with.",
   "heavyseas.game.thirst_no_water": "Thirst: %s has no water at all and must take %s.",

@@ -264,6 +264,11 @@ public abstract class GameScreen extends Screen {
             ClientPrefs.toggleTheme();
             return true;
         }
+        if (HeavySeasClient.logKey() != null && HeavySeasClient.logKey().matchesKey(keyCode, scanCode)) {
+            SidebarReveal.togglePin();       // 钉住 / 放开右栏：界面开着时按键不走按键绑定
+            LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");
+            return true;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 

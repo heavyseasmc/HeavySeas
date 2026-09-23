@@ -208,6 +208,7 @@
   "key.heavyseas.hand": "查看手牌",
   "key.heavyseas.act": "行动",
   "key.heavyseas.theme": "切换界面主题（浅色 / 深色）",
+  "key.heavyseas.log": "钉住 / 放开航海日志",
   "heavyseas.game.thirst_choose": "口渴：%s 要决定喝几张水（还需化解 %s 次）。",
   "heavyseas.game.thirst_ask_donors": "口渴：%s 自己打不出水；其他人有 %s 次机会可以帮他。",
   "heavyseas.game.thirst_no_water": "口渴：%s 一张水都没有，只能硬扛 %s 次。",

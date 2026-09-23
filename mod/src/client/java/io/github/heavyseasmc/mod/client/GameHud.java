@@ -70,8 +70,10 @@ public final class GameHud {
         }
         HudView view = GameComponents.of(client.world).hudView();
         if (!view.active()) {
+            SidebarReveal.forget();          // 这一局结束了：下一局第一条播报要能触发滑出来
             return;                          // 没有对局就什么都不画，不留一个空框
         }
+        SidebarReveal.observe(view.notifications().size(), System.currentTimeMillis());
         List<Line> lines = new ArrayList<>();
         lines.add(new Line(Text.translatable("heavyseas.status.header", view.turn(), GameScreen.phaseLabel(view),
                 view.gulls(), GameState.GULLS_TO_LAND), GuiLanguage.ink()));
@@ -164,13 +166,40 @@ public final class GameHud {
         }
         HudView view = GameComponents.of(client.world).hudView();
         if (!view.active()) {
+            SidebarReveal.forget();
             return;
         }
-        drawNotifications(context, client, view.weather(), view.notifications(),
-                sidebarLayout(context.getScaledWindowWidth(), view));
+        long now = System.currentTimeMillis();
+        SidebarReveal.observe(view.notifications().size(), now);
+        float open = SidebarReveal.openness(now);
+        if (open <= 0f) {
+            return;                          // 收着的时候一个像素都不画 —— 第一刀把这块屏幕让给了牌
+        }
+        // ❗**盖在舞台上**，不占版面：这里用「看得见的那一份」几何（visible = true），
+        //   而 sidebarLayout 给各面的仍是 visible = false —— 舞台一个像素都不动。
+        //   否则每来一条播报整屏就要重排一次，那正是 §7.13 要避免的割裂感。
+        NotificationSidebarLayout overlay =
+                NotificationSidebarLayout.of(context.getScaledWindowWidth(), true);
+        int slide = Math.round((1f - open) * (overlay.sidebarWidth() + NotificationSidebarLayout.MARGIN));
+        // ❗自己滑出来的那一下**只给「刚刚发生了什么」**：最新的两条，不带天候卡。
+        //   整本日志加天候卡有半屏高，实拍到它盖住了右边三张牌与两个座位 ——
+        //   而牌是主体（§7.8）。要看全的按 L 钉住：钉住是你自己要的，盖住也是你自己认的。
+        List<Text> shown = view.notifications();
+        String weather = view.weather();
+        if (!SidebarReveal.pinned()) {
+            shown = shown.subList(0, Math.min(REVEAL_LINES, shown.size()));
+            weather = "";
+        }
+        context.getMatrices().push();
+        context.getMatrices().translate(slide, 0, 0);
+        drawNotifications(context, client, weather, shown, overlay);
+        context.getMatrices().pop();
     }
 
     /** GameScreen 与实际绘制共用这一份几何；两边各算一遍仍会得到完全相同的边界。 */
+    /** 自己滑出来时最多给几条。再多就成了「整本日志盖住牌」，那是钉住才该发生的事。 */
+    private static final int REVEAL_LINES = 2;
+
     static NotificationSidebarLayout sidebarLayout(int screenWidth, HudView view) {
         boolean visible = view.active() && (!view.notifications().isEmpty() || !view.weather().isEmpty())
                 && !(MinecraftClient.getInstance().currentScreen instanceof GameScreen);

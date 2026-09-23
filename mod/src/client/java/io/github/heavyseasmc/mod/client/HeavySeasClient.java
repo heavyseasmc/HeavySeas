@@ -70,8 +70,14 @@ public final class HeavySeasClient implements ClientModInitializer {
     private static KeyBinding actKey;
 
     private static KeyBinding themeKey;
+    private static KeyBinding logKey;
 
     /** 换界面主题的键。界面开着时 {@link GameScreen} 用它认按键。 */
+    /** 航海日志（右栏）钉住 / 放开。界面开着时按键不走按键绑定，由 GameScreen 接。 */
+    public static KeyBinding logKey() {
+        return logKey;
+    }
+
     public static KeyBinding themeKey() {
         return themeKey;
     }
@@ -140,9 +146,18 @@ public final class HeavySeasClient implements ClientModInitializer {
         themeKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.theme", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F8,
                 "key.categories.heavyseas"));
+        // 航海日志（右栏）钉住 / 放开。❗不在屏幕上给提示：按键在 Minecraft 的控制设置里看得见，
+        // 而 GUI 上的字不是用来教玩家怎么玩的（用户 2026-09-22）—— 与换主题那个键同一条路数。
+        logKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_L,
+                "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (themeKey.wasPressed()) {
                 ClientPrefs.toggleTheme();
+            }
+            while (logKey.wasPressed()) {
+                SidebarReveal.togglePin();
+                LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");
             }
         });
 
