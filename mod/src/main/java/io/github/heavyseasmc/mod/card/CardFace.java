@@ -15,7 +15,7 @@ import java.util.Objects;
  * @param id     牌 id；插画贴图 {@code cards/art/<kind>/<id>.png}
  * @param title  牌名
  * @param badges 角标，从左到右
- * @param roll   口渴排（只有航海卡有），从左到右
+ * @param roll   信息带里那一排，从左到右：航海卡是口渴排，天候卡是效果图示（ADR-0040）；别的牌为空
  */
 public record CardFace(String kind, String id, Title title, List<Badge> badges, List<Chip> roll) {
 
@@ -55,10 +55,14 @@ public record CardFace(String kind, String id, Title title, List<Badge> badges, 
         }
     }
 
-    /** 口渴排里一枚：一个人（{@code WHO}）· 除他之外（{@code NOT}）· 一个图示（{@code ICON}）。 */
+    /**
+     * 信息带里一枚。口渴排用前三种：一个人（{@code WHO}）· 除他之外（{@code NOT}）· 一个图示（{@code ICON}）；
+     * 天候的效果图示另用三种（ADR-0040 §7.2）：划掉的图示（{@code STRUCK}，= 这一回合不算 / 没有）·
+     * 箭头（{@code ARROW}，= 变成；{@code ref} 为空）· 数字（{@code COUNT}，{@code ref} 就是印的字，如 {@code +1}）。
+     */
     public record Chip(Type type, String ref) {
 
-        public enum Type { WHO, NOT, ICON }
+        public enum Type { WHO, NOT, ICON, STRUCK, ARROW, COUNT }
 
         public Chip {
             Objects.requireNonNull(type, "type");

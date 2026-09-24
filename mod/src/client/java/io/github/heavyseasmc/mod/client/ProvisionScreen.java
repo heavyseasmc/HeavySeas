@@ -56,6 +56,15 @@ public final class ProvisionScreen extends GameScreen {
     private long snapAt;
     /** 播完这一下就把界面收掉 —— 留牌那一包已经到了，只是被这一下拦着。 */
     private boolean closeWhenSnapDone;
+    /** 你自己按下去留的是第几张；{@code -1} = 还没按（或是替你选的，那一张在 {@link #snapIndex}）。 */
+    private int committedIndex = -1;
+    /**
+     * 「传」的起点（O21）：留下的那张「飞」进你自己的座位，其余「滑」到下一位。0 = 没在播。
+     * 替你选的那一路要等「顿」播完才开始，所以它可能是一个将来的时刻。
+     */
+    private long passAt;
+    /** 这一次「传」里留下的是第几张。 */
+    private int keptIndex = -1;
 
     /** 见过一次「对局还在」的投影没有。见 {@link #tick()}。 */
     private boolean sawGame;
@@ -76,6 +85,9 @@ public final class ProvisionScreen extends GameScreen {
             this.snapIndex = -1;
             this.snapAt = 0L;
             this.closeWhenSnapDone = false;
+            this.committedIndex = -1;
+            this.passAt = 0L;
+            this.keptIndex = -1;
             send(0, false);
             // 与语言无关的一行：验收要判「箱子真的传到我手上了」。
             // ❗不能拿「界面：打开 ProvisionScreen」当这件事的证据 —— 界面已经开着时这里是**换牌**，不重开，
@@ -112,6 +124,35 @@ public final class ProvisionScreen extends GameScreen {
         return snapAt > 0L && GuiLanguage.snap(System.currentTimeMillis(), snapAt) < 1f;
     }
 
+    /**
+     * 箱子从你手上传走了（服务端认下了你留的那张）：开始「传」—— 留下的那张「飞」进你自己的座位，
+     * 其余几张「滑」到下一位（O21 · ADR-0018 §7.2：飞 = 牌换了主人，滑 = 轮到下一个人）。
+     *
+     * <p>❗落点是<b>座位轨上你自己那一格</b>：这一面没有手牌区，而轨上那一格就是「你」（金）。
+     * 替你选的那一路先播完「顿」再传 —— 两件事各说各的，不叠在一起。
+     *
+     * @return 这一下要不要播（有牌可传才播）；重复调用不会重来
+     */
+    public boolean beginPass() {
+        if (passAt > 0L) {
+            return true;
+        }
+        if (data == null || data.offer().isEmpty()) {
+            return false;
+        }
+        keptIndex = snapIndex >= 0 ? snapIndex : committedIndex >= 0 ? committedIndex : highlight;
+        long now = System.currentTimeMillis();
+        passAt = snapAt > 0L ? Math.max(now, snapAt + GuiLanguage.SNAP_MS) : now;
+        LOGGER.info("补给箱：第 {} 张飞进你的座位，其余 {} 张滑到下一位", keptIndex + 1, data.offer().size() - 1);
+        return true;
+    }
+
+    /** 「顿」或「传」还在播吗 —— 播完之前界面不收（牌离开你手里的那一下不能被截断）。 */
+    public boolean busy() {
+        long now = System.currentTimeMillis();
+        return snapping() || (passAt > 0L && (GuiLanguage.flying(now, passAt) || GuiLanguage.sliding(now, passAt)));
+    }
+
     /** 播完就关。 */
     public void closeAfterSnap() {
         closeWhenSnapDone = true;
@@ -122,13 +163,33 @@ public final class ProvisionScreen extends GameScreen {
         return false;                 // 选牌不能逃 —— 逃了也只是超时替你选
     }
 
-    /** 一帧的版面，全部以 GUI 单位计。带位归 {@link Bands}，这里只排舞台那一格里的东西。 */
-    private record Layout(int w, int h, int left, int cardsTop, int rowW) {
+    /**
+     * 一帧的版面，全部以 GUI 单位计。带位归 {@link Bands}，这里只排舞台那一格里的东西。
+     *
+     * @param perRow  一排几张（一排就是全部；两排时上排多一张）
+     * @param rowStep 上下两排之间隔多远（牌高 + 「顿」要的留空）
+     * @param screenW 窗口宽：每一排各自居中
+     */
+    private record Layout(int w, int h, int cardsTop, int rowW, int n, int perRow, int rowStep, int screenW) {
 
         int cardX(int i) {
-            return left + i * (w + CARD_GAP);
+            int row = i / perRow;
+            int inRow = Math.min(perRow, n - row * perRow);
+            int rowLeft = (screenW - cardRowWidth(inRow, w)) / 2;
+            return rowLeft + (i - row * perRow) * (w + CARD_GAP);
+        }
+
+        int cardTop(int i) {
+            return cardsTop + (i / perRow) * rowStep;
+        }
+
+        int left() {
+            return (screenW - rowW) / 2;
         }
     }
+
+    /** 一排牌（连头上的留空）占不到舞台的这个比例时，才考虑排成两排。 */
+    private static final float TWO_ROWS_EMPTY = 0.5f;
 
     /**
      * 这一帧舞台里的版面。
@@ -149,10 +210,29 @@ public final class ProvisionScreen extends GameScreen {
         // 空只会偏大一点点，卡因此略小一点点，绝不会反过来压上座位轨。
         int room = snapRoom(cardHeightFor(n, avail - snapRoom(0)));
         int h = cardHeightFor(n, avail - room);
+        int perRow = n;
+        // 一排放不下、卡被宽度卡小时，试两排（总纲 §7.8：舞台先给牌）。
+        // ❗界面尺寸 1 时一排八张被宽度卡在舞台高的四成，上下各空一大截（O32，2026-09-24 实拍）；
+        //   界面尺寸自动（1280×720 下是 3）时两排反而更小，照旧一排 —— 按算出来的大小选，不按界面尺寸写死。
+        // ❗判的是「一排之后舞台还空着一大半」，不是「两排大多少」：两排时每排头上都要留「顿」的空，
+        //   界面尺寸 1 的八张牌换成两排只大 6%（209 → 222 个单位，实测）—— 牌几乎没长，舞台却从空一大半变成铺满。
+        //   用户抱怨的是后者（O32：「舞台空了一大半」）。两排不许比一排小。
+        if (n >= 4 && h + room < avail * TWO_ROWS_EMPTY) {
+            int per2 = (n + 1) / 2;
+            int room2 = snapRoom(cardHeightFor(per2, (avail - 2 * snapRoom(0)) / 2));
+            int h2 = cardHeightFor(per2, (avail - 2 * room2) / 2);
+            if (h2 >= h) {
+                perRow = per2;
+                room = room2;
+                h = h2;
+            }
+        }
+        int rows = (n + perRow - 1) / perRow;
         int w = GuiLanguage.cardWidth(h);
-        int cardsTop = cardsTopIn(b.stageTop(), bottom, h, room);
-        int rowW = cardRowWidth(n, w);
-        return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW);
+        int rowStep = h + room;
+        int cardsTop = cardsTopIn(b.stageTop(), bottom, h + (rows - 1) * rowStep, room);
+        int rowW = cardRowWidth(perRow, w);
+        return new Layout(w, h, cardsTop, rowW, n, perRow, rowStep, width);
     }
 
     /** 座位轨是<b>这一条链</b>（箱子传到哪了），不是座位序 —— 所以覆写它。**公开信息**，等待要看得见（决策 ⑨）。 */
@@ -207,14 +287,14 @@ public final class ProvisionScreen extends GameScreen {
         // 高亮那一张最后画：收成一叠时它在堆顶，摊开时它抬起来 —— 两种状态下它都必须压在别人上面。
         for (int i = 0; i < offer.size(); i++) {
             if (i != highlight) {
-                drawOne(context, now, dt, l, in, gathered, snapP, offer, i);
+                drawOne(context, now, dt, b, l, in, gathered, snapP, offer, i);
             }
         }
         if (highlight >= 0 && highlight < offer.size()) {
-            drawOne(context, now, dt, l, in, gathered, snapP, offer, highlight);
+            drawOne(context, now, dt, b, l, in, gathered, snapP, offer, highlight);
         }
 
-        if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
+        if (gathered > 0f && passAt == 0L && highlight >= 0 && highlight < offer.size()) {
             String card = offer.get(highlight);
             drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
                     provisionCaption(card), provisionName(card), provisionEffect(card));
@@ -246,7 +326,7 @@ public final class ProvisionScreen extends GameScreen {
             close();
             return;
         }
-        if (closeWhenSnapDone && !snapping() && client != null) {
+        if (closeWhenSnapDone && !busy() && client != null) {
             client.setScreen(null);
         }
     }
@@ -257,19 +337,22 @@ public final class ProvisionScreen extends GameScreen {
      * <p>❗版面本身不动 —— 命中判定照旧按摊开那一排算。收起来时点牌没有意义（都叠在一起了），
      * 所以查看态里鼠标点击不再当作留牌。
      */
-    private void drawOne(DrawContext context, long now, long dt, Layout l, Inspect in, float gathered,
+    private void drawOne(DrawContext context, long now, long dt, Bands b, Layout l, Inspect in, float gathered,
                          float snapP, List<String> offer, int i) {
         float entered = GuiLanguage.deal(now, dealAt, i);
         if (entered <= 0f) {
             return;                       // 还没轮到它入场
         }
         boolean hi = i == highlight;
-        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
+        boolean passing = passAt > 0L && now >= passAt;
+        // ❗「抬」要一直保持到「传」真的开始：替你选的那一路，「传」的起点是「顿」播完的那一刻（一个将来的时刻）。
+        //   第一版写成 passAt == 0 —— 服务端那一包一到 passAt 就有值了，抬起的 9 个单位在「顿」的同时落回去，
+        //   正好把「顿」往上那一下抵掉（snap_test 量到超时那一路抬起 0.0 px，2026-09-25）。
+        lift[i] = GuiLanguage.approach(lift[i], hi && !passing ? GuiLanguage.LIFT_PX : 0f, dt);
 
         int depth = hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight));
-        CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(), depth);
+        CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardTop(i) + l.h(), l.w(), l.h(), depth);
 
-        context.getMatrices().push();
         // 入场：从下方抬起 + 轻微放大。全部走矩阵，不碰布局。
         float rise = (1f - entered) * GuiLanguage.DEAL_RISE;
         float scale = GuiLanguage.dealScale(entered);
@@ -279,19 +362,72 @@ public final class ProvisionScreen extends GameScreen {
             rise += GuiLanguage.snapRise(snapP);
             scale *= GuiLanguage.snapScale(snapP);
         }
-        context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
+        float cx = pose.cx();
+        float bottom = pose.bottom() - lift[i] * (1f - gathered) + rise;
+        if (passing) {
+            // 「传」（O21）：留下的那张沿弧线「飞」进你的座位，其余「滑」到下一位 —— 都缩到头像那么大。
+            boolean kept = i == keptIndex;
+            if (kept ? !GuiLanguage.flying(now, passAt) : !GuiLanguage.sliding(now, passAt)) {
+                return;                   // 已经落进座位：这一面上不再有它
+            }
+            float p = kept ? GuiLanguage.fly(now, passAt) : GuiLanguage.slide(now, passAt);
+            float[] spot = seatSpot(b, kept ? data.at() : data.at() + 1, pose.w());
+            float targetScale = spot[2] / Math.max(1f, pose.w());
+            float targetBottom = spot[1] + spot[2] * GuiLanguage.CARD_H / GuiLanguage.CARD_W / 2f;
+            cx += (spot[0] - cx) * p;
+            bottom += (targetBottom - bottom) * p - (kept ? GuiLanguage.flyArc(p) : 0f);
+            scale *= 1f + (targetScale - 1f) * p;
+        }
+
+        context.getMatrices().push();
+        context.getMatrices().translate(cx, bottom, 0);
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
         CardTexture.drawProvision(context, offer.get(i), 0, 0, pose.w(), pose.h());
-        if (hi) {
+        if (hi && !passing) {
             // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
+            // 传走的那一下不带框：它已经不是「你正在选的」，是「你的了」。
             drawCardFrame(context, pose.w(), pose.h());
         }
         context.getMatrices().pop();
     }
 
+    /**
+     * 座位轨上第 {@code index} 格：头像中心的 x、y 与直径（GUI 单位）—— 「传」的落点。
+     *
+     * <p>与 {@link #drawRailBand} 同一套格子算法（{@code railCell} · 居中）。轨被这一档窗口拿掉时
+     * 落到上带正中；没有下一位（你是这条链的最后一个）时滑出舞台右边。
+     */
+    private float[] seatSpot(Bands b, int index, int cardW) {
+        List<String> chain = data.chain();
+        if (index >= chain.size()) {
+            return new float[]{width + cardW, b.stageTop() + b.stageH() / 2f, cardW};
+        }
+        if (chain.isEmpty() || b.railH() == 0) {
+            return new float[]{width / 2f, b.topY(), Math.max(8, cardW / 4f)};
+        }
+        int cell = railCell(chain.size());
+        int left = (width - chain.size() * cell) / 2;
+        float cx = left + index * cell + cell / 2f;
+        int full = b.avatar();
+        if (full <= 0) {
+            return new float[]{cx, b.railY() + textH() / 2f, Math.max(8, cell / 3f)};
+        }
+        int m = GuiMaterial.ringMargin(full);
+        int d = Math.max(1, Math.min(full, cell - 2 * m - 2));
+        return new float[]{cx, b.railY() + m + full / 2f, d};
+    }
+
+    /** 指针落在第几张上（一排或两排）。上边界把「抬」起来的那几像素算进去，与单排那一版同一条。 */
     private int indexAt(int mouseX, int mouseY, Layout l) {
-        return cardIndexAt(mouseX, mouseY, l.left(), l.cardsTop(), l.w(), l.h(), data.offer().size());
+        for (int i = 0; i < data.offer().size(); i++) {
+            int x = l.cardX(i);
+            int top = l.cardTop(i);
+            if (mouseX >= x && mouseX < x + l.w() && mouseY >= top - GuiLanguage.LIFT_PX && mouseY <= top + l.h()) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void setHighlight(int index) {
@@ -308,9 +444,15 @@ public final class ProvisionScreen extends GameScreen {
         }
     }
 
-    /** 「顿」开始之后这一轮就定了 —— 再点再按都不作数，否则会往服务端发一个已经没意义的留牌。 */
+    /** 「顿」开始、或你自己按下去之后，这一轮就定了 —— 再点再按都不作数，否则会往服务端发一个已经没意义的留牌。 */
     private boolean decided() {
-        return snapAt > 0L;
+        return snapAt > 0L || committedIndex >= 0 || passAt > 0L;
+    }
+
+    /** 你自己留这一张。记下是哪一张：服务端认下之后「飞」走的就是它。 */
+    private void commit(int index) {
+        committedIndex = index;
+        send(index, true);
     }
 
     @Override
@@ -321,7 +463,7 @@ public final class ProvisionScreen extends GameScreen {
         if (data != null && !data.offer().isEmpty() && !decided() && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
-                send(i, true);
+                commit(i);
                 return true;
             }
         }
@@ -348,7 +490,7 @@ public final class ProvisionScreen extends GameScreen {
                 return true;
             }
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_SPACE -> {
-                send(highlight, true);
+                commit(highlight);
                 return true;
             }
             default -> {

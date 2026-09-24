@@ -147,8 +147,14 @@ public abstract class GameScreen extends Screen {
     protected static final int BORDER_ROOM = CARD_FRAME + 4;
     /** 窗口小到离谱时卡也不能缩没了 —— 缩没了与「没有牌」长得一样。 */
     protected static final int MIN_CARD_H = 24;
-    /** 卡最高占屏幕高的这个比例：再高就把上下带挤没了。可调（ADR-0018 §8 右列），但只此一处。 */
-    protected static final float MAX_CARD_H_RATIO = 0.5f;
+    /**
+     * 卡最高占屏幕高的这个比例。可调（ADR-0018 §8 右列），但只此一处。
+     *
+     * <p>2026-09-25 从 0.5 提到 0.75：原先的理由是「再高就把上下带挤没了」，而第四刀之后带位只由窗口算（§7.11），
+     * 牌再大也挤不动带 —— 舞台的高度本身就是上限。界面尺寸 1 时舞台占窗口约七成，0.5 这条于是把牌卡在
+     * 舞台的三分之二，上下各空一截（O32 记的「舞台空了一大半」，总纲 §7.8：舞台先给牌）。
+     */
+    protected static final float MAX_CARD_H_RATIO = 0.75f;
 
     /** 按钮的内边距与两侧留白。按钮长什么样也是「必须一致」的那一类，所以同样放在这里。 */
     protected static final int BTN_PAD_X = 10;
@@ -190,6 +196,18 @@ public abstract class GameScreen extends Screen {
             announced = true;
             LOGGER.info("界面：打开 {}", getClass().getSimpleName());
         }
+    }
+
+    /**
+     * 收起时也打一行，与「界面：打开 X」成对。
+     *
+     * <p>GUI 回归要知道「拍的那一刻这一面还开着没有」：会自己超时收起的面（口渴 · 替人打水 · 舵手……）
+     * 拍到一半没了，截图里就是世界 —— 只看「打开」那一行，分不出「拍到了」与「拍晚了」（2026-09-25 实拍）。
+     */
+    @Override
+    public void removed() {
+        super.removed();
+        LOGGER.info("界面：收起 {}", getClass().getSimpleName());
     }
 
     /** 当前世界的对局投影；没有世界时是 {@link HudView#IDLE}。 */
@@ -307,8 +325,13 @@ public abstract class GameScreen extends Screen {
      * @param availH 竖着剩给这一排卡的高度（调用方已经减掉上下各行与留空）
      */
     protected int cardHeightFor(int n, int availH) {
+        return cardHeightFor(n, availH, width - 2 * SIDE);
+    }
+
+    /** 同上，但这一排横着只有 {@code availW} 宽（舞台里另有一块被别的东西占了，比如手牌一面的爱恨两张）。 */
+    protected int cardHeightFor(int n, int availH, int availW) {
         int count = Math.max(1, n);
-        int byWidth = GuiLanguage.cardHeight((width - 2 * SIDE - (count - 1) * CARD_GAP) / count);
+        int byWidth = GuiLanguage.cardHeight((availW - (count - 1) * CARD_GAP) / count);
         int cap = Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO));
         return Math.max(MIN_CARD_H, Math.min(Math.min(availH, byWidth), cap));
     }
@@ -1113,16 +1136,25 @@ public abstract class GameScreen extends Screen {
      * 签子会压住它（2026-09-23 实拍）。那一行是热信息，不该被查看态盖掉。
      */
     protected Inspect inspect(Bands b, int stageTop) {
-        int room = Math.max(0, b.stageBottom() - stageTop);
+        // ❗上下先让出金框（卡外 CARD_FRAME）与一叠牌往下错开的那几层：原先整个舞台高都给了堆顶那张，
+        //   金框与压在底下的几张于是盖住了舞台的下沿线（2026-09-25 四面补拍，手牌一面的查看态 band_check 红）。
+        int padTop = CARD_FRAME + 1;
+        int padBottom = CARD_FRAME + (int) Math.ceil(STACK_MAX_DEPTH * STACK_STEP_Y) + 1;
+        int room = Math.max(0, b.stageBottom() - stageTop - padTop - padBottom);
         int h = Math.min(room, Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO)));
         int w = GuiLanguage.cardWidth(h);
         int stage = width - 2 * SIDE;
         int plateW = Math.max(PLATE_MIN_W, Math.min(Math.round(stage * PLATE_MAX_SHARE), stage - w - PLATE_GAP));
         int total = w + PLATE_GAP + plateW;
         int left = (width - total) / 2;
-        int top = stageTop + Math.max(0, (room - h) / 2);
+        int top = stageTop + padTop + Math.max(0, (room - h) / 2);
         return new Inspect(left, top, w, h, left + w + PLATE_GAP, top, plateW);
     }
+
+    /** 查看态那一叠牌：最多错开几层、每层往右下错开多少（GUI 单位）。 */
+    private static final int STACK_MAX_DEPTH = 6;
+    private static final float STACK_STEP_X = 1.6f;
+    private static final float STACK_STEP_Y = 1.2f;
 
     /**
      * 查看态开着没有。**状态只在这里存一份** —— 六个牌面各存各的，迟早有一面忘了关。
@@ -1182,9 +1214,9 @@ public abstract class GameScreen extends Screen {
      * @param depth 这张在叠里排第几层（被看的那张是 0）；一叠牌要错开一点点，才看得出是一叠而不是一张
      */
     protected CardPose cardPose(Inspect in, float g, float rowCx, float rowBottom, int rowW, int rowH, int depth) {
-        int d = Math.min(Math.max(0, depth), 6);
-        float stackX = in.cardX() + d * 1.6f;
-        float stackBottom = in.cardY() + in.cardH() + d * 1.2f;
+        int d = Math.min(Math.max(0, depth), STACK_MAX_DEPTH);
+        float stackX = in.cardX() + d * STACK_STEP_X;
+        float stackBottom = in.cardY() + in.cardH() + d * STACK_STEP_Y;
         return new CardPose(rowCx + (stackX + in.cardW() / 2f - rowCx) * g,
                 rowBottom + (stackBottom - rowBottom) * g,
                 Math.round(rowW + (in.cardW() - rowW) * g),

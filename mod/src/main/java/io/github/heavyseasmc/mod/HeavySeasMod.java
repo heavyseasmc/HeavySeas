@@ -99,7 +99,7 @@ public final class HeavySeasMod implements ModInitializer {
                     try {
                         var data = GameDataLoader.require();
                         ServerPlayNetworking.send(handler.player,
-                                CatalogS2C.of(data.provisions().all(), data.roster().characters()));
+                                CatalogS2C.of(data.provisions().all(), data.roster().characters(), data.weather()));
                     } catch (RuntimeException e) {
                         LOGGER.warn("牌目录没发出去（提示签上会少「类别 · 共几张」、角标空着）：{}", e.toString());
                     }

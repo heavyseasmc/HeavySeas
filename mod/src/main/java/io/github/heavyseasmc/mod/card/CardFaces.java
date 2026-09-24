@@ -2,6 +2,7 @@ package io.github.heavyseasmc.mod.card;
 
 import io.github.heavyseasmc.engine.model.Provision;
 import io.github.heavyseasmc.engine.model.ProvisionEffect;
+import io.github.heavyseasmc.engine.weather.WeatherEffect;
 import io.github.heavyseasmc.mod.state.NavCardView;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +24,14 @@ public final class CardFaces {
     public static final String ROWERS = "oar";
     public static final String FIGHTERS = "fight";
     public static final String EVERYONE = "everyone";
+    // 天候的效果图示（ADR-0040）。海鸥借航海卡上那一枚（gull_plus 就是一只不带符号的海鸥）。
+    public static final String OVERBOARD = "overboard";
+    public static final String THIRST = "thirst";
+    public static final String WATER = "water";
+    public static final String NAV_CARD = "nav_card";
+    public static final String CRATE = "crate";
+    public static final String RESHUFFLE = "reshuffle";
+    public static final String ARROW = "arrow";
 
     private CardFaces() {
     }
@@ -65,8 +74,52 @@ public final class CardFaces {
 
     // ---------------------------------------------------------------- 天候
 
+    /** 只有牌名与插画的天候牌（效果图示还不知道时 —— 目录没到就是这样，信息带空着，不编）。 */
     public static CardFace weather(String id) {
-        return new CardFace("weather", id, CardFace.Title.of("heavyseas.weather." + id), List.of(), List.of());
+        return weather(id, List.of());
+    }
+
+    /** 天候牌：牌名 · 插画 · 信息带里的效果图示（{@link #weatherGlyph}）。 */
+    public static CardFace weather(String id, List<CardFace.Chip> glyph) {
+        return new CardFace("weather", id, CardFace.Title.of("heavyseas.weather." + id), List.of(), glyph);
+    }
+
+    /**
+     * 一种天候效果画成信息带里的哪一排（ADR-0040 §5 的表）：「因 → 果」，元素只有四种。
+     *
+     * <p>这是<b>呈现</b>的决定，不是规则 —— 与 {@link #provisionBadges} 同一类，所以放在这里而不在引擎。
+     * ❗{@code switch} 不带 {@code default}：加一种效果而忘了画它，编译就过不去。
+     */
+    public static List<CardFace.Chip> weatherGlyph(WeatherEffect effect) {
+        return switch (effect) {
+            case FIGHTERS_OVERBOARD -> List.of(icon(FIGHTERS), arrow(), icon(OVERBOARD));
+            case ROWERS_OVERBOARD -> List.of(icon(ROWERS), arrow(), icon(OVERBOARD));
+            // 两枚水而不是「×2」：乘号不一定在 GUI 字体的子集里，两枚水也不必认字
+            case DOUBLE_WATER -> List.of(icon(THIRST), arrow(), icon(WATER), icon(WATER));
+            case ALL_THIRST -> List.of(icon(EVERYONE), arrow(), icon(THIRST));
+            case IGNORE_THIRST -> List.of(struck(THIRST));
+            case IGNORE_GULLS -> List.of(struck(GULL_PLUS));
+            case SKIP_NAVIGATION -> List.of(struck(NAV_CARD));
+            case EXTRA_NAVIGATION -> List.of(count("+1"), icon(NAV_CARD));
+            case EXTRA_PROVISION -> List.of(count("+1"), icon(CRATE));
+            case RESHUFFLE_DISCARD -> List.of(icon(RESHUFFLE));
+        };
+    }
+
+    private static CardFace.Chip icon(String ref) {
+        return new CardFace.Chip(CardFace.Chip.Type.ICON, ref);
+    }
+
+    private static CardFace.Chip struck(String ref) {
+        return new CardFace.Chip(CardFace.Chip.Type.STRUCK, ref);
+    }
+
+    private static CardFace.Chip arrow() {
+        return new CardFace.Chip(CardFace.Chip.Type.ARROW, "");
+    }
+
+    private static CardFace.Chip count(String text) {
+        return new CardFace.Chip(CardFace.Chip.Type.COUNT, text);
     }
 
     // ---------------------------------------------------------------- 航海

@@ -145,36 +145,36 @@ public final class HandScreen extends GameScreen {
         Inspect ins = inspect(b);
         float gathered = gathered(now);
 
-        // 爱恨那一行只有你看得到（全程保密，规则里也不许亮出来证明自己）；键位那一行紧贴手牌。
-        // 两行都贴舞台底边，且<b>空手时照样让位</b> —— 牌不能因为手上有没有牌就上下跳。
-        int lines = view.love().isEmpty() ? 0 : 1;
-        int linesTop = footerTop(b, lines);
-        int lineY = linesTop;
-        if (!view.love().isEmpty()) {
-            drawLine(context, Text.translatable("heavyseas.hand.affinity",
-                            Text.translatable("heavyseas.character." + view.love()),
-                            Text.translatable("heavyseas.character." + view.hate())),
-                    width / 2, lineY, GuiLanguage.muted());
-            lineY += lineStep();
-        }
-        // 手牌摊在舞台里，一排，吃掉舞台减去那两行之后剩下的全部高度。
+        // 爱恨两张小卡在舞台右头（O25，交互稿里就是两张小卡；原先是一行字「你爱：X · 你恨：Y」）。
+        // 只有你看得到（全程保密，规则里也不许亮出来证明自己）。手牌那一排在剩下的宽度里居中 ——
+        // 小卡占着的那一块<b>空手时照样让位</b>：牌不能因为手上有没有牌就左右跳。
+        boolean affinity = !view.love().isEmpty();
         int room = liftRoom();
-        int avail = linesTop - HINT_GAP - b.stageTop();
-        int cardH = cardHeightFor(Math.max(1, hand.size()), avail - room);
+        int avail = b.stageBottom() - b.stageTop();
+        int fullW = width - 2 * SIDE;
+        int n = Math.max(1, hand.size());
+        int miniH = affinity ? Math.max(MIN_CARD_H, Math.round(cardHeightFor(n, avail - room) * AFFINITY_SHARE)) : 0;
+        int miniW = GuiLanguage.cardWidth(miniH);
+        int blockW = affinity ? 2 * miniW + CARD_GAP : 0;
+        int handW = fullW - (affinity ? blockW + AFFINITY_GAP : 0);
+        int cardH = cardHeightFor(n, avail - room, handW);
         int cardW = GuiLanguage.cardWidth(cardH);
-        int handTop = cardsTopIn(b.stageTop(), linesTop - HINT_GAP, cardH, room);
+        int handTop = cardsTopIn(b.stageTop(), b.stageBottom(), cardH, room);
+        if (affinity && gathered < 1f) {
+            drawAffinity(context, width - SIDE - blockW, handTop + cardH - miniH, miniW, miniH, 1f - gathered);
+        }
 
         if (hand.isEmpty()) {
-            // 空手也留出牌的位置：下面那两行不能因为手上没牌就跳到别处去。
+            // 空手也留出牌的位置：小卡不能因为手上没牌就挪到别处去。
             // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按绑定键进来的人，要的是「一张都没有」。
             boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
             drawLine(context, Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
-                    width / 2, handTop + (cardH - textH()) / 2, GuiLanguage.dim());
+                    SIDE + handW / 2, handTop + (cardH - textH()) / 2, GuiLanguage.dim());
             return;
         }
 
-        int step = step(hand.size(), cardW);
-        int left = (width - ((hand.size() - 1) * step + cardW)) / 2;
+        int step = step(hand.size(), cardW, handW);
+        int left = SIDE + (handW - ((hand.size() - 1) * step + cardW)) / 2;
 
         // 鼠标真的动了才换选中（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
@@ -212,14 +212,39 @@ public final class HandScreen extends GameScreen {
      * 右边几张会落到屏幕外面 —— 而画到屏幕外与没画长得一模一样，
      * 玩家只会觉得「我的牌少了几张」。挤到看不清仍然够得着，落在屏幕外就够不着了。
      */
-    private int step(int count, int cardW) {
+    private int step(int count, int cardW, int rowW) {
         int loose = cardW + HAND_GAP;
         if (count <= 1) {
             return loose;
         }
-        // 900 是 GUI 单位的上限：界面尺寸设成 1 时一行只用得上屏幕中间一截，改成随宽度放开。
-        int avail = Math.min(width - 32, Math.max(900, Math.round(width * 0.8f)));
-        return Math.max(1, Math.min(loose, (avail - cardW) / (count - 1)));
+        // 这一排最宽就是爱恨小卡左边那一段（rowW）：叠得再紧也不许压到小卡上。
+        return Math.max(1, Math.min(loose, (rowW - cardW) / (count - 1)));
+    }
+
+    /** 爱恨小卡是手牌的几成高：小到一眼看得出「不是手牌」，大到认得出是谁。 */
+    private static final float AFFINITY_SHARE = 0.6f;
+    /** 手牌那一排与小卡之间。比牌间距宽，读得出是两件事。 */
+    private static final int AFFINITY_GAP = 18;
+
+    /**
+     * 爱恨两张小卡：角色卡 + 上面一个字（爱 · 恨）。字用语义色：爱是铜绿（安全），恨是朱砂（伤害）。
+     *
+     * @param alpha 进查看态时淡出 —— 右边那块要让给说明签
+     */
+    private void drawAffinity(DrawContext context, int x, int y, int w, int h, float alpha) {
+        String[] who = {view.love(), view.hate()};
+        String[] label = {"heavyseas.hand.love", "heavyseas.hand.hate"};
+        int[] color = {GuiLanguage.verdigris(), GuiLanguage.cinnabar()};
+        for (int i = 0; i < 2; i++) {
+            int cx = x + i * (w + CARD_GAP);
+            context.setShaderColor(1f, 1f, 1f, alpha);
+            CardTexture.drawCharacter(context, who[i], cx, y, w, h);
+            context.setShaderColor(1f, 1f, 1f, 1f);
+            if (alpha > 0.05f) {                  // 几乎全透明的字，排字器会当成不透明画出来 —— 淡到这里就不画
+                drawLineIn(context, Text.translatable(label[i]), cx, y - lineStep(), w,
+                        withAlpha(color[i], Math.round(alpha * 255)));
+            }
+        }
     }
 
     private void drawHandCard(DrawContext context, long now, List<String> hand, int i,

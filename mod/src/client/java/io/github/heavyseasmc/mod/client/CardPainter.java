@@ -91,7 +91,7 @@ final class CardPainter {
 
         float badgeLeft = drawBadges(context, s.badges(), face.badges(), tier, x, y, fx, fy, textScale);
         drawTitle(context, s.title(), face.title(), tier, x, y, fx, fy, badgeLeft, textScale);
-        drawRoll(context, lay, face, tier, x, y, fx, fy);
+        drawRoll(context, lay, face, tier, x, y, fx, fy, textScale);
     }
 
     // ---------------------------------------------------------------- 牌名
@@ -168,10 +168,13 @@ final class CardPainter {
         return (float) left;
     }
 
-    // ---------------------------------------------------------------- 口渴排
+    // ---------------------------------------------------------------- 信息带（口渴排 · 效果图示）
+
+    /** 数字在圆盘里占多高（与图示的线稿同一档分量）。 */
+    private static final float COUNT_IN_DISC = 0.46f;
 
     private static void drawRoll(DrawContext context, CardLayout lay, CardFace face, String tier,
-                                 int x, int y, float fx, float fy) {
+                                 int x, int y, float fx, float fy, int textScale) {
         List<CardLayout.Slot> slots = lay.chips(face.kind(), tier, face.roll().size());
         for (int i = 0; i < slots.size(); i++) {
             CardLayout.Slot sl = slots.get(i);
@@ -191,17 +194,38 @@ final class CardPainter {
                     blit(context, icon("chip_ring"), cx, cy, d, d);
                     blit(context, icon("strike"), cx, cy, d, d);
                 }
-                case ICON -> {
-                    if (chip.ref().equals(io.github.heavyseasmc.mod.card.CardFaces.EVERYONE)) {
-                        blit(context, icon(chip.ref()), cx, cy, d, d);   // 自带底盘
-                    } else {
-                        blit(context, icon("chip_disc"), cx, cy, d, d);
-                        int is = Math.round(d * ICON_IN_DISC);
-                        blit(context, icon(chip.ref()), cx + (d - is) / 2, cy + (d - is) / 2, is, is);
-                    }
+                case ICON -> drawIconChip(context, chip.ref(), cx, cy, d);
+                case STRUCK -> {
+                    // 划掉 = 这一回合不算 / 没有（ADR-0040）：与「除他之外」同一道朱砂斜线
+                    drawIconChip(context, chip.ref(), cx, cy, d);
+                    blit(context, icon("strike"), cx, cy, d, d);
+                }
+                case ARROW -> {
+                    // 箭头 = 变成。没有圆盘：它是两枚图示之间的连接，不是第三件东西
+                    int is = Math.round(d * ICON_IN_DISC);
+                    blit(context, icon(io.github.heavyseasmc.mod.card.CardFaces.ARROW),
+                            cx + (d - is) / 2, cy + (d - is) / 2, is, is);
+                }
+                case COUNT -> {
+                    // 数字（+1）：与角标同一套排字，写的是符号不是话，与语言无关
+                    blit(context, icon("chip_disc"), cx, cy, d, d);
+                    int size = Math.max(1, Math.round(d * COUNT_IN_DISC));
+                    GuiText.draw(context, chip.ref(), cx, cy + Math.round((d - size * 1.25f) / 2f), d, size, true,
+                            GuiLanguage.CARD_INK, GuiText.Align.CENTER, 1, false, textScale <= 0, textScale);
                 }
             }
         }
+    }
+
+    /** 一枚图示：纸色圆盘 + 线稿。「全员」那一枚自带底盘。 */
+    private static void drawIconChip(DrawContext context, String ref, int cx, int cy, int d) {
+        if (ref.equals(io.github.heavyseasmc.mod.card.CardFaces.EVERYONE)) {
+            blit(context, icon(ref), cx, cy, d, d);
+            return;
+        }
+        blit(context, icon("chip_disc"), cx, cy, d, d);
+        int is = Math.round(d * ICON_IN_DISC);
+        blit(context, icon(ref), cx + (d - is) / 2, cy + (d - is) / 2, is, is);
     }
 
     // ---------------------------------------------------------------- 取贴图

@@ -10,6 +10,7 @@ import io.github.heavyseasmc.engine.data.RosterLoader;
 import io.github.heavyseasmc.engine.data.WeatherLoader;
 import io.github.heavyseasmc.engine.model.Provision;
 import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.weather.WeatherEffect;
 import io.github.heavyseasmc.mod.state.NavCardView;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -90,8 +91,9 @@ class CardFaceGateTest {
                         checked++;
                         double px = slot.d() * narrow / s.masterW();
                         if (px + 1e-9 < roll.minPx()) {
-                            out.add(String.format("%s · %s · 口渴排 %s：牌宽 %.0f px 时头像只有 %.1f px（要 %d）",
-                                    kind, tier, face.id(), narrow, px, roll.minPx()));
+                            // 信息带在航海卡上叫口渴排、在天候卡上叫效果图示（ADR-0040）—— 报错点名它在这种牌上的名字
+                            out.add(String.format("%s · %s · %s %s：牌宽 %.0f px 时一枚只有 %.1f px（要 %d）",
+                                    kind, tier, layout.kind(kind).label(), face.id(), narrow, px, roll.minPx()));
                             break;
                         }
                     }
@@ -127,6 +129,31 @@ class CardFaceGateTest {
         return out;
     }
 
+    /**
+     * 判据 ③（ADR-0040）：每一种天候效果都画成了一排图示，而且两两不同。返回问题；空 = 通过。
+     *
+     * <p>❗对<b>枚举全集</b>查，不只对数据里出现的那十张：数据包换了、某种效果第一次出现时，
+     * 它的图示不该是第一次被人看见。{@code glyph} 作参数，红测才能换进一张坏的映射。
+     */
+    static List<String> glyphProblems(java.util.function.Function<WeatherEffect, List<CardFace.Chip>> glyph) {
+        List<String> out = new ArrayList<>();
+        Map<List<CardFace.Chip>, List<String>> seen = new LinkedHashMap<>();
+        for (WeatherEffect effect : WeatherEffect.values()) {
+            List<CardFace.Chip> chips = glyph.apply(effect);
+            if (chips.isEmpty()) {
+                out.add(effect.id() + " 没有图示 —— 信息带会空着");
+                continue;
+            }
+            seen.computeIfAbsent(chips, k -> new ArrayList<>()).add(effect.id());
+        }
+        seen.values().stream().filter(ids -> ids.size() > 1)
+                .forEach(ids -> out.add("图示分不开：" + String.join(" / ", ids)));
+        if (seen.isEmpty() && out.isEmpty()) {
+            out.add("一种效果都没查 —— 判据坏了，不是都分得开");
+        }
+        return out;
+    }
+
     // ---------------------------------------------------------------- 真数据
 
     @Test
@@ -145,6 +172,13 @@ class CardFaceGateTest {
         MIN_CARDS.forEach((kind, min) -> assertTrue(perKind.getOrDefault(kind, 0) >= min,
                 kind + " 只拼出 " + perKind.getOrDefault(kind, 0) + " 张 —— 没在查，不是都分得开"));
         List<String> problems = duplicateProblems(layout(), faces, artPrints(faces));
+        assertEquals(List.of(), problems, String.join("\n", problems));
+    }
+
+    @Test
+    @DisplayName("③ 每一种天候效果都画成了一排图示，而且两两分得开（ADR-0040）")
+    void everyWeatherEffectHasItsOwnGlyph() {
+        List<String> problems = glyphProblems(CardFaces::weatherGlyph);
         assertEquals(List.of(), problems, String.join("\n", problems));
     }
 
@@ -206,6 +240,27 @@ class CardFaceGateTest {
         assertTrue(!duplicateProblems(broken, faces, artPrints(faces)).isEmpty(), "按像素算时必须分不开");
     }
 
+    @Test
+    @DisplayName("红测 ①：天候卡 L2 的信息带砍到 60 高 → 必须只红在「weather · l2 · 效果图示」")
+    void redTestWeatherBandTooSmall() throws IOException {
+        CardLayout broken = layoutWith("\"l2\": {\"top\": 216, \"bottom\": 286, \"left\": 36, \"right\": 384, \"dmax\": 70",
+                "\"l2\": {\"top\": 216, \"bottom\": 276, \"left\": 36, \"right\": 384, \"dmax\": 60");
+        List<String> problems = sizeProblems(broken, faces());
+        assertTrue(!problems.isEmpty(), "效果图示缩小了，判据却说都够大");
+        assertTrue(problems.stream().allMatch(p -> p.startsWith("weather · l2 · 效果图示")),
+                "红了，但红在别处：\n" + String.join("\n", problems));
+    }
+
+    @Test
+    @DisplayName("红测 ③：浓雾画成与雨天同一排 → 必须点名这两种；某种效果没有图示 → 必须点名它")
+    void redTestGlyphCollision() {
+        List<String> same = glyphProblems(e -> CardFaces.weatherGlyph(
+                e == WeatherEffect.IGNORE_GULLS ? WeatherEffect.IGNORE_THIRST : e));
+        assertEquals(List.of("图示分不开：ignore_gulls / ignore_thirst"), same, "该只点名浓雾与雨天：" + same);
+        List<String> empty = glyphProblems(e -> e == WeatherEffect.RESHUFFLE_DISCARD ? List.of() : CardFaces.weatherGlyph(e));
+        assertEquals(List.of("reshuffle_discard 没有图示 —— 信息带会空着"), empty, "该只点名晴空：" + empty);
+    }
+
     // ---------------------------------------------------------------- 取数
 
     private static CardLayout layout() throws IOException {
@@ -231,7 +286,7 @@ class CardFaceGateTest {
             out.add(CardFaces.character(s.id().value(), CardFaces.characterBadges(s.size(), s.survival())));
         }
         WeatherLoader.load(DATA.resolve("weather").resolve("default.json"))
-                .forEach(w -> out.add(CardFaces.weather(w.id())));
+                .forEach(w -> out.add(CardFaces.weather(w.id(), CardFaces.weatherGlyph(w.effect()))));
         NavigationLoader.load(DATA.resolve("navigation").resolve("default.json"), roster.ids(),
                         ProvisionLoader.loadIds(provPath))
                 .forEach(card -> out.add(CardFaces.nav(NavCardView.of(card))));

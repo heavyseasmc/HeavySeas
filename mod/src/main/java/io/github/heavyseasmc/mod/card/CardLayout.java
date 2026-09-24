@@ -66,15 +66,26 @@ public record CardLayout(List<String> tiers, Map<String, Shape> shapes, Map<Stri
                         Title title, Badges badges, Footer footer) {
     }
 
-    /** 口渴排的一条带：头像按「让头像最大」在 1..{@code maxRows} 行里挑。 */
+    /** 信息带的一条带：圆盘按「让圆盘最大」在 1..{@code maxRows} 行里挑。 */
     public record Band(int top, int bottom, int left, int right, int dmax, int gap, int maxRows) {
     }
 
+    /**
+     * 信息带：插画窗下面那一排圆盘。一张牌至多一条，排法与画法共用 ——
+     * 航海卡上它是口渴排（版面描述里的 {@code roll}），天候卡上它是效果图示（{@code effect}，ADR-0040）。
+     */
     public record Roll(Map<String, Band> band, Set<String> tiers, int minPx) {
     }
 
-    public record Kind(String shape, Roll roll) {
+    /**
+     * @param roll  这种牌的信息带；没有就是 {@code null}
+     * @param label 它在这种牌上叫什么（闸门报错时点名用）
+     */
+    public record Kind(String shape, Roll roll, String label) {
     }
+
+    /** 版面描述里信息带可能叫的名字 → 它在报错里叫什么。一种牌只许有其中一个。 */
+    private static final Map<String, String> ROW_KEYS = Map.of("roll", "口渴排", "effect", "效果图示");
 
     // ---------------------------------------------------------------- 读
 
@@ -111,8 +122,14 @@ public record CardLayout(List<String> tiers, Map<String, Shape> shapes, Map<Stri
         for (Map.Entry<String, JsonElement> e : root.getAsJsonObject("kinds").entrySet()) {
             JsonObject k = e.getValue().getAsJsonObject();
             Roll roll = null;
-            if (k.has("roll")) {
-                JsonObject r = k.getAsJsonObject("roll");
+            String label = null;
+            List<String> rows = ROW_KEYS.keySet().stream().filter(k::has).sorted().toList();
+            if (rows.size() > 1) {
+                throw new IllegalArgumentException(e.getKey() + " 同时有 " + rows + " —— 一种牌至多一条信息带");
+            }
+            if (!rows.isEmpty()) {
+                label = ROW_KEYS.get(rows.get(0));
+                JsonObject r = k.getAsJsonObject(rows.get(0));
                 Map<String, Band> bands = new LinkedHashMap<>();
                 for (Map.Entry<String, JsonElement> be : r.getAsJsonObject("band").entrySet()) {
                     JsonObject o = be.getValue().getAsJsonObject();
@@ -122,7 +139,7 @@ public record CardLayout(List<String> tiers, Map<String, Shape> shapes, Map<Stri
                 }
                 roll = new Roll(Map.copyOf(bands), set(r, "tiers"), r.get("min_px").getAsInt());
             }
-            kinds.put(e.getKey(), new Kind(k.get("shape").getAsString(), roll));
+            kinds.put(e.getKey(), new Kind(k.get("shape").getAsString(), roll, label));
         }
         return new CardLayout(tiers, shapes, kinds);
     }

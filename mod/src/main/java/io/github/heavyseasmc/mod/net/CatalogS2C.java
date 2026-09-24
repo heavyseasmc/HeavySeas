@@ -2,6 +2,7 @@ package io.github.heavyseasmc.mod.net;
 
 import io.github.heavyseasmc.engine.model.Provision;
 import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.weather.WeatherCard;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.card.CardFace;
 import io.github.heavyseasmc.mod.card.CardFaces;
@@ -23,10 +24,40 @@ import net.minecraft.util.Identifier;
  * <p>❗不从客户端那边猜：把数写死在客户端等于把数据包的规则抄了一份，
  * 换数据包时两边就分家了 —— 而分家之后屏幕上照样有数字，只是错的。
  *
- * <p>范围：物资与角色。航海卡的内容随划船 / 舵手两面的 {@code NavCardView} 下发，不走这里；
- * 天候卡的牌面上没有数。
+ * <p>范围：物资 · 角色 · 天候。航海卡的内容随划船 / 舵手两面的 {@code NavCardView} 下发，不走这里；
+ * 天候卡带的是信息带里那一排效果图示（ADR-0040）—— 哪张天候是什么效果也是数据包定的。
  */
-public record CatalogS2C(List<Provisions> provisions, List<Characters> characters) implements CustomPayload {
+public record CatalogS2C(List<Provisions> provisions, List<Characters> characters, List<Weathers> weathers)
+        implements CustomPayload {
+
+    /** 信息带里一枚：类型（{@link CardFace.Chip.Type} 的名字）+ 引用。按名字传，不按序号 —— 枚举加一种时旧序号会错位。 */
+    public record Chip(String type, String ref) {
+        public static final PacketCodec<ByteBuf, Chip> CODEC = PacketCodec.tuple(
+                PacketCodecs.STRING, Chip::type,
+                PacketCodecs.STRING, Chip::ref,
+                Chip::new);
+
+        static Chip of(CardFace.Chip c) {
+            return new Chip(c.type().name(), c.ref());
+        }
+
+        /** 认不出的类型当场抛：画成别的东西比不画更糟。 */
+        public CardFace.Chip face() {
+            return new CardFace.Chip(CardFace.Chip.Type.valueOf(type), ref);
+        }
+    }
+
+    /** 一张天候牌的目录条目：信息带里那一排效果图示。 */
+    public record Weathers(String id, List<Chip> glyph) {
+        public static final PacketCodec<ByteBuf, Weathers> CODEC = PacketCodec.tuple(
+                PacketCodecs.STRING, Weathers::id,
+                Chip.CODEC.collect(PacketCodecs.toList(8)), Weathers::glyph,
+                Weathers::new);
+
+        public Weathers {
+            glyph = List.copyOf(glyph);
+        }
+    }
 
     /** 一枚角标：图标名 + 印的字。 */
     public record Badge(String icon, String text) {
@@ -74,15 +105,17 @@ public record CatalogS2C(List<Provisions> provisions, List<Characters> character
     public static final PacketCodec<RegistryByteBuf, CatalogS2C> CODEC = PacketCodec.tuple(
             Provisions.CODEC.collect(PacketCodecs.toList(64)), CatalogS2C::provisions,
             Characters.CODEC.collect(PacketCodecs.toList(32)), CatalogS2C::characters,
+            Weathers.CODEC.collect(PacketCodecs.toList(64)), CatalogS2C::weathers,
             CatalogS2C::new);
 
     public CatalogS2C {
         provisions = List.copyOf(provisions);
         characters = List.copyOf(characters);
+        weathers = List.copyOf(weathers);
     }
 
     /** 从正式数据构造。类别名用小写的枚举名 —— 客户端拿它拼 {@code heavyseas.category.<类别>}。 */
-    public static CatalogS2C of(List<Provision> cards, List<Survivor> roster) {
+    public static CatalogS2C of(List<Provision> cards, List<Survivor> roster, List<WeatherCard> weather) {
         return new CatalogS2C(
                 cards.stream()
                         .map(card -> new Provisions(card.id(),
@@ -92,6 +125,10 @@ public record CatalogS2C(List<Provisions> provisions, List<Characters> character
                 roster.stream()
                         .map(s -> new Characters(s.id().value(),
                                 CardFaces.characterBadges(s.size(), s.survival()).stream().map(Badge::of).toList()))
+                        .toList(),
+                weather.stream()
+                        .map(w -> new Weathers(w.id(),
+                                CardFaces.weatherGlyph(w.effect()).stream().map(Chip::of).toList()))
                         .toList());
     }
 

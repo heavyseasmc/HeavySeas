@@ -60,7 +60,18 @@
   "kinds": {
     "provision": {"shape": "portrait"},
     "character": {"shape": "portrait"},
-    "weather": {"shape": "landscape"},
+    "weather": {
+      "shape": "landscape",
+      "_effect": "信息带（ADR-0040）：与航海卡的 roll 是同一种槽位，只是装的是效果图示。L2 没有底栏，带往下长、上沿不动。",
+      "effect": {
+        "band": {
+          "l0": {"top": 219, "bottom": 269, "left": 36, "right": 384, "dmax": 50, "gap": 8, "max_rows": 1},
+          "l1": {"top": 219, "bottom": 269, "left": 36, "right": 384, "dmax": 50, "gap": 8, "max_rows": 1},
+          "l2": {"top": 216, "bottom": 286, "left": 36, "right": 384, "dmax": 70, "gap": 8, "max_rows": 1}
+        },
+        "tiers": ["l0", "l1", "l2"], "min_px": 14
+      }
+    },
     "nav": {
       "shape": "portrait",
       "roll": {

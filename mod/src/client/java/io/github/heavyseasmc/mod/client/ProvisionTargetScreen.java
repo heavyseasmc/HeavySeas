@@ -17,6 +17,8 @@ import java.util.List;
 public final class ProvisionTargetScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+    /** 目标最多排几列（放不下时 {@link GameScreen#layoutButtonGrid} 自己减）。八个人全伤时两行排完。 */
+    private static final int TARGET_COLUMNS = 4;
 
     private HudView view;
     private int focus;
@@ -62,15 +64,21 @@ public final class ProvisionTargetScreen extends GameScreen {
 
         List<Text> labels = new ArrayList<>();
         for (HudView.MedicalTarget target : view.provisionTargets()) {
-            labels.add(Text.translatable("heavyseas.target.entry", nameOf(target.id()),
-                    target.health(), target.maxHealth(), conditionName(target.condition())));
+            // 清醒的人只写体力；昏迷才多写一截 —— 「清醒」写在每一格上是废话，还把一排撑到放不下
+            labels.add(target.condition() == io.github.heavyseasmc.engine.state.Condition.CONSCIOUS
+                    ? Text.translatable("heavyseas.target.entry", nameOf(target.id()),
+                            target.health(), target.maxHealth())
+                    : Text.translatable("heavyseas.target.entry_down", nameOf(target.id()),
+                            target.health(), target.maxHealth(), conditionName(target.condition())));
         }
-        // 说明一行贴舞台底边；按钮在两行题头与它之间居中。
+        // 按钮排成一片（一行放不下就折成几列），在题头与舞台底边之间居中。
+        // ❗2026-09-25 第一次实拍（四面补拍）：原先排成一行、放不下就一行一个 —— 四个人受伤时竖着叠四个，
+        //   最后一个压过舞台的下沿线，落进倒计时那一栏。
         int bottom = b.stageBottom();
         int regionTop = titleY + lineStep() + BTN_GAP + buttonLiftRoom();
-        int blockH = labels.isEmpty() ? textH() : rowHeight(layoutButtonRow(labels, 0, BTN_GAP));
+        int blockH = labels.isEmpty() ? textH() : rowHeight(layoutButtonGrid(labels, 0, BTN_GAP, TARGET_COLUMNS));
         int buttonsTop = regionTop + Math.max(0, (bottom - regionTop - blockH) / 2);
-        boxes = layoutButtonRow(labels, buttonsTop, BTN_GAP);
+        boxes = layoutButtonGrid(labels, buttonsTop, BTN_GAP, TARGET_COLUMNS);
         if (labels.isEmpty()) {
             drawLine(context, Text.translatable("heavyseas.command.nobody_wounded"),
                     width / 2, buttonsTop, GuiLanguage.muted());

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>怒海狂涛 · 图标 · crate</title>
+  <g fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="10" y="18" width="44" height="34" rx="2"/>
+    <path d="M10 18 L16 10 L48 10 L54 18"/>
+    <path d="M10 29 L54 29 M10 41 L54 41" stroke-width="2.4" opacity="0.6"/>
+    <path d="M14 50 L50 20" stroke-width="2.6"/>
+  </g>
+</svg>

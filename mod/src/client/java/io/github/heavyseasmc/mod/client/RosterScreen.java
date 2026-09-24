@@ -35,11 +35,11 @@ public final class RosterScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    /**
-     * 八个角色排四列（两行）。{@link GameScreen#layoutButtonGrid} 在一行放不下四个时会自己减到三列、两列，
-     * 所以这里给的是上限。❗第一版写的两列：1280×720 实拍，八行加预设一排之后，「敲铃开航 / 取消」那一排掉到窗口外面。
-     */
-    private static final int COLUMNS = 4;
+    /** 头像章的直径上下限（GUI 单位）：小于下限只剩一团色，大于上限就把预设那一排挤出舞台。 */
+    private static final int AVATAR_MIN = 18;
+    private static final int AVATAR_MAX = 44;
+    /** 按钮自带的那道阴影往下多出的一截，外加一点余量：量高度时一起算进去。 */
+    private static final int AVATAR_SPARE = 4;
     private static final int[] PRESETS = {6, 7, 8};
 
     private final RosterConfigS2C config;
@@ -82,34 +82,44 @@ public final class RosterScreen extends GameScreen {
         // 还没入座，所以上带写标题、座位轨那一条带写人数。
         Bands b = drawChrome(context, projection());
 
-        // 三片按钮自上而下：角色格 · 预设 · 开航与取消。每片顶上都留出「抬」的高度。
-        List<Text> characterLabels = new ArrayList<>();
-        for (String id : config.characters()) {
-            characterLabels.add(label(id));
-        }
+        // 两排自上而下：八枚头像章（与座位轨同一个画法）· 预设与开航 / 取消。
+        // ❗2026-09-25 第一次实拍（四面补拍）：原先是三片**文字按钮**（角色两行 · 预设 · 开航与取消），
+        //   1280×720 装不下时整片往上挪进座位轨那一条带，两道通栏线从按钮中间穿过去；
+        //   854×480 并成两片之后最后一排仍压着下沿线。角色是「人」，不是表单项 —— 换成与座位轨同一种头像章，
+        //   一排放得下八个，舞台才装得下。带位是只由窗口算的（§7.11），这一面不许越过它。
         List<Text> presetLabels = new ArrayList<>();
         for (int players : PRESETS) {
             presetLabels.add(Text.translatable("heavyseas.roster.preset", players));
         }
-        // 先量这三片一共多高，再决定从哪一行起排 —— 装不下就往上挪进座位轨那一条带
-        // （这一面还没有座位，那条带上只有一行字）。❗反过来（先定起点再往下堆）第三片会掉出舞台，
-        // 而掉出去与没画长得一样：§7.7 那次是按钮盖住说明行，这次会是「开航」按钮根本看不见。
-        int lead = BTN_GAP + buttonLiftRoom();
-        int total = rowHeight(layoutButtonGrid(characterLabels, 0, BTN_GAP, COLUMNS))
-                + lead + rowHeight(layoutButtonRow(presetLabels, 0, BTN_GAP))
-                + lead + buttonHeight();
-        int floor = b.railY() + lineStep() + buttonLiftRoom();
-        int gridTop = Math.max(floor, Math.min(b.stageTop() + buttonLiftRoom(), b.stageBottom() - total));
-        List<Box> grid = layoutButtonGrid(characterLabels, gridTop, BTN_GAP, COLUMNS);
-        int presetsTop = gridTop + rowHeight(grid) + BTN_GAP + buttonLiftRoom();
-        List<Box> presets = layoutButtonRow(presetLabels, presetsTop, BTN_GAP);
         List<Text> actionLabels = List.of(Text.translatable("heavyseas.roster.start"), Text.translatable("gui.cancel"));
-        int actionsTop = presetsTop + rowHeight(presets) + BTN_GAP + buttonLiftRoom();
-        List<Box> actions = layoutButtonRow(actionLabels, actionsTop, BTN_GAP);
+        List<Text> tailLabels = new ArrayList<>(presetLabels);
+        tailLabels.addAll(actionLabels);
 
-        List<Box> all = new ArrayList<>(grid);
-        all.addAll(presets);
-        all.addAll(actions);
+        int n = characterCount();
+        int cell = railCell(Math.max(1, n));
+        int lead = BTN_GAP + buttonLiftRoom();
+        int tailH = rowHeight(layoutButtonRow(tailLabels, 0, BTN_GAP));
+        int room = b.stageH() - buttonLiftRoom();
+        // 头像章多大：先按格子宽（留出圈），再一格一格缩到连圈带名字、加上下面那一排都放得进舞台为止。
+        // ❗第一版只按直径估高，漏了圈往外多出的那一截：854×480 下最后一排按钮的阴影压上了舞台下沿线。
+        int d = Math.min(cell - 12, AVATAR_MAX);
+        while (d > AVATAR_MIN
+                && d + 2 * GuiMaterial.ringMargin(d) + 2 + lineStep() + lead + tailH + AVATAR_SPARE > room) {
+            d--;
+        }
+        int m = GuiMaterial.ringMargin(d);
+        int chipH = d + 2 * m + 2 + lineStep();
+        int total = chipH + lead + tailH;
+        int rowTop = b.stageTop() + buttonLiftRoom() + Math.max(0, (room - total) / 2);
+        int left = (width - n * cell) / 2;
+        List<Box> chips = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            chips.add(new Box(left + i * cell, rowTop, cell, chipH));
+        }
+        List<Box> tail = layoutButtonRow(tailLabels, rowTop + chipH + lead, BTN_GAP);
+
+        List<Box> all = new ArrayList<>(chips);
+        all.addAll(tail);
         boxes = all;
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
@@ -122,14 +132,25 @@ public final class RosterScreen extends GameScreen {
 
         for (int i = 0; i < all.size(); i++) {
             lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
+            if (i < n) {
+                // 勾上 = 头像亮着、圈上一道铜绿（铜绿 = 可选 · 安全）；没勾 = 淡下去（与座位轨上「还没轮到」同一个淡）。
+                // 焦点 = 金圈（金 = 你指着的那个）。原先在名字前加一个「✓」——那个字不在 GUI 字体的子集里，
+                // 实拍只剩一个认不出的小点（2026-09-25，GuiGlyphCoverageTest 从此守着）。
+                String id = config.characters().get(i);
+                boolean on = selected.contains(id);
+                Box box = all.get(i);
+                int y = Math.round(box.y() + m - lift[i]);
+                GuiMaterial.avatar(context, id, box.x() + (cell - d) / 2, y, d,
+                        i == focus ? GuiLanguage.gold() : on ? GuiLanguage.verdigris() : 0, on ? 1f : SEAT_FADED);
+                drawLineIn(context, nameOf(id), box.x() + 2, y + d + m + 2, cell - 4,
+                        i == focus ? GuiLanguage.gold() : on ? GuiLanguage.verdigris() : GuiLanguage.muted());
+                continue;
+            }
             Text text;
             int color;
             int fill = GuiLanguage.ground();
-            if (i < characterCount()) {
-                text = characterLabels.get(i);
-                color = selected.contains(config.characters().get(i)) ? GuiLanguage.verdigris() : GuiLanguage.muted();
-            } else if (i < startIndex()) {
-                text = presetLabels.get(i - characterCount());
+            if (i < startIndex()) {
+                text = presetLabels.get(i - n);
                 color = GuiLanguage.ink();
             } else if (i == startIndex()) {
                 text = actionLabels.get(0);
@@ -175,11 +196,6 @@ public final class RosterScreen extends GameScreen {
             case 8 -> config.preset8();
             default -> List.of();
         };
-    }
-
-    private Text label(String id) {
-        Text name = Text.translatable("heavyseas.character." + id);
-        return selected.contains(id) ? Text.literal("✓ ").append(name) : name;
     }
 
     /** 按下焦点所在的那个按钮。 */
@@ -233,12 +249,12 @@ public final class RosterScreen extends GameScreen {
                 return true;
             }
             case GLFW.GLFW_KEY_UP -> {
-                // 角色格里上下是一列；出了格子就一片一片地退。
-                focus = Math.max(0, focus - (focus < characterCount() ? COLUMNS : 1));
+                // 上下是在两排之间跳：下面那一排回到头像那一排的第一个
+                focus = focus >= characterCount() ? 0 : focus;
                 return true;
             }
             case GLFW.GLFW_KEY_DOWN -> {
-                focus = Math.min(last, focus + (focus + COLUMNS < characterCount() ? COLUMNS : 1));
+                focus = focus < characterCount() ? Math.min(last, characterCount()) : focus;
                 return true;
             }
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_SPACE -> {

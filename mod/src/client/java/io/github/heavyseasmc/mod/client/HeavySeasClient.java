@@ -187,7 +187,8 @@ public final class HeavySeasClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(CatalogS2C.ID, (payload, context) ->
                 context.client().execute(() -> {
                     Catalog.accept(payload);
-                    LOGGER.info("牌目录：收到 {} 种物资、{} 个角色", Catalog.size(), Catalog.characters());
+                    LOGGER.info("牌目录：收到 {} 种物资、{} 个角色、{} 种天候（带效果图示的 {} 种）",
+                            Catalog.size(), Catalog.characters(), Catalog.weathers(), Catalog.weathersWithGlyph());
                 }));
         ClientPlayNetworking.registerGlobalReceiver(RosterConfigS2C.ID, (payload, context) ->
                 context.client().execute(() -> context.client().setScreen(new RosterScreen(payload))));
@@ -499,12 +500,13 @@ public final class HeavySeasClient implements ClientModInitializer {
         if (client.currentScreen instanceof ProvisionScreen screen) {
             if (mine) {
                 screen.apply(payload);
-            } else if (screen.snapping()) {
-                // ❗替你选的那一下还没播完。这里要是照常关掉，界面在「顿」的第一帧就消失了 ——
+            } else if (screen.beginPass() || screen.snapping()) {
+                // 传走了：留下的那张「飞」进你的座位、其余「滑」到下一位（O21），播完再关。
+                // ❗替你选的那一下（「顿」）还没播完时也一样：这里要是照常关掉，界面在「顿」的第一帧就消失了 ——
                 //   和手动点完就关**长得一模一样**，等于这一条又回到 ADR-0018 §6 清单第 4 条的反面。
                 screen.closeAfterSnap();
             } else {
-                client.setScreen(null);      // 传走了就关掉，别让界面挂在那儿
+                client.setScreen(null);      // 没有牌可传（不该发生）：直接关，别让界面挂在那儿
             }
             return;
         }

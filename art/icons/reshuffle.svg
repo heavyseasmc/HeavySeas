@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>怒海狂涛 · 图标 · reshuffle</title>
+  <g fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M50 26 A19 19 0 0 0 15 22"/>
+    <path d="M50 14 L50 26 L38 26"/>
+    <path d="M14 38 A19 19 0 0 0 49 42"/>
+    <path d="M14 50 L14 38 L26 38"/>
+    <rect x="26" y="24" width="12" height="16" rx="1.5" stroke-width="2.4" opacity="0.6"/>
+  </g>
+</svg>
