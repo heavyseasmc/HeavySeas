@@ -101,7 +101,7 @@ public final class ProvisionTargetScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean leftClick(double mouseX, double mouseY) {
         if (!committed) {
             int picked = indexAt(boxes, (int) mouseX, (int) mouseY);
             if (picked >= 0) {
@@ -110,7 +110,7 @@ public final class ProvisionTargetScreen extends GameScreen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override

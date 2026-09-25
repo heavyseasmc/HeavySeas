@@ -123,7 +123,7 @@
   "heavyseas.keys.cancel": "取消",
   "heavyseas.provision.title": "补给箱",
   "heavyseas.provision.water.effect": "化解 1 次口渴，可以给别人。",
-  "heavyseas.provision.medical_kit.effect": "花一次行动治 1 人：回 1 点体力，或唤醒昆迷。",
+  "heavyseas.provision.medical_kit.effect": "花一次行动治 1 人：回 1 点体力，或唤醒昏迷。",
   "heavyseas.provision.bait_bucket.effect": "落海的人每次多挨 1 点，水性与救生圈都挡不住。",
   "heavyseas.provision.ration.effect": "花一次行动，清醒的人各回 1 点体力。要有尸体。",
   "heavyseas.provision.rum.effect": "这一回合体型 +3，回合末口渴一次。",

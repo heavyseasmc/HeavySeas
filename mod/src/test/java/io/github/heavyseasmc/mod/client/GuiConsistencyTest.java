@@ -223,6 +223,58 @@ class GuiConsistencyTest {
      * 不只查「没人自己算」，还查<b>每一面都真的调了</b> {@code drawChrome} ——
      * 只查前者的话，一个干脆什么都不画的界面也能全绿（「0 命中」与「没在扫」输出相同）。
      */
+    /**
+     * 左右键只在 {@code GameScreen} 里分（ADR-0043 §7.0）：各面只写 {@code leftClick} / {@code rightClick}，不许自己覆写 {@code mouseClicked}。
+     *
+     * <p>2026-09-25 核出七面的 {@code mouseClicked} 不看是哪个键 —— 右键在行动 · 站队 · 同意 · 医疗目标 · 阵容 · 替人打水 · 口渴里
+     * 等于左键确认，而用户要「右键 = 详情」。分键收到 {@code GameScreen} 一处、并且 {@code final} 之后，子类覆写在编译期就过不去；
+     * 所以这道判据真正守的是<b>那个 final 还在</b>。去掉 final 的同时有哪一面覆写了，也一并点名。
+     *
+     * <h2>正向对照</h2>
+     * {@code GameScreen} 里那一处必须找得到、而且是 {@code final}；扫到的界面数必须够。
+     */
+    @Test
+    void mouseButtonsAreSplitOnceInGameScreen() throws IOException {
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(CLIENT_DIR)) {
+            files = listing.filter(p -> p.toString().endsWith(".java")).sorted().toList();
+        }
+        assertTrue(files.size() >= MIN_FILES, "只扫到 " + files.size() + " 份客户端源码 —— 没在扫，不是干净");
+
+        Pattern override = Pattern.compile("\\bboolean\\s+mouseClicked\\s*\\(");
+        List<String> problems = new ArrayList<>();
+        int screens = 0;
+        boolean dispatcher = false;
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            String whole = String.join("\n", lines);
+            if (name.equals("GameScreen.java")) {
+                dispatcher = whole.contains("public final boolean mouseClicked(");
+                continue;
+            }
+            if (!whole.contains("extends GameScreen")) {
+                continue;
+            }
+            screens++;
+            for (int i = 0; i < lines.size(); i++) {
+                String code = lines.get(i).strip();
+                if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) {
+                    continue;
+                }
+                if (override.matcher(code).find()) {
+                    problems.add(name + ":" + (i + 1) + "  自己覆写了 mouseClicked：左右键要在 GameScreen 里分，这一面只写 leftClick / rightClick");
+                }
+            }
+        }
+        // 两件事收进同一张清单一次报：先断言 final 的话，去掉 final 的同时有人覆写，那一面永远点不出名。
+        if (!dispatcher) {
+            problems.add(0, "GameScreen.java  那一处分左右键的 mouseClicked 不在了、或者不再是 final —— 各面又能绕过它，右键又能确认");
+        }
+        assertTrue(screens >= 12, "只扫到 " + screens + " 个界面 —— 没在扫，不是干净");
+        assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
     @Test
     void bandsAreComputedOnceInGameScreen() throws IOException {
         List<Path> files;

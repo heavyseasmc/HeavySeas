@@ -239,10 +239,7 @@ public final class RowScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (inspectClick(button)) {
-            return true;
-        }
+    protected boolean leftClick(double mouseX, double mouseY) {
         Layout l = layout;
         if (l != null && focus >= 0 && !inspecting()) {
             int card = cardAt((int) mouseX, (int) mouseY, l);
@@ -257,8 +254,24 @@ public final class RowScreen extends GameScreen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
+
+    /** 右键看点中的那张；已经定了去留的那张不再是焦点的候选（与方向键同一条）。 */
+    @Override
+    protected boolean rightClick(double mouseX, double mouseY) {
+        Layout l = layout;
+        int card = l == null || focus < 0 || inspecting() ? -1 : cardAt((int) mouseX, (int) mouseY, l);
+        if (card >= 0 && fates[card] != Session.RowFate.UNDECIDED) {
+            card = -1;
+        }
+        return inspectClick(card, k -> focus = k);
+    }
+    @Override
+    protected int inspectedIndex() {
+        return focus;
+    }
+
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

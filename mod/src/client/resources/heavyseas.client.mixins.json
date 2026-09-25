@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "BackgroundRendererMixin",
+    "KeyBindingPriorityMixin",
     "LobbyBoatTargetingMixin",
     "NativeImageMixin",
     "TrueTypeFontMixin"

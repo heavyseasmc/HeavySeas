@@ -233,10 +233,7 @@ public final class HelmScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (inspectClick(button)) {
-            return true;
-        }
+    protected boolean leftClick(double mouseX, double mouseY) {
         if (!decided() && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
@@ -245,11 +242,25 @@ public final class HelmScreen extends GameScreen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override
+    protected boolean rightClick(double mouseX, double mouseY) {
+        int i = decided() || inspecting() ? -1 : indexAt((int) mouseX, (int) mouseY, layout(bands()));
+        return inspectClick(i, this::setHighlight);
+    }
+    @Override
+    protected int inspectedIndex() {
+        return highlight;
+    }
+
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (inspectKey(keyCode)) {
+            return true;              // 底栏一直写着「查看」，这一面此前却没接这个键（ADR-0043 §7.0）
+        }
         if (decided()) {
             return super.keyPressed(keyCode, scanCode, modifiers);
         }

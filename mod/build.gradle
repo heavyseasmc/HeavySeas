@@ -770,7 +770,8 @@ def checkMixinRemapped = tasks.register('checkMixinRemapped') {
                 }
                 // 每个 mixin 的目标方法名都列在这里：漏列一个，那个 mixin 翻没翻对这道闸门就看不见。
                 def yarnTargets = ['applyFog', 'getGlyph', 'getProvidedGlyphs', 'makeGlyphBitmapSubpixel',
-                                   'findCrosshairTarget']
+                                   'findCrosshairTarget', 'onKeyPressed', 'setKeyPressed', 'KEY_TO_BINDINGS',
+                                   'timesPressed']
                 def leftover = yarnTargets.findAll { text.contains(it) }
                 if (text.contains('net/minecraft/client/') || !leftover.isEmpty()) {
                     problems << "${entry.name}：残留 yarn 名（net/minecraft/client/… 或 ${leftover}），生产客户端上找不到目标"

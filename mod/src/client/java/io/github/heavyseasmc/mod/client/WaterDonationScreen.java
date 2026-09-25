@@ -96,12 +96,12 @@ public final class WaterDonationScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonCode) {
+    protected boolean leftClick(double mouseX, double mouseY) {
         if (!awaiting && indexAt(List.of(card), (int) mouseX, (int) mouseY) == 0) {
             donate();
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, buttonCode);
+        return false;
     }
 
     @Override

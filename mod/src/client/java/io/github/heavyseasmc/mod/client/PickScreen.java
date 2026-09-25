@@ -194,10 +194,7 @@ public final class PickScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (inspectClick(button)) {
-            return true;
-        }
+    protected boolean leftClick(double mouseX, double mouseY) {
         int count = options(view.contest());
         if (!committed && count > 0 && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands(), count), count);
@@ -207,8 +204,21 @@ public final class PickScreen extends GameScreen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
+
+    @Override
+    protected boolean rightClick(double mouseX, double mouseY) {
+        int count = options(view.contest());
+        int i = committed || count <= 0 || inspecting()
+                ? -1 : indexAt((int) mouseX, (int) mouseY, layout(bands(), count), count);
+        return inspectClick(i, k -> highlight = k);
+    }
+    @Override
+    protected int inspectedIndex() {
+        return highlight;
+    }
+
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

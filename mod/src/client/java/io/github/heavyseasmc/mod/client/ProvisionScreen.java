@@ -456,10 +456,7 @@ public final class ProvisionScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (inspectClick(button)) {
-            return true;
-        }
+    protected boolean leftClick(double mouseX, double mouseY) {
         if (data != null && !data.offer().isEmpty() && !decided() && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
             if (i >= 0) {
@@ -467,8 +464,21 @@ public final class ProvisionScreen extends GameScreen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
+
+    /** 右键看点中的那张。决定之后照样能看，但不再挪高亮（高亮此刻就是你留下的那张）。 */
+    @Override
+    protected boolean rightClick(double mouseX, double mouseY) {
+        int i = data == null || data.offer().isEmpty() || decided() || inspecting()
+                ? -1 : indexAt((int) mouseX, (int) mouseY, layout(bands()));
+        return inspectClick(i, this::setHighlight);
+    }
+    @Override
+    protected int inspectedIndex() {
+        return highlight;
+    }
+
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

@@ -244,7 +244,7 @@ public final class ActionScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean leftClick(double mouseX, double mouseY) {
         if (!decided()) {
             int i = indexAt(buttons, (int) mouseX, (int) mouseY);
             if (i >= 0) {
@@ -253,7 +253,7 @@ public final class ActionScreen extends GameScreen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override

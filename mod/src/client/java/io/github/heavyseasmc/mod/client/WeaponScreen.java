@@ -169,10 +169,7 @@ public final class WeaponScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (inspectClick(button)) {
-            return true;
-        }
+    protected boolean leftClick(double mouseX, double mouseY) {
         List<String> weapons = view.contest().myWeapons();
         if (!weapons.isEmpty() && !inspecting()) {
             int i = indexAt((int) mouseX, (int) mouseY, layout(bands(), weapons.size()), weapons.size());
@@ -182,8 +179,21 @@ public final class WeaponScreen extends GameScreen {
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
+
+    @Override
+    protected boolean rightClick(double mouseX, double mouseY) {
+        List<String> weapons = view.contest().myWeapons();
+        int i = weapons.isEmpty() || inspecting()
+                ? -1 : indexAt((int) mouseX, (int) mouseY, layout(bands(), weapons.size()), weapons.size());
+        return inspectClick(i, k -> highlight = k);
+    }
+    @Override
+    protected int inspectedIndex() {
+        return highlight;
+    }
+
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

@@ -290,6 +290,38 @@ public abstract class GameScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    /**
+     * 鼠标只在这里分左右键，各面只实现 {@link #leftClick} 与 {@link #rightClick}。
+     *
+     * <p>❗<b>{@code final}</b>：此前各面各自覆写 {@code mouseClicked}，而其中七面不看是哪个键 —— 右键在行动 · 站队 ·
+     * 同意 · 医疗目标 · 阵容 · 替人打水 · 口渴里<b>等于左键确认</b>（2026-09-25 核出）。用户要「右键 = 详情」，
+     * 靠每一面各自记得判键是靠不住的，所以把分键收到这一处，右键从结构上就到不了「确认」（与 {@code drawFootBand}
+     * 把两件合成一次调用同一个路数）。{@code GuiConsistencyTest} 守「子类不许覆写 mouseClicked」。
+     */
+    @Override
+    public final boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && leftClick(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && rightClick(mouseX, mouseY)) {
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /** 左键：选 / 按。返回 {@code true} = 这一下已经处理了。 */
+    protected boolean leftClick(double mouseX, double mouseY) {
+        return false;
+    }
+
+    /**
+     * 右键：看，<b>永不确认</b>。有查看态的面用 {@link #inspectClick} 实现；没有的面默认什么都不做
+     * （座位、图标、按钮的说明签是 ADR-0043 的下一步）。
+     */
+    protected boolean rightClick(double mouseX, double mouseY) {
+        return false;
+    }
+
     @Override
     public boolean shouldPause() {
         return false;                  // 多人游戏里暂停毫无意义：别人还在等你，服务端的计时也不会停
@@ -1175,16 +1207,27 @@ public abstract class GameScreen extends Screen {
     protected void toggleInspect() {
         inspecting = !inspecting;
         inspectAt = System.currentTimeMillis();
+        // 与语言无关的一行：客户端回归（click_test）靠它判「右键 / U 真的进了查看态」，而不是确认了什么。
+        // ❗「看的是第几张」取自界面此刻的状态（inspectedIndex），不回显右键点中的参数 ——
+        //   回显参数的话，「点中了第 k 张却没把高亮挪过去」照样打印第 k 张（证伪表：参数回显不是判据）。
+        int shown = inspectedIndex();
+        LOGGER.info("查看：{} {}{}", inspecting ? "进" : "出", getClass().getSimpleName(),
+                inspecting && shown >= 0 ? " 第 " + shown + " 张" : "");
+    }
+
+    /** 查看态里那一叠顶上是第几张（各面的高亮）；这一面没有查看态时是 -1。 */
+    protected int inspectedIndex() {
+        return -1;
     }
 
     /**
      * 进 / 出查看态的键。各面的 {@code keyPressed} 开头调它，返回 {@code true} 就别再往下走。
      *
-     * <p>❗<b>统一用 Tab，不用 U</b>：手牌一面的 U 已经是「打出」（花掉一次行动）。
-     * 一个动词配两个键、还要按面区分，正是这一轮在收的那种乱。右键是同一件事的鼠标版。
+     * <p><b>U 与 Tab 都是「看」</b>，各面一样（用户 2026-09-25 定「U 是详情」，ADR-0043 D2）；右键是同一件事的鼠标版。
+     * 此前统一用 Tab、不用 U，是因为手牌一面的 U 是「使用」—— 现在「使用」改成 Enter，U 空出来了。
      */
     protected boolean inspectKey(int keyCode) {
-        if (keyCode == GLFW.GLFW_KEY_TAB) {
+        if (keyCode == GLFW.GLFW_KEY_TAB || keyCode == GLFW.GLFW_KEY_U) {
             toggleInspect();
             return true;
         }
@@ -1195,13 +1238,23 @@ public abstract class GameScreen extends Screen {
         return false;
     }
 
-    /** 右键 = 查看（与 Tab 同一件事）。各面的 {@code mouseClicked} 开头调它。 */
-    protected boolean inspectClick(int button) {
-        if (button == 1) {
-            toggleInspect();
-            return true;
+    /**
+     * 右键 = 看（与 U · Tab 同一件事），各面的 {@link #rightClick} 调它。
+     *
+     * <p>点在某张牌上、而且还没在看：先把高亮挪到<b>点中的那一张</b>，再进查看态 —— 右键看的是你点的那张，
+     * 不是碰巧高亮着的那张（ADR-0043 §7.0）。点在空处、或者已经在看：开 / 关查看态。
+     * 查看态里牌收成了一叠，摊开那一排的命中框已经不对，所以那时不按位置认牌。
+     *
+     * @param cardIndex 点中了第几张；{@code < 0} = 没点在牌上（调用方在查看态里一律传 -1）
+     * @param highlight 把高亮挪到第几张 —— 各面挪高亮的方式不同（有的要重新「抬」），由各面给
+     */
+    protected boolean inspectClick(int cardIndex, java.util.function.IntConsumer highlight) {
+        if (!inspecting && cardIndex >= 0) {
+            highlight.accept(cardIndex);
+            LOGGER.info("查看（右键）：第 {} 张", cardIndex);
         }
-        return false;
+        toggleInspect();
+        return true;
     }
 
     /** 一张牌这一帧落在哪、多大。 */
@@ -1223,12 +1276,12 @@ public abstract class GameScreen extends Screen {
                 Math.round(rowH + (in.cardH() - rowH) * g));
     }
 
-    /** 这一面的按键提示右头：确认那一件，加一枚「Tab 查看 / 收起」。 */
+    /** 这一面的按键提示右头：确认那一件，加一枚「U 查看 / 收起」（Tab 与右键也行，提示只写一个）。 */
     protected java.util.List<KeyHint> inspectHints(String confirm) {
         if (!density().atLeast(Density.FULL)) {
             return List.of(primary(confirm, "Enter"));      // 查看那一条是说明，小窗第一个砍
         }
-        return List.of(primary(confirm, "Enter"), keys(inspecting ? "close" : "inspect", "Tab"));
+        return List.of(primary(confirm, "Enter"), keys(inspecting ? "close" : "inspect", "U"));
     }
 
     /** 同上，中间多一件（挂武器那面的「Esc 不押」）。 */
@@ -1236,7 +1289,7 @@ public abstract class GameScreen extends Screen {
         if (!density().atLeast(Density.FULL)) {
             return List.of(primary(confirm, "Enter"), extra);
         }
-        return List.of(primary(confirm, "Enter"), extra, keys(inspecting ? "close" : "inspect", "Tab"));
+        return List.of(primary(confirm, "Enter"), extra, keys(inspecting ? "close" : "inspect", "U"));
     }
 
     /** 那一叠牌与签子之间。 */
@@ -1250,8 +1303,8 @@ public abstract class GameScreen extends Screen {
      * @param pointX  尖角指着哪儿；{@code < 0} = 不要尖角（签子在牌旁边时）
      * @param caption 题头，可为 {@code null}（类别与张数还没送到客户端时就是这样）
      */
-    protected void drawCardPlate(DrawContext context, int x, int top, int w, int pointX,
-                                 Text caption, Text name, Text body) {
+    protected int drawCardPlate(DrawContext context, int x, int top, int w, int pointX,
+                                Text caption, Text name, Text body) {
         int tw = w - 2 * PLATE_PAD_X;
         int capH = caption == null ? 0 : GuiText.lineHeight(GuiText.CAPTION, false) + 2;
         // 签子按**这一句实际排几行**画：短句的签子就矮一点。查看态里它在牌旁边，
@@ -1275,6 +1328,7 @@ public abstract class GameScreen extends Screen {
         }
         GuiText.draw(context, body.getString(), tx, y, tw, GuiText.BODY, false, ink,
                 GuiText.Align.LEFT, PLATE_BODY_LINES);
+        return top + h;
     }
 
     /** 把一个 ARGB 色换成另一个不透明度。按不动的东西靠它淡下去，不另起颜色：语义色只有三个。 */

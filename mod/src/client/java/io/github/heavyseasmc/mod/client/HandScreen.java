@@ -61,6 +61,20 @@ public final class HandScreen extends GameScreen {
     /** 打开过了。见 {@link #init()}。 */
     private boolean opened;
 
+    /**
+     * 查看态里焦点在不在「亮出」那颗按钮上（ADR-0043 D2）。亮出<b>不可逆</b>：要先进查看态看清那张、
+     * 再按 ↓ 把焦点挪到按钮上、再按 Enter —— 或者直接点那颗按钮。平时 Enter 是「打出」。
+     */
+    private boolean revealFocus;
+    /** 「亮出」按钮这一帧画在哪；没画就是 {@code null}（不在查看态、或叠还没收拢）。 */
+    private Box revealBox;
+    /** 这一帧那一排牌的落位：按位置认牌（左键选 · 右键看）要用。 */
+    private int rowLeft;
+    private int rowTop;
+    private int rowStep;
+    private int rowW;
+    private int rowH;
+
     public HandScreen() {
         super(Text.translatable("heavyseas.hand.title"));
     }
@@ -111,6 +125,10 @@ public final class HandScreen extends GameScreen {
         }
         if (selected >= after) {
             select(Math.max(0, after - 1));
+        }
+        if (after == 0 && inspecting()) {
+            toggleInspect();                  // 最后一张亮出 / 打出之后，叠里什么都不剩
+            revealFocus = false;
         }
     }
 
@@ -175,6 +193,11 @@ public final class HandScreen extends GameScreen {
 
         int step = step(hand.size(), cardW, handW);
         int left = SIDE + (handW - ((hand.size() - 1) * step + cardW)) / 2;
+        rowLeft = left;
+        rowTop = handTop;
+        rowStep = step;
+        rowW = cardW;
+        rowH = cardH;
 
         // 鼠标真的动了才换选中（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
@@ -193,17 +216,32 @@ public final class HandScreen extends GameScreen {
             }
         }
         drawHandCard(context, now, hand, selected, left + selected * step, handTop, cardW, cardH, ins, gathered);
+        revealBox = null;
         if (gathered > 0f && selected >= 0 && selected < hand.size()) {
             String card = hand.get(selected);
-            drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
+            int plateBottom = drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
                     provisionCaption(card), provisionName(card), provisionEffect(card));
+            // 「亮出」只在叠收拢之后出现：还在收的时候按钮跟着签子一起动，点不准。
+            // 字用朱砂 —— 不可逆的那一类（与划船「其余当场塞回」、行动一面「抢夺」同一个语义色）。
+            if (inspecting() && gathered >= 1f) {
+                Text label = Text.translatable("heavyseas.keys.reveal");
+                revealBox = new Box(ins.plateX(), plateBottom + REVEAL_GAP, buttonWidth(label), buttonHeight());
+                drawButton(context, revealBox, label, revealFocus, GuiLanguage.cinnabar(), 0f);
+            }
         }
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
         //   与 HUD 那一行「按绑定键查看」同一条理由。这一面没有倒计时，提示就排在那一条空着的带上。
-        drawFootBand(context, b, List.of(keys("select", "←", "→")),
-                List.of(keys("reveal", "Enter"), keys("play", "U"),
-                        keys(inspecting() ? "close" : "inspect", "Tab")), now, null);
+        // U 与右键是「看」（各面一样，ADR-0043 D2）；Enter 是「打出」；亮出在查看态里（↓ 挪到按钮上再 Enter）。
+        List<KeyHint> right = !inspecting()
+                ? List.of(keys("play", "Enter"), keys("inspect", "U"))
+                : revealFocus
+                        ? List.of(keys("reveal", "Enter"), keys("close", "U"))
+                        : List.of(keys("play", "Enter"), keys("reveal", "↓"), keys("close", "U"));
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), right, now, null);
     }
+
+    /** 签子与「亮出」按钮之间。 */
+    private static final int REVEAL_GAP = 6;
 
     /**
      * 相邻两张之间挪多远：放得下就并排，放不下就叠。
@@ -341,9 +379,45 @@ public final class HandScreen extends GameScreen {
         selected = index;
     }
 
+    /** 点在第几张上；这一帧还没画过牌、或手上没牌时是 -1。 */
+    private int cardAt(double mouseX, double mouseY) {
+        if (view.hand().isEmpty() || rowW <= 0) {
+            return -1;
+        }
+        return indexAt((int) mouseX, (int) mouseY, rowLeft, rowTop, rowStep, rowW, rowH);
+    }
+
+    @Override
+    protected boolean leftClick(double mouseX, double mouseY) {
+        if (revealBox != null && revealBox.contains((int) mouseX, (int) mouseY)) {
+            reveal();
+            return true;
+        }
+        if (!inspecting()) {
+            int i = cardAt(mouseX, mouseY);
+            if (i >= 0) {
+                select(i);                    // 点一下只是选中：打出与亮出都要再按一下，不随手花掉
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean rightClick(double mouseX, double mouseY) {
+        revealFocus = false;
+        return inspectClick(inspecting() ? -1 : cardAt(mouseX, mouseY), this::select);
+    }
+    @Override
+    protected int inspectedIndex() {
+        return selected;
+    }
+
+
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (inspectKey(keyCode)) {
+            revealFocus = false;
             return true;
         }
         int count = view.hand().size();
@@ -352,15 +426,26 @@ public final class HandScreen extends GameScreen {
                     selected + (keyCode == GLFW.GLFW_KEY_RIGHT ? 1 : -1))));
             return true;
         }
-        // 亮出：把正在看的那张放到面前。**不可逆**，所以要按回车而不是随手点一下（规则 §5.2）。
-        if (count > 0 && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
-            reveal();
+        // 亮出：把正在看的那张放到面前。**不可逆**（规则 §5.2），所以不再是一个随手就按到的键：
+        // 要在查看态里按 ↓ 把焦点挪到「亮出」按钮上，再按 Enter（ADR-0043 D2，用户 2026-09-25 定）。
+        if (inspecting() && count > 0 && keyCode == GLFW.GLFW_KEY_DOWN) {
+            revealFocus = true;
             return true;
         }
-        // 用：花掉这一个行动打出去（医疗箱 · 撑伞 · 信号枪当信号 · 绝境）。
+        if (inspecting() && keyCode == GLFW.GLFW_KEY_UP) {
+            revealFocus = false;
+            return true;
+        }
+        // 打出：花掉这一个行动打出去（医疗箱 · 撑伞 · 信号枪当信号 · 绝境）。Enter 在两个状态里都是它
+        // （ADR-0037 §7.12 ①「Enter 在两个状态里都能确认」）—— 除非焦点在「亮出」上。
         // ❗只有轮到你时才行得通 —— 它占行动。按不动时服务端会回一句人话，不是静默丢掉。
-        if (count > 0 && keyCode == GLFW.GLFW_KEY_U) {
-            use();
+        if (count > 0 && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
+            if (inspecting() && revealFocus) {
+                reveal();
+                revealFocus = false;
+            } else {
+                use();
+            }
             return true;
         }
         // 用哪个键开的，就用哪个键收起来。写死 R 的话玩家改了键位就收不起来了。

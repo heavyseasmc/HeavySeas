@@ -25,6 +25,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.option.KeyBinding;
@@ -33,6 +34,11 @@ import net.minecraft.client.util.InputUtil;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.lang.ref.WeakReference;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * 客户端入口。
@@ -83,6 +89,14 @@ public final class HeavySeasClient implements ClientModInitializer {
         return themeKey;
     }
 
+    /** 本模组注册的全部按键：对局进行中它们先于 Minecraft 自带的绑定与别的模组接键（{@link KeyPriority}）。还没注册时为空。 */
+    static List<KeyBinding> ownKeys() {
+        return Stream.of(handKey, actKey, themeKey, logKey).filter(Objects::nonNull).toList();
+    }
+
+    /** 上一次记过的「别的界面」：窗口改尺寸会让同一个界面再 init 一次，同一个实例只记一次。 */
+    private static WeakReference<Screen> lastOtherScreen = new WeakReference<>(null);
+
     /**
      * 轮到你了、但行动一面还没弹出来。
      *
@@ -124,6 +138,15 @@ public final class HeavySeasClient implements ClientModInitializer {
     public void onInitializeClient() {
         HudRenderCallback.EVENT.register(GameHud::render);
         GameScreenSidebar.register();
+        // 别的界面（Minecraft 自带的进度 · 游戏菜单 · 聊天……）打开时也记一行，与 GameScreen 的「界面：打开 X」配对：
+        // 回归脚本据此分得开「本模组那一面没弹」与「被别的界面盖住了」—— 此前两次都要截图才看出来
+        // （2026-09-25 游戏菜单盖住各面 · 同日 L 打开 Minecraft 自带的进度界面、吞掉 F8）。类名在开发环境是 yarn 名、生产 jar 里是中间名。
+        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+            if (!(screen instanceof GameScreen) && lastOtherScreen.get() != screen) {
+                lastOtherScreen = new WeakReference<>(screen);
+                LOGGER.info("界面（其他）：打开 {}", screen.getClass().getSimpleName());
+            }
+        });
 
         // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
         EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);

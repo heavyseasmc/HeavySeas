@@ -189,7 +189,7 @@ public final class ThirstScreen extends GameScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    protected boolean leftClick(double mouseX, double mouseY) {
         Layout l = layout(bands());
         int i = cardIndexAt((int) mouseX, (int) mouseY, l.left(), l.cardsTop(), l.w(), l.h(), waters);
         if (i >= 0) {
@@ -197,7 +197,7 @@ public final class ThirstScreen extends GameScreen {
             setChosen(chosen == i + 1 ? i : i + 1);
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override
