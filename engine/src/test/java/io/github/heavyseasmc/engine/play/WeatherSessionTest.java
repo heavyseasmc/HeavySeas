@@ -111,6 +111,45 @@ class WeatherSessionTest {
     }
 
     @Test
+    void weatherHasANewWindowAndBaitDoesNotCarryOver() {
+        Session session = atAction(WeatherEffect.ROWERS_OVERBOARD, List.of(QUIET, QUIET, QUIET));
+        CharacterId rower = session.state().bySeat().getFirst();
+        session.row(rower, (cards, state, who) -> 0);
+        session.reveal(rower, deal(session, rower, "life_preserver"));
+        deal(session, rower, "bait_bucket");
+        session.advancePhase();
+        session.beginNavigation(new NavigationCard("two-falls", 0,
+                new Selector.Only(java.util.Set.of(rower)), new Selector.Nobody(), true, false));
+        int first = session.overboardPending().orElseThrow().token();
+        session.playOverboardCard(rower, rower, "bait_bucket", first);
+        session.finishOverboard();
+        assertEquals(1, session.state().stateOf(rower).damage());
+        assertNotEquals(first, session.overboardPending().orElseThrow().token());
+        assertThrows(IllegalStateException.class,
+                () -> session.playOverboardCard(rower, rower, "bait_bucket", first));
+        session.finishOverboard();
+        assertEquals(1, session.state().stateOf(rower).damage());
+        assertTrue(session.overboardPending().isEmpty());
+        session.requireNoProvisionLost("weather window");
+    }
+
+    @Test
+    void fourthGullFinishesBeforeAnyOverboardWindow() {
+        NavigationCard gull = card("gull", 1, new Selector.Nobody(), false, false);
+        Session session = atAction(WeatherEffect.ALL_THIRST, List.of(gull, gull, gull));
+        CharacterId actor = session.state().bySeat().getFirst();
+        session.fireSignal(actor, deal(session, actor, "flare_gun"));
+        assertEquals(3, session.state().gulls());
+        session.advancePhase();
+        session.beginNavigation(new NavigationCard("land", 1,
+                new Selector.Everyone(), new Selector.Everyone(), true, true));
+        assertTrue(session.state().isOver());
+        assertTrue(session.overboardPending().isEmpty());
+        assertTrue(session.thirstPending().isEmpty());
+        assertTrue(session.navigationReport().overboardSelected().isEmpty());
+    }
+
+    @Test
     void becalmedSkipsNavigationButEndsDayAndClearsMarkers() {
         Session session = atAction(WeatherEffect.SKIP_NAVIGATION, List.of(QUIET));
         CharacterId actor = session.state().bySeat().getFirst();

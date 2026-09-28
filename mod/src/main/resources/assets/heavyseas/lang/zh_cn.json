@@ -336,5 +336,13 @@
   "heavyseas.roster.start": "敲铃开航",
   "heavyseas.mist_sea.recovered": "上次雾海航行异常中断，你的物品与返回位置已恢复。",
   "heavyseas.endgame.arrived": "第四只海鸥掀开浓雾；救生艇载着你们驶向岸边。",
-  "heavyseas.endgame.spectating": "旁观终局 · 私密牌与计分明细不对旁观者开放"
+  "heavyseas.endgame.spectating": "旁观终局 · 私密牌与计分明细不对旁观者开放",
+  "heavyseas.overboard.title": "落海",
+  "heavyseas.overboard.pending": "即将落海：%s",
+  "heavyseas.trade.title": "赠送物资",
+  "heavyseas.trade.give": "赠送",
+  "heavyseas.trade.recipient": "给 %s",
+  "heavyseas.table.title": "公开物资",
+  "heavyseas.table.offline": "离线",
+  "heavyseas.card_action.rejected": "现在不能打出这张牌。"
 }

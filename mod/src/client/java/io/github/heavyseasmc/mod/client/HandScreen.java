@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod.client;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.UseProvisionC2S;
+import io.github.heavyseasmc.mod.net.CardActionC2S;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.minecraft.client.gui.DrawContext;
@@ -68,6 +69,7 @@ public final class HandScreen extends GameScreen {
     private boolean revealFocus;
     /** 「亮出」按钮这一帧画在哪；没画就是 {@code null}（不在查看态、或叠还没收拢）。 */
     private Box revealBox;
+    private Box giveBox;
     /** 这一帧那一排牌的落位：按位置认牌（左键选 · 右键看）要用。 */
     private int rowLeft;
     private int rowTop;
@@ -217,6 +219,7 @@ public final class HandScreen extends GameScreen {
         }
         drawHandCard(context, now, hand, selected, left + selected * step, handTop, cardW, cardH, ins, gathered);
         revealBox = null;
+        giveBox = null;
         if (gathered > 0f && selected >= 0 && selected < hand.size()) {
             String card = hand.get(selected);
             int plateBottom = drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
@@ -226,6 +229,14 @@ public final class HandScreen extends GameScreen {
             if (inspecting() && gathered >= 1f) {
                 Text label = Text.translatable("heavyseas.keys.reveal");
                 revealBox = new Box(ins.plateX(), plateBottom + REVEAL_GAP, buttonWidth(label), buttonHeight());
+                if (canGive()) {
+                    Text give = Text.translatable("heavyseas.trade.give");
+                    int gap = BTN_GAP;
+                    int half = Math.max(1, (ins.plateW() - gap) / 2);
+                    revealBox = new Box(ins.plateX(), plateBottom + REVEAL_GAP, half, buttonHeight());
+                    giveBox = new Box(ins.plateX() + half + gap, plateBottom + REVEAL_GAP, half, buttonHeight());
+                    drawButton(context, giveBox, give, false, GuiLanguage.verdigris(), 0f);
+                }
                 drawButton(context, revealBox, label, revealFocus, GuiLanguage.cinnabar(), 0f);
             }
         }
@@ -345,8 +356,7 @@ public final class HandScreen extends GameScreen {
      * 指南针让划船堆多一张。握在手里的那几张一点用都没有 —— 亮出不是装饰动作，是真的取舍
      * （亮了就看得见、落水时会被冲走）。
      *
-     * <p>走的是 {@code /seas reveal}，不是新包：这一下每局最多十来次，而每加一个包
-     * 就多一处「两端字段表要对上」。等这一面有了更多动作再一起做成包。
+     * <p>亮出与赠牌共用类型化载荷；服务端只认发送者实际占用的座位。
      */
     private void reveal() {
         List<String> hand = view.hand();
@@ -356,8 +366,18 @@ public final class HandScreen extends GameScreen {
         String card = hand.get(selected);
         // 与语言无关的一行：GUI 回归靠它判「亮出这一下真的发出去了」。
         LOGGER.info("手牌：亮出 {}", card);
-        client.player.networkHandler.sendChatCommand(
-                "seas reveal " + view.character() + " " + card);
+        ClientPlayNetworking.send(CardActionC2S.of(CardActionC2S.Kind.REVEAL, card, "", 0));
+    }
+
+    private boolean canGive() {
+        return view.phase() == Phase.ACTION && view.condition().canAct()
+                && !view.contest().active() && !view.endgame().active();
+    }
+
+    private void give() {
+        if (canGive() && selected >= 0 && selected < view.hand().size()) {
+            client.setScreen(new CardChoiceScreen(view.hand().get(selected), false));
+        }
     }
 
     /**
@@ -389,6 +409,10 @@ public final class HandScreen extends GameScreen {
 
     @Override
     protected boolean leftClick(double mouseX, double mouseY) {
+        if (giveBox != null && giveBox.contains((int) mouseX, (int) mouseY)) {
+            give();
+            return true;
+        }
         if (revealBox != null && revealBox.contains((int) mouseX, (int) mouseY)) {
             reveal();
             return true;
@@ -416,6 +440,10 @@ public final class HandScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_G) {
+            give();
+            return true;
+        }
         if (inspectKey(keyCode)) {
             revealFocus = false;
             return true;

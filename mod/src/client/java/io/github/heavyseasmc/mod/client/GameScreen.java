@@ -171,6 +171,17 @@ public abstract class GameScreen extends Screen {
 
     /** 这一面打开过了没有。见 {@link #init()}。 */
     private boolean announced;
+    private final List<SeatHit> seatHits = new ArrayList<>();
+    private final List<DetailHit> detailHits = new ArrayList<>();
+    private Text detail;
+    private int detailX;
+    private int detailY;
+
+    private record SeatHit(Box box, String character) {
+    }
+
+    private record DetailHit(Box box, Text text) {
+    }
 
     protected GameScreen(Text title) {
         super(title);
@@ -278,6 +289,10 @@ public abstract class GameScreen extends Screen {
     /** 界面开着时按键不经按键绑定的轮询，所以换主题在这里接一次；各面的 keyPressed 最后都会落到 super。 */
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && detail != null) {
+            detail = null;
+            return true;
+        }
         if (HeavySeasClient.themeKey() != null && HeavySeasClient.themeKey().matchesKey(keyCode, scanCode)) {
             ClientPrefs.toggleTheme();
             return true;
@@ -300,6 +315,20 @@ public abstract class GameScreen extends Screen {
      */
     @Override
     public final boolean mouseClicked(double mouseX, double mouseY, int button) {
+        detail = null;
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && inspectSeat(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+            for (DetailHit hit : detailHits) {
+                if (hit.box().contains((int) mouseX, (int) mouseY)) {
+                    detail = hit.text();
+                    detailX = (int) mouseX;
+                    detailY = (int) mouseY;
+                    return true;
+                }
+            }
+        }
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && leftClick(mouseX, mouseY)) {
             return true;
         }
@@ -307,6 +336,45 @@ public abstract class GameScreen extends Screen {
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean inspectSeat(double x, double y) {
+        for (SeatHit hit : seatHits) {
+            if (hit.box().contains((int) x, (int) y)) {
+                client.setScreen(new TableScreen(hit.character()));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    final void renderDetails(DrawContext context, int mouseX, int mouseY) {
+        Text shown = detail;
+        int x = detailX;
+        int y = detailY;
+        if (shown == null) {
+            for (DetailHit hit : detailHits) {
+                if (hit.box().contains(mouseX, mouseY)) {
+                    shown = hit.text();
+                    x = mouseX;
+                    y = mouseY;
+                    break;
+                }
+            }
+        }
+        if (shown != null) {
+            int w = Math.max(60, Math.min(220, width - 2 * SIDE));
+            int pad = 6;
+            int h = GuiText.height(shown.getString(), w - 2 * pad, GuiText.BODY, false, 6) + 2 * pad;
+            x = MathHelper.clamp(x + pad, SIDE, Math.max(SIDE, width - w - SIDE));
+            y = MathHelper.clamp(y + pad, pad, Math.max(pad, height - h - pad));
+            context.getMatrices().push();
+            context.getMatrices().translate(0, 0, 400);
+            GuiMaterial.plate(context, x, y, w, h, -1);
+            GuiText.draw(context, shown.getString(), x + pad, y + pad, w - 2 * pad,
+                    GuiText.BODY, false, GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT, 6);
+            context.getMatrices().pop();
+        }
     }
 
     /** 左键：选 / 按。返回 {@code true} = 这一下已经处理了。 */
@@ -511,6 +579,8 @@ public abstract class GameScreen extends Screen {
      * <p>各面在 {@code render} 的开头调它一次，拿回来的 {@link Bands} 就是这一帧唯一的版面来源。
      */
     protected Bands drawChrome(DrawContext context, HudView view) {
+        seatHits.clear();
+        detailHits.clear();
         edgeLeftW = 0;
         edgeRightW = 0;                        // 每帧清零：这一面这一帧到底放没放边上的提示，只认它自己说的
         Bands b = bands();
@@ -758,6 +828,7 @@ public abstract class GameScreen extends Screen {
      */
     protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color,
                               int fill, float rise, float scale) {
+        detailHits.add(new DetailHit(b, label));
         context.getMatrices().push();
         context.getMatrices().translate(b.x() + b.w() / 2f, b.y() + b.h() + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
@@ -828,6 +899,7 @@ public abstract class GameScreen extends Screen {
      */
     protected int drawSeat(DrawContext context, String characterId, int x, int y, int cell, Bands b,
                            int mark, boolean faded, int nameColor, int lineColor) {
+        seatHits.add(new SeatHit(new Box(x, y, cell, b.railH()), characterId));
         int full = b.avatar();
         if (full > 0) {
             int m = GuiMaterial.ringMargin(full);
@@ -1360,15 +1432,23 @@ public abstract class GameScreen extends Screen {
         int span = ICON_H + (rich ? ICON_GROUP_GAP + gulls : 0) + (weather ? ICON_H + ICON_GROUP_GAP : 0);
         int x = (width - span) / 2;
         if (weather) {
+            detailHits.add(new DetailHit(new Box(x, y, ICON_H, ICON_H),
+                    Text.translatable("heavyseas.game.weather",
+                            Text.translatable("heavyseas.weather." + view.weather()),
+                            Text.translatable("heavyseas.weather.effect." + view.weather()))));
             GuiMaterial.icon(context, "weather_" + view.weather(), x, y, ICON_H, GuiLanguage.ink());
             x += ICON_H + ICON_GROUP_GAP;
         }
         // 阶段轮盘：一圈四格，当前那格粗而实。每一格一张贴图 —— 单色着色挑不出其中一格。
         GuiMaterial.icon(context, "phase_" + view.phase().ordinal(), x, y, ICON_H, GuiLanguage.verdigris());
+        Text status = Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
+                view.gulls(), GameState.GULLS_TO_LAND);
+        detailHits.add(new DetailHit(new Box(x, y, ICON_H, ICON_H), status));
         if (!rich) {
             return;
         }
         x += ICON_H + ICON_GROUP_GAP;
+        detailHits.add(new DetailHit(new Box(x, y, gulls, ICON_H), status));
         // 海鸥：够不够 4 只是一眼的事，不该让人去读数字。
         for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
             GuiMaterial.icon(context, "gull", x + i * (ICON_H + ICON_GAP), y, ICON_H,

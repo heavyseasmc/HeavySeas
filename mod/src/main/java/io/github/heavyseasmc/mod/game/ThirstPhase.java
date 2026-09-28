@@ -92,8 +92,7 @@ public final class ThirstPhase {
             resolve(world, component, 0);
             return;
         }
-        boolean canDecide = ThirstEligibility.canChoose(session.state().conditionOf(who), own,
-                prompt.waterPerSource());
+        boolean canDecide = canDecide(session, prompt);
         boolean canReceiveDonation = hasHumanDonor(session, component, who);
         if (!canDecide && !canReceiveDonation) {
             // 没有可做的决定。说一句为什么，不然屏幕上只会看到血无缘无故掉了。
@@ -111,7 +110,7 @@ public final class ThirstPhase {
             resolve(world, component, 0);
             return;
         }
-        if (occupant.isDummy() && component.dummyAutoplay()) {
+        if (canDecide && occupant.isDummy() && component.dummyAutoplay()) {
             int drink = Math.min(prompt.waterNeeded(), own);
             drink -= drink % prompt.waterPerSource();
             LOGGER.info("口渴（替身自动）：{} 喝 {} 张（还需化解 {} 次）", who.value(), drink, prompt.remaining());
@@ -147,9 +146,7 @@ public final class ThirstPhase {
         if (pending.isEmpty() || seat.isEmpty() || !seat.get().equals(pending.get().who())) {
             return;
         }
-        CharacterId who = pending.get().who();
-        if (!ThirstEligibility.canChoose(session.state().conditionOf(who), session.watersOf(who),
-                pending.get().waterPerSource())) {
+        if (!canDecide(session, pending.get())) {
             return;                             // 这是只给旁人捐水的窗口；本人无权用 0 提前收场
         }
         int waters = clamp(session, pending.get(), action.waters(), component.thirstDonors().size());
@@ -205,7 +202,7 @@ public final class ThirstPhase {
             return false;
         }
         Session.ThirstPrompt prompt = pending.get();
-        if (donor.equals(prompt.who()) || !session.state().conditionOf(donor).canAct()) {
+        if (donor.equals(prompt.who()) || !session.state().canAct(donor)) {
             return false;                     // 本人走喝水选择；昏迷者不能替别人打牌
         }
         // ❗攒着，不因第一张就结算：那会把他还没说话的其余口渴直接变成伤害。
@@ -246,9 +243,19 @@ public final class ThirstPhase {
             }
             int waters = clamp(session, pending.get(), component.thirstHighlight(),
                     component.thirstDonors().size());
-            LOGGER.info("口渴超时：替 {} 喝了 {} 张（当前高亮）", pending.get().who().value(), waters);
+            if (canDecide(session, pending.get())) {
+                LOGGER.info("口渴超时：替 {} 喝了 {} 张（当前高亮）", pending.get().who().value(), waters);
+            } else {
+                LOGGER.info("代打水窗口结束：{} 本人无从决定，按已收到的承诺结算", pending.get().who().value());
+            }
             resolve(world, component, waters);
         }
+    }
+
+    private static boolean canDecide(Session session, Session.ThirstPrompt prompt) {
+        CharacterId who = prompt.who();
+        return session.state().canAct(who) && ThirstEligibility.canChoose(
+                session.state().conditionOf(who), session.watersOf(who), prompt.waterPerSource());
     }
 
     /**
@@ -256,7 +263,10 @@ public final class ThirstPhase {
      *
      * <p>别人已经替他打进来的那几张要先扣掉：他自己最多再喝「还差的那些」。
      */
-    private static int clamp(Session session, Session.ThirstPrompt prompt, int waters, int donated) {
+    static int clamp(Session session, Session.ThirstPrompt prompt, int waters, int donated) {
+        if (!session.state().canAct(prompt.who())) {
+            return 0;
+        }
         int own = session.watersOf(prompt.who());
         int need = Math.max(0, prompt.waterNeeded() - donated);
         int chosen = Math.max(0, Math.min(waters, Math.min(need, own)));
@@ -277,7 +287,7 @@ public final class ThirstPhase {
         return component.occupants().entrySet().stream().anyMatch(entry ->
                 !entry.getKey().equals(recipient)
                         && !entry.getValue().isDummy()
-                        && session.state().conditionOf(entry.getKey()).canAct()
+                        && session.state().canAct(entry.getKey())
                         && availableDonationWater(session, component, entry.getKey()) > 0);
     }
 
@@ -285,7 +295,8 @@ public final class ThirstPhase {
         Session session = component.requireSession();
         Session.ThirstPrompt prompt = session.thirstPending().orElseThrow();
         CharacterId who = prompt.who();
-        List<CharacterId> donors = new ArrayList<>(component.thirstDonors());
+        List<CharacterId> donors = new ArrayList<>(component.thirstDonors().stream()
+                .filter(session.state()::canAct).toList());
         int own = clamp(session, prompt, waters, donors.size());
         for (int i = 0; i < own; i++) {
             donors.add(who);                  // 界面这条路只喝自己的；别人替他打走 /seas water from

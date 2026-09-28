@@ -286,7 +286,7 @@ public final class ContestPhase {
         Session session = component.requireSession();
         Optional<Contest> pending = session.contest();
         Optional<CharacterId> seat = component.seatOf(player.getUuid());
-        if (pending.isEmpty() || seat.isEmpty()) {
+        if (pending.isEmpty() || seat.isEmpty() || !session.state().canAct(seat.get())) {
             return;
         }
         Contest contest = pending.get();
@@ -341,7 +341,7 @@ public final class ContestPhase {
 
     /** 他能不能加入这一场：清醒、还在游戏里、而且还没在场上（规则 §9.3；加入之后不可退出）。 */
     public static boolean canJoin(Session session, Contest contest, CharacterId who) {
-        if (session.state().isRemoved(who) || !session.state().conditionOf(who).canAct()) {
+        if (!session.state().canAct(who)) {
             return false;
         }
         return !contest.fight().map(f -> f.combatants().contains(who)).orElse(true);
@@ -357,7 +357,8 @@ public final class ContestPhase {
      * 表现是界面上摆着的牌押不出去 —— 屏幕上只是「按了没反应」，没有任何人会报错。
      */
     public static boolean canCommitWeapon(Session session, Contest contest, CharacterId who, String cardId) {
-        if (!contest.fight().map(f -> f.combatants().contains(who)).orElse(false)) {
+        if (!session.state().canAct(who)
+                || !contest.fight().map(f -> f.combatants().contains(who)).orElse(false)) {
             return false;
         }
         SurvivorState state = session.state().stateOf(who);
@@ -470,7 +471,27 @@ public final class ContestPhase {
 
     /** 这一段等的是不是一个真人（替身开着自动推进就不算）。 */
     private static boolean waiting(GameComponent component, CharacterId who) {
-        return component.occupantOf(who).map(o -> !o.isDummy() || !component.dummyAutoplay()).orElse(false);
+        return component.requireSession().state().canAct(who)
+                && component.occupantOf(who).map(o -> !o.isDummy() || !component.dummyAutoplay()).orElse(false);
+    }
+
+    static void connectionChanged(ServerWorld world, GameComponent component) {
+        Optional<Contest> pending = component.requireSession().contest();
+        if (pending.isEmpty() || component.contestDeadline() <= 0) {
+            return;
+        }
+        Contest c = pending.get();
+        boolean waiting = switch (c.stage()) {
+            case CONSENT -> waiting(component, c.target());
+            case PICK -> waiting(component, c.attacker());
+            case STANCES -> driven(component);
+            case WEAPONS -> anyHumanCombatant(component, c) || !component.dummyAutoplay();
+        };
+        if (!waiting) {
+            component.clearContest();
+            GameFlow.schedule(component, 0L, "connection changed during contest",
+                    () -> advanceWithoutHumans(world, component));
+        }
     }
 
     /** 挂武器段只开放给参战者 —— 参战的全是替身时不必开窗口。 */

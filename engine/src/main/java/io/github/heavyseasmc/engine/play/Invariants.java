@@ -83,7 +83,7 @@ public final class Invariants {
 
         // 舵手必须是清醒者里最靠船尾的那个。写错了整局的权力位就错了，而它不会自己报错。
         g.helmsman().ifPresent(h -> {
-            if (!g.conditionOf(h).canAct()) {
+            if (!g.canAct(h)) {
                 bad.add("舵手 %s 不是清醒状态".formatted(h));
             }
             List<CharacterId> conscious = g.consciousBySeat();
@@ -98,7 +98,7 @@ public final class Invariants {
 
         // 下一个行动者必须清醒且本回合未行动过。
         g.nextActor().ifPresent(a -> {
-            if (!g.conditionOf(a).canAct()) {
+            if (!g.canAct(a)) {
                 bad.add("下一个行动者 %s 不是清醒状态".formatted(a));
             }
             if (g.stateOf(a).actedThisTurn()) {

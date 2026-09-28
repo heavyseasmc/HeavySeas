@@ -50,12 +50,6 @@ import java.util.Set;
  * 这里一条规则都没有。阶段怎么推进、谁能行动、落海怎么算，全在引擎的 {@code play} 包里 ——
  * 模拟器跑几千局验的就是那一份。本类只做三件事：**问谁、调用、播报**。
  *
- * <h2>M1 还缺的那一处，说出来</h2>
- * <b>没有人能喝水</b>：{@link Session.WaterChoice} 一律返回 0。牌现在真的进了手里，
- * 但「喝几张」是个<b>决策</b>（水同时是谈判筹码，自动替人喝掉就把那条筹码抹了），
- * 需要一面自己的界面与一份超时规则，都还没有。结果是口渴必定造成伤害，对局偏短。
- * 写 0 是「这件事还没做」的老实写法，不是平衡取舍。
- *
  * <h2>谁来推下一步（ADR-0019）</h2>
  * 真人的决定从界面来；替身的决定在自动推进开着时由排程在下一 tick 做（{@link #tick}），关着时等指令；
  * 航海阶段不等任何指令 —— {@link NavigationPhase} 要么当场翻顶牌，要么开舵手的 12 秒窗口。
@@ -145,7 +139,8 @@ public final class GameFlow {
         session.dealAffinities(Affinities.random(roster, new Random(world.getRandom().nextLong())));
 
         GameComponent component = GameComponents.of(world);
-        component.begin(session, occupants);
+        component.begin(session, occupants, humans.stream().map(ServerPlayerEntity::getUuid)
+                .collect(java.util.stream.Collectors.toSet()));
         // ❗开局也是一次状态变化，先把投影推出去。各面的包（补给箱、划船、舵手）都在这之后发，
         //   而那几面要靠投影判「对局还在不在」—— 投影还没到就收到包的话，界面开出来又当场自己收掉。
         //   2026-09-16 实拍：船头那一位的补给箱一闪即没，然后干等 16 秒超时，屏幕上没有任何报错。
@@ -329,12 +324,18 @@ public final class GameFlow {
         Session session = component.requireSession();
         component.clearHelm();
         // 海鸥与落海当场算完；口渴逐个问（ADR-0021）——「喝几张水」是决策，真人答不了同步的问题。
-        NavigationReport report = session.beginNavigate(card);
+        session.beginNavigation(card);
 
         // 结算后只公开被执行的那一张（决策 ⑭）。播的是它印着什么，不是它的 id —— id 不是给人读的。
         List<String> seats = session.state().bySeat().stream().map(CharacterId::value).toList();
         broadcast(world, Text.translatable("heavyseas.game.card_played",
                 NavCardText.describe(NavCardView.of(card), seats)).formatted(Formatting.AQUA));
+        OverboardPhase.begin(world, component);
+    }
+
+    static void completeNavigation(ServerWorld world, GameComponent component, NavigationReport report) {
+        Session session = component.requireSession();
+        NavigationCard card = report.card();
         if (!report.overboardSelected().isEmpty()) {
             broadcast(world, Text.translatable("heavyseas.game.overboard", names(report.overboardSelected())));
         }

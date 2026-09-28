@@ -121,6 +121,20 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     /** 客户端侧的投影。服务端不读它。 */
     private HudView view = HudView.IDLE;
+    private TableView tableView = TableView.EMPTY;
+    private long overboardDeadline;
+
+    public TableView tableView() {
+        return tableView;
+    }
+
+    public long overboardDeadline() {
+        return overboardDeadline;
+    }
+
+    public void setOverboardDeadline(long deadline) {
+        overboardDeadline = deadline;
+    }
 
     /** 客户端 HUD 的数据源。服务端上它永远是 {@link HudView#IDLE}。 */
     public HudView hudView() {
@@ -160,6 +174,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     @Override
     public void writeSyncPacket(RegistryByteBuf buf, ServerPlayerEntity recipient) {
         writeView(buf, recipient);
+        TableView.of(session, seatOf(recipient.getUuid()), overboardDeadline).write(buf);
         buf.writeInt(SYNC_END);           // ❗必须是最后一笔，且每条分支都经过这里
     }
 
@@ -328,9 +343,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         for (String card : hand) {
             buf.writeString(card);
         }
-        // ❗面前那一区是**公开**的（亮出来就是给全船看的），但这一版只写收件人自己那份：
-        //   别人的「面前」要等头顶信息条（决策 ⑥）才有地方显示，现在发了也没人读。
-        //   记在 CURRENT_STATUS 的开放项里，不在这里偷偷发。
+        // 本人的公开区保留撑伞状态；全船公开牌另由 TableView 投影。
         List<String> front = g.stateOf(id).front();
         buf.writeVarInt(front.size());
         for (String card : front) {
@@ -455,6 +468,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     @Override
     public void applySyncPacket(RegistryByteBuf buf) {
         HudView next = readView(buf);
+        TableView nextTable = TableView.read(buf);
         int mark = buf.readInt();
         if (mark != SYNC_END) {
             // ❗先核对再赋值：半截读出来的投影不许装进界面。
@@ -463,6 +477,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                             .formatted(mark));
         }
         view = next;
+        tableView = nextTable;
     }
 
     private static HudView readView(RegistryByteBuf buf) {
@@ -786,6 +801,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         thirstDonors.add(donor);
     }
 
+    public void removeThirstDonor(CharacterId donor) {
+        thirstDonors.removeIf(donor::equals);
+    }
+
     public void clearThirst() {
         this.thirstDeadline = 0L;
         this.thirstHighlight = 0;
@@ -889,11 +908,21 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     public void begin(Session started, Map<CharacterId, Occupant> seats) {
+        begin(started, seats, Set.of());
+    }
+
+    public void begin(Session started, Map<CharacterId, Occupant> seats, Set<UUID> audience) {
+        overboardDeadline = 0;
+        setWaterBodies(List.of(), 0);
         clearDesignation();
         clearProvisionTarget();
         this.session = started;
         this.occupants.clear();
         this.occupants.putAll(seats);
+        activeVoyagePlayers.clear();
+        activeVoyagePlayers.addAll(audience);
+        seats.values().stream().filter(o -> !o.isDummy()).map(Occupant::player)
+                .forEach(activeVoyagePlayers::add);
         this.interruptedTurn = 0;
         this.pendingDummies.clear();
         this.endedFor.clear();
@@ -906,6 +935,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         fogCleared = false;
         steps.clear();
     }
+
+    public boolean belongsToActiveVoyage(UUID player) {
+        return session != null && activeVoyagePlayers.contains(player);
+    }
+
+    private final Set<UUID> activeVoyagePlayers = new java.util.HashSet<>();
 
     /**
      * 这一局摆在世界里的那几个座位（船头到船尾）· ADR-0024。
@@ -1109,6 +1144,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     public void end() {
+        overboardDeadline = 0;
+        setWaterBodies(List.of(), 0);
         occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
         if (owner instanceof ServerWorld serverWorld) {
             serverWorld.getPlayers().stream().map(ServerPlayerEntity::getUuid).forEach(endedFor::add);
@@ -1118,6 +1155,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearActionWindow();
         this.session = null;
         this.occupants.clear();
+        this.activeVoyagePlayers.clear();
         clearProvision();
         clearHelm();
         clearThirst();
@@ -1172,7 +1210,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     /** 座位上有没有真人。有人要看，节奏才需要停下来等人读（ADR-0019：航海结算后的停顿）。 */
     public boolean anyHumanSeated() {
-        return occupants.values().stream().anyMatch(o -> !o.isDummy());
+        return session != null && occupants.entrySet().stream()
+                .anyMatch(e -> !e.getValue().isDummy() && !session.state().isOffline(e.getKey()));
     }
 
     /** 这个玩家占着哪个角色。一个玩家最多占一个座位。 */
@@ -1193,10 +1232,50 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * Unlike the rule session this record is persisted: it is the recovery contract after a crash/restart.
      */
     public record VoyageEscrow(UUID player, String dimension, double x, double y, double z,
-                               float yaw, float pitch, NbtList inventory) {
+                               float yaw, float pitch, NbtList inventory, Optional<BodySnapshot> body) {
         public VoyageEscrow {
             inventory = inventory.copy();
+            Objects.requireNonNull(body, "body");
         }
+
+        public VoyageEscrow(UUID player, String dimension, double x, double y, double z,
+                            float yaw, float pitch, NbtList inventory) {
+            this(player, dimension, x, y, z, yaw, pitch, inventory, Optional.empty());
+        }
+    }
+
+    public record BodySnapshot(double maxHealth, float health, float absorption, String gameMode,
+                               NbtCompound hunger) {
+        public BodySnapshot {
+            hunger = hunger.copy();
+        }
+
+        public NbtCompound write() {
+            NbtCompound tag = new NbtCompound();
+            tag.putDouble("max_health", maxHealth);
+            tag.putFloat("health", health);
+            tag.putFloat("absorption", absorption);
+            tag.putString("game_mode", gameMode);
+            tag.put("hunger", hunger.copy());
+            return tag;
+        }
+
+        public static BodySnapshot read(NbtCompound tag) {
+            return new BodySnapshot(tag.getDouble("max_health"), tag.getFloat("health"),
+                    tag.getFloat("absorption"), tag.getString("game_mode"), tag.getCompound("hunger"));
+        }
+    }
+
+    private Set<CharacterId> waterBodies = Set.of();
+    private long waterBodiesUntil;
+
+    public boolean bodyInWater(CharacterId id) {
+        return System.currentTimeMillis() < waterBodiesUntil && waterBodies.contains(id);
+    }
+
+    public void setWaterBodies(List<CharacterId> ids, long until) {
+        waterBodies = Set.copyOf(ids);
+        waterBodiesUntil = until;
     }
 
     private final Map<UUID, VoyageEscrow> voyageEscrows = new LinkedHashMap<>();
@@ -1230,7 +1309,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             VoyageEscrow escrow = new VoyageEscrow(saved.getUuid("player"), saved.getString("dimension"),
                     saved.getDouble("x"), saved.getDouble("y"), saved.getDouble("z"),
                     saved.getFloat("yaw"), saved.getFloat("pitch"),
-                    saved.getList("inventory", NbtElement.COMPOUND_TYPE));
+                    saved.getList("inventory", NbtElement.COMPOUND_TYPE),
+                    saved.contains("body", NbtElement.COMPOUND_TYPE)
+                            ? Optional.of(BodySnapshot.read(saved.getCompound("body"))) : Optional.empty());
             voyageEscrows.put(escrow.player(), escrow);
         }
         sceneLeftover = null;
@@ -1277,6 +1358,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             saved.putFloat("yaw", escrow.yaw());
             saved.putFloat("pitch", escrow.pitch());
             saved.put("inventory", escrow.inventory().copy());
+            escrow.body().ifPresent(body -> saved.put("body", body.write()));
             escrows.add(saved);
         }
         tag.put(KEY_ESCROWS, escrows);

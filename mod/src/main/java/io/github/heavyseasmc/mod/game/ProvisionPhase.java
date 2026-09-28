@@ -143,7 +143,12 @@ public final class ProvisionPhase {
         // ❗牌一进手里就推一次投影。漏推的表现是「留了牌，手牌界面里没有」——
         //   看起来像手牌那一面坏了，其实是这里少了一行。
         GameComponents.sync(world);
+        resume(world, component);
+    }
 
+    /** Re-arm only when ownership changed, including a skipped offline recipient. */
+    static void resume(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
         if (session.provisionInProgress()) {
             armDeadline(component, session.provisionOffer().size());
             broadcast(world, component);
@@ -157,6 +162,12 @@ public final class ProvisionPhase {
                 session.state().consciousBySeat().size(), session.table().provisionsLeft(),
                 handTotal(session));
         GameFlow.afterProvision(world, component);
+    }
+
+    static void resend(ServerWorld world, GameComponent component) {
+        if (component.requireSession().provisionInProgress()) {
+            broadcast(world, component);
+        }
     }
 
     /**

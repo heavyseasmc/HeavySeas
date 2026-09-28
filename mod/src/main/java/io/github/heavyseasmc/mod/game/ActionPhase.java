@@ -141,6 +141,17 @@ public final class ActionPhase {
         }
 
         Session session = component.requireSession();
+        if (kind.get() == UseProvisionC2S.Kind.PLAY && session.state().canAct(actor)
+                && !session.state().isOver() && session.provisions().has(action.card())
+                && session.provisions().get(action.card()).effect() instanceof ProvisionEffect.BuffSize) {
+            try {
+                session.drinkRum(actor, action.card());
+                GameComponents.sync(world);
+            } catch (IllegalArgumentException | IllegalStateException rejected) {
+                player.sendMessage(Text.translatable("heavyseas.card_action.rejected"), true);
+            }
+            return;
+        }
         if (session.state().phase() != Phase.ACTION || session.rower().isPresent()
                 || session.contest().isPresent() || component.designating().isPresent()
                 || !session.nextActor().map(actor::equals).orElse(false)) {

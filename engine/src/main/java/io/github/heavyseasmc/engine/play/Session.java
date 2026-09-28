@@ -96,6 +96,20 @@ public final class Session {
         return state;
     }
 
+    public void setOffline(CharacterId who, boolean offline) {
+        boolean interruptedAction = offline && state.phase() == Phase.ACTION && contest == null
+                && (rower().map(who::equals).orElse(false) || state.nextActor().map(who::equals).orElse(false));
+        state = state.withOffline(who, offline);
+        if (interruptedAction) {
+            if (rower().map(who::equals).orElse(false)) {
+                cancelRow();
+            }
+            state = state.withState(who, state.stateOf(who).markActed());
+        }
+        skipOfflineProvisionHolders();
+        Invariants.requireValid(state, context, "connection changed");
+    }
+
     public Table table() {
         return table;
     }
@@ -255,7 +269,18 @@ public final class Session {
         }
         state = state.withState(holder, state.stateOf(holder).withCard(cardId));
         provisionAt++;
+        skipOfflineProvisionHolders();
         Invariants.requireValid(state, context, "物资留牌后");
+    }
+
+    private void skipOfflineProvisionHolders() {
+        while (provisionAt < provisionChain.size() && state.isOffline(provisionChain.get(provisionAt))) {
+            provisionAt++;
+        }
+        if (provisionAt >= provisionChain.size() && !provisionOffer.isEmpty()) {
+            table.returnProvisions(provisionOffer);
+            provisionOffer.clear();
+        }
     }
 
     /**
@@ -524,7 +549,7 @@ public final class Session {
         boolean handOnly = kind == Contest.Kind.STEAL && stealsUncontested(actor);
         contest = new Contest(kind, actor, target, Contest.Stage.CONSENT, Optional.empty(), handOnly, Map.of(),
                 "", Set.of());
-        if (handOnly || !state.conditionOf(target).canAct()) {
+        if (handOnly || !state.canAct(target)) {
             agreed();
         }
     }
@@ -537,6 +562,9 @@ public final class Session {
      */
     public void consent(boolean fight) {
         Contest c = requireStage(Contest.Stage.CONSENT, "表态");
+        if (fight) {
+            requireCanAct(c.target());
+        }
         if (!fight) {
             if (c.kind() == Contest.Kind.RATION) {
                 Set<CharacterId> passed = new LinkedHashSet<>(c.passed());
@@ -564,7 +592,7 @@ public final class Session {
      */
     public void join(CharacterId who, Fight.Side side) {
         Contest c = requireStage(Contest.Stage.STANCES, "站队");
-        if (state.isRemoved(who) || !state.conditionOf(who).canAct()) {
+        if (!state.canAct(who)) {
             throw new IllegalArgumentException("%s %s 不清醒，不能加入战斗（规则 §9.3）".formatted(context, who.value()));
         }
         contest = c.withFight(c.fight().orElseThrow().join(who, side));
@@ -586,6 +614,7 @@ public final class Session {
      */
     public void commitWeapon(CharacterId who, String cardId) {
         Contest c = requireStage(Contest.Stage.WEAPONS, "押武器");
+        requireCanAct(who);
         if (!c.fight().orElseThrow().combatants().contains(who)) {
             throw new IllegalArgumentException("%s %s 没有参战，不能押武器（决策 ④：只开放给参战双方）"
                     .formatted(context, who.value()));
@@ -901,6 +930,7 @@ public final class Session {
      *                               或者这一回合还没 {@link #prepareRowStack}
      */
     public NavigationCard takeCardForNavigation(NavigationCard helmsmanPick) {
+        requireNoThirstInProgress("take navigation card");
         if (state.phase() != Phase.NAVIGATION) {
             throw new IllegalStateException("%s 航海牌只在航海阶段结算，现在是 %s".formatted(context, state.phase()));
         }
@@ -936,6 +966,7 @@ public final class Session {
 
     /** 狂风：标准航海之前从牌堆顶额外翻一张并结算，不动划船堆。 */
     public NavigationCard takeWeatherNavigationCard() {
+        requireNoThirstInProgress("take weather navigation card");
         if (state.phase() != Phase.NAVIGATION || currentWeatherEffect() != WeatherEffect.EXTRA_NAVIGATION) {
             throw new IllegalStateException(context + " 当前没有狂风的额外航海牌可翻");
         }
@@ -961,6 +992,7 @@ public final class Session {
 
     /** 返回刚结算完的是不是狂风额外牌，并把标志清掉。 */
     public boolean finishNavigationResolution() {
+        requireNoThirstInProgress("finish navigation");
         boolean extra = resolvingExtraNavigation;
         resolvingExtraNavigation = false;
         return extra;
@@ -1022,14 +1054,44 @@ public final class Session {
      * @return 这一步点到了谁。口渴的两份名单在点名时就定了，所以报告在这里就是完整的
      */
     public NavigationReport beginNavigate(NavigationCard card) {
+        beginNavigation(card);
+        while (overboardPending().isPresent()) {
+            finishOverboard();
+        }
+        return navigationReport();
+    }
+
+    private PendingNavigation pendingNavigation;
+    private NavigationReport lastNavigationReport;
+    private int overboardSequence;
+
+    private static final class PendingNavigation {
+        final NavigationCard card;
+        final List<CharacterId> candidates;
+        final List<List<CharacterId>> windows = new ArrayList<>();
+        final List<CharacterId> selected = new ArrayList<>();
+        final List<CharacterId> removed = new ArrayList<>();
+        int token;
+        int bait;
+
+        PendingNavigation(NavigationCard card, List<CharacterId> candidates) {
+            this.card = card;
+            this.candidates = candidates;
+        }
+    }
+
+    /** Start with gulls, then pause before each independent overboard resolution. */
+    public void beginNavigation(NavigationCard card) {
         Objects.requireNonNull(card, "card");
         requireNoThirstInProgress("再结算一张航海牌");
+        lastNavigationReport = null;
         // a) 海鸥。浓雾让本回合所有海鸥图示失效。
         int gull = currentWeatherEffect() == WeatherEffect.IGNORE_GULLS ? 0 : card.gull();
         state = state.withGulls(gull);
         Invariants.requireValid(state, context, "海鸥结算后");
         if (state.isOver()) {
-            return new NavigationReport(card, true, List.of(), List.of(), List.of(), List.of(), List.of());
+            lastNavigationReport = new NavigationReport(card, true, List.of(), List.of(), List.of(), List.of(), List.of());
+            return;
         }
 
         // b) 航海牌本身的落海阶段。
@@ -1041,13 +1103,8 @@ public final class Session {
             }
         }
         List<CharacterId> inWater = List.copyOf(card.overboard().select(overboardPool, usedProvisionResolver()));
-        OverboardOutcome baseOverboard = resolveOverboard(inWater);
-        List<CharacterId> overboardSelected = new ArrayList<>(baseOverboard.selected());
-        List<CharacterId> removedNow = new ArrayList<>(baseOverboard.removed());
-        if (state.isOver()) {
-            return new NavigationReport(card, false, overboardCandidates, overboardSelected,
-                    List.of(), List.of(), removedNow);
-        }
+        PendingNavigation pending = new PendingNavigation(card, List.copyOf(overboardCandidates));
+        pending.windows.add(inWater);
 
         // 巨浪 / 暴风雨各自开启一个独立落海阶段：诱饵也因此在每一阶段分别结算。
         WeatherEffect weather = currentWeatherEffect();
@@ -1059,15 +1116,19 @@ public final class Session {
             List<CharacterId> marked = state.onBoatBySeat().stream()
                     .filter(id -> state.stateOf(id).thirst().has(converted))
                     .toList();
-            OverboardOutcome weatherOverboard = resolveOverboard(marked);
-            overboardSelected.addAll(weatherOverboard.selected());
-            removedNow.addAll(weatherOverboard.removed());
-            if (state.isOver()) {
-                return new NavigationReport(card, false, overboardCandidates, List.copyOf(overboardSelected),
-                        List.of(), List.of(), List.copyOf(removedNow));
-            }
+            pending.windows.add(marked);
         }
+        pendingNavigation = pending;
+        nextOverboardWindow();
+    }
 
+    private NavigationReport prepareThirst(NavigationCard card, List<CharacterId> overboardCandidates,
+                                           List<CharacterId> overboardSelected, List<CharacterId> removedNow) {
+        if (state.isOver()) {
+            return new NavigationReport(card, false, overboardCandidates, overboardSelected,
+                    List.of(), List.of(), removedNow);
+        }
+        WeatherEffect weather = currentWeatherEffect();
         // c) 口渴。候选不含死者，但含昏迷者 —— 他仍会口渴，只是不能自己打水。
         Set<CharacterId> thirstPool = new LinkedHashSet<>();
         for (CharacterId id : state.bySeat()) {
@@ -1108,6 +1169,115 @@ public final class Session {
         }
         return new NavigationReport(card, false, overboardCandidates, overboardSelected,
                 thirstCandidates, thirstSelected, removedNow);
+    }
+
+    public record OverboardPrompt(int token, List<CharacterId> swimmers) {
+        public OverboardPrompt {
+            swimmers = List.copyOf(swimmers);
+        }
+    }
+
+    public Optional<OverboardPrompt> overboardPending() {
+        return pendingNavigation == null ? Optional.empty()
+                : Optional.of(new OverboardPrompt(pendingNavigation.token, pendingNavigation.windows.getFirst()));
+    }
+
+    public void finishOverboard() {
+        if (pendingNavigation == null) {
+            throw new IllegalStateException("no pending overboard window");
+        }
+        PendingNavigation pending = pendingNavigation;
+        OverboardOutcome result = resolveOverboard(pending.windows.removeFirst(), pending.bait);
+        pending.selected.addAll(result.selected());
+        pending.removed.addAll(result.removed());
+        nextOverboardWindow();
+    }
+
+    private void nextOverboardWindow() {
+        PendingNavigation pending = pendingNavigation;
+        while (!pending.windows.isEmpty()) {
+            List<CharacterId> swimmers = pending.windows.getFirst().stream()
+                    .filter(id -> !state.isRemoved(id)).toList();
+            if (!swimmers.isEmpty() && !state.isOver()) {
+                pending.windows.set(0, swimmers);
+                pending.token = ++overboardSequence;
+                pending.bait = 0;
+                return;
+            }
+            pending.windows.removeFirst();
+        }
+        pendingNavigation = null;
+        lastNavigationReport = prepareThirst(pending.card, pending.candidates,
+                List.copyOf(pending.selected), List.copyOf(pending.removed));
+    }
+
+    public NavigationReport navigationReport() {
+        if (pendingNavigation != null || lastNavigationReport == null) {
+            throw new IllegalStateException("navigation is not resolved");
+        }
+        return lastNavigationReport;
+    }
+
+    public void playOverboardCard(CharacterId from, CharacterId target, String cardId, int token) {
+        ProvisionEffect effect = requireOverboardPlay(from, target, cardId, token);
+        if (effect instanceof ProvisionEffect.DamageInWater bait) {
+            consume(from, cardId, true);
+            pendingNavigation.bait = bait.stacks()
+                    ? pendingNavigation.bait + bait.amount() : Math.max(pendingNavigation.bait, bait.amount());
+        } else {
+            SurvivorState giver = state.stateOf(from);
+            state = state.withState(from, giver.hasInHand(cardId)
+                    ? giver.withoutCard(cardId) : giver.withoutCardInFront(cardId));
+            state = state.withState(target, state.stateOf(target).withCardInFront(cardId));
+        }
+        requireNoProvisionLost("overboard intervention");
+    }
+
+    public record OverboardPlay(String card, CharacterId target) {
+    }
+
+    /** Private choices for this recipient; the public projection never contains others' hands. */
+    public List<OverboardPlay> overboardPlays(CharacterId who) {
+        if (pendingNavigation == null || !state.canAct(who)) {
+            return List.of();
+        }
+        List<String> cards = new ArrayList<>(state.stateOf(who).hand());
+        cards.addAll(state.stateOf(who).front());
+        List<OverboardPlay> result = new ArrayList<>();
+        for (String card : new LinkedHashSet<>(cards)) {
+            for (CharacterId target : pendingNavigation.windows.getFirst()) {
+                try {
+                    ProvisionEffect effect = requireOverboardPlay(who, target, card, pendingNavigation.token);
+                    result.add(new OverboardPlay(card, target));
+                    if (effect instanceof ProvisionEffect.DamageInWater) {
+                        break;
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // Most held cards have no intervention at this window.
+                }
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private ProvisionEffect requireOverboardPlay(CharacterId from, CharacterId target, String cardId, int token) {
+        if (pendingNavigation == null || pendingNavigation.token != token) {
+            throw new IllegalStateException("overboard window has changed");
+        }
+        if (!pendingNavigation.windows.getFirst().contains(target)) {
+            throw new IllegalArgumentException("target is not going overboard");
+        }
+        ProvisionEffect effect = requireHeld(from, cardId).effect();
+        if (effect instanceof ProvisionEffect.DamageInWater) {
+            return effect;
+        }
+        if (effect instanceof ProvisionEffect.PreventOverboardDamage ring
+                && (from.equals(target) || ring.transferable())
+                && (!ring.receiverMustBeConscious() || state.canAct(target))
+                && state.conditionOf(target) != Condition.DEAD && !hasLifePreserverInFront(target)) {
+            return effect;
+        }
+        throw new IllegalArgumentException("card cannot be played on this target");
     }
 
     /**
@@ -1166,12 +1336,20 @@ public final class Session {
                     "%s %s 在当前天候下每次口渴需要 %d 张水，不能只交 %d 张"
                             .formatted(context, prompt.who().value(), prompt.waterPerSource(), donors.size()));
         }
+        Map<CharacterId, Integer> required = new LinkedHashMap<>();
+        donors.forEach(donor -> required.merge(donor, 1, Integer::sum));
+        for (Map.Entry<CharacterId, Integer> entry : required.entrySet()) {
+            CharacterId donor = entry.getKey();
+            if (!state.canAct(donor)) {
+                throw new IllegalArgumentException(
+                        "%s %s 不清醒或已离线，打不出水".formatted(context, donor.value()));
+            }
+            if (watersOf(donor) < entry.getValue()) {
+                throw new IllegalArgumentException("%s %s 没有所需的水".formatted(context, donor.value()));
+            }
+        }
         for (CharacterId donor : donors) {
             SurvivorState from = state.stateOf(donor);
-            if (!state.conditionOf(donor).canAct()) {
-                throw new IllegalArgumentException(
-                        "%s %s 不清醒，打不出水（别人可以替他打）".formatted(context, donor.value()));
-            }
             // ❗手上的与<b>亮在面前的</b>都能喝。规则 §5.2：亮出是为了防偷与「随时可用」，
             //   不是把牌锁死 —— 只认手牌的话，亮过的水就永远喝不了了，而屏幕上看不出任何异常。
             if (from.hasInHand(WATER)) {
@@ -1277,13 +1455,13 @@ public final class Session {
     }
 
     /** 一个独立落海阶段；诱饵伤害、冲牌、水中死亡都只看这一阶段的名单。 */
-    private OverboardOutcome resolveOverboard(List<CharacterId> requested) {
+    private OverboardOutcome resolveOverboard(List<CharacterId> requested, int playedBait) {
         List<CharacterId> inWater = requested.stream()
                 .filter(id -> !state.isRemoved(id))
                 .distinct().toList();
         List<CharacterId> selected = inWater.stream()
                 .filter(id -> state.conditionOf(id) != Condition.DEAD).toList();
-        int shark = sharkDamage(inWater);
+        int shark = Math.max(playedBait, sharkDamage(inWater));
         for (CharacterId id : inWater) {
             int hurt = (isOverboardImmune(state, id) ? 0 : 1) + shark;
             if (hurt > 0) {
@@ -1340,13 +1518,16 @@ public final class Session {
         if (!share.sources().contains(WATER)) {
             return 0;
         }
-        if (share.requiresConscious() && state.conditionOf(id) != Condition.CONSCIOUS) {
+        if (share.requiresConscious() && !state.canAct(id)) {
             return 0;
         }
         return Boolean.TRUE.equals(share.stacking().get(WATER)) ? thirstWatersSpent : Math.min(1, thirstWatersSpent);
     }
 
     private void requireNoThirstInProgress(String what) {
+        if (pendingNavigation != null) {
+            throw new IllegalStateException("overboard decision pending: " + what);
+        }
         int at = nextThirstIndex();
         if (at >= 0) {
             throw new IllegalStateException("%s %s 还没决定喝不喝水，不能%s"
@@ -1378,7 +1559,7 @@ public final class Session {
     private boolean isOverboardImmune(GameState g, CharacterId id) {
         Ability ability = g.roster().get(id).ability();
         if (ability instanceof Ability.OverboardImmune oi
-                && (!oi.requiresConscious() || g.conditionOf(id) == Condition.CONSCIOUS)) {
+                && (!oi.requiresConscious() || g.canAct(id))) {
             return true;
         }
         for (String cardId : g.stateOf(id).front()) {
@@ -1486,6 +1667,7 @@ public final class Session {
      * 亮了也就落水时会被冲走、并且看得见。
      */
     public void reveal(CharacterId who, String cardId) {
+        requireCanAct(who);
         if (contest != null && contest.stage() == Contest.Stage.PICK && contest.target().equals(who)) {
             // 被抢方在战斗里照常能亮牌，但不能在抢夺结算那一刻把手牌亮出来躲掉这一抢（规则 §5 抢夺）。
             throw new IllegalStateException("%s %s 正在挨抢，挑牌那一刻不能亮牌".formatted(context, who.value()));
@@ -1531,6 +1713,10 @@ public final class Session {
      * @throws IllegalArgumentException 他手上与面前都没有这张
      */
     public void giveCard(CharacterId from, CharacterId to, String cardId) {
+        giveCard(from, to, cardId, !state.stateOf(from).hasInHand(cardId));
+    }
+
+    public void giveCard(CharacterId from, CharacterId to, String cardId, boolean fromFront) {
         requireNoContest("交易（规则 §9.1：战斗结束前任何卡不得易手）");
         if (state.phase() != Phase.ACTION) {
             throw new IllegalStateException(
@@ -1542,12 +1728,13 @@ public final class Session {
         if (state.isRemoved(from) || state.isRemoved(to)) {
             throw new IllegalArgumentException("%s 被移出游戏的人不能交易".formatted(context));
         }
+        requireCanAct(from);
         table.provisions().get(cardId);
         SurvivorState giver = state.stateOf(from);
-        if (giver.hasInHand(cardId)) {
+        if (!fromFront && giver.hasInHand(cardId)) {
             state = state.withState(from, giver.withoutCard(cardId))
                     .withState(to, state.stateOf(to).withCard(cardId));
-        } else if (giver.hasInFront(cardId)) {
+        } else if (fromFront && giver.hasInFront(cardId)) {
             state = state.withState(from, giver.withoutCardInFront(cardId))
                     .withState(to, state.stateOf(to).withCardInFront(cardId));
         } else {
@@ -1594,6 +1781,7 @@ public final class Session {
      */
     public void openParasol(CharacterId who, String cardId) {
         requireNoContest("撑伞");
+        requireCanAct(who);
         Provision card = table.provisions().get(cardId);
         if (!(card.effect() instanceof ProvisionEffect.PreventThirst cover) || !cover.requiresOpen()) {
             throw new IllegalArgumentException("%s 不是要撑开才生效的物资".formatted(cardId));
@@ -1657,7 +1845,7 @@ public final class Session {
     /** 下一位仍能反对的人，按座位顺序；打牌者、已回答者与不清醒者都跳过。 */
     private Optional<CharacterId> nextRationOpponent(CharacterId user, Set<CharacterId> passed) {
         return state.onBoatBySeat().stream()
-                .filter(id -> !id.equals(user) && !passed.contains(id) && state.conditionOf(id).canAct())
+                .filter(id -> !id.equals(user) && !passed.contains(id) && state.canAct(id))
                 .findFirst();
     }
 
@@ -1669,7 +1857,7 @@ public final class Session {
         }
         List<CharacterId> healed = new ArrayList<>();
         for (CharacterId id : state.bySeat()) {
-            if (state.conditionOf(id) != Condition.CONSCIOUS || state.stateOf(id).damage() == 0) {
+            if (!state.canAct(id) || state.stateOf(id).damage() == 0) {
                 continue;
             }
             state = state.withState(id, state.stateOf(id).healIfHurt(heal.amount()));
@@ -1722,6 +1910,7 @@ public final class Session {
      * @throws IllegalStateException 这一回合已经喝过了
      */
     public void drinkRum(CharacterId who, String cardId) {
+        requireCanAct(who);
         Provision card = table.provisions().get(cardId);
         if (!(card.effect() instanceof ProvisionEffect.BuffSize buff)) {
             throw new IllegalArgumentException("%s 不是能喝的加体型物资".formatted(cardId));
@@ -1772,7 +1961,7 @@ public final class Session {
         if (!share.sources().contains(cardId)) {
             return false;
         }
-        return !share.requiresConscious() || state.conditionOf(id) == Condition.CONSCIOUS;
+        return !share.requiresConscious() || state.canAct(id);
     }
 
     /** 蹭到的酒给几点体型。不叠加，所以按目录里那张牌的加值算一次。 */
@@ -1907,6 +2096,7 @@ public final class Session {
      * 而表现只是「医生的技能好像没什么用」。
      */
     private Provision requireHeld(CharacterId who, String cardId) {
+        requireCanAct(who);
         Provision card = table.provisions().get(cardId);
         SurvivorState s = state.stateOf(who);
         if (!s.hasInHand(cardId) && !s.hasInFront(cardId)) {
@@ -1914,6 +2104,12 @@ public final class Session {
                     "%s %s 手上与面前都没有 %s".formatted(context, who.value(), cardId));
         }
         return card;
+    }
+
+    private void requireCanAct(CharacterId who) {
+        if (!state.canAct(who)) {
+            throw new IllegalArgumentException("%s %s cannot act".formatted(context, who.value()));
+        }
     }
 
     /** 用掉一张：弃牌堆，或者留在面前（医生的医疗箱）。手上那张用过之后不回手牌。 */
