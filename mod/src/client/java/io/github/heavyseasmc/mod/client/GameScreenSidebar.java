@@ -23,8 +23,10 @@ final class GameScreenSidebar {
 
             // HudRenderCallback 比 Screen 先画，放在那里会被 GameScreen.renderBackdrop 盖住。
             // afterRender 包住的是 renderWithTooltip；侧栏因此永远是这一面的最后一层。
-            ScreenEvents.afterRender(screen).register((ignored, context, mouseX, mouseY, delta) ->
-                    GameHud.renderSidebar(context, client));
+            ScreenEvents.afterRender(screen).register((ignored, context, mouseX, mouseY, delta) -> {
+                GameHud.renderSidebar(context, client);
+                gameScreen.renderDetails(context, mouseX, mouseY);
+            });
         });
     }
 }

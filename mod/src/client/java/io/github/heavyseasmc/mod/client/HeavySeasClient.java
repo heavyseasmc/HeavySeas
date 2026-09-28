@@ -115,6 +115,7 @@ public final class HeavySeasClient implements ClientModInitializer {
 
     /** 上一次弹出口渴一面的那个窗口。同一个窗口只弹一次。 */
     private static long thirstWindowShown;
+    private static long overboardWindowShown;
 
     /**
      * 换座位 / 抢夺那一场里，已经为哪一个窗口弹过界面（以窗口的超时时刻认，与口渴、舵手同一个写法）。
@@ -328,6 +329,17 @@ public final class HeavySeasClient implements ClientModInitializer {
             return;
         }
         endgameStageShown = null;
+
+        var table = client.world == null ? io.github.heavyseasmc.mod.state.TableView.EMPTY
+                : GameComponents.of(client.world).tableView();
+        if (table.overboardOpen() && !table.plays().isEmpty()) {
+            boolean fresh = table.deadline() != overboardWindowShown;
+            overboardWindowShown = table.deadline();
+            if (!(client.currentScreen instanceof CardChoiceScreen) && (fresh || pressed)) {
+                client.setScreen(new CardChoiceScreen(table.token()));
+            }
+            return;
+        }
 
         // 医疗箱的目标一面：它由手牌一面的 U 触发，服务端确认效果与持牌后才会出现在投影里。
         if (view.myProvisionTarget()) {

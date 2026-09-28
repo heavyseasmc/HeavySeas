@@ -38,18 +38,20 @@ public final class GameState {
 
     /** 被移出游戏的人（死在水里，连人带牌离场，ADR-0022）。只增不减。 */
     private final Set<CharacterId> removed;
+    private final Set<CharacterId> offline;
 
     /** 第几只海鸥到达时靠岸获救。 */
     public static final int GULLS_TO_LAND = 4;
 
     private GameState(Roster roster, Map<CharacterId, SurvivorState> states,
-                      Phase phase, int turn, int gulls, Set<CharacterId> removed) {
+                      Phase phase, int turn, int gulls, Set<CharacterId> removed, Set<CharacterId> offline) {
         this.roster = roster;
         this.states = Map.copyOf(states);
         this.phase = phase;
         this.turn = turn;
         this.gulls = gulls;
         this.removed = Collections.unmodifiableSet(new LinkedHashSet<>(removed));
+        this.offline = Set.copyOf(offline);
     }
 
     /** 开局：全员未受伤，回合 1，物资阶段，0 只海鸥。 */
@@ -62,13 +64,13 @@ public final class GameState {
         for (Survivor s : roster.survivors()) {
             initial.put(s.id(), SurvivorState.fresh(s.id(), s.seat()));
         }
-        return new GameState(roster, initial, Phase.PROVISION, 1, 0, Set.of());
+        return new GameState(roster, initial, Phase.PROVISION, 1, 0, Set.of(), Set.of());
     }
 
     /** 带天候扩充的开局：第 1 天从翻天候开始。 */
     public static GameState startWithWeather(Roster roster) {
         GameState base = start(roster);
-        return new GameState(base.roster, base.states, Phase.WEATHER, base.turn, base.gulls, base.removed);
+        return new GameState(base.roster, base.states, Phase.WEATHER, base.turn, base.gulls, base.removed, base.offline);
     }
 
     public Roster roster() {
@@ -133,9 +135,29 @@ public final class GameState {
         return removed.contains(id);
     }
 
+    public boolean isOffline(CharacterId id) {
+        stateOf(id);
+        return offline.contains(id);
+    }
+
+    public boolean canAct(CharacterId id) {
+        return conditionOf(id).canAct() && !isOffline(id);
+    }
+
+    public GameState withOffline(CharacterId id, boolean offline) {
+        stateOf(id);
+        Set<CharacterId> next = new LinkedHashSet<>(this.offline);
+        if (offline) {
+            next.add(id);
+        } else {
+            next.remove(id);
+        }
+        return new GameState(roster, states, phase, turn, gulls, removed, next);
+    }
+
     /** 按座位升序的清醒角色。物资阶段的抽牌数与传牌次序都用它。 */
     public List<CharacterId> consciousBySeat() {
-        return bySeat().stream().filter(id -> conditionOf(id).canAct()).toList();
+        return bySeat().stream().filter(this::canAct).toList();
     }
 
     /**
@@ -150,7 +172,7 @@ public final class GameState {
      */
     public Optional<CharacterId> nextActor() {
         return bySeat().stream()
-                .filter(id -> conditionOf(id).canAct())
+                .filter(this::canAct)
                 .filter(id -> !stateOf(id).actedThisTurn())
                 .findFirst();
     }
@@ -204,7 +226,7 @@ public final class GameState {
         stateOf(id);            // 存在性校验
         Map<CharacterId, SurvivorState> copy = new LinkedHashMap<>(states);
         copy.put(id, next);
-        return new GameState(roster, copy, phase, turn, gulls, removed);
+        return new GameState(roster, copy, phase, turn, gulls, removed, offline);
     }
 
     /**
@@ -214,7 +236,7 @@ public final class GameState {
      * 下限钳到 0；上限<b>不钳</b>：凑够 4 只就是终局，多出来的没有意义但也不该报错。
      */
     public GameState withGulls(int delta) {
-        return new GameState(roster, states, phase, turn, Math.max(0, gulls + delta), removed);
+        return new GameState(roster, states, phase, turn, Math.max(0, gulls + delta), removed, offline);
     }
 
     /**
@@ -229,7 +251,7 @@ public final class GameState {
         }
         Set<CharacterId> next = new LinkedHashSet<>(removed);
         next.add(id);
-        return new GameState(roster, states, phase, turn, gulls, next);
+        return new GameState(roster, states, phase, turn, gulls, next, offline);
     }
 
     /**
@@ -245,10 +267,10 @@ public final class GameState {
         }
         Phase next = phase.next();
         if (!phase.endsTurn()) {
-            return new GameState(roster, states, next, turn, gulls, removed);
+            return new GameState(roster, states, next, turn, gulls, removed, offline);
         }
         Map<CharacterId, SurvivorState> cleared = new LinkedHashMap<>();
         states.forEach((id, s) -> cleared.put(id, s.endOfTurn()));
-        return new GameState(roster, cleared, next, turn + 1, gulls, removed);
+        return new GameState(roster, cleared, next, turn + 1, gulls, removed, offline);
     }
 }

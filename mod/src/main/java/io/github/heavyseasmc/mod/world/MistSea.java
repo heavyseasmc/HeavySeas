@@ -185,8 +185,10 @@ public final class MistSea {
     }
 
     private static void escrow(GameComponent component, ServerPlayerEntity player) {
-        if (component.hasVoyageEscrow(player.getUuid())) {
-            throw new IllegalStateException(player.getGameProfile().getName() + " 已有一份未恢复的雾海托管");
+        for (ServerWorld world : player.server.getWorlds()) {
+            if (GameComponents.of(world).hasVoyageEscrow(player.getUuid())) {
+                throw new IllegalStateException(player.getGameProfile().getName() + " 已有一份未恢复的雾海托管");
+            }
         }
         Vec3d returnPoint = player.getPos();
         if (player.getVehicle() instanceof SeatEntity seat && seat.ours() && seat.lobby()) {
@@ -196,7 +198,8 @@ public final class MistSea {
         NbtList inventory = player.getInventory().writeNbt(new NbtList());
         component.putVoyageEscrow(new GameComponent.VoyageEscrow(player.getUuid(),
                 player.getWorld().getRegistryKey().getValue().toString(),
-                returnPoint.x, returnPoint.y, returnPoint.z, player.getYaw(), player.getPitch(), inventory));
+                returnPoint.x, returnPoint.y, returnPoint.z, player.getYaw(), player.getPitch(), inventory,
+                Optional.of(PlayerBodies.capture(player))));
         player.getInventory().clear();
         player.getInventory().markDirty();
         player.playerScreenHandler.sendContentUpdates();
@@ -234,29 +237,26 @@ public final class MistSea {
 
     /** Login recovery path for a server which stopped during a match. Safe and idempotent. */
     public static void recover(ServerPlayerEntity player) {
-        ServerWorld sea = world(player.server);
-        if (sea == null) {
-            return;
-        }
-        GameComponent component = GameComponents.of(sea);
-        if (!component.hasVoyageEscrow(player.getUuid())) {
-            return;
-        }
-        if (component.session().isPresent()) {
-            // This is a reconnect, not crash recovery. The escrow must remain sealed until the match ends.
-            VoyageLayout layout = component.layoutId().map(SceneDataLoader::require)
-                    .orElseGet(SceneDataLoader::defaultLayout);
-            if (!player.getWorld().getRegistryKey().equals(sea.getRegistryKey())) {
-                Vec3d bow = layout.boat().bow();
-                player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
+        // The interrupted voyage may have used a custom dimension, not the current default layout.
+        for (ServerWorld sea : player.server.getWorlds()) {
+            GameComponent component = GameComponents.of(sea);
+            if (!component.hasVoyageEscrow(player.getUuid())) {
+                continue;
             }
-            GameComponents.sync(sea);
+            if (component.belongsToActiveVoyage(player.getUuid())) {
+                VoyageLayout layout = component.layoutId().map(SceneDataLoader::require)
+                        .orElseGet(SceneDataLoader::defaultLayout);
+                if (!player.getWorld().getRegistryKey().equals(sea.getRegistryKey())) {
+                    Vec3d bow = layout.boat().bow();
+                    player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
+                }
+                GameComponents.sync(sea);
+            } else if (restore(component, player)) {
+                checkpoint(player.server, "雾海异常中断恢复");
+                player.sendMessage(Text.translatable("heavyseas.mist_sea.recovered"), true);
+                LOGGER.info("雾海恢复：{} 的物品与返回位置已恢复", player.getGameProfile().getName());
+            }
             return;
-        }
-        if (restore(component, player)) {
-            checkpoint(player.server, "雾海异常中断恢复");
-            player.sendMessage(Text.translatable("heavyseas.mist_sea.recovered"), true);
-            LOGGER.info("雾海恢复：{} 的物品与返回位置已恢复", player.getGameProfile().getName());
         }
     }
 
@@ -278,6 +278,7 @@ public final class MistSea {
             player.playerScreenHandler.sendContentUpdates();
             player.removeStatusEffect(StatusEffects.BLINDNESS);
             player.teleport(destination, escrow.x(), escrow.y(), escrow.z(), escrow.yaw(), escrow.pitch());
+            escrow.body().ifPresent(body -> PlayerBodies.restore(player, body));
             return true;
         } catch (RuntimeException failure) {
             // Never consume the only recovery copy on a partial restore.

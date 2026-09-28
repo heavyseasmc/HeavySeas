@@ -112,6 +112,10 @@ public final class Seats {
         }
         List<CharacterId> order = component.requireSession().state().bySeat();
         for (int i = 0; i < order.size() && i < component.seatIds().size(); i++) {
+            var state = component.requireSession().state();
+            if (state.isRemoved(order.get(i)) || state.isOffline(order.get(i)) || component.bodyInWater(order.get(i))) {
+                continue;
+            }
             Optional<GameComponent.Occupant> who = component.occupantOf(order.get(i));
             if (who.isEmpty() || who.get().isDummy()) {
                 continue;                     // 替身不需要身体（ADR-0024 §7.6）：那个座位就空着

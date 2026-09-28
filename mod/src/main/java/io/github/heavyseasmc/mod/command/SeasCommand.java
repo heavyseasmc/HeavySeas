@@ -54,7 +54,7 @@ import java.util.Optional;
  * <h2>为什么还留着</h2>
  * 指令能被一个人跑完 —— 配合 dummy，开发期不必凑 6 个真人；出口验收 {@code playthrough-check.sh}
  * 关着替身自动推进打的那一局，靠的就是这里的 {@code pass · row · swap · fight}（ADR-0019）。
- * 玩家侧的几条等 GUI 能驱动整局之后再删（O18）。
+ * 整棵命令树仅向管理员和控制台开放；普通玩家使用 GUI。
  *
  * <h2>谁能替谁下指令</h2>
  * 真人占的座位只有他本人能动；dummy 占的座位要 2 级权限（它是测试夹具，不该让普通玩家随手替人行动）。
@@ -110,6 +110,7 @@ public final class SeasCommand {
     /** 这个重载只为机械证明生产命令树不含 {@code /seas dev}。 */
     static void register(CommandDispatcher<ServerCommandSource> dispatcher, boolean developmentEnvironment) {
         dispatcher.register(CommandManager.literal("seas")
+                .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                 .then(CommandManager.literal("start")
                         .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .executes(guarded(context -> start(context, 6, SceneDataLoader.DEFAULT)))
@@ -242,6 +243,7 @@ public final class SeasCommand {
                                         StringArgumentType.getString(context, "card")))))));
         if (developmentEnvironment) {
             dispatcher.register(CommandManager.literal("seas")
+                    .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                     .then(CommandManager.literal("dev")
                             .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                             .then(CommandManager.literal("roster")

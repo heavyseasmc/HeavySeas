@@ -135,6 +135,11 @@ public final class Table {
         return out;
     }
 
+    /** Undelivered cards stay available after a recipient disconnects. */
+    void returnProvisions(List<String> cards) {
+        provisionPile.addAll(cards);
+    }
+
     /**
      * 从物资牌堆里抽走指定的一张（<b>夹具</b>，不是规则）。
      *

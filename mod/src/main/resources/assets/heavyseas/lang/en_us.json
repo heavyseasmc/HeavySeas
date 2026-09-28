@@ -336,5 +336,13 @@
   "heavyseas.roster.start": "Ring Bell and Sail",
   "heavyseas.mist_sea.recovered": "Your previous Mist Sea voyage ended unexpectedly. Your inventory and return position were restored.",
   "heavyseas.endgame.arrived": "The fourth gull parts the fog; the occupied boat glides toward shore.",
-  "heavyseas.endgame.spectating": "Spectating the finale · private cards and score details remain hidden"
+  "heavyseas.endgame.spectating": "Spectating the finale · private cards and score details remain hidden",
+  "heavyseas.overboard.title": "Overboard",
+  "heavyseas.overboard.pending": "Going overboard: %s",
+  "heavyseas.trade.title": "Give a Card",
+  "heavyseas.trade.give": "Give",
+  "heavyseas.trade.recipient": "To %s",
+  "heavyseas.table.title": "Public Cards",
+  "heavyseas.table.offline": "Offline",
+  "heavyseas.card_action.rejected": "That card cannot be played now."
 }

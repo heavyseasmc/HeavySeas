@@ -6,6 +6,10 @@ import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
 import io.github.heavyseasmc.mod.game.ContestPhase;
+import io.github.heavyseasmc.mod.game.ConnectionPhase;
+import io.github.heavyseasmc.mod.game.OverboardPhase;
+import io.github.heavyseasmc.mod.game.CardActions;
+import io.github.heavyseasmc.mod.net.CardActionC2S;
 import io.github.heavyseasmc.mod.game.DesignationPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.game.NavigationPhase;
@@ -36,6 +40,7 @@ import io.github.heavyseasmc.mod.world.LobbyBoatEntity;
 import io.github.heavyseasmc.mod.world.LobbyBoat;
 import io.github.heavyseasmc.mod.world.SceneItems;
 import io.github.heavyseasmc.mod.world.Seats;
+import io.github.heavyseasmc.mod.world.PlayerBodies;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -79,6 +84,7 @@ public final class HeavySeasMod implements ModInitializer {
         ServerChunkEvents.CHUNK_LOAD.register(LobbyBoatBlockEntity::restoreLegacyAnchors);
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。
         SeatEntity.register();
+        PlayerBodies.register();
         GullEntity.register();
         // ❗孤儿座位：加载事件只登记，tick 末尾才清。加载回调仍在实体管理器的遍历里，
         //   当场 discard 会让存档检查点抛 ConcurrentModificationException。
@@ -93,6 +99,7 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 server.execute(() -> {
                     MistSea.recover(handler.player);
+                    ConnectionPhase.connected(handler.player, true);
                     // 牌的目录（类别 · 张数 · 角标上的数）：这些是牌自己的属性，数据包说了算 ——
                     // 客户端的提示签与牌面角标要写它们，而在这个包之前根本拿不到数据。
                     // ❗发失败不是致命的：提示签少两栏、角标空着，牌照样能玩。所以只记一句，不打断进服。
@@ -104,6 +111,8 @@ public final class HeavySeasMod implements ModInitializer {
                         LOGGER.warn("牌目录没发出去（提示签上会少「类别 · 共几张」、角标空着）：{}", e.toString());
                     }
                 }));
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
+                ConnectionPhase.connected(handler.player, false));
         // 指定模式（ADR-0025）：世界里右键一个人就是「我要对他动手」。
         // ❗只在指定模式里才作数，其余一律放行 —— 吃掉别人的右键会让人觉得「右键偶尔失灵」。
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) ->
@@ -132,6 +141,10 @@ public final class HeavySeasMod implements ModInitializer {
                         () -> ActionPhase.onChoice(context.player(), payload)));
         // 手牌里打出特殊物资；医疗箱会用同一个包走第二步挑目标。
         PayloadTypeRegistry.playC2S().register(UseProvisionC2S.ID, UseProvisionC2S.CODEC);
+        PayloadTypeRegistry.playC2S().register(CardActionC2S.ID, CardActionC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(CardActionC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> CardActions.onAction(context.player(), payload)));
         ServerPlayNetworking.registerGlobalReceiver(UseProvisionC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> ActionPhase.onUseProvision(context.player(), payload)));
@@ -165,9 +178,11 @@ public final class HeavySeasMod implements ModInitializer {
 
         // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
         ServerTickEvents.END_SERVER_TICK.register(Seats::tick);
+        ServerTickEvents.END_SERVER_TICK.register(PlayerBodies::tick);
         ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ActionPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(NavigationPhase::tick);
+        ServerTickEvents.END_SERVER_TICK.register(OverboardPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ThirstPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ContestPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(DesignationPhase::tick);
