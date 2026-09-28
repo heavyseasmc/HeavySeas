@@ -1,20 +1,22 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # 提交前检查。启用（每个克隆只需一次）：
 #   git config core.hooksPath .githooks
 #
-set -uo pipefail
+set -eu
 
 root="$(git rev-parse --show-toplevel)"
 private_root="${HEAVYSEAS_WIKI:-$root/docs}"
-if [[ ! -f "$private_root/tools/precommit.sh" ]]; then
+if [ ! -f "$private_root/tools/precommit.sh" ]; then
   sibling="$(cd "$root/.." && pwd)/VibeCodingWiki"
-  [[ -f "$sibling/tools/precommit.sh" ]] && private_root="$sibling"
+  if [ -f "$sibling/tools/precommit.sh" ]; then
+    private_root="$sibling"
+  fi
 fi
 check="$private_root/tools/precommit.sh"
 
-if [[ -f "$check" ]]; then
-  bash "$check" || {
+if [ -f "$check" ]; then
+  "${BASH:-bash}" "$check" "$@" || {
     echo
     echo "提交已中止。确需绕过时：git commit --no-verify（请三思）"
     exit 1
@@ -24,8 +26,9 @@ else
 fi
 
 # docs/ 是维护者的本地目录，不应被暂存。
-staged_docs=$(git diff --cached --name-only | grep '^docs/' || true)
-if [[ -n "$staged_docs" ]]; then
+staged_files=$(git diff --cached --name-only)
+staged_docs=$(printf '%s\n' "$staged_files" | grep '^docs/' || true)
+if [ -n "$staged_docs" ]; then
   echo "❌ docs/ 下的文件被暂存了，该目录不入库："
   echo "$staged_docs" | sed 's/^/     /'
   echo "   修复：git restore --staged docs/"

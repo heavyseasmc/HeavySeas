@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # 推送前检查。启用（每个克隆只需一次）：
 #   git config core.hooksPath .githooks
@@ -9,18 +9,20 @@
 #
 # 绕过：git push --no-verify（请三思：上一次跳过检查的代价是重建整个仓库历史）
 
-set -uo pipefail
+set -eu
 
 root="$(git rev-parse --show-toplevel)"
 private_root="${HEAVYSEAS_WIKI:-$root/docs}"
-if [[ ! -f "$private_root/tools/prepush.sh" ]]; then
+if [ ! -f "$private_root/tools/prepush.sh" ]; then
   sibling="$(cd "$root/.." && pwd)/VibeCodingWiki"
-  [[ -f "$sibling/tools/prepush.sh" ]] && private_root="$sibling"
+  if [ -f "$sibling/tools/prepush.sh" ]; then
+    private_root="$sibling"
+  fi
 fi
 check="$private_root/tools/prepush.sh"
 
-if [[ -f "$check" ]]; then
-  bash "$check" || {
+if [ -f "$check" ]; then
+  "${BASH:-bash}" "$check" "$@" || {
     echo
     echo "推送已中止。确需绕过时：git push --no-verify（请三思）"
     exit 1
