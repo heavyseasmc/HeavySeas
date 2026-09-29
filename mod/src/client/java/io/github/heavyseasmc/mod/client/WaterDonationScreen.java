@@ -119,4 +119,10 @@ public final class WaterDonationScreen extends GameScreen {
         ClientPlayNetworking.send(new WaterDonationC2S(1));
         LOGGER.info("口渴：替 {} 打 1 张水", view.thirstPrompt().who());
     }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable("heavyseas.cue.water");
+    }
 }

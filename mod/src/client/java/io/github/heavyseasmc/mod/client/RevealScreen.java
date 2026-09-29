@@ -38,7 +38,11 @@ public final class RevealScreen extends GameScreen {
 
     /** 舞台上卡与「恨 / 爱」那个字之间。 */
     private static final int STAGE_GAP = 10;
-    private static final int LABEL_SCALE = 2;
+    /**
+     * 「恨 / 爱」那个大字取梯子最大一级，按 1:1 画。原先是正文套矩阵 ×2，边缘成了台阶 ——
+     * 文字不许用矩阵放大（ADR-0037 §7.3）；判据在 {@code GuiConsistencyTest}。
+     */
+    private static final int LABEL_SIZE = GuiText.TITLE;
 
     /**
      * 翻开之后看清多久再「滑」到下一个人。服务端每一步停 2.6 秒（{@code EndgamePhase.FLIP_HOLD_MS}），
@@ -107,6 +111,7 @@ public final class RevealScreen extends GameScreen {
             stageWho = e.flipped() - 1;
             stageRevealed = true;
             flipAt = now;
+            GuiSound.flipped(now, flipMillis(e.entries().get(stageWho)));
             slideAt = 0L;
             pendingNext = e.flipped() < e.entries().size() ? e.flipped() : -1;
             // 与语言无关的一行：GUI 回归靠它数「客户端真的翻了几张」。
@@ -207,7 +212,7 @@ public final class RevealScreen extends GameScreen {
         }
         HudView.Endgame.Entry en = entries.get(stageWho);
         Text label = Text.translatable(hate ? "heavyseas.reveal.hates" : "heavyseas.reveal.loves");
-        int labelW = textW(label) * LABEL_SCALE;
+        int labelW = GuiText.width(label.getString(), LABEL_SIZE, false);
         int avail = bottom - top;
         int byWidth = GuiLanguage.cardHeight(Math.max(1, (width - 2 * SIDE - labelW - 2 * STAGE_GAP) / 2));
         int cap = Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO));
@@ -225,11 +230,9 @@ public final class RevealScreen extends GameScreen {
         }
 
         // 「恨」用朱砂 —— 它只给伤害与紧迫；「爱」不占语义色（ADR-0018 §7.3：多了就不成语义）。
-        context.getMatrices().push();
-        context.getMatrices().translate(left + w + STAGE_GAP, y + h / 2f - textH() * LABEL_SCALE / 2f, 0);
-        context.getMatrices().scale(LABEL_SCALE, LABEL_SCALE, 1f);
-        drawLineLeft(context, label, 0, 0, hate ? GuiLanguage.cinnabar() : GuiLanguage.ink());
-        context.getMatrices().pop();
+        int labelY = Math.round(y + h / 2f - GuiText.lineHeight(LABEL_SIZE, false) / 2f);
+        GuiText.line(context, label, left + w + STAGE_GAP, labelY, labelW, LABEL_SIZE, false,
+                hate ? GuiLanguage.cinnabar() : GuiLanguage.ink(), GuiText.Align.LEFT);
 
         int tx = left + w + labelW + 2 * STAGE_GAP;
         boolean front = stageRevealed && !en.target().isEmpty() && showsFront(now, en);
@@ -256,8 +259,12 @@ public final class RevealScreen extends GameScreen {
         Text line;
         int color = GuiLanguage.muted();
         if (stageRevealed && !en.target().isEmpty() && showsFront(now, en)) {
-            line = Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
-                    nameOf(en.who()), nameOf(en.target()));
+            // 抽到自己是合规的（规则基线 §10.3），但「小孩 恨的是 小孩。」读起来像出了错（ADR-0045 N4）。
+            line = en.target().equals(en.who())
+                    ? Text.translatable(hate ? "heavyseas.endgame.reveal_hate_self" : "heavyseas.endgame.reveal_love_self",
+                            nameOf(en.who()))
+                    : Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
+                            nameOf(en.who()), nameOf(en.target()));
             color = GuiLanguage.ink();
         } else {
             line = Text.translatable(hate ? "heavyseas.reveal.asking_hate" : "heavyseas.reveal.asking_love",

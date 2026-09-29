@@ -218,6 +218,7 @@ public abstract class GameScreen extends Screen {
     @Override
     public void removed() {
         super.removed();
+        GuiSound.cancel();                   // 没响的全部作废：牌已经不在桌上了
         LOGGER.info("界面：收起 {}", getClass().getSimpleName());
     }
 
@@ -401,6 +402,7 @@ public abstract class GameScreen extends Screen {
      * （原先靠把黑加到 0xE4）。板只铺在舞台上：{@code width} 已为侧栏收窄，侧栏自己有一块标签作底。
      */
     protected void renderBackdrop(DrawContext context, int mouseX, int mouseY, float delta) {
+        GuiSound.pump(System.currentTimeMillis());
         GuiMaterial.dimWorld(context);
         int m = GuiMaterial.SHEET_MARGIN;
         GuiMaterial.sheet(context, m, m, width - 2 * m, height - 2 * m);
@@ -900,6 +902,7 @@ public abstract class GameScreen extends Screen {
     protected int drawSeat(DrawContext context, String characterId, int x, int y, int cell, Bands b,
                            int mark, boolean faded, int nameColor, int lineColor) {
         seatHits.add(new SeatHit(new Box(x, y, cell, b.railH()), characterId));
+        seatDetail(characterId).ifPresent(t -> detailHits.add(new DetailHit(new Box(x, y, cell, b.railH()), t)));
         int full = b.avatar();
         if (full > 0) {
             int m = GuiMaterial.ringMargin(full);
@@ -913,6 +916,27 @@ public abstract class GameScreen extends Screen {
         }
         context.fill(x + 2, nameY + textH() + 1, x + cell - 2, nameY + textH() + 2, lineColor);
         return nameY;
+    }
+
+    /**
+     * 停在座位上时那张签：名字 · 体力 · 清醒与否（离线就写离线）· 右键能看他面前的牌。
+     *
+     * <p>全是公开的（体型与伤势全船可见，决策 ③；面前那一区本来就摊在桌上），数据取自 {@code TableView}。
+     * 右键进公开区那一面（协作者 {@code 2adbbe4}）原先屏幕上没有任何提示 —— 这张签就是它的入口
+     * （ADR-0045 §1.5 N1）。也是 ADR-0043 D4 排好的「L1 悬停签」。
+     */
+    private java.util.Optional<Text> seatDetail(String characterId) {
+        if (client == null || client.world == null) {
+            return java.util.Optional.empty();
+        }
+        for (var seat : io.github.heavyseasmc.mod.state.GameComponents.of(client.world).tableView().seats()) {
+            if (seat.id().equals(characterId)) {
+                Text state = seat.offline() ? Text.translatable("heavyseas.table.offline") : conditionName(seat.condition());
+                return java.util.Optional.of(Text.translatable("heavyseas.seat.detail", nameOf(characterId),
+                        Math.max(0, seat.health()), seat.size(), state));
+            }
+        }
+        return java.util.Optional.empty();
     }
 
     /**
@@ -1334,6 +1358,31 @@ public abstract class GameScreen extends Screen {
     }
 
     /**
+     * 牌落在桌上的影子（「落牌加重」的第二件：影子收紧，ADR-0037 §7.1 第 3 条）。
+     * 在牌自己的坐标里画（{@code (0,0)} 是牌的左上角），画在牌之前。
+     *
+     * <p>离桌越高，影子离得越远、摊得越开、越淡；落定时贴紧、最深 —— 那一下收紧就是「落下来了」。
+     * 2026-09-30 之前牌没有影子，只有纸板与标签那两道固定偏移的（ADR-0045 §1.3 动 1）。
+     *
+     * @param height 这张牌此刻离桌多高，GUI 单位（入场还没落定的那一截 · 顿 · 抬 加起来）
+     */
+    protected void drawCardShadow(DrawContext context, int w, int h, float height) {
+        // 系数是实拍调的：第一版抬 9 个单位时影子离得太远、太重，读起来像一块灰板（2026-09-30）。
+        float up = Math.max(0f, height);
+        int dx = Math.round(1.5f + up * 0.18f);
+        int dy = Math.round(2.5f + up * 0.5f);
+        int spread = Math.round(up * 0.18f);
+        int alpha = Math.max(0x12, 0x4C - Math.round(up * 3.2f));
+        // 影子落在桌上 —— 只许落在舞台那一格里。补给箱的牌底边贴着舞台下沿，不裁的话影子压断那一道通栏线：
+        // 2026-09-30 pass_test 当场红在「基线里只找到一道带线」（那道线正是它认「这一面还开着」的依据）。
+        // 裁剪区按屏幕坐标给，不受这张牌的矩阵影响。
+        Bands b = bands();
+        context.enableScissor(0, b.stageTop(), width, b.stageBottom());
+        context.fill(dx - spread, dy - spread, w + dx + spread, h + dy + spread, alpha << 24);
+        context.disableScissor();
+    }
+
+    /**
      * 一张牌在「摊成一排」与「收成一叠」之间的落位。
      *
      * @param depth 这张在叠里排第几层（被看的那张是 0）；一叠牌要错开一点点，才看得出是一叠而不是一张
@@ -1431,6 +1480,13 @@ public abstract class GameScreen extends Screen {
         int gulls = rich ? GameState.GULLS_TO_LAND * ICON_H + (GameState.GULLS_TO_LAND - 1) * ICON_GAP : 0;
         int span = ICON_H + (rich ? ICON_GROUP_GAP + gulls : 0) + (weather ? ICON_H + ICON_GROUP_GAP : 0);
         int x = (width - span) / 2;
+        // 轮到你做决定时，上带左头一句不超过 8 个字的动词短语（用户 2026-09-25 定，ADR-0043 D3 (b)）。
+        // 金 = 轮到你。与图标同一行，不占舞台的高度（牌是主体，ADR-0037 §7.8）；放不下就缩字号，绝不压到图标。
+        Text cue = cue();
+        if (cue != null && x - SIDE - ICON_GROUP_GAP > 0) {
+            GuiText.line(context, cue, SIDE, y + (ICON_H - textH()) / 2, x - SIDE - ICON_GROUP_GAP, GuiText.BODY, true,
+                    GuiLanguage.gold(), GuiText.Align.LEFT);
+        }
         if (weather) {
             detailHits.add(new DetailHit(new Box(x, y, ICON_H, ICON_H),
                     Text.translatable("heavyseas.game.weather",
@@ -1454,6 +1510,14 @@ public abstract class GameScreen extends Screen {
             GuiMaterial.icon(context, "gull", x + i * (ICON_H + ICON_GAP), y, ICON_H,
                     i < view.gulls() ? GuiLanguage.verdigris() : GuiLanguage.dim());
         }
+    }
+
+    /**
+     * 这一面此刻要你做什么：一句不超过 8 个字的动词短语，画在上带左头（ADR-0043 D3 (b)）。
+     * 不是你的决定（看手牌 · 看公开区 · 翻牌 · 计分）或已经定了，就返回 {@code null} —— 过期的提示比没有提示更糟。
+     */
+    protected Text cue() {
+        return null;
     }
 
     /**

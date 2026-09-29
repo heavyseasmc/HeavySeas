@@ -97,6 +97,7 @@ public final class HandScreen extends GameScreen {
         lift = new float[view.hand().size()];
         dealtFrom = 0;                       // 一进来整手都是「新到你面前」，整排发一次
         dealtAt = System.currentTimeMillis();
+        GuiSound.dealt(dealtAt, view.hand().size());
     }
 
     private HudView currentView() {
@@ -124,6 +125,7 @@ public final class HandScreen extends GameScreen {
         if (after > before) {
             dealtFrom = before;
             dealtAt = System.currentTimeMillis();
+            GuiSound.dealt(dealtAt, after - before);
         }
         if (selected >= after) {
             select(Math.max(0, after - 1));
@@ -177,11 +179,25 @@ public final class HandScreen extends GameScreen {
         int miniW = GuiLanguage.cardWidth(miniH);
         int blockW = affinity ? 2 * miniW + CARD_GAP : 0;
         int handW = fullW - (affinity ? blockW + AFFINITY_GAP : 0);
+        // 面前那一区（样张 b-4 的「面前」）：亮出来的牌离开手牌之后就落在这里 —— 原先这一面不画它，
+        // 亮出去的牌从界面上消失了（ADR-0043 §1.6 A2 · ADR-0045）。比手牌小一号，读得出是另一堆。
+        List<HudView.FrontCard> front = view.front();
+        int frontH = 0;
+        int frontW = 0;
+        if (!front.isEmpty()) {
+            frontH = Math.max(MIN_CARD_H, Math.round(cardHeightFor(n, avail - room, handW) * FRONT_SHARE));
+            int fw = GuiLanguage.cardWidth(frontH);
+            frontW = front.size() * fw + (front.size() - 1) * CARD_GAP;
+            handW -= frontW + AFFINITY_GAP;
+        }
         int cardH = cardHeightFor(n, avail - room, handW);
         int cardW = GuiLanguage.cardWidth(cardH);
         int handTop = cardsTopIn(b.stageTop(), b.stageBottom(), cardH, room);
         if (affinity && gathered < 1f) {
             drawAffinity(context, width - SIDE - blockW, handTop + cardH - miniH, miniW, miniH, 1f - gathered);
+        }
+        if (!front.isEmpty() && gathered < 1f) {
+            drawFront(context, front, SIDE + handW + AFFINITY_GAP, handTop + cardH - frontH, frontH, 1f - gathered);
         }
 
         if (hand.isEmpty()) {
@@ -243,8 +259,11 @@ public final class HandScreen extends GameScreen {
         // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
         //   与 HUD 那一行「按绑定键查看」同一条理由。这一面没有倒计时，提示就排在那一条空着的带上。
         // U 与右键是「看」（各面一样，ADR-0043 D2）；Enter 是「打出」；亮出在查看态里（↓ 挪到按钮上再 Enter）。
+        // G 赠送只在送得出去的时候写（行动阶段、你能动、没有打架与终局）—— 写了按不动，比不写更糟。
         List<KeyHint> right = !inspecting()
-                ? List.of(keys("play", "Enter"), keys("inspect", "U"))
+                ? canGive()
+                        ? List.of(keys("play", "Enter"), keys("gift", "G"), keys("inspect", "U"))
+                        : List.of(keys("play", "Enter"), keys("inspect", "U"))
                 : revealFocus
                         ? List.of(keys("reveal", "Enter"), keys("close", "U"))
                         : List.of(keys("play", "Enter"), keys("reveal", "↓"), keys("close", "U"));
@@ -272,6 +291,36 @@ public final class HandScreen extends GameScreen {
 
     /** 爱恨小卡是手牌的几成高：小到一眼看得出「不是手牌」，大到认得出是谁。 */
     private static final float AFFINITY_SHARE = 0.6f;
+    /** 面前那一区是手牌的几成高：比手牌小一号（它已经不在手里），比爱恨小卡大（它是牌，要认得出画）。 */
+    private static final float FRONT_SHARE = 0.72f;
+
+    /**
+     * 面前那一区：你亮出来（或别的规则落到你面前）的牌，上面一个小标题「面前」。
+     * 全船都看得见这一区（公开），所以这里不必藏；但它不在手里，打不出也选不中 —— 不进高亮与命中。
+     *
+     * @param alpha 进查看态时淡出 —— 右边那块要让给说明签
+     */
+    private void drawFront(DrawContext context, List<HudView.FrontCard> front, int x, int y, int h, float alpha) {
+        int w = GuiLanguage.cardWidth(h);
+        context.setShaderColor(1f, 1f, 1f, alpha);
+        for (int i = 0; i < front.size(); i++) {
+            HudView.FrontCard card = front.get(i);
+            int cx = x + i * (w + CARD_GAP);
+            // 面前的牌全是明牌。open 说的是「伞撑着没有」（GameComponent 写投影时的那一位），不是正反面 ——
+            // 撑着的那一把外面一圈铜绿：它此刻正在起作用（铜绿 = 正常 · 安全）。
+            CardTexture.drawProvision(context, card.id(), cx, y, w, h);
+            if (card.open()) {
+                context.drawBorder(cx - 2, y - 2, w + 4, h + 4, GuiLanguage.verdigris());
+                context.drawBorder(cx - 1, y - 1, w + 2, h + 2, GuiLanguage.verdigris());
+            }
+        }
+        context.setShaderColor(1f, 1f, 1f, 1f);
+        if (alpha > 0.05f) {
+            int groupW = front.size() * w + (front.size() - 1) * CARD_GAP;
+            drawLineIn(context, Text.translatable("heavyseas.hand.front"), x, y - lineStep(), groupW,
+                    withAlpha(GuiLanguage.muted(), Math.round(alpha * 255)));
+        }
+    }
     /** 手牌那一排与小卡之间。比牌间距宽，读得出是两件事。 */
     private static final int AFFINITY_GAP = 18;
 
@@ -313,6 +362,7 @@ public final class HandScreen extends GameScreen {
         context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+        drawCardShadow(context, pose.w(), pose.h(), Math.abs(rise) + lift[i] * (1f - gathered));
         CardTexture.drawProvision(context, hand.get(i), 0, 0, pose.w(), pose.h());
         if (i == selected) {
             drawCardFrame(context, pose.w(), pose.h());

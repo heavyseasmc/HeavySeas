@@ -80,6 +80,7 @@ public final class ProvisionScreen extends GameScreen {
         this.data = next;
         if (newOffer) {
             this.dealAt = System.currentTimeMillis();
+            GuiSound.dealt(dealAt, next.offer().size());
             this.highlight = 0;
             this.lift = new float[next.offer().size()];
             this.snapIndex = -1;
@@ -114,6 +115,7 @@ public final class ProvisionScreen extends GameScreen {
         highlight = index;
         snapIndex = index;
         snapAt = System.currentTimeMillis();
+        GuiSound.snapped(snapAt);
         // 验收靠这一行：超时有、手动没有。抓帧看不清 396ms 时，它是第二个来源。
         LOGGER.info("补给箱：第 {} 张是替你选的（{}），播一次「顿」",
                 index + 1, data.offer().get(index));
@@ -383,6 +385,7 @@ public final class ProvisionScreen extends GameScreen {
         context.getMatrices().translate(cx, bottom, 0);
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+        drawCardShadow(context, pose.w(), pose.h(), Math.abs(rise) + lift[i] * (1f - gathered));
         CardTexture.drawProvision(context, offer.get(i), 0, 0, pose.w(), pose.h());
         if (hi && !passing) {
             // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
@@ -507,5 +510,11 @@ public final class ProvisionScreen extends GameScreen {
                 return super.keyPressed(keyCode, scanCode, modifiers);
             }
         }
+    }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return decided() ? null : Text.translatable("heavyseas.cue.provision");
     }
 }

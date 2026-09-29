@@ -197,8 +197,22 @@ public final class GuiLanguage {
 
     // ---------------------------------------------------------------- 发 Deal
 
-    /** 发：新东西到你面前。单张 300ms。 */
-    public static final long DEAL_MS = 300L;
+    /**
+     * 发：新东西到你面前。单张 360ms。
+     *
+     * <p>2026-09-30 从 300 放到 360，并加上落点（ADR-0037 §7.1 第 3 条「发 / 顿 / 翻放慢并加落点」）。
+     * 重量感主要来自落点的三件事（压一下 · 影子收紧 · 一声闷响），不是更慢的曲线 —— 所以只放慢一点。
+     */
+    public static final long DEAL_MS = 360L;
+    /** 进度走到这里算「落桌」：之后是压一下（{@link #dealScale}）。 */
+    private static final float LAND_AT = 0.82f;
+    /** 压一下压多深：比例，一张牌压下去约 3.5%。 */
+    private static final float PRESS = 0.035f;
+    /**
+     * 从开始发到落桌那一刻多少毫秒（缓动是 ease-out cubic，进度到 {@link #LAND_AT} 的时刻由它反推）。
+     * 落桌那一声闷响（{@link GuiSound}）就排在这一刻 —— 声音与画面取自同一个数。
+     */
+    public static final long DEAL_LAND_MS = Math.round(DEAL_MS * (1.0 - Math.cbrt(1.0 - LAND_AT)));
     /** 相邻两张错开 45ms —— 错开才读得出是「发」而不是「出现」。 */
     public static final long DEAL_STAGGER_MS = 45L;
     /** 从下方 26px 升起。 */
@@ -219,9 +233,16 @@ public final class GuiLanguage {
         return 1f - (1f - p) * (1f - p) * (1f - p);      // ease-out cubic ≈ cubic-bezier(.16,1,.3,1)
     }
 
-    /** 入场时的缩放：配合升起，让「发」有从手边推出去的分量。 */
+    /**
+     * 入场时的缩放：配合升起，让「发」有从手边推出去的分量；落桌之后<b>压一下</b>再回到原大
+     * （「落牌加重」的第一件，ADR-0037 §7.1 第 3 条）。
+     */
     public static float dealScale(float progress) {
-        return 0.94f + 0.06f * progress;
+        if (progress < LAND_AT) {
+            return 0.94f + 0.06f * (progress / LAND_AT);
+        }
+        float t = Math.min(1f, (progress - LAND_AT) / (1f - LAND_AT));
+        return 1f - PRESS * (float) Math.sin(Math.PI * t);
     }
 
     // ---------------------------------------------------------------- 抬 Lift
@@ -366,8 +387,11 @@ public final class GuiLanguage {
 
     // ---------------------------------------------------------------- 翻 Flip
 
-    /** 翻：暗牌变明牌。全局唯一的「信息状态改变」，400ms，中点换面。 */
-    public static final long FLIP_MS = 400L;
+    /**
+     * 翻：暗牌变明牌。全局唯一的「信息状态改变」，480ms，中点换面（换面那一下一声纸响，{@link GuiSound}）。
+     * 2026-09-30 从 400 放到 480（ADR-0037 §7.1 第 3 条）；服务端每一步停 2.6 秒，放得下。
+     */
+    public static final long FLIP_MS = 480L;
 
     /** 胜者揭牌：先蓄势、再翻转、最后回弹，整段 1.4 秒。 */
     public static final long WINNER_FLIP_MS = 1400L;

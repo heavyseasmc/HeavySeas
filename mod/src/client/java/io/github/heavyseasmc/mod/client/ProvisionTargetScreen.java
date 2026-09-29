@@ -150,4 +150,10 @@ public final class ProvisionTargetScreen extends GameScreen {
         ClientPlayNetworking.send(UseProvisionC2S.target(view.provisionTargetCard(), target));
         LOGGER.info("特殊物资：{} 挑了目标 {}", view.provisionTargetCard(), target);
     }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return committed ? null : Text.translatable("heavyseas.cue.medical");
+    }
 }

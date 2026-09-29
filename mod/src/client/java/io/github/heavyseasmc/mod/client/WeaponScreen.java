@@ -219,4 +219,10 @@ public final class WeaponScreen extends GameScreen {
             }
         }
     }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable("heavyseas.cue.weapon");
+    }
 }

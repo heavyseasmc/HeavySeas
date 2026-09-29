@@ -1,5 +1,10 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.ui.NotificationArrivals;
+import net.minecraft.text.Text;
+
+import java.util.List;
+
 /**
  * 对局界面里的通知侧栏：默认收起，**有事自己滑出来几秒再收回**，也可以按键钉住（ADR-0037 §7.1 第 4 条）。
  *
@@ -18,8 +23,10 @@ final class SidebarReveal {
     /** 自己滑出来之后停多久（毫秒）。够看清一条播报，又不至于赖在牌上面。 */
     static final long REVEAL_MS = 4000L;
 
-    /** 上一帧见到几条播报。-1 = 还没见过，第一帧不算「多了一条」。 */
-    private static int lastCount = -1;
+    /** 上一帧见到的播报（按文字比）。{@code null} = 还没见过，第一帧不算「新到了几条」。 */
+    private static List<String> last = null;
+    /** 这一局一共新到过几条 —— 只增不减；日志页签上的未读数拿它减去「展开到底时看到第几条」。 */
+    private static int arrived = 0;
     private static long shownAt = 0L;
     private static boolean pinned;
 
@@ -27,26 +34,39 @@ final class SidebarReveal {
     }
 
     /**
-     * 每帧报一次现在有几条播报。多出来的那一刻起算。
+     * 每帧报一次现在的播报。有新到的那一刻起算。
      *
-     * <p>❗数的是**条数变多**，不是「侧栏该不该显示」：后者每帧都成立，那样它就永远不收回去了。
+     * <p>❗数的是**新到了几条**，不是「侧栏该不该显示」：后者每帧都成立，那样它就永远不收回去了。
+     * ❗也不是**条数变多**：服务端只留最新的八条，满了之后新来一条条数不变 ——
+     * 2026-09-30 实拍，按条数判的时候开局不久右栏就再也不自己滑出来了（{@link NotificationArrivals}）。
      */
-    static void observe(int count, long now) {
-        if (lastCount >= 0 && count > lastCount) {
-            shownAt = now;
+    static void observe(List<Text> notes, long now) {
+        List<String> current = notes.stream().map(Text::getString).toList();
+        if (last != null) {
+            int n = NotificationArrivals.count(last, current);
+            if (n > 0) {
+                shownAt = now;
+                arrived += n;
+            }
         }
-        lastCount = count;
+        last = current;
+    }
+
+    /** 这一局一共新到过几条。 */
+    static int arrived() {
+        return arrived;
     }
 
     /**
-     * 换了一局（或这一局结束）就把条数清回 **0**，不是清回「还没见过」。
+     * 换了一局（或这一局结束）就清成**空的一本**，不是清回「还没见过」。
      *
-     * <p>❗清回 -1 的话，新一局那一批开场播报会被当成「第一次见到」而不是「多了几条」，
+     * <p>❗清回「还没见过」的话，新一局那一批开场播报会被当成「第一次见到」而不是「新到了几条」，
      * 于是**整局第一次什么都不滑出来**（2026-09-24 实测：右侧亮块 0.013，与收着时一模一样）。
-     * 清回 0 才对：开局本来就是「有事发生」。
+     * 清成空的才对：开局本来就是「有事发生」。
      */
     static void forget() {
-        lastCount = 0;
+        last = List.of();
+        arrived = 0;
         shownAt = 0L;
     }
 

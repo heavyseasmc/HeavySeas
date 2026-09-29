@@ -84,11 +84,29 @@ public final class CardChoiceScreen extends GameScreen {
         }
         TableView.Play choice = choices.get(selected);
         int bottom = b.stageBottom() - buttonHeight() - lineStep() - HINT_GAP - BORDER_ROOM;
+        // 落海窗口：先说谁要落海。原先这一面只有「救生圈 · 目标 · 给 X · 打出」，屏幕上一个字都不说情境 ——
+        // 全局情绪最高的那一下被做成了一张普通表单（ADR-0045 §1.4 B4）。朱砂：紧迫 · 不可逆。
+        int stageTop = b.stageTop();
+        if (token > 0) {
+            List<String> swimmers = GameComponents.of(client.world).tableView().swimmers();
+            if (!swimmers.isEmpty()) {
+                net.minecraft.text.MutableText names = Text.empty();
+                for (String id : swimmers) {
+                    if (!names.getSiblings().isEmpty()) {
+                        names.append("、");
+                    }
+                    names.append(nameOf(id));
+                }
+                drawLine(context, Text.translatable("heavyseas.overboard.pending", names), width / 2, stageTop,
+                        GuiLanguage.cinnabar());
+                stageTop += lineStep() + HINT_GAP;
+            }
+        }
         int arrowW = buttonWidth(Text.literal("←"));
-        int h = cardHeightFor(2, bottom - b.stageTop() - liftRoom(),
+        int h = cardHeightFor(2, bottom - stageTop - liftRoom(),
                 width - 2 * (SIDE + arrowW + BTN_GAP));
         int w = GuiLanguage.cardWidth(h);
-        int top = cardsTopIn(b.stageTop(), bottom, h, liftRoom());
+        int top = cardsTopIn(stageTop, bottom, h, liftRoom());
         int left = (width - 2 * w - CARD_GAP) / 2;
         CardTexture.drawProvision(context, choice.card(), left, top, w, h);
         CardTexture.drawCharacter(context, choice.target(), left + w + CARD_GAP, top, w, h);
@@ -151,5 +169,11 @@ public final class CardChoiceScreen extends GameScreen {
             return true;
         }
         return super.keyPressed(key, scan, modifiers);
+    }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable(token > 0 ? "heavyseas.cue.overboard" : "heavyseas.cue.gift");
     }
 }

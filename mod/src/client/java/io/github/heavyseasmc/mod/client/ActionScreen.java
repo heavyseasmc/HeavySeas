@@ -324,6 +324,7 @@ public final class ActionScreen extends GameScreen {
         ClientPlayNetworking.send(ActionChoiceC2S.of(c.kind));
         snapIndex = focus;
         snapAt = System.currentTimeMillis();
+        GuiSound.snapped(snapAt);
         // 验收靠这一行与服务端那行「行动（界面）」对上：客户端按了、服务端认了，两个来源。
         LOGGER.info("行动：确认「{}」，播一次「顿」", c.name());
     }
@@ -335,5 +336,11 @@ public final class ActionScreen extends GameScreen {
 
     private boolean snapping() {
         return decided() && GuiLanguage.snap(System.currentTimeMillis(), snapAt) < 1f;
+    }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable("heavyseas.hud.cue.act");
     }
 }

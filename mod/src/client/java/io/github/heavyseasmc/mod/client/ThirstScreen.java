@@ -60,6 +60,7 @@ public final class ThirstScreen extends GameScreen {
         this.chosen = normalized(Math.min(Math.max(0,
                 remaining * waterPerSource - view.thirstPrompt().donated()), waters), true);
         this.dealAt = System.currentTimeMillis();
+        GuiSound.dealt(dealAt, waters);
     }
 
     @Override
@@ -111,6 +112,7 @@ public final class ThirstScreen extends GameScreen {
             context.getMatrices().translate(l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h() - lift[i] + rise, 0);
             context.getMatrices().scale(scale, scale, 1f);
             context.getMatrices().translate(-l.w() / 2f, -l.h(), 0);
+            drawCardShadow(context, l.w(), l.h(), Math.abs(rise) + lift[i]);
             CardTexture.drawProvision(context, Session.WATER, 0, 0, l.w(), l.h());
             if (drinking) {
                 drawCardFrame(context, l.w(), l.h());
@@ -222,5 +224,11 @@ public final class ThirstScreen extends GameScreen {
                 return super.keyPressed(keyCode, scanCode, modifiers);
             }
         }
+    }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable("heavyseas.hud.cue.thirst");
     }
 }

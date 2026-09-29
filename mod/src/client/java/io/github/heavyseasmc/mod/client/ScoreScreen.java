@@ -9,18 +9,27 @@ import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
- * 计分面板（决策 ⑪ 三幕之末 · ADR-0022）。版式照交互稿「计分面板」那一面（用户 2026-09-15 定）。
+ * 计分面板（决策 ⑪ 三幕之末 · ADR-0022）。版式照样张 b-5：左边全船按分数排一列（头像 · 名字 · 合计，
+ * 胜者一枚桂冠，你那一行金色），右边一张「你的账」—— 四项分开列，合计压底。
+ *
+ * <h2>为什么不再是一张表</h2>
+ * 计分是一局的高潮，而 2026-09-30 之前舞台上只有你自己的四行字、上面一排全员合计 ——
+ * 没有头像，也看不出谁赢（ADR-0045 §1.2 界 6）。稿子一直是现在这样，是没照着做。
  *
  * <h2>四项分开列</h2>
  * 「自恋者生存分算两次」是第一项与第三项相加的自然结果，并在一起就看不出来了（ADR-0018 §7.4）。
- * 所以舞台上是<b>你自己</b>的四行，用「发」逐条落下；合计用「顿」—— 稿子就是这么动的。
  *
- * <h2>上带多了一排全员合计</h2>
- * 稿子只画了一个人的四行；多人局里谁赢是公开的，得看得见。明细不公开：明细会把没翻的那张牌泄出去
- * （「所恨的人死了 7」就指明了是谁），所以投影里只有自己的明细，别人只有合计。
+ * <h2>明细只有你自己的</h2>
+ * 别人只有合计：明细会把没翻的那张牌泄出去（「所恨的人死了 7」就指明了是谁），所以投影里只有自己的明细。
+ *
+ * <h2>动</h2>
+ * 左边一行一行「发」下来，右边四项跟着「发」，合计最后「顿」一下。「顿」只抬不放大 ——
+ * 字不许套矩阵缩放（ADR-0037 §7.3）。
  *
  * <h2>没有倒计时</h2>
  * 服务端停一段时间就收起会话（{@code EndgamePhase.SCORE_HOLD_MS}），会话一收这一面自己关。
@@ -29,8 +38,20 @@ public final class ScoreScreen extends GameScreen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    /** 你自己那四行最宽多少：一行一个标签一个数，太宽读起来要扫视。 */
-    private static final int ROW_MAX_W = 240;
+    /** 左边一列与右边那张账最宽多少（样张 b-5 在 1280×720 下量的），GUI 单位。 */
+    private static final int LIST_MAX_W = 174;
+    private static final int CARD_MAX_W = 146;
+    private static final int COLUMN_GAP = 16;
+    /** 左边一行最高多少：八个人排得下为准。 */
+    private static final int ROW_MAX_H = 19;
+    private static final int LIST_AVATAR = 14;
+    private static final int CARD_AVATAR = 18;
+    private static final int ICON = 9;
+    private static final int PAD = 7;
+
+    private static final String[] ITEM_LABELS = {"heavyseas.score.self", "heavyseas.score.treasure",
+            "heavyseas.score.loved", "heavyseas.score.hated"};
+    private static final String[] ITEM_ICONS = {"score_alive", "score_treasure", "heart", "heart_broken"};
 
     private HudView view = HudView.IDLE;
     private long dealAt;
@@ -67,65 +88,131 @@ public final class ScoreScreen extends GameScreen {
         }
         renderBackdrop(context, mouseX, mouseY, delta);
         long now = System.currentTimeMillis();
-        int fh = textH();
 
-        // 上带（公开）：这一局怎么结束的（drawTopBand 覆写），座位轨那一条带上是全员合计。
+        // 上带（公开）：这一局怎么结束的（drawTopBand 覆写）。座位轨那一条带不画座位 —— 这一面的内容从那里就开始排。
         Bands b = drawChrome(context, view);
-        int totalsBottom = drawTotals(context, e, b.railY());
-
+        int top = b.railY();
+        int bottom = b.stageBottom() - 4;
+        int avail = width - 2 * SIDE;
         HudView.Score s = view.myScore();
-        if (!s.present()) {
+        boolean card = s.present();
+        int listW = card ? Math.min(LIST_MAX_W, Math.round((avail - COLUMN_GAP) * 0.54f)) : Math.min(LIST_MAX_W, avail);
+        int cardW = card ? Math.min(CARD_MAX_W, avail - COLUMN_GAP - listW) : 0;
+        int total = listW + (card ? COLUMN_GAP + cardW : 0);
+        int left = (width - total) / 2;
+        drawRanking(context, e, now, left, top, listW, bottom);
+
+        if (!card) {
             drawLine(context, Text.translatable(
                             view.seated() ? "heavyseas.score.waiting" : "heavyseas.endgame.spectating"),
-                    width / 2, (b.stageTop() + b.stageBottom()) / 2, GuiLanguage.muted());
+                    left + listW + (width - left - listW) / 2, (top + bottom) / 2, GuiLanguage.muted());
+        } else {
+            if (!logged) {
+                logged = true;
+                // 与语言无关的一行：GUI 回归靠它判「计分面板拿到了我自己的明细」，并与服务端那行「计分：」对账。
+                LOGGER.info("计分面板：我 {} 存活 {} + 财宝 {} + 所爱 {} + 所恨 {} = {}", view.character(),
+                        s.selfSurvival(), s.treasure(), s.loved(), s.hated(), s.total());
+            }
+            drawAccount(context, s, now, left + listW + COLUMN_GAP, top, cardW, bottom);
+        }
+        drawKeyHints(context, List.of(keys("close", "Esc")), b.gaugeY(), GuiLanguage.muted());
+    }
+
+    /**
+     * 左边一列：全船按合计从高到低。胜者（最高分，并列都算）一枚桂冠；你那一行金色、左边一道金；移出游戏的淡下去。
+     */
+    private void drawRanking(DrawContext context, HudView.Endgame e, long now, int x, int top, int w, int bottom) {
+        List<HudView.Endgame.Entry> entries = new ArrayList<>(e.entries());
+        if (entries.isEmpty()) {
             return;
         }
-        if (!logged) {
-            logged = true;
-            // 与语言无关的一行：GUI 回归靠它判「计分面板拿到了我自己的明细」，并与服务端那行「计分：」对账。
-            LOGGER.info("计分面板：我 {} 存活 {} + 财宝 {} + 所爱 {} + 所恨 {} = {}", view.character(),
-                    s.selfSurvival(), s.treasure(), s.loved(), s.hated(), s.total());
-        }
-
-        // 舞台：你自己的四行（发），合计（顿）。
-        String[] labels = {"heavyseas.score.self", "heavyseas.score.treasure",
-                "heavyseas.score.loved", "heavyseas.score.hated"};
-        int[] values = {s.selfSurvival(), s.treasure(), s.loved(), s.hated()};
-        int rowW = Math.min(ROW_MAX_W, width - 2 * SIDE);
-        int rowH = fh + 6;
-        int blockH = 5 * rowH + 6;
-        int top = Math.max(totalsBottom, b.stageTop()) + Math.max(0, (b.stageBottom() - b.stageTop() - blockH) / 2);
-        int left = (width - rowW) / 2;
-        for (int i = 0; i < labels.length; i++) {
+        entries.sort(Comparator.comparingInt(HudView.Endgame.Entry::total).reversed());
+        int best = entries.get(0).total();
+        int rowH = Math.max(textH() + 2, Math.min(ROW_MAX_H, (bottom - top) / entries.size()));
+        int d = Math.min(LIST_AVATAR, rowH - 2 * GuiMaterial.ringMargin(LIST_AVATAR) - 1);
+        int laurelW = ICON + 3;
+        for (int i = 0; i < entries.size(); i++) {
             float p = GuiLanguage.deal(now, dealAt, i);
             if (p <= 0f) {
                 continue;
             }
-            float rise = (1f - p) * GuiLanguage.DEAL_RISE;
-            int y = Math.round(top + i * rowH + rise);
-            int color = values[i] == 0 ? GuiLanguage.dim() : GuiLanguage.ink();
-            drawLineLeft(context, Text.translatable(labels[i]), left, y, color);
-            Text value = Text.literal(Integer.toString(values[i]));
-            drawLineLeft(context, value, left + rowW - textW(value), y, color);
+            HudView.Endgame.Entry en = entries.get(i);
+            int y = Math.round(top + i * rowH + (1f - p) * GuiLanguage.DEAL_RISE);
+            boolean me = view.seated() && en.who().equals(view.character());
+            boolean gone = view.removed().contains(en.who());
+            if (me) {
+                context.fill(x, y, x + w, y + rowH - 1, (GuiLanguage.gold() & 0x00FFFFFF) | 0x2E000000);
+                context.fill(x, y, x + 2, y + rowH - 1, GuiLanguage.gold());
+            }
+            if (en.total() == best) {
+                GuiMaterial.icon(context, "laurel", x + 4, y + (rowH - ICON) / 2, ICON, GuiLanguage.gold());
+            }
+            int ax = x + 4 + laurelW + GuiMaterial.ringMargin(d);
+            if (d > 4) {
+                GuiMaterial.avatar(context, en.who(), ax, y + (rowH - d) / 2, d, me ? GuiLanguage.gold() : 0,
+                        gone ? 0.35f : 1f);
+            }
+            int nameX = ax + d + GuiMaterial.ringMargin(d) + 5;
+            Text score = Text.literal(Integer.toString(Math.max(0, en.total())));
+            int scoreW = GuiText.width(score.getString(), GuiText.NAME, true);
+            int nameColor = gone ? GuiLanguage.dim() : me ? GuiLanguage.gold() : GuiLanguage.ink();
+            GuiText.line(context, nameOf(en.who()), nameX, y + (rowH - textH()) / 2, Math.max(1, x + w - 6 - scoreW - nameX),
+                    GuiText.BODY, false, nameColor, GuiText.Align.LEFT);
+            int lineH = GuiText.lineHeight(GuiText.NAME, true);
+            GuiText.line(context, score, x + w - 4 - scoreW, y + (rowH - lineH) / 2, scoreW, GuiText.NAME, true,
+                    gone ? GuiLanguage.dim() : me ? GuiLanguage.gold() : GuiLanguage.ink(), GuiText.Align.LEFT);
+            context.fill(x, y + rowH - 1, x + w, y + rowH, (GuiLanguage.ground() & 0x00FFFFFF) | 0x66000000);
         }
-        long snapAt = dealAt + 3 * GuiLanguage.DEAL_STAGGER_MS + GuiLanguage.DEAL_MS;
+    }
+
+    /** 右边那张「你的账」：头像与名字 · 四项 · 一道线 · 合计。印在纸签上，字一律 onTag。 */
+    private void drawAccount(DrawContext context, HudView.Score s, long now, int x, int top, int w, int bottom) {
+        int fh = textH();
+        int rowH = fh + 7;
+        int headH = CARD_AVATAR + 2 * GuiMaterial.ringMargin(CARD_AVATAR);
+        int totalH = GuiText.lineHeight(GuiText.TITLE, true);
+        int h = PAD + headH + 6 + 4 * rowH + 6 + totalH + PAD;
+        int y = top + Math.max(0, (bottom - top - h) / 2);
+        GuiMaterial.tag(context, x, y, w, h);
+        int ink = GuiLanguage.onTag(GuiLanguage.ink());
+        int dim = GuiLanguage.onTag(GuiLanguage.dim());
+        int muted = GuiLanguage.onTag(GuiLanguage.muted());
+        int ring = GuiMaterial.ringMargin(CARD_AVATAR);
+        GuiMaterial.avatar(context, view.character(), x + PAD + ring, y + PAD + ring, CARD_AVATAR, GuiLanguage.gold(), 1f);
+        int hx = x + PAD + headH + 6;
+        GuiText.line(context, Text.translatable("heavyseas.score.yours"), hx, y + PAD, w - (hx - x) - PAD,
+                GuiText.CAPTION, false, muted, GuiText.Align.LEFT);
+        GuiText.line(context, nameOf(view.character()), hx, y + PAD + GuiText.lineHeight(GuiText.CAPTION, false) + 1,
+                w - (hx - x) - PAD, GuiText.NAME, true, ink, GuiText.Align.LEFT);
+
+        int[] values = {s.selfSurvival(), s.treasure(), s.loved(), s.hated()};
+        int ry = y + PAD + headH + 6;
+        for (int i = 0; i < ITEM_LABELS.length; i++) {
+            float p = GuiLanguage.deal(now, dealAt, i + 2);
+            if (p > 0f) {
+                int yy = Math.round(ry + i * rowH + (1f - p) * GuiLanguage.DEAL_RISE / 2f);
+                int color = values[i] == 0 ? dim : ink;
+                GuiMaterial.icon(context, ITEM_ICONS[i], x + PAD, yy + (fh - ICON) / 2 + 1, ICON, color);
+                Text value = Text.literal(Integer.toString(values[i]));
+                int vw = GuiText.width(value.getString(), GuiText.BODY, false);
+                GuiText.line(context, Text.translatable(ITEM_LABELS[i]), x + PAD + ICON + 6, yy,
+                        Math.max(1, w - 2 * PAD - ICON - 6 - vw - 4), GuiText.BODY, false, color, GuiText.Align.LEFT);
+                GuiText.line(context, value, x + w - PAD - vw, yy, vw, GuiText.BODY, false, color, GuiText.Align.LEFT);
+            }
+        }
+        long snapAt = dealAt + 5 * GuiLanguage.DEAL_STAGGER_MS + GuiLanguage.DEAL_MS;
         if (now >= snapAt) {
-            int ruleY = top + 4 * rowH + 1;
-            context.fill(left, ruleY, left + rowW, ruleY + 1, GuiLanguage.ground());
-            float p = GuiLanguage.snap(now, snapAt);
-            float rise = GuiLanguage.snapRise(p);
-            float scale = GuiLanguage.snapScale(p);
-            int y = top + 4 * rowH + 6;
-            context.getMatrices().push();
-            // 绕这一行的中心缩放：「顿」长出来的那一截上下对称，不会压到上面那道线。
-            context.getMatrices().translate(width / 2f, y + fh / 2f + rise, 0);
-            context.getMatrices().scale(scale, scale, 1f);
-            context.getMatrices().translate(-width / 2f, -(y + fh / 2f), 0);
-            // 合计是「你」的数 —— 金色（ADR-0018 §7.3：金 = 你）。
-            drawLineLeft(context, Text.translatable("heavyseas.score.total"), left, y, GuiLanguage.gold());
-            Text total = Text.literal(Integer.toString(s.total()));
-            drawLineLeft(context, total, left + rowW - textW(total), y, GuiLanguage.gold());
-            context.getMatrices().pop();
+            int ruleY = ry + 4 * rowH + 2;
+            context.fill(x + PAD, ruleY, x + w - PAD, ruleY + 1, ink);
+            // 合计是「你」的数 —— 金色（ADR-0018 §7.3：金 = 你）。「顿」只抬，不放大。
+            int rise = Math.round(GuiLanguage.snapRise(GuiLanguage.snap(now, snapAt)));
+            int ty = ruleY + 4 + rise;
+            Text totalText = Text.literal(Integer.toString(s.total()));
+            int tw = GuiText.width(totalText.getString(), GuiText.TITLE, true);
+            GuiText.line(context, Text.translatable("heavyseas.score.total"), x + PAD, ty + (totalH - fh) / 2,
+                    Math.max(1, w - 2 * PAD - tw - 4), GuiText.BODY, false, muted, GuiText.Align.LEFT);
+            GuiText.line(context, totalText, x + w - PAD - tw, ty, tw, GuiText.TITLE, true,
+                    GuiLanguage.onTag(GuiLanguage.gold()), GuiText.Align.LEFT);
         }
     }
 
@@ -138,7 +225,7 @@ public final class ScoreScreen extends GameScreen {
                 width / 2, b.topY(), GuiLanguage.ink());
     }
 
-    /** 这一条带上不是座位轨，是全员合计（在 {@link #render} 里画）。 */
+    /** 这一条带上不画座位：计分那一列就是这一局的全员，从这里开始排。 */
     @Override
     protected void drawRailBand(DrawContext context, HudView v, Bands b) {
     }
@@ -151,41 +238,5 @@ public final class ScoreScreen extends GameScreen {
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    /** 名字放不下一格时截短 —— 八人局、英文、窄窗口时相邻两格会叠成一团，截短至少还认得出是谁。 */
-    /**
-     * 全员合计：名字一行、分数一行。最高分用墨色、其余用灰；你自己的名字是金色。
-     *
-     * @return 这一排的下沿
-     */
-    private int drawTotals(DrawContext context, HudView.Endgame e, int y) {
-        List<HudView.Endgame.Entry> entries = e.entries();
-        int n = entries.size();
-        if (n == 0) {
-            return y;
-        }
-        int fh = textH();
-        int best = Integer.MIN_VALUE;
-        int widest = 0;
-        for (HudView.Endgame.Entry en : entries) {
-            best = Math.max(best, en.total());
-            widest = Math.max(widest, textW(Text.translatable("heavyseas.character." + en.who())));
-        }
-        int cell = Math.min(Math.max(widest + 8, 48), (width - 2 * SIDE) / n);
-        int left = (width - n * cell) / 2;
-        for (int i = 0; i < n; i++) {
-            HudView.Endgame.Entry en = entries.get(i);
-            int x = left + i * cell + cell / 2;
-            boolean me = en.who().equals(view.character());
-            boolean top = en.total() == best;
-            boolean gone = view.removed().contains(en.who());
-            int nameColor = me ? GuiLanguage.gold() : top ? GuiLanguage.ink() : GuiLanguage.muted();
-            drawLineIn(context, Text.translatable("heavyseas.character." + en.who()), x - (cell - 4) / 2, y, cell - 4,
-                    gone ? GuiLanguage.dim() : nameColor);
-            drawLine(context, Text.literal(Integer.toString(Math.max(0, en.total()))),
-                    x, y + fh + 3, top ? GuiLanguage.ink() : GuiLanguage.muted());
-        }
-        return y + 2 * fh + 6;
     }
 }

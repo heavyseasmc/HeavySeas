@@ -130,20 +130,25 @@ final class GuiMaterial {
         context.disableScissor();
     }
 
-    /** 框线用代码画：整数个 GUI 单位的直线在任何界面尺寸下都是锐利的，不必进贴图。颜色取自调色板，与贴图同源。 */
+    /**
+     * 框线用代码画：整数个 GUI 单位的直线在任何界面尺寸下都是锐利的，不必进贴图。颜色取自调色板，与贴图同源。
+     *
+     * <p>只一道外沿加一道细线（样张 b 的木板就是这样）。2026-09-30 之前是外沿加三道，读起来是「黑白黑」
+     * 一整圈，全屏对比最强的东西成了画框而不是牌（ADR-0045 §1.2 界 1）。
+     */
     private static void frame(DrawContext context, int x, int y, int w, int h) {
-        int line = GuiLanguage.frame();
         int i = SHEET_FRAME_INSET;
         context.drawBorder(x, y, w, h, GuiLanguage.rim());
-        context.drawBorder(x + i - 2, y + i - 2, w - 2 * (i - 2), h - 2 * (i - 2), line);
-        context.drawBorder(x + i - 1, y + i - 1, w - 2 * (i - 1), h - 2 * (i - 1), line);
-        context.drawBorder(x + i + 1, y + i + 1, w - 2 * (i + 1), h - 2 * (i + 1), line);
+        context.drawBorder(x + i - 1, y + i - 1, w - 2 * (i - 1), h - 2 * (i - 1), GuiLanguage.frame());
     }
+
+    /** 包角画多大，GUI 单位。贴图一格是 24 个单位的量；稿子上的包角约是它的三分之二，缩下去走平滑过滤。 */
+    private static final int CORNER_UNITS = 16;
 
     private static void corners(DrawContext context, int x, int y, int w, int h) {
         Identifier id = texture("corners");
         int cell = CORNERS_TEXELS / 2;
-        int size = cell / TEXELS_PER_UNIT;
+        int size = CORNER_UNITS;
         if (w < 3 * size || h < 3 * size) {
             return;                                           // 板太小就不压角：角比板还抢眼
         }
@@ -284,6 +289,14 @@ final class GuiMaterial {
     /** 头像圈比头像那个圆往外多出多少，GUI 单位。排版要给它留出来。 */
     static int ringMargin(int diameter) {
         return Math.round(diameter * (RING_TEXELS - RING_PORTRAIT_TEXELS) / (2f * RING_PORTRAIT_TEXELS));
+    }
+
+    /** 只要那一圈金属（主画面右上的天候舷窗）：与头像同一张贴图，圈里放什么由调用方画。 */
+    static void ringOnly(DrawContext context, int x, int y, int diameter) {
+        int m = ringMargin(diameter);
+        int size = diameter + 2 * m;
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.drawTexture(texture("ring"), x - m, y - m, size, size, 0f, 0f, 1, 1, 1, 1);
     }
 
     /**

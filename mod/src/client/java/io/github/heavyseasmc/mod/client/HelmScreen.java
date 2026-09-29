@@ -68,6 +68,7 @@ public final class HelmScreen extends GameScreen {
         this.deadlineMs = view.sea().helmDeadlineMs();
         this.lift = new float[offer.size()];
         this.dealAt = System.currentTimeMillis();
+        GuiSound.dealt(dealAt, offer.size());
     }
 
     @Override
@@ -87,6 +88,7 @@ public final class HelmScreen extends GameScreen {
         highlight = index;
         snapIndex = index;
         snapAt = System.currentTimeMillis();
+        GuiSound.snapped(snapAt);
         // 验收靠这一行：超时有、手动没有。抓帧看不清 396ms 时，它是第二个来源。
         LOGGER.info("舵手：第 {} 张是替你挑的（{}），播一次「顿」", index + 1, offer.get(index).id());
     }
@@ -161,6 +163,7 @@ public final class HelmScreen extends GameScreen {
             context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
             context.getMatrices().scale(scale, scale, 1f);
             context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+            drawCardShadow(context, pose.w(), pose.h(), Math.abs(rise) + lift[i] * (1f - gathered));
             CardTexture.drawNav(context, offer.get(i), 0, 0, pose.w(), pose.h());
             if (hi) {
                 drawCardFrame(context, pose.w(), pose.h());
@@ -281,5 +284,11 @@ public final class HelmScreen extends GameScreen {
                 return super.keyPressed(keyCode, scanCode, modifiers);
             }
         }
+    }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable("heavyseas.cue.helm");
     }
 }

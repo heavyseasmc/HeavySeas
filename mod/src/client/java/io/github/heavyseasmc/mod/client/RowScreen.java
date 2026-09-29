@@ -88,6 +88,7 @@ public final class RowScreen extends GameScreen {
         lift = new float[cards.size()];
         focus = nextUndecided(0, 1);
         dealAt = System.currentTimeMillis();
+        GuiSound.dealt(dealAt, cards.size());
     }
 
     /** 每帧对一次投影。服务端那边已经定了、这边还没记上的（重开界面之前定过一张），以服务端为准。 */
@@ -220,6 +221,7 @@ public final class RowScreen extends GameScreen {
         context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+        drawCardShadow(context, pose.w(), pose.h(), Math.abs(rise) + lift[i]);
         CardTexture.drawNav(context, cards.get(i), 0, 0, pose.w(), pose.h());
         if (undecided && i == focus) {
             drawCardFrame(context, pose.w(), pose.h());
@@ -341,5 +343,11 @@ public final class RowScreen extends GameScreen {
             }
         }
         return false;
+    }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable("heavyseas.hud.cue.row");
     }
 }

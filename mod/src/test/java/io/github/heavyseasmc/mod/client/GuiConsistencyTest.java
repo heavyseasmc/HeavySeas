@@ -362,4 +362,74 @@ class GuiConsistencyTest {
         assertTrue(problems.isEmpty(), "有字绕开了 GuiText（ADR-0037）：" + System.lineSeparator() + "  "
                 + String.join(System.lineSeparator() + "  ", problems));
     }
+
+    /** 界面里的矩阵缩放，捕获第一个参数（横向倍数）。 */
+    private static final Pattern MATRIX_SCALE = Pattern.compile("getMatrices\\(\\)\\.scale\\(\\s*([^,]+?)\\s*,");
+    /** 画字的调用：{@code GuiText} 本身，与 {@code GameScreen} 里包着它的那几个助手。 */
+    private static final Pattern DRAWS_TEXT = Pattern.compile(
+            "\\b(?:GuiText\\.(?:line|draw)|drawLine(?:Left|In)?|drawParagraph|drawButton)\\(");
+    /** 常量倍数：数字字面量或全大写的常量名。逐帧算出来的动画倍数是局部变量，不归这一条管。 */
+    private static final Pattern CONSTANT_FACTOR = Pattern.compile("^(?:\\d+(?:\\.\\d+)?[fF]?|[A-Z][A-Z0-9_]*)$");
+
+    /**
+     * 字不许套常量倍数的矩阵放大（ADR-0037 §7.3）：放大出来的边缘是台阶，要大字就取梯子上更大的一级。
+     *
+     * <p>2026-09-30 复核实拍抓到终局的「恨 / 爱」是正文套 ×2 画的（{@code RevealScreen} 当时的 {@code LABEL_SCALE}），
+     * 而 {@link #textIsDrawnOnlyThroughGuiText} 放行了它 —— 字确实经过 {@code GuiText}，只是外面多套了一层矩阵。
+     *
+     * <p>判法：每一处常量倍数的 {@code scale(...)}，从它往下数到与之配对的 {@code pop()}，中间画了字就红。
+     * 「顿」「翻」那种逐帧的倍数是变量，这里不拦 —— 它们峰值只比 1 大一点、零点几秒就回到 1，
+     * 算不算违反 §7.3 等用户判（O35），判定之前不写进判据。
+     * 正向对照：扫到的矩阵缩放必须够多，「0 处违反」与「一处都没扫到」输出相同。
+     */
+    @Test
+    void textIsNotScaledUpByAConstantMatrix() throws IOException {
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(CLIENT_DIR)) {
+            files = listing.filter(p -> p.toString().endsWith(".java")).sorted().toList();
+        }
+        assertTrue(files.size() >= MIN_FILES, "只扫到 " + files.size() + " 份客户端源码 —— 没在扫，不是干净");
+
+        List<String> problems = new ArrayList<>();
+        int scales = 0;
+        for (Path file : files) {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int i = 0; i < lines.size(); i++) {
+                String code = lines.get(i).strip();
+                if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) {
+                    continue;
+                }
+                var m = MATRIX_SCALE.matcher(code);
+                if (!m.find()) {
+                    continue;
+                }
+                scales++;
+                String factor = m.group(1).strip();
+                if (!CONSTANT_FACTOR.matcher(factor).matches() || factor.matches("1(?:\\.0)?[fF]?")) {
+                    continue;
+                }
+                int depth = 0;
+                for (int j = i + 1; j < lines.size(); j++) {
+                    String body = lines.get(j);
+                    if (body.contains("getMatrices().push()")) {
+                        depth++;
+                    }
+                    if (body.contains("getMatrices().pop()")) {
+                        if (depth == 0) {
+                            break;
+                        }
+                        depth--;
+                    }
+                    if (DRAWS_TEXT.matcher(body).find()) {
+                        problems.add(file.getFileName() + ":" + (i + 1) + "  字套在常量倍数 " + factor
+                                + " 的矩阵放大里画（第 " + (j + 1) + " 行）：" + code);
+                        break;
+                    }
+                }
+            }
+        }
+        assertTrue(scales >= 5, "只认出 " + scales + " 处矩阵缩放 —— 没在扫，不是干净");
+        assertTrue(problems.isEmpty(), "字被矩阵放大了（ADR-0037 §7.3）：" + System.lineSeparator() + "  "
+                + String.join(System.lineSeparator() + "  ", problems));
+    }
 }

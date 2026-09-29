@@ -161,8 +161,12 @@ public final class EndgamePhase {
         CharacterId target = hate ? affinities.hateOf(who) : affinities.loveOf(who);
         LOGGER.info("终局揭示：{} · {} → {}（第 {}/{} 张）", hate ? "恨" : "爱", who.value(), target.value(),
                 progress.flipped() + 1, progress.order().size());
-        GameFlow.broadcast(world, Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
-                GameFlow.characterName(who), GameFlow.characterName(target)));
+        // 抽到自己是合规的（规则基线 §10.3）；那一句换个说法，免得读起来像出了错（ADR-0045 N4）。
+        GameFlow.broadcast(world, who.equals(target)
+                ? Text.translatable(hate ? "heavyseas.endgame.reveal_hate_self" : "heavyseas.endgame.reveal_love_self",
+                        GameFlow.characterName(who))
+                : Text.translatable(hate ? "heavyseas.endgame.reveal_hate" : "heavyseas.endgame.reveal_love",
+                        GameFlow.characterName(who), GameFlow.characterName(target)));
         component.setEndgame(progress.withFlipped(progress.flipped() + 1));
         GameComponents.sync(world);
         long delay = progress.isWinner(who) ? WINNER_FLIP_HOLD_MS : FLIP_HOLD_MS;

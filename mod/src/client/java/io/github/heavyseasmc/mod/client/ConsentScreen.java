@@ -167,4 +167,10 @@ public final class ConsentScreen extends GameScreen {
             }
         }
     }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return committed ? null : Text.translatable("heavyseas.cue.consent");
+    }
 }
