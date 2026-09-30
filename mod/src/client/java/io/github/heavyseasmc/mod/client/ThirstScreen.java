@@ -125,9 +125,7 @@ public final class ThirstScreen extends GameScreen {
         int hurt = Math.max(0, remaining - (prompt.donated() + chosen) / waterPerSource);
         drawLine(context, Text.translatable("heavyseas.thirst.title", remaining), width / 2, l.titleY(),
                 GuiLanguage.ink());
-        drawLine(context, Text.translatable("heavyseas.thirst.detail", prompt.sources(), prompt.covered(),
-                        prompt.shared(), prompt.donated()),
-                width / 2, l.detailY(), GuiLanguage.muted());
+        // 「来源 · 阳伞抵 · 蹭到 · 别人给」那一行用户 2026-09-30 判去掉（验收清单第 9 条）：还需化解几次 · 喝几张挨几点，两行够了。
         drawLine(context, chosen == 0
                         ? Text.translatable("heavyseas.thirst.none")
                         : Text.translatable("heavyseas.thirst.drink", chosen, hurt),
@@ -138,9 +136,8 @@ public final class ThirstScreen extends GameScreen {
 
     private Layout layout(Bands b) {
         int n = Math.max(1, waters);
-        // 贴舞台底边的三行全是**此刻的状态**：还需化解几次 · 来源明细 · 喝几张挨几点。
-        // 键位挪到了倒计时那一条带的两头；「划船堆 N 张 · 舵手 X」在这一面去掉了（与口渴无关）。
-        int titleY = footerTop(b, 3);
+        // 贴舞台底边的两行全是**此刻的状态**：还需化解几次 · 喝几张挨几点（来源明细那一行 2026-09-30 去掉）。
+        int titleY = footerTop(b, 2);
         int step = lineStep();
         int room = liftRoom();
         int avail = titleY - HINT_GAP - b.stageTop();
@@ -149,7 +146,7 @@ public final class ThirstScreen extends GameScreen {
         int cardsTop = cardsTopIn(b.stageTop(), titleY - HINT_GAP, h, room);
         int rowW = cardRowWidth(n, w);
         return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW,
-                titleY, titleY + step, titleY + 2 * step);
+                titleY, titleY + step, titleY + step);
     }
 
     /** 改张数并上报：超时认的是它，服务端不知道的话只能按开窗时那个默认值算。 */

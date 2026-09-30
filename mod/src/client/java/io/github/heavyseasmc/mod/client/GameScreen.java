@@ -6,6 +6,9 @@ import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.ui.HudLayout.Rect;
+import io.github.heavyseasmc.mod.ui.HudPart;
+import io.github.heavyseasmc.mod.ui.SheetLayout;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -207,6 +210,10 @@ public abstract class GameScreen extends Screen {
             announced = true;
             LOGGER.info("界面：打开 {}", getClass().getSimpleName());
         }
+        if (openedAt == 0L) {
+            long now = System.currentTimeMillis();
+            openedAt = now - lastRemovedAt < SWAP_MS ? now - foldMs() : now;
+        }
     }
 
     /**
@@ -218,6 +225,7 @@ public abstract class GameScreen extends Screen {
     @Override
     public void removed() {
         super.removed();
+        lastRemovedAt = System.currentTimeMillis();
         GuiSound.cancel();                   // 没响的全部作废：牌已经不在桌上了
         LOGGER.info("界面：收起 {}", getClass().getSimpleName());
     }
@@ -290,6 +298,9 @@ public abstract class GameScreen extends Screen {
     /** 界面开着时按键不经按键绑定的轮询，所以换主题在这里接一次；各面的 keyPressed 最后都会落到 super。 */
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (closingAt > 0L) {
+            return true;                     // 正在合上：这一面已经说了再见，按键不再算数
+        }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && detail != null) {
             detail = null;
             return true;
@@ -316,6 +327,9 @@ public abstract class GameScreen extends Screen {
      */
     @Override
     public final boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (closingAt > 0L) {
+            return true;
+        }
         detail = null;
         if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && inspectSeat(mouseX, mouseY)) {
             return true;
@@ -402,10 +416,136 @@ public abstract class GameScreen extends Screen {
      * （原先靠把黑加到 0xE4）。板只铺在舞台上：{@code width} 已为侧栏收窄，侧栏自己有一块标签作底。
      */
     protected void renderBackdrop(DrawContext context, int mouseX, int mouseY, float delta) {
-        GuiSound.pump(System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        GuiSound.pump(now);
+        // 照样张 b-3：整屏压暗（.dimmer，带色相的径向暗角）上放一块板（.sheet，四边各离窗口 50 · 34 稿子像素、四个包角），
+        // 两件都是样张 CSS 由浏览器渲出来的贴图（ADR-0046）。在物理像素里画，界面尺寸 3 下与样张逐像素相同。
+        float open = easeOut(unfolded(now));
+        context.setShaderColor(1f, 1f, 1f, open);
         GuiMaterial.dimWorld(context);
-        int m = GuiMaterial.SHEET_MARGIN;
-        GuiMaterial.sheet(context, m, m, width - 2 * m, height - 2 * m);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+        SheetLayout l = sheet();
+        beginFold(context, l, open);
+        pxBegin(context);
+        Rect s = l.sheet();
+        GuiMaterial.hudPart(context, HudPart.SHEET, s.x(), s.y(), s.w(), s.h(), l.k());
+        pxEnd(context);
+    }
+
+    // ------------------------------------------------------------------ 纸板开合（ADR-0048 · ADR-0045 §5.2 B7 最低成本那一格）
+
+    /** 纸板从一条线竖着翻开 / 合回一条线，各多久（ADR-0045 动 2：此前开合都是一帧硬切）。 */
+    static final long FOLD_MS = 200;
+    /** 上一面收起之后这么快就有下一面顶上来，算「换面」：不再翻开一次，免得两面之间露出世界闪一下。 */
+    private static final long SWAP_MS = 80;
+    private static long lastRemovedAt;
+    private long openedAt;
+    private long closingAt;
+    /** 这一帧推过矩阵：{@link #endFold} 要弹回。 */
+    private boolean folding;
+    private boolean closeQueued;
+
+    /** 此刻纸板翻开了几成：0 = 一条线，1 = 全开。 */
+    private float unfolded(long now) {
+        float span = foldMs();
+        if (closingAt > 0L) {
+            return 1f - Math.min(1f, (now - closingAt) / span);
+        }
+        return openedAt == 0L ? 1f : Math.min(1f, Math.max(0f, (now - openedAt) / span));
+    }
+
+    /** 这一次开合多久：{@link #FOLD_MS}，评审时按偏好放慢（{@code motionSlow}）。 */
+    private static long foldMs() {
+        return FOLD_MS * ClientPrefs.motionSlow();
+    }
+
+    private static float easeOut(float t) {
+        float u = 1f - t;
+        return 1f - u * u * u;
+    }
+
+    /** 没全开时，以板的竖向中线为轴把这一面整个压扁：板与板上的一切一起展开 / 合上。弹回在 {@link #endFold}。 */
+    private void beginFold(DrawContext context, SheetLayout l, float open) {
+        if (open >= 1f) {
+            return;
+        }
+        Rect s = l.sheet();
+        float cy = (s.y() + s.h() / 2f) / guiScale();
+        context.getMatrices().push();
+        context.getMatrices().translate(0f, cy, 0f);
+        context.getMatrices().scale(1f, Math.max(0.02f, open), 1f);
+        context.getMatrices().translate(0f, -cy, 0f);
+        folding = true;
+    }
+
+    /**
+     * 这一面画完（{@code GameScreenSidebar} 的 afterRender，侧栏之前）：弹回 {@link #beginFold} 推的矩阵；
+     * 合上满了 {@link #FOLD_MS} 就真的收起 —— 放到这一帧之后做，不在渲染途中换界面。
+     */
+    void endFold(DrawContext context) {
+        if (folding) {
+            context.getMatrices().pop();
+            folding = false;
+        }
+        if (closingAt > 0L && !closeQueued && System.currentTimeMillis() - closingAt >= foldMs() && client != null) {
+            closeQueued = true;
+            client.execute(this::finishClose);
+        }
+    }
+
+    private void finishClose() {
+        if (client != null && client.currentScreen == this) {
+            super.close();
+        }
+    }
+
+    /**
+     * 收起：先合上 {@link #FOLD_MS}，再真的收。各面超时、轮次走了、Esc 都走这里；被另一面直接顶掉的不经这里（那是换面）。
+     * 重复调（各面的 tick 每一拍都会调）只认第一次。
+     */
+    @Override
+    public void close() {
+        if (closingAt > 0L) {
+            return;
+        }
+        if (client == null || client.currentScreen != this) {
+            super.close();
+            return;
+        }
+        closingAt = System.currentTimeMillis();
+    }
+
+    // ------------------------------------------------------------------ 骨架：照样张的物理像素（ADR-0046 · SheetLayout）
+
+    /** 这一帧的骨架。每帧现算：窗口与界面尺寸随时会变。 */
+    protected SheetLayout sheet() {
+        var window = client == null ? net.minecraft.client.MinecraftClient.getInstance().getWindow() : client.getWindow();
+        return SheetLayout.of(window.getFramebufferWidth(), window.getFramebufferHeight(), guiScale());
+    }
+
+    /** 界面尺寸（整数）：物理像素 ÷ 它 = GUI 单位。 */
+    protected int guiScale() {
+        var window = client == null ? net.minecraft.client.MinecraftClient.getInstance().getWindow() : client.getWindow();
+        return Math.max(1, (int) Math.round(window.getScaleFactor()));
+    }
+
+    /** 往下画物理像素（骨架那几件）：矩阵缩到 1 / 界面尺寸。与 {@link #pxEnd} 成对。 */
+    protected void pxBegin(DrawContext context) {
+        float f = 1f / guiScale();
+        context.getMatrices().push();
+        context.getMatrices().scale(f, f, 1f);
+    }
+
+    protected void pxEnd(DrawContext context) {
+        context.getMatrices().pop();
+    }
+
+    /** 物理像素的矩形换成 GUI 单位的命中框（往外取整，宁大勿小）。 */
+    protected Box unitBox(Rect r) {
+        int s = guiScale();
+        int x0 = Math.floorDiv(r.x(), s);
+        int y0 = Math.floorDiv(r.y(), s);
+        return new Box(x0, y0, Math.floorDiv(r.right() + s - 1, s) - x0, Math.floorDiv(r.bottom() + s - 1, s) - y0);
     }
 
     /**
@@ -499,7 +639,15 @@ public abstract class GameScreen extends Screen {
      * —— 画在矩阵外面的那一版，发牌那 300ms 里框停在落点、卡还在下面往上走（2026-09-15 真实客户端上看到的）。
      */
     protected static void drawCardFrame(DrawContext context, int w, int h) {
-        context.drawBorder(-CARD_FRAME, -CARD_FRAME, w + 2 * CARD_FRAME, h + 2 * CARD_FRAME, GuiLanguage.gold());
+        // 照样张 .sel（外 3 深金 · 4 金 · 1 深金，样张 CSS 渲出来的那一件）：在卡自己的矩阵里、换到物理像素画，跟着卡一起抬、一起缩放。
+        var window = net.minecraft.client.MinecraftClient.getInstance().getWindow();
+        int s = Math.max(1, (int) Math.round(window.getScaleFactor()));
+        SheetLayout l = SheetLayout.of(window.getFramebufferWidth(), window.getFramebufferHeight(), s);
+        float f = 1f / s;
+        context.getMatrices().push();
+        context.getMatrices().scale(f, f, 1f);
+        GuiMaterial.hudPart(context, HudPart.CARD_SEL, 0, 0, w * s, h * s, l.k());
+        context.getMatrices().pop();
     }
 
     /**
@@ -542,21 +690,19 @@ public abstract class GameScreen extends Screen {
      * 剩下的一段由座位轨与舞台分 —— 轨最多拿 {@link #RAIL_MAX_SHARE}，舞台拿剩下的全部。
      */
     protected Bands bands() {
-        int text = textH();
-        // ❗没有身份行了（用户 2026-09-22：「按稿子去掉，交给 HUD」）—— 体力与口渴主画面 HUD 上有，
-        //   界面里再写一遍是重复，而那一条带是牌最缺的二十个单位。倒计时于是直接贴底。
-        int footH = Math.max(Math.max(BAR_H, text), keyHintRowH()) + 2 * FOOT_PAD;
-        int gaugeY = height - Math.max(8, Math.round(height * 0.05f)) - footH;
-        int railY = TOP_BAND_Y + topBandH();
-        int stageBottom = gaugeY - BAND_GAP;
-        int middle = Math.max(0, stageBottom - railY);           // 座位轨与舞台分这一段
-        int bare = RAIL_H + text - BASE_TEXT_H;                  // 只有名字与那条线的轨
-        int room = Math.round(middle * RAIL_MAX_SHARE);
-        int avatar = bare > room ? 0 : avatarDiameter(room - bare);
-        int railH = bare > room ? 0 : bare + blockOf(avatar);
-        int ruleY = railY + (railH > 0 ? railH : 0);
-        int stageTop = ruleY + (railH > 0 ? BAND_GAP : 0);
-        return new Bands(TOP_BAND_Y, railY, railH, avatar, ruleY, stageTop, stageBottom, gaugeY);
+        // 照样张 b-3 的骨架（SheetLayout，物理像素）换成 GUI 单位：上带在板顶 +22，座位轨 +84，
+        // 倒计时锚在板底 −112，提示那一行贴板底 −20。舞台 = 座位轨名字那一行之下 · 倒计时之上。
+        SheetLayout l = sheet();
+        int s = guiScale();
+        int topY = Math.floorDiv(l.phase(0).y(), s);
+        int railY = Math.floorDiv(l.seatToken(0, 8).y(), s);
+        int ruleY = Math.floorDiv(l.railBottom() + s - 1, s);
+        int railH = Math.max(0, ruleY - railY);
+        int avatar = Math.max(1, l.seatToken(0, 8).w() / s);
+        int gaugeY = Math.floorDiv(l.countBar().y(), s);
+        int stageTop = ruleY + Math.max(1, l.len(12) / s);
+        int stageBottom = gaugeY - Math.max(1, l.len(14) / s);
+        return new Bands(topY, railY, railH, avatar, ruleY, stageTop, stageBottom, gaugeY);
     }
 
     /**
@@ -588,12 +734,7 @@ public abstract class GameScreen extends Screen {
         Bands b = bands();
         drawTopBand(context, view, b);
         drawRailBand(context, view, b);
-        // 两道通栏线把舞台夹出来：座位轨与舞台之间、舞台与倒计时之间（样张里是木板之间的缝）。
-        // 截图判据认的就是它们 —— 两条都在，才量得出「舞台上下沿都没动」。
-        if (b.railH() > 0) {
-            GuiMaterial.bandRule(context, SIDE, b.ruleY(), width - 2 * SIDE);
-        }
-        GuiMaterial.bandRule(context, SIDE, b.stageBottom(), width - 2 * SIDE);
+        // 2026-09-30 之前这里还有两道通栏线把舞台夹出来；样张 b-3 没有它们（板上只有木纹与板缝），照样张收掉（ADR-0046）。
         return b;
     }
 
@@ -612,14 +753,53 @@ public abstract class GameScreen extends Screen {
         if (seats.isEmpty() || b.railH() == 0) {
             return;
         }
-        int cell = railCell(seats.size());
-        int left = (width - seats.size() * cell) / 2;
         for (int i = 0; i < seats.size(); i++) {
             String id = seats.get(i);
             boolean here = id.equals(view.actor());
-            drawSeat(context, id, left + i * cell, b.railY(), cell, b, here ? GuiLanguage.gold() : 0, false,
-                    here ? GuiLanguage.gold() : GuiLanguage.muted(), here ? GuiLanguage.gold() : GuiLanguage.ground());
+            boolean you = view.seated() && id.equals(view.character());
+            // 样张：金圈 = 你，铜绿圈 = 正轮到（「你 · 正轮到」两样都占时铜绿压过金 —— 样张 CSS 的先后就是这样）
+            drawSeatAt(context, id, i, seats.size(), here ? GuiLanguage.verdigris() : you ? GuiLanguage.gold() : 0,
+                    false, here || you, false);
         }
+    }
+
+    /**
+     * 座位轨上第 {@code i} 格（共 {@code n} 格），照样张 b-3 的 {@code .srail}：头像 46 · 外圈（{@link HudPart} 渲出来的那几种）·
+     * 名字 15px；{@code crate} = 补给箱此刻在他手里，头上一只铜绿的箱。
+     *
+     * @param mark    圈上的语义色：金 = 你 · 铜绿 = 正轮到 · 朱砂 = 被抢 / 被换，{@code 0} = 普通那一圈
+     * @param faded   还没轮到：头像淡下去
+     * @param lit     名字亮着（你 · 正轮到）；否则是样张 {@code .mut} 的次墨
+     */
+    protected void drawSeatAt(DrawContext context, String characterId, int i, int n, int mark, boolean faded,
+                              boolean lit, boolean crate) {
+        SheetLayout l = sheet();
+        Box hit = unitBox(l.seatCell(i, n));
+        seatHits.add(new SeatHit(hit, characterId));
+        seatDetail(characterId).ifPresent(t -> detailHits.add(new DetailHit(hit, t)));
+        pxBegin(context);
+        Rect t = l.seatToken(i, n);
+        var seat = SeatMarks.seat(characterId);
+        GuiMaterial.portrait(context, characterId, t.x(), t.y(), t.w(), faded ? SEAT_FADED : 1f);
+        seat.ifPresent(s -> SeatMarks.shade(context, t, SeatMarks.Kit.TOKEN46, s, l.k()));
+        HudPart ring = mark == GuiLanguage.gold() ? HudPart.TOK46_YOU
+                : mark == GuiLanguage.verdigris() ? HudPart.TOK46_ACT
+                : mark == GuiLanguage.cinnabar() ? HudPart.TOK46_CINN : HudPart.TOK46_PLAIN;
+        if (ring == HudPart.TOK46_ACT) {
+            GuiMaterial.breathingRing(context, HudPart.TOK46_PLAIN, ring, t.x(), t.y(), t.w(), t.h(), l.k());
+        } else {
+            GuiMaterial.hudPart(context, ring, t.x(), t.y(), t.w(), t.h(), l.k());
+        }
+        // D1 (a)：体力印章 · 昏迷 · 移出 · 死亡（ADR-0048）。各面的轨上没有舵轮，印章一律在右下
+        seat.ifPresent(s -> SeatMarks.marks(context, t, s, l.k(), false));
+        Rect nm = l.seatName(i, n);
+        GuiText.drawPx(context, nameOf(characterId).getString(), nm.x(), nm.y(), nm.w(), l.len(SheetLayout.NAME_PX),
+                false, lit ? GuiLanguage.ink() : GuiLanguage.Hud.ink2(), GuiText.Align.CENTER, 0);
+        if (crate) {
+            Rect c = l.crate(i, n);
+            GuiMaterial.hudIcon(context, HudPart.IC_CRATE, c.x(), c.y(), c.w(), c.h(), GuiLanguage.verdigris(), l.k());
+        }
+        pxEnd(context);
     }
 
     /** 座位轨一格多宽：整条铺到舞台两边，格子按人数均分。 */
@@ -770,13 +950,22 @@ public abstract class GameScreen extends Screen {
 
     /** 一个按钮多高：一行字加上下内边距。 */
     protected int buttonHeight() {
-        return textH() + 2 * BTN_PAD_Y;
+        // 样张 .btn：padding 9 · 18px × 行高 1.7 ≈ 48.6 稿子像素，换成 GUI 单位
+        SheetLayout l = sheet();
+        return Math.max(1, Math.round(l.len(SheetLayout.HINTS_H) / (float) guiScale()));
     }
 
-    /** 一个按钮多宽：字宽加左右内边距。 */
+    /** 按钮多宽：左右各 20 稿子像素，字按 18px、字距 2 量（样张 .btn）。 */
     protected int buttonWidth(Text label) {
-        return textW(label) + 2 * BTN_PAD_X;
+        SheetLayout l = sheet();
+        int px = l.len(BTN_TEXT_PX);
+        int w = 2 * l.len(20) + GuiText.widthPx(label.getString(), px, false, l.len(BTN_TEXT_SPACING));
+        return Math.max(1, (w + guiScale() - 1) / guiScale());
     }
+
+    /** 按钮上的字（样张 .btn { font-size: 18px; letter-spacing: 2px }）。 */
+    private static final double BTN_TEXT_PX = 18;
+    private static final double BTN_TEXT_SPACING = 2;
 
     /**
      * 指针落在第几个按钮上；都不在时 {@code -1}。
@@ -830,24 +1019,25 @@ public abstract class GameScreen extends Screen {
      */
     protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color,
                               int fill, float rise, float scale) {
-        detailHits.add(new DetailHit(b, label));
+        // 2026-09-30 之前这里还给每颗按钮登记一张写着它自己名字的悬停签（停在「划船」上再弹一次「划船」）——
+        // 用户判收掉（验收清单第 10 条）：签子只该说按钮上没写的东西。
         context.getMatrices().push();
         context.getMatrices().translate(b.x() + b.w() / 2f, b.y() + b.h() + rise, 0);
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-b.w() / 2f, -b.h(), 0);
-        // 按钮是一块标签（纸签 / 搪瓷牌）；按不动的连底一起淡下去（fill 的不透明度就是那个「淡」）。
+        // 照样张 .btn：搪瓷（内一道深线），焦点那一颗外一圈金（.btn.focus）；字 18px、字距 2（ADR-0046）。
+        // 按不动的连底一起淡下去（fill 的不透明度就是那个「淡」）。
+        SheetLayout l = sheet();
+        int s = guiScale();
         float alpha = (fill >>> 24) / 255f;
+        float f = 1f / s;
+        context.getMatrices().scale(f, f, 1f);
         context.setShaderColor(1f, 1f, 1f, alpha);
-        GuiMaterial.tag(context, 0, 0, b.w(), b.h());
+        GuiMaterial.hudPart(context, focused ? HudPart.BTN_FOCUS : HudPart.BTN, 0, 0, b.w() * s, b.h() * s, l.k());
         context.setShaderColor(1f, 1f, 1f, 1f);
-        color = GuiLanguage.onTag(color);
-        if (focused) {
-            // 金 =「你 · 你选的那个」。按钮的框是 1 像素，卡的框是 2 像素（CARD_FRAME）—— 两种元素，各只此一处。
-            context.drawBorder(-1, -1, b.w() + 2, b.h() + 2, GuiLanguage.gold());
-            context.drawBorder(-2, -2, b.w() + 4, b.h() + 4, GuiLanguage.gold());
-        }
-        drawLine(context, label, b.w() / 2,
-                (b.h() - textH()) / 2 + 1, color);
+        int px = l.len(BTN_TEXT_PX);
+        GuiText.drawPx(context, label.getString(), 0, (b.h() * s - GuiText.linePxAt(px, false)) / 2, b.w() * s, px, false,
+                GuiLanguage.onTag(color), GuiText.Align.CENTER, l.len(BTN_TEXT_SPACING));
         context.getMatrices().pop();
     }
 
@@ -1172,9 +1362,114 @@ public abstract class GameScreen extends Screen {
      */
     protected void drawFootBand(DrawContext context, Bands b, List<KeyHint> left, List<KeyHint> right,
                                 long now, Countdown countdown) {
-        drawEdgeHints(context, b, left, right);
+        // 照样张 b-3：倒计时一条（.count，锚在板底 −112、居中 540 宽）· 下面一行提示（.hints，贴板底 −20、居中）——
+        // 打头一句次墨的说明（这一面的那句短语，ADR-0043 D3 (b)），然后「键帽 + 一句话」，确认那一件是一枚按钮。
+        SheetLayout l = sheet();
+        pxBegin(context);
         if (countdown != null) {
-            drawCountdown(context, b, now, countdown.deadlineMs(), countdown.totalMs(), countdown.stageW());
+            drawCountdownPx(context, l, now, countdown.deadlineMs(), countdown.totalMs());
+        }
+        List<KeyHint> all = new ArrayList<>(left);
+        all.addAll(right);
+        drawHintsPx(context, l, cue(), all);
+        pxEnd(context);
+    }
+
+    /** 倒计时（物理像素）：外三圈的横杠里铜绿的液面往左退，最后一段朱砂；秒数 22px 右对齐（定宽，数位变了不横跳）。 */
+    private void drawCountdownPx(DrawContext context, SheetLayout l, long now, long deadlineMs, long totalMs) {
+        long left = Math.max(0L, deadlineMs - now);
+        long total = Math.max(1L, totalMs);
+        float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
+        boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
+        Rect bar = l.countBar();
+        GuiMaterial.hudPart(context, HudPart.COUNT_BAR, bar.x(), bar.y(), bar.w(), bar.h(), l.k());
+        GuiMaterial.hudPartLeft(context, urgent ? HudPart.COUNT_FILL_URGENT : HudPart.COUNT_FILL,
+                bar.x(), bar.y(), bar.w(), bar.h(), Math.round(bar.w() * frac), l.k());
+        Rect sec = l.countSeconds();
+        int px = l.len(SheetLayout.SEC_PX);
+        GuiText.drawPx(context, String.format("%.1f", left / 1000f), sec.x(), sec.y() + (sec.h() - GuiText.linePxAt(px, true)) / 2,
+                sec.w(), px, true, urgent ? GuiLanguage.cinnabar() : GuiLanguage.ink(), GuiText.Align.RIGHT, 0);
+    }
+
+    /**
+     * 提示那一行（物理像素）：一句次墨的说明 · 若干「键帽 + 一句话」· 确认那一件画成搪瓷按钮（金圈），整行居中，间距 28。
+     * 放不下时先省掉打头那句说明，再不行就缩（归 {@link GuiText}）。
+     */
+    private void drawHintsPx(DrawContext context, SheetLayout l, Text cue, List<KeyHint> hints) {
+        int gap = l.len(SheetLayout.HINTS_GAP);
+        int textPx = l.len(SheetLayout.HINTS_PX);
+        String lead = cue == null ? "" : cue.getString();
+        int leadW = lead.isEmpty() ? 0 : GuiText.widthPx(lead, textPx, false, 0);
+        int[] widths = new int[hints.size()];
+        int total = 0;
+        for (int i = 0; i < hints.size(); i++) {
+            widths[i] = hintWidthPx(l, hints.get(i));
+            total += widths[i] + (i > 0 ? gap : 0);
+        }
+        int room = l.sheet().w() - 2 * l.len(40);
+        if (leadW > 0 && total + gap + leadW > room) {
+            leadW = 0;                                   // 放不下：先省掉那句说明，键位与按钮一个不少
+            lead = "";
+        }
+        int all = total + (leadW > 0 ? leadW + gap : 0);
+        int x = l.width() / 2 - Math.min(all, room) / 2;
+        int cy = l.hintsCenterY();
+        if (leadW > 0) {
+            GuiText.drawPx(context, lead, x, cy - GuiText.linePxAt(textPx, false) / 2, leadW + 2, textPx, false,
+                    GuiLanguage.Hud.ink2(), GuiText.Align.LEFT, 0);
+            x += leadW + gap;
+        }
+        for (int i = 0; i < hints.size(); i++) {
+            drawHintPx(context, l, hints.get(i), x, cy, widths[i]);
+            x += widths[i] + gap;
+        }
+    }
+
+    private int hintWidthPx(SheetLayout l, KeyHint hint) {
+        int keys = 0;
+        for (String key : hint.keys()) {
+            keys += keycapWPx(l, key) + l.len(SheetLayout.ROW_GAP);
+        }
+        if (hint.primary()) {
+            return 2 * l.len(SheetLayout.BTN_PAD_X) + keys + (hint.keys().isEmpty() ? 0 : l.len(SheetLayout.BTN_GAP)
+                    - l.len(SheetLayout.ROW_GAP)) + GuiText.widthPx(hint.label().getString(), l.len(SheetLayout.BTN_PX),
+                    false, l.len(SheetLayout.BTN_SPACING));
+        }
+        return keys + GuiText.widthPx(hint.label().getString(), l.len(SheetLayout.HINTS_PX), false, 0);
+    }
+
+    /** 键帽宽（物理像素）：样张 .key { min-width: 26px; padding: 0 7px }，字 600 14px。 */
+    private static int keycapWPx(SheetLayout l, String key) {
+        return Math.max(l.len(io.github.heavyseasmc.mod.ui.HudLayout.KEY), GuiText.widthPx(key, l.len(14), true, 0) + 2 * l.len(7));
+    }
+
+    private void drawHintPx(DrawContext context, SheetLayout l, KeyHint hint, int x, int cy, int w) {
+        int key = l.len(io.github.heavyseasmc.mod.ui.HudLayout.KEY);
+        int keyPx = l.len(14);
+        if (hint.primary()) {
+            int h = l.len(SheetLayout.HINTS_H);
+            GuiMaterial.hudPart(context, HudPart.BTN_FOCUS, x, cy - h / 2, w, h, l.k());
+            x += l.len(SheetLayout.BTN_PAD_X);
+        }
+        for (String k : hint.keys()) {
+            int kw = keycapWPx(l, k);
+            GuiMaterial.hudPart(context, HudPart.KEY, x, cy - key / 2, kw, key, l.k());
+            GuiText.drawPx(context, k, x, cy - key / 2 + (key - GuiText.linePxAt(keyPx, true)) / 2, kw, keyPx, true,
+                    GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.CENTER, 0);
+            x += kw + l.len(SheetLayout.ROW_GAP);
+        }
+        String label = hint.label().getString();
+        if (hint.primary()) {
+            if (!hint.keys().isEmpty()) {
+                x += l.len(SheetLayout.BTN_GAP) - l.len(SheetLayout.ROW_GAP);
+            }
+            int px = l.len(SheetLayout.BTN_PX);
+            GuiText.drawPx(context, label, x, cy - GuiText.linePxAt(px, false) / 2, w, px, false,
+                    GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.LEFT, l.len(SheetLayout.BTN_SPACING));
+        } else {
+            int px = l.len(SheetLayout.HINTS_PX);
+            GuiText.drawPx(context, label, x, cy - GuiText.linePxAt(px, false) / 2, w, px, false,
+                    GuiLanguage.ink(), GuiText.Align.LEFT, 0);
         }
     }
 
@@ -1475,42 +1770,43 @@ public abstract class GameScreen extends Screen {
      * 上带：回合 · 阶段 · 海鸥。全船都知道的东西 —— 每一面都要、而且必须长得一样，所以放在这里。
      */
     protected void drawPublicBand(DrawContext context, HudView view, int y) {
-        boolean rich = density().atLeast(Density.MEDIUM);    // COMPACT 只剩阶段轮盘：天候与海鸥都在 HUD 上有
-        boolean weather = rich && !view.weather().isEmpty();  // 第一张天候翻开之前也没有它，那一格就空着
-        int gulls = rich ? GameState.GULLS_TO_LAND * ICON_H + (GameState.GULLS_TO_LAND - 1) * ICON_GAP : 0;
-        int span = ICON_H + (rich ? ICON_GROUP_GAP + gulls : 0) + (weather ? ICON_H + ICON_GROUP_GAP : 0);
-        int x = (width - span) / 2;
-        // 轮到你做决定时，上带左头一句不超过 8 个字的动词短语（用户 2026-09-25 定，ADR-0043 D3 (b)）。
-        // 金 = 轮到你。与图标同一行，不占舞台的高度（牌是主体，ADR-0037 §7.8）；放不下就缩字号，绝不压到图标。
-        Text cue = cue();
-        if (cue != null && x - SIDE - ICON_GROUP_GAP > 0) {
-            GuiText.line(context, cue, SIDE, y + (ICON_H - textH()) / 2, x - SIDE - ICON_GROUP_GAP, GuiText.BODY, true,
-                    GuiLanguage.gold(), GuiText.Align.LEFT);
+        // 照样张 b-3 的 .hd：四格阶段（此刻那一格垫铜绿圆底，其余 42%）+ 四只海鸥（飞来的实、没来的 30%），在板的中线上居中。
+        // 2026-09-30 之前这里还有天候图标与一枚进度弧，左头还有那句短语 —— 样张没有，天候并进悬停签，短语挪进提示那一行。
+        SheetLayout l = sheet();
+        int ink = GuiLanguage.ink();
+        boolean endgame = view.endgame().active();
+        pxBegin(context);
+        int icon = l.len(SheetLayout.ICON);
+        for (int i = 0; i < SheetLayout.PHASES; i++) {
+            Rect ph = l.phase(i);
+            boolean on = !endgame && view.phase().ordinal() == i;
+            if (on) {
+                GuiMaterial.hudPart(context, HudPart.PHASE_ON, ph.x(), ph.y(), ph.w(), ph.h(), l.k());
+            }
+            GuiMaterial.hudIcon(context, PHASE_ICONS[i], ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
+                    icon, icon, on ? GuiLanguage.Hud.PHASE_ON_ICON : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.PHASE_OFF_ALPHA),
+                    l.k());
         }
-        if (weather) {
-            detailHits.add(new DetailHit(new Box(x, y, ICON_H, ICON_H),
-                    Text.translatable("heavyseas.game.weather",
-                            Text.translatable("heavyseas.weather." + view.weather()),
-                            Text.translatable("heavyseas.weather.effect." + view.weather()))));
-            GuiMaterial.icon(context, "weather_" + view.weather(), x, y, ICON_H, GuiLanguage.ink());
-            x += ICON_H + ICON_GROUP_GAP;
+        for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
+            Rect g = l.gull(i);
+            GuiMaterial.hudIcon(context, HudPart.IC_GULL, g.x(), g.y(), g.w(), g.h(),
+                    i < view.gulls() ? ink : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.GULL_OFF_ALPHA), l.k());
         }
-        // 阶段轮盘：一圈四格，当前那格粗而实。每一格一张贴图 —— 单色着色挑不出其中一格。
-        GuiMaterial.icon(context, "phase_" + view.phase().ordinal(), x, y, ICON_H, GuiLanguage.verdigris());
+        pxEnd(context);
         Text status = Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
                 view.gulls(), GameState.GULLS_TO_LAND);
-        detailHits.add(new DetailHit(new Box(x, y, ICON_H, ICON_H), status));
-        if (!rich) {
-            return;
+        if (!view.weather().isEmpty()) {
+            status = status.copy().append(" · ").append(Text.translatable("heavyseas.game.weather",
+                    Text.translatable("heavyseas.weather." + view.weather()),
+                    Text.translatable("heavyseas.weather.effect." + view.weather())));
         }
-        x += ICON_H + ICON_GROUP_GAP;
-        detailHits.add(new DetailHit(new Box(x, y, gulls, ICON_H), status));
-        // 海鸥：够不够 4 只是一眼的事，不该让人去读数字。
-        for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
-            GuiMaterial.icon(context, "gull", x + i * (ICON_H + ICON_GAP), y, ICON_H,
-                    i < view.gulls() ? GuiLanguage.verdigris() : GuiLanguage.dim());
-        }
+        Rect first = l.phase(0);
+        Rect last = l.gull(GameState.GULLS_TO_LAND - 1);
+        detailHits.add(new DetailHit(unitBox(new Rect(first.x(), first.y(), last.right() - first.x(), first.h())), status));
     }
+
+    /** 上带四格阶段的图标（样张 b-3：天候 · 补给 · 行动 · 航海，与 {@link Phase} 的顺序一致）。 */
+    private static final HudPart[] PHASE_ICONS = {HudPart.IC_SUN, HudPart.IC_CRATE, HudPart.IC_FIST, HudPart.IC_BOAT};
 
     /**
      * 这一面此刻要你做什么：一句不超过 8 个字的动词短语，画在上带左头（ADR-0043 D3 (b)）。

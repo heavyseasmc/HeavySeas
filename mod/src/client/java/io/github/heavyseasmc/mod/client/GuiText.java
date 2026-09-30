@@ -149,6 +149,108 @@ final class GuiText {
         return ceilDiv(Math.max(1, fit.lines().size()) * linePx, scale);
     }
 
+    // ---------------------------------------------------------------- 物理像素里排字（主画面 HUD）
+
+    /**
+     * 在<b>已经缩到物理像素</b>的矩阵里画一行字。主画面 HUD 照样张按物理像素排（{@code HudLayout}），
+     * 调用方先把矩阵缩到 1 / 界面尺寸，这里就不再缩 —— 否则缩两次。
+     *
+     * <p>字号直接给物理像素（样张的 {@code font-size} 乘上 {@code HudLayout.k()} 再取整），取梯子上不大于它的那一级；
+     * 放不下就往下缩一级，再不行截断（与 {@link #draw} 同一套 {@link TextFit}）。
+     *
+     * @param top     行框上沿（物理像素）；行框高是 {@link #linePxAt}
+     * @param spacing 字距（物理像素，样张的 {@code letter-spacing}）；大于 0 时按字符分开画、不缩不截
+     * @return 实际画了多宽（物理像素）
+     */
+    static int drawPx(DrawContext context, String text, int x, int top, int boxPx, int sizePx, boolean bold,
+                      int color, Align align, int spacing) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        if (spacing > 0) {
+            int px = candidates(bold, sizePx)[0];
+            int w = spacedWidth(renderer, text, bold, px, spacing);
+            int x0 = x + alignOffset(align, boxPx, w);
+            int py = top + baselineIn(px) - BASELINE_BELOW_DRAW_Y;
+            int cx = x0;
+            for (int i = 0; i < text.length(); ) {
+                int cp = text.codePointAt(i);
+                String ch = new String(Character.toChars(cp));
+                context.drawText(renderer, styled(ch, bold, px), cx, py, color, false);
+                cx += renderer.getWidth(styled(ch, bold, px)) + spacing;
+                i += Character.charCount(cp);
+            }
+            return w;
+        }
+        TextFit.Result fit = TextFit.fit(text, boxPx, 1, candidates(bold, sizePx),
+                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.SHRINK_FIRST);
+        if (fit.lines().isEmpty()) {
+            return 0;
+        }
+        TextFit.Line l = fit.lines().get(0);
+        int py = top + (linePx(sizePxOf(bold, sizePx)) - linePx(fit.size())) / 2 + baselineIn(fit.size())
+                - BASELINE_BELOW_DRAW_Y;
+        context.drawText(renderer, styled(l.text(), bold, fit.size()), x + alignOffset(align, boxPx, l.width()), py,
+                color, false);
+        return l.width();
+    }
+
+    /**
+     * 同上，但是一段：先折行，折不下才缩，最多 {@code maxLines} 行，行距由调用方给（样张的 {@code line-height}）。
+     *
+     * @return 实际排了几行
+     */
+    static int paragraphPx(DrawContext context, String text, int x, int top, int boxPx, int sizePx, boolean bold,
+                           int color, int maxLines, int lineStepPx) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        TextFit.Result fit = TextFit.fit(text, boxPx, maxLines, candidates(bold, sizePx),
+                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.WRAP_FIRST);
+        int lead = (lineStepPx - linePx(fit.size())) / 2;
+        for (int i = 0; i < fit.lines().size(); i++) {
+            TextFit.Line l = fit.lines().get(i);
+            int py = top + i * lineStepPx + lead + baselineIn(fit.size()) - BASELINE_BELOW_DRAW_Y;
+            context.drawText(renderer, styled(l.text(), bold, fit.size()), x, py, color, false);
+        }
+        return Math.max(1, fit.lines().size());
+    }
+
+    /** 这段字在 {@link #paragraphPx} 里会排成几行（先量后铺底用）。 */
+    static int paragraphLines(String text, int boxPx, int sizePx, boolean bold, int maxLines) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        return Math.max(1, TextFit.fit(text, boxPx, maxLines, candidates(bold, sizePx),
+                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.WRAP_FIRST).lines().size());
+    }
+
+    /** 物理像素字号下一行字多宽（带字距）。 */
+    static int widthPx(String text, int sizePx, boolean bold, int spacing) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        return spacedWidth(renderer, text, bold, sizePxOf(bold, sizePx), spacing);
+    }
+
+    /** 物理像素字号下一行的行框多高。 */
+    static int linePxAt(int sizePx, boolean bold) {
+        return linePx(sizePxOf(bold, sizePx));
+    }
+
+    private static int sizePxOf(boolean bold, int sizePx) {
+        return candidates(bold, sizePx)[0];
+    }
+
+    private static int spacedWidth(TextRenderer renderer, String text, boolean bold, int px, int spacing) {
+        int w = renderer.getWidth(styled(text, bold, px));
+        return spacing > 0 ? w + spacing * Math.max(0, text.codePointCount(0, text.length()) - 1) : w;
+    }
+
+    private static int baselineIn(int px) {
+        return Math.round((linePx(px) - px) / 2f + px * IDEOGRAPH_ASCENT);
+    }
+
+    private static int alignOffset(Align align, int box, int w) {
+        return switch (align) {
+            case LEFT -> 0;
+            case CENTER -> (box - w) / 2;
+            case RIGHT -> box - w;
+        };
+    }
+
     /** 只量不画：这段字排进宽 {@code boxW} 的框里要占多高，GUI 单位。要先铺底再写字的地方用。 */
     static int height(String text, int boxW, int guiSize, boolean bold, int maxLines) {
         MinecraftClient client = MinecraftClient.getInstance();

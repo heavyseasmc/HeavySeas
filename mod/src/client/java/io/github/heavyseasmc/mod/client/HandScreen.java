@@ -6,6 +6,8 @@ import io.github.heavyseasmc.mod.net.UseProvisionC2S;
 import io.github.heavyseasmc.mod.net.CardActionC2S;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.ui.SheetLayout;
+import io.github.heavyseasmc.mod.ui.HudLayout.Rect;
 import net.minecraft.client.gui.DrawContext;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.text.Text;
@@ -52,8 +54,12 @@ public final class HandScreen extends GameScreen {
     /** 当前看的是第几张。<b>一进来就有</b>，不等玩家先动一下。 */
     private int selected;
 
-    /** 每张的抬起量，向目标插值。下标与手牌对齐。 */
+    /** 每张的抬起量，向目标插值。下标与手牌对齐。选中那张「抽出来」的进度就是它（ADR-0049）。 */
     private float[] lift = new float[0];
+    /** 手牌少了一张、多了一张，其余的滑到新位置（按「哪一张」认，ADR-0049）。 */
+    private final CardRow.Slide slide = new CardRow.Slide();
+    /** 抽出来往上提多少（GUI 单位），每帧随窗口算。 */
+    private float pullLift;
 
     /** 这一批「发」从第几张起、什么时候开始 —— 已经在手上的牌不重发。 */
     private int dealtFrom;
@@ -69,7 +75,6 @@ public final class HandScreen extends GameScreen {
     private boolean revealFocus;
     /** 「亮出」按钮这一帧画在哪；没画就是 {@code null}（不在查看态、或叠还没收拢）。 */
     private Box revealBox;
-    private Box giveBox;
     /** 这一帧那一排牌的落位：按位置认牌（左键选 · 右键看）要用。 */
     private int rowLeft;
     private int rowTop;
@@ -160,193 +165,313 @@ public final class HandScreen extends GameScreen {
 
         long now = System.currentTimeMillis();
         long dt = frameDelta(now);
-
         List<String> hand = view.hand();
-        // 共有的四条带在 GameScreen 里排定（这一面没有倒计时，那一格空着 —— 空着与挪位置是两回事）。
+        // 照样张 b-4（用户 2026-09-30 验收清单第 4 条：「照稿子 b-4 换」）：这一面没有上带与座位轨 ——
+        // 左边一张大图是选中的那张，右边一块说明签与两枚按钮，下面「手牌」「面前」两排小牌，右上「只有你看得到」的爱恨。
         Bands b = drawChrome(context, view);
-        Inspect ins = inspect(b);
-        float gathered = gathered(now);
+        SheetLayout l = sheet();
+        int s = guiScale();
+        Rect sheetBox = l.sheet();
 
-        // 爱恨两张小卡在舞台右头（O25，交互稿里就是两张小卡；原先是一行字「你爱：X · 你恨：Y」）。
-        // 只有你看得到（全程保密，规则里也不许亮出来证明自己）。手牌那一排在剩下的宽度里居中 ——
-        // 小卡占着的那一块<b>空手时照样让位</b>：牌不能因为手上有没有牌就左右跳。
-        boolean affinity = !view.love().isEmpty();
-        int room = liftRoom();
-        int avail = b.stageBottom() - b.stageTop();
-        int fullW = width - 2 * SIDE;
-        int n = Math.max(1, hand.size());
-        int miniH = affinity ? Math.max(MIN_CARD_H, Math.round(cardHeightFor(n, avail - room) * AFFINITY_SHARE)) : 0;
-        int miniW = GuiLanguage.cardWidth(miniH);
-        int blockW = affinity ? 2 * miniW + CARD_GAP : 0;
-        int handW = fullW - (affinity ? blockW + AFFINITY_GAP : 0);
-        // 面前那一区（样张 b-4 的「面前」）：亮出来的牌离开手牌之后就落在这里 —— 原先这一面不画它，
-        // 亮出去的牌从界面上消失了（ADR-0043 §1.6 A2 · ADR-0045）。比手牌小一号，读得出是另一堆。
+        int smallW = Math.max(8, (int) Math.round(SMALL_W * l.k() / s));
+        int smallH = GuiLanguage.cardHeight(smallW);
+        int gap = Math.max(1, (int) Math.round(SMALL_GAP * l.k() / s));
+        int rowTop = Math.round((sheetBox.y() + l.len(ROW_TOP)) / (float) s);
+        int handX = Math.round((sheetBox.x() + l.len(HAND_X)) / (float) s);
+        int frontMinX = Math.round((sheetBox.x() + l.len(FRONT_X)) / (float) s);
+        int zoneGap = Math.max(1, (int) Math.round(ZONE_GAP * l.k() / s));
+        int rightEdge = Math.round((sheetBox.right() - l.len(SECRET_RIGHT)) / (float) s);
         List<HudView.FrontCard> front = view.front();
-        int frontH = 0;
-        int frontW = 0;
-        if (!front.isEmpty()) {
-            frontH = Math.max(MIN_CARD_H, Math.round(cardHeightFor(n, avail - room, handW) * FRONT_SHARE));
-            int fw = GuiLanguage.cardWidth(frontH);
-            frontW = front.size() * fw + (front.size() - 1) * CARD_GAP;
-            handW -= frontW + AFFINITY_GAP;
-        }
-        int cardH = cardHeightFor(n, avail - room, handW);
-        int cardW = GuiLanguage.cardWidth(cardH);
-        int handTop = cardsTopIn(b.stageTop(), b.stageBottom(), cardH, room);
-        if (affinity && gathered < 1f) {
-            drawAffinity(context, width - SIDE - blockW, handTop + cardH - miniH, miniW, miniH, 1f - gathered);
-        }
-        if (!front.isEmpty() && gathered < 1f) {
-            drawFront(context, front, SIDE + handW + AFFINITY_GAP, handTop + cardH - frontH, frontH, 1f - gathered);
-        }
+        int frontW = front.isEmpty() ? 0 : front.size() * smallW + (front.size() - 1) * gap;
 
-        if (hand.isEmpty()) {
-            // 空手也留出牌的位置：小卡不能因为手上没牌就挪到别处去。
-            // 「补给箱还没传到你手上」只在物资阶段是真话；终局里空手按绑定键进来的人，要的是「一张都没有」。
-            boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
-            drawLine(context, Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
-                    SIDE + handW / 2, handTop + (cardH - textH()) / 2, GuiLanguage.dim());
-            return;
-        }
-
-        int step = step(hand.size(), cardW, handW);
-        int left = SIDE + (handW - ((hand.size() - 1) * step + cardW)) / 2;
-        rowLeft = left;
-        rowTop = handTop;
+        // 手牌那一排：放得下就照样张的间距并排，放不下就叠（绝不画出板外 —— 画到外面与没画长得一样）
+        int handRoom = Math.max(smallW, (front.isEmpty() ? rightEdge : Math.max(frontMinX, handX)) - handX
+                - (front.isEmpty() ? 0 : zoneGap));
+        int step = CardRow.step(hand.size(), smallW, gap, front.isEmpty() ? rightEdge - handX : Math.max(handRoom,
+                rightEdge - handX - frontW - zoneGap));
+        int handEnd = handX + (hand.isEmpty() ? 0 : (hand.size() - 1) * step + smallW);
+        int frontX = Math.max(frontMinX, handEnd + zoneGap);
+        rowLeft = handX;
+        this.rowTop = rowTop;
         rowStep = step;
-        rowW = cardW;
-        rowH = cardH;
+        rowW = smallW;
+        rowH = smallH;
 
-        // 鼠标真的动了才换选中（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
-        // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
-        if (mouseActuallyMoved(mouseX, mouseY) && !inspecting()) {
-            int hovered = indexAt(mouseX, mouseY, left, handTop, step, cardW, cardH);
+        if (mouseActuallyMoved(mouseX, mouseY)) {
+            int hovered = indexAt(mouseX, mouseY, handX, rowTop, step, smallW, smallH);
             if (hovered >= 0) {
                 select(hovered);              // 鼠标与键盘指的是同一个东西，不能各说各话
             }
         }
 
-        // 选中的那张最后画 —— 叠起来时它必须在最上面，否则「抬」看不出来。
-        for (int i = 0; i < hand.size(); i++) {
-            lift[i] = GuiLanguage.approach(lift[i], i == selected ? GuiLanguage.LIFT_PX : 0f, dt);
-            if (i != selected) {
-                drawHandCard(context, now, hand, i, left + i * step, handTop, cardW, cardH, ins, gathered);
-            }
+
+        drawFront(context, front, frontX, rowTop + smallH, smallW, smallH,
+                CardRow.step(front.size(), smallW, gap, Math.max(smallW, rightEdge - frontX)));
+        if (!view.love().isEmpty()) {
+            drawSecret(context, l);
         }
-        drawHandCard(context, now, hand, selected, left + selected * step, handTop, cardW, cardH, ins, gathered);
+
+        playBox = null;
         revealBox = null;
-        giveBox = null;
-        if (gathered > 0f && selected >= 0 && selected < hand.size()) {
-            String card = hand.get(selected);
-            int plateBottom = drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
-                    provisionCaption(card), provisionName(card), provisionEffect(card));
-            // 「亮出」只在叠收拢之后出现：还在收的时候按钮跟着签子一起动，点不准。
-            // 字用朱砂 —— 不可逆的那一类（与划船「其余当场塞回」、行动一面「抢夺」同一个语义色）。
-            if (inspecting() && gathered >= 1f) {
-                Text label = Text.translatable("heavyseas.keys.reveal");
-                revealBox = new Box(ins.plateX(), plateBottom + REVEAL_GAP, buttonWidth(label), buttonHeight());
-                if (canGive()) {
-                    Text give = Text.translatable("heavyseas.trade.give");
-                    int gap = BTN_GAP;
-                    int half = Math.max(1, (ins.plateW() - gap) / 2);
-                    revealBox = new Box(ins.plateX(), plateBottom + REVEAL_GAP, half, buttonHeight());
-                    giveBox = new Box(ins.plateX() + half + gap, plateBottom + REVEAL_GAP, half, buttonHeight());
-                    drawButton(context, giveBox, give, false, GuiLanguage.verdigris(), 0f);
-                }
-                drawButton(context, revealBox, label, revealFocus, GuiLanguage.cinnabar(), 0f);
+        if (hand.isEmpty()) {
+            boolean waiting = view.phase() == Phase.PROVISION && !view.endgame().active();
+            drawLine(context, Text.translatable(waiting ? "heavyseas.hand.empty" : "heavyseas.hand.empty_none"),
+                    width / 2, Math.round((sheetBox.y() + l.len(BIG_Y + 200)) / (float) s), GuiLanguage.dim());
+        } else {
+            selected = Math.max(0, Math.min(hand.size() - 1, selected));
+            pullLift = (float) (CardRow.PULL_LIFT * l.k() / s);
+            float[] target = new float[hand.size()];
+            for (int i = 0; i < hand.size(); i++) {
+                target[i] = handX + i * step;
             }
+            float[] at = slide.positions(hand, target, dt);
+            boolean stacked = hand.size() > 1 && step < smallW;
+            for (int i = 0; i < hand.size(); i++) {
+                lift[i] = GuiLanguage.approach(lift[i], i == selected ? pullLift : 0f, dt);
+                if (i != selected) {
+                    drawHandCard(context, now, hand, i, at[i], rowTop, smallW, smallH,
+                            stacked && i > 0 && i - 1 != selected);
+                }
+            }
+            drawHandCard(context, now, hand, selected, at[selected], rowTop, smallW, smallH, false);
+            String card = hand.get(selected);
+            drawBig(context, l, card);
+            drawInfo(context, l, card, hand.size());
         }
-        // ❗键位要写出来。手上有牌却没人知道能拿它做什么，与没有手牌没有区别 ——
-        //   与 HUD 那一行「按绑定键查看」同一条理由。这一面没有倒计时，提示就排在那一条空着的带上。
-        // U 与右键是「看」（各面一样，ADR-0043 D2）；Enter 是「打出」；亮出在查看态里（↓ 挪到按钮上再 Enter）。
-        // G 赠送只在送得出去的时候写（行动阶段、你能动、没有打架与终局）—— 写了按不动，比不写更糟。
-        List<KeyHint> right = !inspecting()
-                ? canGive()
-                        ? List.of(keys("play", "Enter"), keys("gift", "G"), keys("inspect", "U"))
-                        : List.of(keys("play", "Enter"), keys("inspect", "U"))
-                : revealFocus
-                        ? List.of(keys("reveal", "Enter"), keys("close", "U"))
-                        : List.of(keys("play", "Enter"), keys("reveal", "↓"), keys("close", "U"));
-        drawFootBand(context, b, List.of(keys("select", "←", "→")), right, now, null);
+        // 两排的小标题（样张 .zone：13px、字距 4、70%）—— 在牌之后画：选中的那张抬起来时金框不盖住它
+        // ❗样张把它摆在 376，而样张里选中的是第二张。第一张被选中时抬 16、金框再往外 8，金框上沿落在 384，
+        //   正好穿过 376 起的那一行字（用户 2026-10-01 演示时指出）。所以行框底让到金框上沿之上 ——
+        //   按夹过梯子之后的真实行高算：小窗口下字会被夹大一档，写死一个 y 就又压上去了。
+        //   ADR-0049 之后选中那张是「抽出来」：提得更高、还往左转，右上角升得最高 —— 按抽出来那一截算。
+        pxBegin(context);
+        int zonePx = l.len(ZONE_PX);
+        int frameTop = (int) Math.floor(rowTop * s - CardRow.pullRoom(CardRow.PULL_LIFT * l.k(), smallW * s,
+                smallH * s, l.len(SEL_OUT)));
+        int zoneY = frameTop - l.len(ZONE_CLEAR) - GuiText.linePxAt(zonePx, false);
+        GuiText.drawPx(context, Text.translatable("heavyseas.hand.zone").getString(), handX * s, zoneY, l.len(200),
+                zonePx, false, GuiLanguage.Hud.alpha(GuiLanguage.ink(), 0.7f), GuiText.Align.LEFT, l.len(4));
+        if (!front.isEmpty()) {
+            GuiText.drawPx(context, Text.translatable("heavyseas.hand.front").getString(), frontX * s, zoneY, l.len(200),
+                    zonePx, false, GuiLanguage.Hud.alpha(GuiLanguage.ink(), 0.7f), GuiText.Align.LEFT, l.len(4));
+        }
+        pxEnd(context);
+        // 提示那一行：←→ 换一张 · G 赠送（送得出去时）· U 查看 · Esc 收起。打出与亮出是上面两枚按钮。
+        List<KeyHint> right = canGive()
+                ? List.of(keys("gift", "G"), keys(inspecting() ? "close" : "inspect", "U"), keys("close", "Esc"))
+                : List.of(keys(inspecting() ? "close" : "inspect", "U"), keys("close", "Esc"));
+        drawFootBand(context, b, List.of(keys("swap_card", "←", "→")), right, now, null);
     }
 
-    /** 签子与「亮出」按钮之间。 */
-    private static final int REVEAL_GAP = 6;
-
-    /**
-     * 相邻两张之间挪多远：放得下就并排，放不下就叠。
-     *
-     * <p>❗<b>不设「最小间距」下限。</b> 设了下限，牌多到连下限都摆不下时，
-     * 右边几张会落到屏幕外面 —— 而画到屏幕外与没画长得一模一样，
-     * 玩家只会觉得「我的牌少了几张」。挤到看不清仍然够得着，落在屏幕外就够不着了。
-     */
-    private int step(int count, int cardW, int rowW) {
-        int loose = cardW + HAND_GAP;
-        if (count <= 1) {
-            return loose;
-        }
-        // 这一排最宽就是爱恨小卡左边那一段（rowW）：叠得再紧也不许压到小卡上。
-        return Math.max(1, Math.min(loose, (rowW - cardW) / (count - 1)));
+    /** 这一面没有上带（样张 b-4）。 */
+    @Override
+    protected void drawTopBand(DrawContext context, HudView v, Bands b) {
     }
 
-    /** 爱恨小卡是手牌的几成高：小到一眼看得出「不是手牌」，大到认得出是谁。 */
-    private static final float AFFINITY_SHARE = 0.6f;
-    /** 面前那一区是手牌的几成高：比手牌小一号（它已经不在手里），比爱恨小卡大（它是牌，要认得出画）。 */
-    private static final float FRONT_SHARE = 0.72f;
+    /** 这一面没有座位轨（样张 b-4）。 */
+    @Override
+    protected void drawRailBand(DrawContext context, HudView v, Bands b) {
+    }
+
+    // 样张 b-4 的几何（稿子像素，相对板的左上角）：.hand-focus { left: 120; top: 96 } 300 宽 ·
+    // .hand-info { left: 470; top: 100; width: 400 } · .zone { top: 376 } · .hand-row { left: 470 / 840; top: 408 }，
+    // 小牌 104 宽、间距 14 · .secret { right: 64; top: 100; width: 216 }。
+    private static final double BIG_X = 120;
+    private static final double BIG_Y = 96;
+    private static final double BIG_W = 300;
+    private static final double INFO_X = 470;
+    private static final double INFO_Y = 100;
+    private static final double INFO_W = 400;
+    private static final double ZONE_PX = 13;
+    /** 选中那一圈金框（样张 .sel：外 3 深金 · 4 金 · 1 深金）往牌外扩多少。 */
+    private static final double SEL_OUT = 8;
+    /** 小标题的行框底离抬起后的金框上沿至少多远。 */
+    private static final double ZONE_CLEAR = 4;
+    private static final double ROW_TOP = 408;
+    private static final double HAND_X = 470;
+    private static final double FRONT_X = 840;
+    private static final double SMALL_W = 104;
+    private static final double SMALL_GAP = 14;
+    /** 「手牌」一排与「面前」一排之间至少隔多少（手牌多到挤过去时，面前往右让）。 */
+    private static final double ZONE_GAP = 30;
+    private static final double SECRET_RIGHT = 64;
+    private static final double SECRET_Y = 100;
+    private static final double SECRET_W = 216;
+
+    /** 两枚按钮（样张 .acts：打出 · 亮在面前，间距 14，签子下面 20）；点击命中用，GUI 单位。 */
+    private Box playBox;
+
+    /** 左边那张大图：选中的那一张，300 稿子像素宽（样张 .hand-focus）。 */
+    private void drawBig(DrawContext context, SheetLayout l, String card) {
+        int s = guiScale();
+        Rect sheetBox = l.sheet();
+        int x = Math.round((sheetBox.x() + l.len(BIG_X)) / (float) s);
+        int y = Math.round((sheetBox.y() + l.len(BIG_Y)) / (float) s);
+        int w = Math.max(8, (int) Math.round(BIG_W * l.k() / s));
+        int h = GuiLanguage.cardHeight(w);
+        context.getMatrices().push();
+        context.getMatrices().translate(x, y, 0);
+        drawCardShadow(context, w, h, 0f);
+        CardTexture.drawProvision(context, card, 0, 0, w, h);
+        context.getMatrices().pop();
+    }
 
     /**
-     * 面前那一区：你亮出来（或别的规则落到你面前）的牌，上面一个小标题「面前」。
-     * 全船都看得见这一区（公开），所以这里不必藏；但它不在手里，打不出也选不中 —— 不进高亮与命中。
-     *
-     * @param alpha 进查看态时淡出 —— 右边那块要让给说明签
+     * 右边的说明签与两枚按钮（样张 .hand-info）：类别 · 手牌 i / n / 牌名 / 效果；下面 [Enter 打出] [↓ Enter 亮在面前]。
+     * 亮出不可逆（规则 §5.2），所以它要先按 ↓ 把焦点挪过去再 Enter（ADR-0043 D2，用户 2026-09-25 定）—— 两枚按钮照样张并排，
+     * 焦点在哪一枚，哪一枚就是金圈。
      */
-    private void drawFront(DrawContext context, List<HudView.FrontCard> front, int x, int y, int h, float alpha) {
-        int w = GuiLanguage.cardWidth(h);
-        context.setShaderColor(1f, 1f, 1f, alpha);
+    private void drawInfo(DrawContext context, SheetLayout l, String card, int count) {
+        int s = guiScale();
+        double k = l.k();
+        Rect sheetBox = l.sheet();
+        int x = sheetBox.x() + l.len(INFO_X);
+        int top = sheetBox.y() + l.len(INFO_Y);
+        int w = l.len(INFO_W);
+        int box = w - 2 * l.len(20);
+        int ink = GuiLanguage.Hud.ENAMEL_LINE;
+        String effect = provisionEffect(card).getString();
+        int bodyPx = l.len(17);
+        int lines = GuiText.paragraphLines(effect, box, bodyPx, false, 3);
+        int h = l.len(14 + 13 * 1.4 + 26 * 1.35 + 4 + 16) + lines * l.len(17 * 1.65);
+        pxBegin(context);
+        GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.ENAMEL, x, top, w, h, k);
+        int tx = x + l.len(20);
+        int y = top + l.len(14);
+        io.github.heavyseasmc.mod.net.CatalogS2C.Provisions entry = Catalog.provision(card);
+        String caption = entry == null ? Text.translatable("heavyseas.hand.position", selected + 1, count).getString()
+                : Text.translatable("heavyseas.hand.caption",
+                Text.translatable("heavyseas.category." + entry.category()), selected + 1, count).getString();
+        int capPx = l.len(13);
+        GuiText.drawPx(context, caption, tx, y + (l.len(13 * 1.4) - GuiText.linePxAt(capPx, false)) / 2, box, capPx, false,
+                GuiLanguage.Hud.alpha(ink, 0.7f), GuiText.Align.LEFT, l.len(4));
+        y += l.len(13 * 1.4);
+        int namePx = l.len(26);
+        GuiText.drawPx(context, provisionName(card).getString(), tx, y + (l.len(26 * 1.35) - GuiText.linePxAt(namePx, true)) / 2,
+                box, namePx, true, ink, GuiText.Align.LEFT, l.len(4));
+        y += l.len(26 * 1.35 + 4);
+        GuiText.paragraphPx(context, effect, tx, y, box, bodyPx, false, ink, 3, l.len(17 * 1.65));
+
+        // 两枚按钮：签子下面 20，间距 14（样张 .acts）
+        int by = top + h + l.len(20);
+        int bh = l.len(io.github.heavyseasmc.mod.ui.SheetLayout.HINTS_H);
+        String play = Text.translatable("heavyseas.keys.play").getString();
+        String front = Text.translatable("heavyseas.keys.reveal_front").getString();
+        int w1 = buttonPx(l, List.of("Enter"), play);
+        int w2 = buttonPx(l, List.of("↓", "Enter"), front);
+        drawButtonPx(context, l, x, by, w1, bh, List.of("Enter"), play, !revealFocus);
+        int x2 = x + w1 + l.len(14);
+        drawButtonPx(context, l, x2, by, w2, bh, List.of("↓", "Enter"), front, revealFocus);
+        pxEnd(context);
+        playBox = unitBox(new Rect(x, by, w1, bh));
+        revealBox = unitBox(new Rect(x2, by, w2, bh));
+    }
+
+    private static int buttonPx(SheetLayout l, List<String> keys, String label) {
+        int w = 2 * l.len(20);
+        for (String k : keys) {
+            w += Math.max(l.len(26), GuiText.widthPx(k, l.len(14), true, 0) + 2 * l.len(7)) + l.len(7);
+        }
+        return w + l.len(10) - l.len(7) + GuiText.widthPx(label, l.len(18), false, l.len(2));
+    }
+
+    /** 一枚搪瓷按钮（样张 .btn；{@code focus} 时外一圈金，.btn.focus）：键帽 + 一句话。 */
+    private static void drawButtonPx(DrawContext context, SheetLayout l, int x, int y, int w, int h, List<String> keys,
+                                     String label, boolean focus) {
+        GuiMaterial.hudPart(context, focus ? io.github.heavyseasmc.mod.ui.HudPart.BTN_FOCUS
+                : io.github.heavyseasmc.mod.ui.HudPart.BTN, x, y, w, h, l.k());
+        int cx = x + l.len(20);
+        int key = l.len(26);
+        int cy = y + h / 2;
+        int keyPx = l.len(14);
+        for (String k : keys) {
+            int kw = Math.max(key, GuiText.widthPx(k, keyPx, true, 0) + 2 * l.len(7));
+            GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.KEY, cx, cy - key / 2, kw, key, l.k());
+            GuiText.drawPx(context, k, cx, cy - key / 2 + (key - GuiText.linePxAt(keyPx, true)) / 2, kw, keyPx, true,
+                    GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.CENTER, 0);
+            cx += kw + l.len(7);
+        }
+        cx += l.len(10) - l.len(7);
+        int px = l.len(18);
+        GuiText.drawPx(context, label, cx, cy - GuiText.linePxAt(px, false) / 2, x + w - cx, px, false,
+                GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.LEFT, l.len(2));
+    }
+
+    /**
+     * 右上「只有你看得到」（样张 .secret）：一枚眼睛 + 一句小标题；爱（朱砂的心）· 恨（碎心）各一行：头像 38 + 名字 17px。
+     * 全程保密（规则里也不许亮出来证明自己）—— 手牌一面本来就只有你看得到。
+     */
+    private void drawSecret(DrawContext context, SheetLayout l) {
+        double k = l.k();
+        Rect sheetBox = l.sheet();
+        int w = l.len(SECRET_W);
+        int x = sheetBox.right() - l.len(SECRET_RIGHT) - w;
+        int top = sheetBox.y() + l.len(SECRET_Y);
+        int headH = l.len(13 * 1.75);
+        int rowH = l.len(44);
+        int h = l.len(12) + headH + l.len(8) + 2 * rowH + l.len(14);
+        int ink = GuiLanguage.Hud.ENAMEL_LINE;
+        pxBegin(context);
+        GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.ENAMEL, x, top, w, h, k);
+        int tx = x + l.len(16);
+        int y = top + l.len(12);
+        int icon = l.len(24);
+        GuiMaterial.hudIcon(context, io.github.heavyseasmc.mod.ui.HudPart.IC_EYE, tx, y + (headH - icon) / 2, icon, icon,
+                GuiLanguage.Hud.alpha(ink, 0.8f), k);
+        int headPx = l.len(13);
+        GuiText.drawPx(context, Text.translatable("heavyseas.hand.secret").getString(), tx + icon + l.len(8),
+                y + (headH - GuiText.linePxAt(headPx, false)) / 2, w - icon - l.len(40), headPx, false,
+                GuiLanguage.Hud.alpha(ink, 0.8f), GuiText.Align.LEFT, l.len(3));
+        y += headH + l.len(8);
+        String[] who = {view.love(), view.hate()};
+        io.github.heavyseasmc.mod.ui.HudPart[] mark = {io.github.heavyseasmc.mod.ui.HudPart.IC_HEART,
+                io.github.heavyseasmc.mod.ui.HudPart.IC_HATE};
+        int[] color = {GuiLanguage.Hud.LOG_CINNABAR, ink};
+        int tok = l.len(38);
+        int namePx = l.len(17);
+        for (int i = 0; i < 2; i++) {
+            int cy = y + rowH / 2;
+            GuiMaterial.hudIcon(context, mark[i], tx, cy - icon / 2, icon, icon, color[i], k);
+            int tokX = tx + icon + l.len(10);
+            GuiMaterial.portrait(context, who[i], tokX, cy - tok / 2, tok, 1f);
+            GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.TOK38_PLAIN, tokX, cy - tok / 2, tok, tok, k);
+            GuiText.drawPx(context, nameOf(who[i]).getString(), tokX + tok + l.len(10), cy - GuiText.linePxAt(namePx, false) / 2,
+                    x + w - (tokX + tok + l.len(10)) - l.len(12), namePx, false, ink, GuiText.Align.LEFT, 0);
+            y += rowH;
+        }
+        pxEnd(context);
+    }
+
+    /**
+     * 面前那一区（样张 b-4 的「面前」一排）：你亮出来（或别的规则落到你面前）的牌。全船都看得见（公开），
+     * 但它不在手里 —— 不进高亮与命中。撑开的伞外面一圈铜绿：它此刻正在起作用。
+     */
+    private void drawFront(DrawContext context, List<HudView.FrontCard> front, int x, int bottom, int w, int h, int step) {
+        boolean stacked = front.size() > 1 && step < w;
         for (int i = 0; i < front.size(); i++) {
             HudView.FrontCard card = front.get(i);
-            int cx = x + i * (w + CARD_GAP);
-            // 面前的牌全是明牌。open 说的是「伞撑着没有」（GameComponent 写投影时的那一位），不是正反面 ——
-            // 撑着的那一把外面一圈铜绿：它此刻正在起作用（铜绿 = 正常 · 安全）。
-            CardTexture.drawProvision(context, card.id(), cx, y, w, h);
+            int cx = x + i * step;
+            context.getMatrices().push();
+            context.getMatrices().translate(cx, bottom - h, 0);
+            drawCardShadow(context, w, h, 0f);
+            if (stacked && i > 0) {
+                CardRow.edgeShadow(context, h, guiScale(), sheet().k());
+            }
+            CardTexture.drawProvision(context, card.id(), 0, 0, w, h);
+            context.getMatrices().pop();
             if (card.open()) {
-                context.drawBorder(cx - 2, y - 2, w + 4, h + 4, GuiLanguage.verdigris());
-                context.drawBorder(cx - 1, y - 1, w + 2, h + 2, GuiLanguage.verdigris());
+                context.drawBorder(cx - 2, bottom - h - 2, w + 4, h + 4, GuiLanguage.verdigris());
+                context.drawBorder(cx - 1, bottom - h - 1, w + 2, h + 2, GuiLanguage.verdigris());
             }
         }
-        context.setShaderColor(1f, 1f, 1f, 1f);
-        if (alpha > 0.05f) {
-            int groupW = front.size() * w + (front.size() - 1) * CARD_GAP;
-            drawLineIn(context, Text.translatable("heavyseas.hand.front"), x, y - lineStep(), groupW,
-                    withAlpha(GuiLanguage.muted(), Math.round(alpha * 255)));
-        }
     }
-    /** 手牌那一排与小卡之间。比牌间距宽，读得出是两件事。 */
-    private static final int AFFINITY_GAP = 18;
 
     /**
-     * 爱恨两张小卡：角色卡 + 上面一个字（爱 · 恨）。字用语义色：爱是铜绿（安全），恨是朱砂（伤害）。
+     * 画一张手牌。选中那张「抽出来」（ADR-0049）：以牌底中点为轴往左转、往上提；其余压暗一点。
      *
-     * @param alpha 进查看态时淡出 —— 右边那块要让给说明签
+     * @param edge 叠着、而且左边那张没被抽走：左边缘给下面那张投一道细影
      */
-    private void drawAffinity(DrawContext context, int x, int y, int w, int h, float alpha) {
-        String[] who = {view.love(), view.hate()};
-        String[] label = {"heavyseas.hand.love", "heavyseas.hand.hate"};
-        int[] color = {GuiLanguage.verdigris(), GuiLanguage.cinnabar()};
-        for (int i = 0; i < 2; i++) {
-            int cx = x + i * (w + CARD_GAP);
-            context.setShaderColor(1f, 1f, 1f, alpha);
-            CardTexture.drawCharacter(context, who[i], cx, y, w, h);
-            context.setShaderColor(1f, 1f, 1f, 1f);
-            if (alpha > 0.05f) {                  // 几乎全透明的字，排字器会当成不透明画出来 —— 淡到这里就不画
-                drawLineIn(context, Text.translatable(label[i]), cx, y - lineStep(), w,
-                        withAlpha(color[i], Math.round(alpha * 255)));
-            }
-        }
-    }
-
-    private void drawHandCard(DrawContext context, long now, List<String> hand, int i,
-                              int x, int top, int w, int h, Inspect ins, float gathered) {
+    private void drawHandCard(DrawContext context, long now, List<String> hand, int i, float x, int top, int w, int h,
+                              boolean edge) {
         float in = GuiLanguage.deal(now, dealtAt, Math.max(0, i - dealtFrom));
         if (i >= dealtFrom && in <= 0f) {
             return;                           // 还没轮到它入场
@@ -354,41 +479,31 @@ public final class HandScreen extends GameScreen {
         float progress = i < dealtFrom ? 1f : in;
         float rise = (1f - progress) * GuiLanguage.DEAL_RISE;
         float scale = GuiLanguage.dealScale(progress);
-
-        CardPose pose = cardPose(ins, gathered, x + w / 2f, top + h, w, h,
-                i == selected ? 0 : 1 + Math.abs(i - Math.max(0, selected)));
         context.getMatrices().push();
         // 全部走矩阵，布局本身不动 —— 命中判定因此可以只看落位后的矩形。
-        context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
+        context.getMatrices().translate(x + w / 2f, top + h - lift[i] + rise, 0);
+        CardRow.rotate(context, pullLift > 0f ? lift[i] / pullLift : 0f);
         context.getMatrices().scale(scale, scale, 1f);
-        context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
-        drawCardShadow(context, pose.w(), pose.h(), Math.abs(rise) + lift[i] * (1f - gathered));
-        CardTexture.drawProvision(context, hand.get(i), 0, 0, pose.w(), pose.h());
+        context.getMatrices().translate(-w / 2f, -h, 0);
+        drawCardShadow(context, w, h, Math.abs(rise) + lift[i]);
+        if (edge) {
+            CardRow.edgeShadow(context, h, guiScale(), sheet().k());
+        }
+        if (i != selected) {
+            CardRow.dim(context);
+        }
+        CardTexture.drawProvision(context, hand.get(i), 0, 0, w, h);
+        CardRow.undim(context);
         if (i == selected) {
-            drawCardFrame(context, pose.w(), pose.h());
+            drawCardFrame(context, w, h);
         }
         context.getMatrices().pop();
     }
 
-    /** 叠起来时上面那张说了算，所以先问选中的那张，再从右往左问。 */
+    /** 叠起来时上面那张说了算，所以先问选中的那张，再从右往左问（{@link CardRow#indexAt}）。 */
     private int indexAt(int mouseX, int mouseY, int left, int top, int step, int w, int h) {
-        int count = view.hand().size();
-        if (mouseY < top - GuiLanguage.LIFT_PX || mouseY > top + h) {
-            return -1;
-        }
-        if (selected < count) {
-            int x = left + selected * step;
-            if (mouseX >= x && mouseX < x + w) {
-                return selected;
-            }
-        }
-        for (int i = count - 1; i >= 0; i--) {
-            int x = left + i * step;
-            if (mouseX >= x && mouseX < x + w) {
-                return i;
-            }
-        }
-        return -1;
+        return CardRow.indexAt(mouseX, mouseY, left, top, step, w, h, view.hand().size(), selected,
+                Math.max(pullLift, GuiLanguage.LIFT_PX));
     }
 
     /**
@@ -459,12 +574,12 @@ public final class HandScreen extends GameScreen {
 
     @Override
     protected boolean leftClick(double mouseX, double mouseY) {
-        if (giveBox != null && giveBox.contains((int) mouseX, (int) mouseY)) {
-            give();
+        if (playBox != null && playBox.contains((int) mouseX, (int) mouseY)) {
+            use();                            // 样张 b-4 的第一枚按钮：打出
             return true;
         }
         if (revealBox != null && revealBox.contains((int) mouseX, (int) mouseY)) {
-            reveal();
+            reveal();                         // 第二枚：亮在面前
             return true;
         }
         if (!inspecting()) {
@@ -506,11 +621,12 @@ public final class HandScreen extends GameScreen {
         }
         // 亮出：把正在看的那张放到面前。**不可逆**（规则 §5.2），所以不再是一个随手就按到的键：
         // 要在查看态里按 ↓ 把焦点挪到「亮出」按钮上，再按 Enter（ADR-0043 D2，用户 2026-09-25 定）。
-        if (inspecting() && count > 0 && keyCode == GLFW.GLFW_KEY_DOWN) {
+        // 样张 b-4 两枚按钮一直摆着，所以 ↓ / ↑ 在两个状态里都挪焦点（仍是两下：先 ↓ 再 Enter）。
+        if (count > 0 && keyCode == GLFW.GLFW_KEY_DOWN) {
             revealFocus = true;
             return true;
         }
-        if (inspecting() && keyCode == GLFW.GLFW_KEY_UP) {
+        if (keyCode == GLFW.GLFW_KEY_UP) {
             revealFocus = false;
             return true;
         }
@@ -518,7 +634,7 @@ public final class HandScreen extends GameScreen {
         // （ADR-0037 §7.12 ①「Enter 在两个状态里都能确认」）—— 除非焦点在「亮出」上。
         // ❗只有轮到你时才行得通 —— 它占行动。按不动时服务端会回一句人话，不是静默丢掉。
         if (count > 0 && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
-            if (inspecting() && revealFocus) {
+            if (revealFocus) {
                 reveal();
                 revealFocus = false;
             } else {

@@ -27,6 +27,8 @@ final class SidebarReveal {
     private static List<String> last = null;
     /** 这一局一共新到过几条 —— 只增不减；日志页签上的未读数拿它减去「展开到底时看到第几条」。 */
     private static int arrived = 0;
+    /** 最近一次到了几条（主画面日志里「刚刚」那一批，样张 b-2）。 */
+    private static int lastBatch = 0;
     private static long shownAt = 0L;
     private static boolean pinned;
 
@@ -47,6 +49,7 @@ final class SidebarReveal {
             if (n > 0) {
                 shownAt = now;
                 arrived += n;
+                lastBatch = n;
             }
         }
         last = current;
@@ -55,6 +58,25 @@ final class SidebarReveal {
     /** 这一局一共新到过几条。 */
     static int arrived() {
         return arrived;
+    }
+
+    /** 最近一批到了几条：日志最上面这几条标「刚刚」、不压淡（样张 b-2）。 */
+    static int lastBatch() {
+        return lastBatch;
+    }
+
+    /**
+     * 自己露出来那一段还剩多少（0–1）：样张 b-2 日志底下那道「自动收回」的短横按它缩。
+     * 钉住时没有这一说，返回 1。
+     */
+    static float remaining(long now) {
+        if (pinned) {
+            return 1f;
+        }
+        if (shownAt <= 0L) {
+            return 0f;
+        }
+        return Math.max(0f, Math.min(1f, 1f - (now - shownAt) / (float) REVEAL_MS));
     }
 
     /**
@@ -67,6 +89,7 @@ final class SidebarReveal {
     static void forget() {
         last = List.of();
         arrived = 0;
+        lastBatch = 0;
         shownAt = 0L;
     }
 

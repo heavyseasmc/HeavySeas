@@ -24,8 +24,10 @@ final class GameScreenSidebar {
             // HudRenderCallback 比 Screen 先画，放在那里会被 GameScreen.renderBackdrop 盖住。
             // afterRender 包住的是 renderWithTooltip；侧栏因此永远是这一面的最后一层。
             ScreenEvents.afterRender(screen).register((ignored, context, mouseX, mouseY, delta) -> {
+                gameScreen.endFold(context);                // 纸板开合推过的矩阵先弹回：侧栏与悬停签不跟着压扁（ADR-0048）
                 GameHud.renderSidebar(context, client);
                 gameScreen.renderDetails(context, mouseX, mouseY);
+                OverboardCue.drawFlash(context);            // 有人落海那一瞬：最上面一层（ADR-0048）
             });
         });
     }

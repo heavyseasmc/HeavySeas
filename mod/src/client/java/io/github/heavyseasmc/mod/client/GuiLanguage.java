@@ -162,6 +162,129 @@ public final class GuiLanguage {
 
     /** 墨 {@code #241E1A}：印在纸色牌面上的字（ADR-0018 §7.3）。与主题无关 —— 牌面永远是纸。 */
     public static final int CARD_INK = 0xFF241E1A;
+    /** 纸 {@code #EADFC6}：牌面的底（样张 {@code --card-paper}）。舷窗里那一小块天候画、头像的底都是它。 */
+    public static final int CARD_PAPER = 0xFFEADFC6;
+
+    // ---------------------------------------------------------------- 主画面 HUD（样张 b-1 · b-2）
+
+    /**
+     * 主画面 HUD 的颜色：样张 B 形制那几条 CSS 的原值（{@code index.html} 的 {@code .dir-b …}），一个都没有另调。
+     *
+     * <p>用户 2026-09-30：「参考图是唯一的视觉标准……严格还原每个组件的颜色、透明度、描边厚度、阴影」。
+     * 样张只画了深色（B 形制就是夜里的舱），所以按主题分的只有<b>木板本身</b>（浅色主题下木板是白天的纸）与压在木板上的字、点；
+     * 搪瓷、黄铜、金签、铜绿圆底是物件自己的颜色，两个主题相同。
+     */
+    public static final class Hud {
+
+        private Hud() {
+        }
+
+        /** 木板外圈贴着板的那一道深线（{@code .paperbit} 的 {@code #1c1007}）。 */
+        public static int plankLine() {
+            return theme == Theme.DARK ? 0xFF1C1007 : 0xFF241E1A;
+        }
+
+        /** 木板外圈中间那一道木色（{@code #5f4a2b}）。 */
+        public static int plankBand() {
+            return theme == Theme.DARK ? 0xFF5F4A2B : 0xFF8D7C5A;
+        }
+
+        /** 体力点：实心那一枚从左上到右下三段（{@code radial-gradient(#fff5d8, #d8c48e 60%, #8d7a4a)}）。 */
+        public static int[] pipOn() {
+            return theme == Theme.DARK ? new int[]{0xFFFFF5D8, 0xFFD8C48E, 0xFF8D7A4A}
+                    : new int[]{0xFF5A4D3E, 0xFF3A3028, 0xFF241E1A};
+        }
+
+        /** 失去的那一枚：{@code background: rgba(0,0,0,.35); box-shadow: inset 0 0 0 1.5px #b7a98a}。 */
+        public static int pipOffFill() {
+            return theme == Theme.DARK ? 0x59000000 : 0x26000000;
+        }
+
+        public static int pipOffRing() {
+            return theme == Theme.DARK ? 0xFFB7A98A : 0xFF8A7C62;
+        }
+
+        /** 次要的字与线（{@code --ink2}）：日志栏头、自动收回的那道短横。 */
+        public static final int INK2 = 0xFFB7A98A;
+
+        /** 板上的次墨（样张 {@code .mut}）：深色下是 {@link #INK2}，浅色主题（纸板）下取浅色那一套的次要色。 */
+        public static int ink2() {
+            return theme == Theme.DARK ? INK2 : LIGHT_PALETTE.muted();
+        }
+
+        /** 头像外圈：{@code 0 0 0 2px #1c1007, 0 0 0 5px #6a5a39, 0 0 0 6px #1c1007}。 */
+        public static final int TOKEN_LINE = 0xFF1C1007;
+        public static final int TOKEN_BRASS = 0xFF6A5A39;
+        /** 「你」那一圈金外面的一道深金（{@code 0 0 0 7px #4a3608}）。 */
+        public static final int GOLD_EDGE = 0xFF4A3608;
+
+        /** 舷窗外圈：{@code 3px #1c1007 · 9px #74633c · 10px #1c1007}。吊绳也是这个铜色。 */
+        public static final int MEDAL_BRASS = 0xFF74633C;
+
+        /** 阶段那一格亮起来的铜绿圆底（{@code radial-gradient(#8fd0c3, #3f8478)}），外一圈 {@code #10201d}，图标 {@code #0d1f1c}。 */
+        public static final int PHASE_ON_TOP = 0xFF8FD0C3;
+        public static final int PHASE_ON_BOTTOM = 0xFF3F8478;
+        public static final int PHASE_ON_LINE = 0xFF10201D;
+        public static final int PHASE_ON_ICON = 0xFF0D1F1C;
+        /** 没轮到的几格 {@code opacity: .42}，还没飞来的海鸥 {@code opacity: .3}。 */
+        public static final float PHASE_OFF_ALPHA = 0.42f;
+        public static final float GULL_OFF_ALPHA = 0.3f;
+
+        /** 金签：{@code linear-gradient(#f7e3a0, #d3a93f 55%, #9a7420)}，内一圈 1.5px {@code #4a3608}，顶上 2px 亮边。 */
+        public static final int RIBBON_TOP = 0xFFF7E3A0;
+        public static final int RIBBON_MID = 0xFFD3A93F;
+        public static final int RIBBON_BOTTOM = 0xFF9A7420;
+        public static final int RIBBON_SHINE = 0xB3FFFADC;
+        /** 金签上的铃是 {@code #33240a}；键帽反过来：深底 {@code #33240a}、金字 {@code #f7e3a0}。 */
+        public static final int RIBBON_INK = 0xFF33240A;
+
+        /** 搪瓷（日志 · 说明签 · 舵轮 · 未读数的底）：{@code linear-gradient(#f4eedd, #e3dac3)}，内一圈 2px {@code #1f1a15}。 */
+        public static final int ENAMEL_TOP = 0xFFF4EEDD;
+        public static final int ENAMEL_BOTTOM = 0xFFE3DAC3;
+        public static final int ENAMEL_LINE = 0xFF1F1A15;
+        /** 搪瓷与键帽底下那一道 2px 厚边（{@code 0 2px 0 #120b05}）。 */
+        public static final int ENAMEL_EDGE = 0xFF120B05;
+        /** 未读数那枚小圆的底（{@code #efe8d6}）。 */
+        public static final int COUNT_FILL = 0xFFEFE8D6;
+
+        /** 键帽：{@code linear-gradient(#f4eedd, #d9cfb6)}，内一圈 1.5px {@code #1f1a15}，底下 2px {@code #120b05}。 */
+        public static final int KEY_TOP = 0xFFF4EEDD;
+        public static final int KEY_BOTTOM = 0xFFD9CFB6;
+
+        /** 日志里：左边那一格 {@code opacity: .65}，旧的那几条 {@code opacity: .55}。 */
+        public static final float LOG_LABEL_ALPHA = 0.65f;
+        public static final float LOG_OLD_ALPHA = 0.55f;
+        /** 日志里的朱砂（{@code .cinn}）。 */
+        public static final int LOG_CINNABAR = 0xFFDA5B3E;
+
+        /** 热栏（样张 {@code .hotbar}）：外圈 {@code rgba(20,20,20,.8)} · 格 {@code rgba(0,0,0,.55)} · 格间线 {@code rgba(140,140,140,.7)}。 */
+        public static final int HOTBAR_EDGE = 0xCC141414;
+        public static final int HOTBAR_CELL = 0x8C000000;
+        public static final int HOTBAR_RULE = 0xB38C8C8C;
+
+        /** 把一个颜色乘上不透明度（样张里的 {@code opacity}）。 */
+        public static int alpha(int color, float a) {
+            int base = (color >>> 24) & 0xFF;
+            return (Math.round(base * a) << 24) | (color & 0x00FFFFFF);
+        }
+
+        /** 两个颜色之间按 {@code t} 插值（渐变逐行画）。 */
+        public static int mix(int a, int b, float t) {
+            float u = Math.max(0f, Math.min(1f, t));
+            int out = 0;
+            for (int shift = 0; shift <= 24; shift += 8) {
+                int ca = (a >>> shift) & 0xFF;
+                int cb = (b >>> shift) & 0xFF;
+                out |= Math.round(ca + (cb - ca) * u) << shift;
+            }
+            return out;
+        }
+
+        /** 三段渐变（{@code a → b 在 mid 处 → c}）。 */
+        public static int mix3(int a, int b, int c, float mid, float t) {
+            return t <= mid ? mix(a, b, t / mid) : mix(b, c, (t - mid) / (1f - mid));
+        }
+    }
 
     // ---------------------------------------------------------------- 卡面
 
@@ -250,7 +373,8 @@ public final class GuiLanguage {
     /** 抬：这个是当前选中。180ms 到位。 */
     public static final long LIFT_MS = 180L;
     /** 抬起 9px。 */
-    public static final float LIFT_PX = 9f;
+    // 2026-09-30 照样张 b-3 的 .lifted（translateY(-16px)，界面尺寸 3 下的物理像素）：16 / 3 个单位。此前是 9。
+    public static final float LIFT_PX = 16f / 3f;
 
     /**
      * 向目标插值，<b>按真实经过的毫秒</b>而不是按帧。

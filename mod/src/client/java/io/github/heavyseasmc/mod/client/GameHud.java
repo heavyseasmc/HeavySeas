@@ -5,39 +5,47 @@ import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.ui.HudLayout;
+import io.github.heavyseasmc.mod.ui.HudLayout.Rect;
+import io.github.heavyseasmc.mod.ui.HudPart;
 import io.github.heavyseasmc.mod.ui.NotificationSidebarLayout;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
+import net.minecraft.text.TranslatableTextContent;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 主画面 HUD：一块状态牌、一条座位轨、一枚轮到你时落下来的金签，右上一扇天候舷窗与一枚日志页签（样张 b-1 · b-2）。
+ * 主画面 HUD：左上一块状态牌与挂在它下面的金签、正上方一条座位轨、右上一扇天候舷窗与一枚日志页签；
+ * 有新播报时右上换成展开的那一列（天候卡 · 效果说明签 · 航海日志）。收着的样子照样张 b-1，展开的照 b-2。
+ *
+ * <h2>照样张还原，一个坐标系</h2>
+ * 用户 2026-09-30：「以第一张参考图为唯一视觉目标……不要重新设计，不要自行添加参考图中不存在的装饰」。
+ * 几何全部在 {@link HudLayout}（稿子像素 × 一个系数 k，左上 / 右上两组锚点），装饰件全部是样张 CSS
+ * 由浏览器渲出来的贴图（{@link HudPart}）—— 这里只负责按那两张表摆、把动态的东西画上去。
+ * 整块在<b>物理像素</b>里画：矩阵先缩到 1 / 界面尺寸，界面尺寸 3 下与样张一个像素不差。
+ * 2026-09-30 之前这里按 GUI 单位现排，用的是对局大面板的材质（带铜包角），实拍与样张差得最多的四处
+ * （包角压住眼睛与 R · 舵轮盖住头像 · 右上两块大面板 · Minecraft 自带的心与饥饿同屏）见 ADR-0046。
  *
  * <h2>为什么一行字都没有</h2>
- * ADR-0037 §7.1 第 5 条「主画面不要成行的文字」，稿子上的主画面是<b>物件</b>：
- * 你的头像（金圈 = 你）· 体力点 · 口渴水滴 · 清醒的眼睛；天候 · 阶段轮盘 · 四只海鸥；第几天 · 手牌几张。
- * 2026-09-30 复核之前这里仍是左上六行带阴影的字 —— 定了没做（ADR-0045 §1.4 B2）。
- * 例外只有一处，是用户 2026-09-25 定的（ADR-0043 D3 (b)）：<b>轮到你做决定时</b>，金签上一句不超过 8 个字的动词短语。
+ * ADR-0037 §7.1 第 5 条「主画面不要成行的文字」，稿子上的主画面是<b>物件</b>。金签上只有铃与键帽 ——
+ * 2026-09-25 起那里多过一句 ≤8 字的短语（ADR-0043 D3 (b)），用户 2026-09-30 定以样张为唯一基准后收回；
+ * 短语仍在各面上带里。唯一的例外是「举着拳头找人」那几秒：它有倒计时、到点就退回，秒数照旧印在金签里（样张没画这一态）。
  *
  * <h2>它只说「有」，不说「是什么」</h2>
  * 手牌只给张数与开界面的键。牌面本身归手牌那一面（{@link HandScreen}）——
  * 把牌名铺在 HUD 上，一是挤，二是<b>别人凑过来看屏幕就全知道了</b>，而本作的手牌是隐藏信息。
  *
- * <h2>在等谁，看座位轨</h2>
- * 原先「口渴：等 X · N 秒」「换座位：X 对 Y」这几行，现在都落在座位轨上：正轮到的那一位铜绿圈，
- * 被抢 / 被换的那一位朱砂圈，舵手身上挂一枚舵轮（带划船堆张数）。**等待要看得见**（决策 ⑨ ⑭），
- * 看的是位置，不是读数字。
- *
  * <h2>键永远是实际绑定的那一个</h2>
- * 金签与手牌上的键帽印的是 {@link KeyBinding#getBoundKeyLocalizedText()}：改了键位还印 G 就是在说谎。
+ * 金签与状态牌上的键帽印的是 {@link KeyBinding#getBoundKeyLocalizedText()}：改了键位还印 G 就是在说谎。
  *
  * <h2>色只从 {@link GuiLanguage} 取</h2>
- * 金 = 你 · 轮到你 · 铜绿 = 正轮到 · 朱砂 = 紧迫与伤害（ADR-0018 §7.3）。压在世界上的东西永远用深色那一套浅色（{@code onWorld}）。
+ * 金 = 你 · 铜绿 = 正轮到 · 朱砂 = 紧迫与伤害（ADR-0018 §7.3）；样张里的其余颜色在 {@link GuiLanguage.Hud}。
  */
 public final class GameHud {
 
@@ -45,20 +53,21 @@ public final class GameHud {
     /** 普通 HUD 底部留给热栏；对局 Screen 没有热栏，可以用到窗口底。 */
     private static final int HUD_BOTTOM_SAFE = 48;
 
-    /** 状态牌的内边距与各件的尺寸，GUI 单位。按样张 b-1 在 1280×720（界面尺寸 3）量出来再取整。 */
-    private static final int PAD = 4;
-    private static final int AVATAR = 18;
-    private static final int PIP = 5;
-    private static final int PIP_GAP = 1;
-    /** 体力点那枚图标整张画多大：实心圆只占母版 30/64，按圆的直径 {@link #PIP} 反推。 */
-    private static final int PIP_ICON = Math.round(PIP * 64f / 30f);
-    private static final int SMALL_ICON = 8;
-    private static final int ICON_GAP = 3;
-    /** 座位轨一格的头像直径与格宽上限。 */
-    private static final int RAIL_AVATAR = 14;
-    private static final int RAIL_CELL_MAX = 19;
-    /** 右上角舷窗的直径。 */
-    private static final int PORTHOLE = 20;
+    /** 状态牌第二行四格阶段的图标（样张 b-1：天候 · 补给 · 行动 · 航海，与 {@link Phase} 的顺序一致）。 */
+    private static final HudPart[] PHASE_ICONS = {HudPart.IC_SUN, HudPart.IC_CRATE, HudPart.IC_FIST, HudPart.IC_BOAT};
+    /** 样张里几处字号（{@code font-size}，稿子像素）。 */
+    private static final double ROMAN_PX = 22;
+    private static final double COUNT_PX = 19;
+    private static final double KEY_PX = 14;
+    private static final double BADGE_PX = 13;
+    private static final double UNREAD_PX = 12;
+    /** 日志栏头的字距（{@code letter-spacing: 4px}）。 */
+    private static final double HEAD_SPACING = 4;
+    /** 展开时日志最多几条（样张 b-2 是四条），每条最多折两行。 */
+    private static final int LOG_ENTRIES = 4;
+    private static final int LOG_LINES_PER_ENTRY = 2;
+    /** 效果说明签最多几行。 */
+    private static final int TIP_LINES = 3;
 
     /** 金签上次换内容的时刻：换了就重新「发」一次（ADR-0018 §7.2：新东西到你面前）。 */
     private static String cueShown = "";
@@ -88,98 +97,134 @@ public final class GameHud {
         }
         long now = System.currentTimeMillis();
         SidebarReveal.observe(view.notifications(), now);
-        int screenW = context.getScaledWindowWidth();
-
-        int plateRight = drawStatusPlate(context, view, now);
-        NotificationSidebarLayout overlay = NotificationSidebarLayout.of(screenW, true);
-        drawSeatRail(context, view, plateRight + 2 * MARGIN, overlay.sidebarX() - 2 * MARGIN);
-        drawTray(context, client, view, now, overlay);
+        int scale = guiScale(client);
+        HudLayout layout = HudLayout.of(client.getWindow().getFramebufferWidth(),
+                client.getWindow().getFramebufferHeight(), scale);
+        MatrixStack matrices = context.getMatrices();
+        matrices.push();
+        matrices.scale(1f / scale, 1f / scale, 1f);          // 往下全是物理像素（HudLayout 的坐标）
+        drawPlaque(context, layout, view);
+        drawRibbon(context, layout, view, now);
+        drawRail(context, layout, view);
+        drawRight(context, layout, view, now, scale);
+        matrices.pop();
+        OverboardCue.drawFlash(context);
     }
 
-    // ---------------------------------------------------------------- 状态牌（左上）
+    // ---------------------------------------------------------------- Minecraft 自带 HUD 在对局中的样子（InGameHudMixin 调）
 
-    /** 画状态牌与它下面的金签，返回状态牌的右沿（座位轨从这里之后排）。 */
-    private static int drawStatusPlate(DrawContext context, HudView view, long now) {
-        int x = MARGIN;
-        int y = MARGIN;
-        int ring = GuiMaterial.ringMargin(AVATAR);
-        int head = AVATAR + 2 * ring;
-        int rowsX = x + PAD + head + PAD;
-        int max = view.seated() ? Math.max(1, view.maxHealth()) : 0;
-        int pipsW = max * PIP + Math.max(0, max - 1) * PIP_GAP;
-        int statusW = view.seated() ? pipsW + ICON_GAP + SMALL_ICON + ICON_GAP + SMALL_ICON : 0;
-        boolean weather = !view.weather().isEmpty();
-        int gullsW = GameState.GULLS_TO_LAND * SMALL_ICON + (GameState.GULLS_TO_LAND - 1) * 2;
-        int publicW = (weather ? SMALL_ICON + ICON_GAP : 0) + SMALL_ICON + ICON_GAP + gullsW;
-        int w = rowsX - x + Math.max(statusW, publicW) + PAD;
-        int rowH = SMALL_ICON + 3;
-        int h = PAD + Math.max(head, 2 * rowH) + PAD + keyRowH() + PAD;
-        GuiMaterial.sheet(context, x, y, w, h);
-
-        // 头像：金圈 = 你。旁观的人没有座位 —— 画一枚空圈也是在说谎，所以不画。
-        if (view.seated()) {
-            GuiMaterial.avatar(context, view.character(), x + PAD + ring, y + PAD + ring, AVATAR, GuiLanguage.gold(),
-                    view.condition() == Condition.DEAD ? 0.35f : 1f);
-            // 第一行：体力点 · 口渴水滴 · 清醒的眼睛
-            int ry = y + PAD;
-            int px = rowsX;
-            for (int i = 0; i < max; i++) {
-                boolean left = i < view.health();
-                int s = PIP_ICON;
-                GuiMaterial.icon(context, left ? "pip" : "pip_empty", px + (PIP - s) / 2, ry + (SMALL_ICON - s) / 2, s,
-                        left ? GuiLanguage.ink() : GuiLanguage.dim());
-                px += PIP + PIP_GAP;
-            }
-            px += ICON_GAP - PIP_GAP;
-            // 口渴标记：没有就是一滴淡的；有就是朱砂（它会在航海之后伤人 —— 紧迫）
-            GuiMaterial.icon(context, "drop", px, ry, SMALL_ICON,
-                    view.thirst() > 0 ? GuiLanguage.cinnabar() : GuiLanguage.dim());
-            px += SMALL_ICON + ICON_GAP;
-            String eye = switch (view.condition()) {
-                case CONSCIOUS -> "eye";
-                case UNCONSCIOUS -> "eye_closed";
-                case DEAD -> "dead";
-            };
-            GuiMaterial.icon(context, eye, px, ry, SMALL_ICON,
-                    view.condition() == Condition.CONSCIOUS ? GuiLanguage.ink() : GuiLanguage.cinnabar());
+    /**
+     * 此刻要不要按样张收起 Minecraft 自带的心 · 饥饿 · 护甲 · 氧气 · 经验、把热栏画成样张那一条：有对局、且偏好没说要自带的。
+     *
+     * <p>对局中这几条不带信息：服务端每 tick 把饥饿钉在满、血量只是引擎体力的镜像、身体不许受伤（{@code PlayerBodies}），
+     * 背包在开航时托管清空（{@code MistSea}）—— 体力已经画在状态牌的点上。偏好 {@code vanillaHud=show} 回到 Minecraft 自带的样子。
+     */
+    public static boolean voyageHud() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null || ClientPrefs.vanillaHudInVoyage()) {
+            return false;
         }
-        // 第二行（公开）：天候 · 阶段轮盘 · 四只海鸥 —— 与各面上带同一排图，同一个意思不许两套画法
-        int ry2 = y + PAD + rowH;
-        int px = rowsX;
-        if (weather) {
-            GuiMaterial.icon(context, "weather_" + view.weather(), px, ry2, SMALL_ICON, GuiLanguage.ink());
-            px += SMALL_ICON + ICON_GAP;
-        }
-        GuiMaterial.icon(context, "phase_" + view.phase().ordinal(), px, ry2, SMALL_ICON, GuiLanguage.verdigris());
-        px += SMALL_ICON + ICON_GAP;
-        for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
-            GuiMaterial.icon(context, "gull", px + i * (SMALL_ICON + 2), ry2, SMALL_ICON,
-                    i < view.gulls() ? GuiLanguage.verdigris() : GuiLanguage.dim());
-        }
-        // 第三行：第几天（罗马数字，样张 b-1 的「III」）· 手牌几张 + 开手牌的键
-        int ky = y + h - PAD - keyRowH();
-        GuiText.line(context, Text.literal(roman(view.turn())), x + PAD, ky + GuiMaterial.KEY_PAD_TOP,
-                head, GuiText.BODY, true, GuiLanguage.ink(), GuiText.Align.CENTER);
-        if (view.seated() && (!view.hand().isEmpty() || !view.love().isEmpty())) {
-            String key = keyLabel(HeavySeasClient.handKey());
-            int kw = keycapW(key);
-            int count = GuiText.width(Integer.toString(view.hand().size()), GuiText.BODY, false);
-            int hx = x + w - PAD - kw;
-            drawKeycap(context, key, hx, ky);
-            hx -= 2 + count;
-            GuiText.line(context, Text.literal(Integer.toString(view.hand().size())), hx, ky + GuiMaterial.KEY_PAD_TOP,
-                    count, GuiText.BODY, false, GuiLanguage.ink(), GuiText.Align.LEFT);
-            GuiMaterial.icon(context, "hand", hx - 2 - SMALL_ICON, ky + 1, SMALL_ICON, GuiLanguage.ink());
-        }
-        drawCue(context, view, now, x, y + h + 3);
-        return x + w;
+        return GameComponents.of(client.world).hudView().active();
     }
 
     /**
-     * 轮到你时落下来的那枚签（样张 b-1 的金铃）：铃 · 一句不超过 8 个字的短语 · 键帽。
-     * 「轮到你 = 一件金色的物件落下来，不是描边发光」（样张页 · 哈比列车一节）。
+     * 热栏的底，照样张 {@code .hotbar}：一圈 3 px 的深边（{@code rgba(20,20,20,.8)}），里面半透明的深色格
+     * （{@code rgba(0,0,0,.55)}），格与格之间一道 3 px 的灰线（{@code rgba(140,140,140,.7)}）。
+     *
+     * <p>坐标是 Minecraft 给的那一块（182×22 个 GUI 单位）：样张的 3 px 在界面尺寸 3 下正好是 1 个单位，所以边与线都按 1 个单位画，
+     * 任何界面尺寸下都跟着热栏走；格距用 Minecraft 的 20 个单位 —— 样张是示意，61 px 的重复格走到第九格只剩一截，
+     * 直接用它的话物品会一格比一格偏出格子。
      */
-    private static void drawCue(DrawContext context, HudView view, long now, int x, int y) {
+    public static void drawHotbar(DrawContext context, int x, int y, int w, int h) {
+        context.fill(x, y, x + w, y + h, GuiLanguage.Hud.HOTBAR_EDGE);
+        context.fill(x + 1, y + 1, x + w - 1, y + h - 1, GuiLanguage.Hud.HOTBAR_CELL);
+        for (int i = 1; i < 9; i++) {
+            int sx = x + 1 + i * 20 - 1;
+            context.fill(sx, y + 1, sx + 1, y + h - 1, GuiLanguage.Hud.HOTBAR_RULE);
+        }
+    }
+
+    static int guiScale(MinecraftClient client) {
+        return Math.max(1, (int) Math.round(client.getWindow().getScaleFactor()));
+    }
+
+    // ---------------------------------------------------------------- 状态牌（样张 .plaque）
+
+    private static void drawPlaque(DrawContext context, HudLayout l, HudView view) {
+        double k = l.k();
+        Rect p = l.plaque();
+        GuiMaterial.hudPart(context, HudPart.PLAQUE, p.x(), p.y(), p.w(), p.h(), k);
+        int ink = GuiLanguage.ink();
+        int max = view.seated() ? Math.max(1, view.maxHealth()) : 0;
+        // 头像：金圈 = 你。旁观的人没有座位 —— 画一枚空圈也是在说谎，所以不画。
+        if (view.seated()) {
+            Rect t = l.token();
+            GuiMaterial.portrait(context, view.character(), t.x(), t.y(), t.w(),
+                    view.condition() == Condition.DEAD ? 0.35f : 1f);
+            GuiMaterial.hudPart(context, HudPart.TOK50_YOU, t.x(), t.y(), t.w(), t.h(), k);
+            // 第一行：体力点（实心 = 还剩的）· 口渴那滴水 · 清醒的眼睛
+            for (int i = 0; i < max; i++) {
+                Rect r = l.pip(i);
+                GuiMaterial.hudPart(context, i < view.health() ? HudPart.PIP_ON : HudPart.PIP_OFF,
+                        r.x(), r.y(), r.w(), r.h(), k);
+            }
+            Rect drop = l.drop(max);
+            // 口渴标记：没有是铜绿（样张的 .verd）；有就是朱砂 —— 它会在航海之后伤人（紧迫）
+            GuiMaterial.hudIcon(context, HudPart.IC_DROP, drop.x(), drop.y(), drop.w(), drop.h(),
+                    view.thirst() > 0 ? GuiLanguage.cinnabar() : GuiLanguage.verdigris(), k);
+            Rect eye = l.eye(max);
+            if (view.condition() == Condition.CONSCIOUS) {
+                GuiMaterial.hudIcon(context, HudPart.IC_EYE, eye.x(), eye.y(), eye.w(), eye.h(), ink, k);
+            } else {
+                // 昏迷 · 死了：样张没画这两态，用管线那两枚
+                GuiMaterial.icon(context, view.condition() == Condition.DEAD ? "dead" : "eye_closed",
+                        eye.x(), eye.y(), eye.w(), GuiLanguage.cinnabar());
+            }
+        }
+        // 第二行（公开）：四格阶段，此刻那一格垫一枚铜绿圆底；其余 42% 不透明（样张 .wheel .ph）
+        int icon = l.len(HudLayout.ICON);
+        for (int i = 0; i < HudLayout.PHASES; i++) {
+            Rect ph = l.phase(i);
+            boolean on = view.phase().ordinal() == i;
+            if (on) {
+                GuiMaterial.hudPart(context, HudPart.PHASE_ON, ph.x(), ph.y(), ph.w(), ph.h(), k);
+            }
+            GuiMaterial.hudIcon(context, PHASE_ICONS[i], ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
+                    icon, icon, on ? GuiLanguage.Hud.PHASE_ON_ICON : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.PHASE_OFF_ALPHA), k);
+        }
+        // 第三行：第几天（罗马数字）· 四只海鸥 · 手牌几张与开手牌的键
+        Rect ro = l.roman();
+        int romanPx = l.len(ROMAN_PX);
+        GuiText.drawPx(context, roman(view.turn()), ro.x(), ro.y() + (ro.h() - GuiText.linePxAt(romanPx, true)) / 2,
+                ro.w(), romanPx, true, ink, GuiText.Align.CENTER, 0);
+        for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
+            Rect g = l.gull(i);
+            GuiMaterial.hudIcon(context, HudPart.IC_GULL, g.x(), g.y(), g.w(), g.h(),
+                    i < view.gulls() ? ink : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.GULL_OFF_ALPHA), k);
+        }
+        if (view.seated() && (!view.hand().isEmpty() || !view.love().isEmpty())) {
+            String key = keyLabel(HeavySeasClient.handKey());
+            double keyW = keyWidthDesign(l, key);
+            Rect kr = l.handKey(keyW);
+            drawKey(context, l, kr, key, false);
+            String count = Integer.toString(view.hand().size());
+            int countPx = l.len(COUNT_PX);
+            double numW = GuiText.widthPx(count, countPx, true, 0) / l.k();
+            Rect cr = l.handCount(keyW, numW);
+            GuiText.drawPx(context, count, cr.x(), cr.y() + (cr.h() - GuiText.linePxAt(countPx, true)) / 2, cr.w() + 2,
+                    countPx, true, ink, GuiText.Align.LEFT, 0);
+            Rect hi = l.handIcon(keyW, numW);
+            GuiMaterial.hudIcon(context, HudPart.IC_CARD, hi.x(), hi.y(), hi.w(), hi.h(), ink, l.k());
+        }
+    }
+
+    // ---------------------------------------------------------------- 金签（样张 .ribbon）
+
+    /**
+     * 轮到你时挂下来的那枚金签：铃 · 键帽，吊在状态牌底下。「轮到你 = 一件金色的物件落下来，不是描边发光」（样张页）。
+     * 换内容时重新「发」一次（从上面落下来、由淡到实）。
+     */
+    private static void drawRibbon(DrawContext context, HudLayout l, HudView view, long now) {
         Cue cue = cue(view, now);
         if (cue == null) {
             cueShown = "";
@@ -189,102 +234,118 @@ public final class GameHud {
             cueShown = cue.id();
             cueAt = now;
         }
+        // 「发」：从上面一点落到位（ADR-0018 §7.2）
         float p = GuiLanguage.deal(now, cueAt, 0);
-        int dy = Math.round((1f - p) * GuiLanguage.DEAL_RISE);
+        int dy = Math.round((1f - p) * l.len(GuiLanguage.DEAL_RISE * HudLayout.DESIGN_GUI_SCALE));
+        MatrixStack matrices = context.getMatrices();
+        matrices.push();
+        matrices.translate(0, dy, 0);
+        Rect rb = l.ribbon();
         String key = keyLabel(HeavySeasClient.actKey());
-        int textW = GuiText.width(cue.text().getString(), GuiText.BODY, false);
-        int kw = keycapW(key);
-        int h = keyRowH() + 4;
-        int w = 4 + SMALL_ICON + 3 + textW + 4 + kw + 3;
-        int ty = y + dy;
-        context.setShaderColor(1f, 1f, 1f, p);
-        GuiMaterial.tag(context, x, ty, w, h);
-        context.setShaderColor(1f, 1f, 1f, 1f);
-        int ring = cue.color();
-        context.drawBorder(x, ty, w, h, ring);
-        context.drawBorder(x + 1, ty + 1, w - 2, h - 2, ring);
-        GuiMaterial.icon(context, "bell", x + 4, ty + (h - SMALL_ICON) / 2, SMALL_ICON, GuiLanguage.onTag(ring));
-        GuiText.line(context, cue.text(), x + 4 + SMALL_ICON + 3, ty + 2 + GuiMaterial.KEY_PAD_TOP, textW,
-                GuiText.BODY, false, GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT);
-        drawKeycap(context, key, x + w - 3 - kw, ty + 2);
+        if (cue.seconds() == null) {
+            GuiMaterial.hudPart(context, HudPart.RIBBON, rb.x(), rb.y(), rb.w(), rb.h(), l.k());
+            Rect bell = l.ribbonBell();
+            GuiMaterial.hudIcon(context, HudPart.IC_BELL, bell.x(), bell.y(), bell.w(), bell.h(), GuiLanguage.Hud.RIBBON_INK, l.k());
+            drawKey(context, l, l.ribbonKey(), key, true);
+        } else {
+            // 找人那几秒：金签往右加宽，铃与键帽之间印秒数（样张没画这一态；吊绳那一段不拉）
+            int numPx = l.len(COUNT_PX);
+            int numW = GuiText.widthPx(cue.seconds(), numPx, true, 0);
+            int gap = l.len(7);
+            int extra = numW + gap;
+            GuiMaterial.ribbonWide(context, rb.x(), rb.y(), rb.w() + extra, rb.h(), l.k());
+            Rect bell = l.ribbonBell();
+            Rect kr = l.ribbonKey();
+            GuiMaterial.hudIcon(context, HudPart.IC_BELL, bell.x(), bell.y(), bell.w(), bell.h(), GuiLanguage.Hud.RIBBON_INK, l.k());
+            GuiText.drawPx(context, cue.seconds(), bell.right() + gap,
+                    rb.y() + (rb.h() - GuiText.linePxAt(numPx, true)) / 2, numW + 2, numPx, true,
+                    cue.color(), GuiText.Align.LEFT, 0);
+            drawKey(context, l, new Rect(kr.x() + extra, kr.y(), kr.w(), kr.h()), key, true);
+        }
+        matrices.pop();
     }
 
-    /** 金签上说什么。一次只有一件事要你做；按「最不能错过」排。 */
-    private record Cue(String id, Text text, int color) {
+    /** 金签的一态：{@code seconds} 非空时印秒数（只有找人那一态）。 */
+    private record Cue(String id, String seconds, int color) {
     }
 
+    /** 金签挂不挂：一次只有一件事要你做。 */
     private static Cue cue(HudView view, long now) {
         if (!view.seated()) {
             return null;
         }
         if (view.endgame().active()) {
-            return new Cue("endgame", Text.translatable("heavyseas.hud.cue.endgame"), GuiLanguage.gold());
+            return new Cue("endgame", null, 0);
         }
         if (view.myDesignating()) {
-            // 举着拳头找人：有倒计时，到点就退回 —— 紧迫，朱砂（ADR-0025）
+            // 举着拳头找人：有倒计时，到点就退回 —— 紧迫，秒数用朱砂（ADR-0025）
             long left = Math.max(0L, view.designateUntil() - now);
-            return new Cue("designate", Text.translatable("heavyseas.hud.cue.designate", (left + 999) / 1000),
-                    GuiLanguage.cinnabar());
+            return new Cue("designate", Long.toString((left + 999) / 1000), GuiLanguage.Hud.LOG_CINNABAR);
         }
         if (view.myContestChoice()) {
-            return new Cue("contest", Text.translatable("heavyseas.hud.cue.contest"), GuiLanguage.gold());
+            return new Cue("contest", null, 0);
         }
         if (view.myThirstChoice()) {
-            return new Cue("thirst", Text.translatable("heavyseas.hud.cue.thirst"), GuiLanguage.gold());
+            return new Cue("thirst", null, 0);
         }
         if (view.myWaterDonation()) {
-            return new Cue("donate", Text.translatable("heavyseas.hud.cue.donate",
-                    Text.translatable("heavyseas.character." + view.thirstPrompt().who())), GuiLanguage.gold());
+            return new Cue("donate", null, 0);
         }
         if (view.myRowPending()) {
-            return new Cue("row", Text.translatable("heavyseas.hud.cue.row"), GuiLanguage.gold());
+            return new Cue("row", null, 0);
         }
         if (view.myTurnToAct()) {
-            return new Cue("act", Text.translatable("heavyseas.hud.cue.act"), GuiLanguage.gold());
+            return new Cue("act", null, 0);
         }
         return null;
     }
 
-    // ---------------------------------------------------------------- 座位轨（正上方）
+    // ---------------------------------------------------------------- 座位轨（样张 .rail）
 
     /**
      * 这一局的座位：金圈 = 你，铜绿圈 = 正轮到的那一位，朱砂圈 = 被抢 / 被换的那一位，
-     * 舵手身上一枚舵轮（带划船堆张数），移出游戏的淡下去。
-     *
-     * <p>排在状态牌与右栏之间那一段的正中；那一段放不下八格就缩格子，绝不压到两边。
+     * 舵手身上一枚舵轮（带划船堆张数）；每一座的体力印章 · 昏迷 · 移出 · 死亡照 D1 (a)（{@link SeatMarks}，ADR-0048）。
      */
-    private static void drawSeatRail(DrawContext context, HudView view, int from, int to) {
+    private static void drawRail(DrawContext context, HudLayout l, HudView view) {
         List<String> seats = view.seats();
-        if (seats.isEmpty() || to - from < seats.size() * 8) {
+        if (seats.isEmpty()) {
             return;
         }
-        int cell = Math.min(RAIL_CELL_MAX, (to - from - 2 * PAD) / seats.size());
-        int d = Math.min(RAIL_AVATAR, cell - 2 * GuiMaterial.ringMargin(RAIL_AVATAR) - 1);
-        if (d <= 4) {
-            return;
-        }
-        int ring = GuiMaterial.ringMargin(d);
-        int w = seats.size() * cell + 2 * PAD;
-        int h = d + 2 * ring + 2 * PAD;
-        int x = from + (to - from - w) / 2;
-        int y = MARGIN;
-        GuiMaterial.sheet(context, x, y, w, h);
+        double k = l.k();
+        Rect rail = l.rail(seats.size());
+        GuiMaterial.hudPart(context, HudPart.RAIL, rail.x(), rail.y(), rail.w(), rail.h(), k);
         String waitingOn = waitingOn(view);
         String target = view.contest().active() ? view.contest().target() : "";
         boolean sea = !view.endgame().active()
                 && (view.phase() == Phase.ACTION || view.phase() == Phase.NAVIGATION);
         for (int i = 0; i < seats.size(); i++) {
             String id = seats.get(i);
-            int cx = x + PAD + i * cell + (cell - d) / 2;
-            int cy = y + PAD + ring;
-            int mark = id.equals(view.character()) && view.seated() ? GuiLanguage.gold()
-                    : id.equals(target) ? GuiLanguage.cinnabar()
-                    : id.equals(waitingOn) ? GuiLanguage.verdigris() : 0;
-            GuiMaterial.avatar(context, id, cx, cy, d, mark, view.removed().contains(id) ? 0.3f : 1f);
-            if (sea && id.equals(view.sea().helmsman())) {
-                int bw = helmBadgeW(view.sea().rowStack());
-                int bx = Math.min(cx + d - bw + 3, x + w - PAD - bw);
-                drawHelmBadge(context, view.sea().rowStack(), bx, cy + d - 6);
+            Rect t = l.seatToken(i);
+            var seat = SeatMarks.seat(id);
+            GuiMaterial.portrait(context, id, t.x(), t.y(), t.w(), 1f);
+            seat.ifPresent(s -> SeatMarks.shade(context, t, SeatMarks.Kit.TOKEN40, s, k));
+            HudPart ring = id.equals(view.character()) && view.seated() ? HudPart.TOK40_YOU
+                    : id.equals(target) ? HudPart.TOK40_CINN
+                    : id.equals(waitingOn) ? HudPart.TOK40_ACT : HudPart.TOK40_PLAIN;
+            if (ring == HudPart.TOK40_ACT) {
+                GuiMaterial.breathingRing(context, HudPart.TOK40_PLAIN, ring, t.x(), t.y(), t.w(), t.h(), k);
+            } else {
+                GuiMaterial.hudPart(context, ring, t.x(), t.y(), t.w(), t.h(), k);
+            }
+            boolean helm = sea && id.equals(view.sea().helmsman());
+            seat.ifPresent(s -> SeatMarks.marks(context, t, s, k, helm));
+            if (helm) {
+                // 舵轮挂在这一座右下，后面几座随后画、按样张的先后压在它上面
+                String n = Integer.toString(view.sea().rowStack());
+                int numPx = l.len(BADGE_PX);
+                double numW = GuiText.widthPx(n, numPx, true, 0) / k;
+                Rect b = l.helmBadge(i, numW);
+                GuiMaterial.hudPart(context, HudPart.BADGE, b.x(), b.y(), b.w(), b.h(), k);
+                Rect bi = l.helmBadgeIcon(i, numW);
+                GuiMaterial.hudIcon(context, HudPart.IC_HELM18, bi.x(), bi.y(), bi.w(), bi.h(), GuiLanguage.Hud.ENAMEL_LINE, k);
+                Rect bt = l.helmBadgeText(i, numW);
+                GuiText.drawPx(context, n, bt.x(), bt.y() + (bt.h() - GuiText.linePxAt(numPx, true)) / 2, bt.w() + 2,
+                        numPx, true, GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.LEFT, 0);
             }
         }
     }
@@ -300,74 +361,223 @@ public final class GameHud {
         return view.actor();
     }
 
-    /** 舵手身上那一枚：舵轮 + 划船堆张数（样张 b-1 小孩头像右下的「⎈2」）。 */
-    private static int helmBadgeW(int rowStack) {
-        return 2 + 6 + 1 + GuiText.width(Integer.toString(rowStack), GuiText.CAPTION, false) + 2;
-    }
-
-    private static void drawHelmBadge(DrawContext context, int rowStack, int x, int y) {
-        String n = Integer.toString(rowStack);
-        int tw = GuiText.width(n, GuiText.CAPTION, false);
-        int w = helmBadgeW(rowStack);
-        int h = 8;
-        GuiMaterial.tag(context, x, y, w, h);
-        GuiMaterial.icon(context, "helm", x + 2, y + 1, 6, GuiLanguage.onTag(GuiLanguage.ink()));
-        GuiText.line(context, Text.literal(n), x + 2 + 6 + 1, y, tw, GuiText.CAPTION, false,
-                GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT);
-    }
-
-    // ---------------------------------------------------------------- 右上：舷窗与日志页签
+    // ---------------------------------------------------------------- 右上：收着（.dock）与展开（.drawer）
 
     /**
-     * 右栏收着的时候只剩一扇天候舷窗与一枚日志页签（带未读数）；有新播报时自己展开几秒再收回，按日志键钉住
-     * （ADR-0037 §7.1 第 4 条 · 样张 b-1 / b-2）。展开的那一份就是对局界面里那本日志，同一个画法。
+     * 右栏收着的时候只剩一扇天候舷窗、一枚日志页签（带未读数）和日志键（样张 b-1）；有新播报时换成展开的那一列
+     * 自己露出几秒再收回，按日志键钉住（样张 b-2 · ADR-0037 §7.1 第 4 条）。两态不同时画 —— 滑动那几帧除外。
      */
-    private static void drawTray(DrawContext context, MinecraftClient client, HudView view, long now,
-                                 NotificationSidebarLayout overlay) {
+    private static void drawRight(DrawContext context, HudLayout l, HudView view, long now, int scale) {
         float open = SidebarReveal.openness(now);
         if (open >= 1f) {
             seenArrived = SidebarReveal.arrived();
         }
         if (open < 1f) {
-            int screenW = context.getScaledWindowWidth();
-            int x = screenW - MARGIN - PORTHOLE - GuiMaterial.ringMargin(PORTHOLE);
-            int y = MARGIN + GuiMaterial.ringMargin(PORTHOLE);
-            if (!view.weather().isEmpty()) {
-                // 舷窗：一块圆玻璃套一圈金属，里面是天候图标。玻璃借实心那枚点（圆占母版 30/64）着成纸色 ——
-                // 纸色 = 深色那一套的正文色，两个主题下都是它；图标用标签上的深墨。
-                int glass = Math.round(PORTHOLE * 64f / 30f);
-                GuiMaterial.icon(context, "pip", x + (PORTHOLE - glass) / 2, y + (PORTHOLE - glass) / 2, glass,
-                        GuiLanguage.onWorld(GuiLanguage.ink()));
-                GuiMaterial.ringOnly(context, x, y, PORTHOLE);
-                int icon = PORTHOLE - 6;
-                GuiMaterial.icon(context, "weather_" + view.weather(), x + 3, y + 3, icon,
-                        GuiLanguage.onTag(GuiLanguage.ink()));
-            }
-            int unread = Math.max(0, SidebarReveal.arrived() - seenArrived);
-            int tabW = 16;
-            int tabH = 14;
-            int tx = screenW - MARGIN - tabW - 2;
-            int ty = y + PORTHOLE + GuiMaterial.ringMargin(PORTHOLE) + 3;
-            GuiMaterial.tag(context, tx, ty, tabW, tabH);
-            GuiMaterial.icon(context, "book", tx + (tabW - 10) / 2, ty + (tabH - 10) / 2, 10,
-                    GuiLanguage.onTag(GuiLanguage.ink()));
-            if (unread > 0) {
-                String n = Integer.toString(Math.min(unread, 99));
-                int bw = Math.max(8, GuiText.width(n, GuiText.CAPTION, false) + 3);
-                GuiMaterial.tag(context, tx + tabW - bw / 2, ty - 4, bw, 8);
-                GuiText.line(context, Text.literal(n), tx + tabW - bw / 2, ty - 4, bw, GuiText.CAPTION, false,
-                        GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.CENTER);
-            }
-            String key = keyLabel(HeavySeasClient.logKey());
-            drawKeycap(context, key, tx + (tabW - keycapW(key)) / 2, ty + tabH + 2);
+            drawDock(context, l, view);
         }
         if (open > 0f) {
-            int slide = Math.round((1f - open) * (overlay.sidebarWidth() + NotificationSidebarLayout.MARGIN));
-            context.getMatrices().push();
-            context.getMatrices().translate(slide, 0, 0);
-            drawNotifications(context, client, view.weather(), view.notifications(), overlay);
-            context.getMatrices().pop();
+            int slide = Math.round((1f - open) * (l.len(HudLayout.DRAWER_W + HudLayout.DOCK_RIGHT) + l.len(20)));
+            MatrixStack matrices = context.getMatrices();
+            matrices.push();
+            matrices.translate(slide, 0, 0);
+            drawDrawer(context, l, view, now, scale, LOG_ENTRIES);
+            matrices.pop();
         }
+    }
+
+    private static void drawDock(DrawContext context, HudLayout l, HudView view) {
+        double k = l.k();
+        Rect medal = l.medal();
+        CardTexture.drawWeatherDisc(context, view.weather(), medal.x(), medal.y(), medal.w());
+        GuiMaterial.hudPart(context, HudPart.MEDAL, medal.x(), medal.y(), medal.w(), medal.h(), k);
+        Rect tab = l.logTab();
+        GuiMaterial.hudPart(context, HudPart.LOGTAB, tab.x(), tab.y(), tab.w(), tab.h(), k);
+        int icon = l.len(HudLayout.ICON);
+        GuiMaterial.hudIcon(context, HudPart.IC_BOOK, tab.centerX() - icon / 2, tab.centerY() - icon / 2, icon, icon,
+                GuiLanguage.ink(), k);
+        int unread = Math.max(0, SidebarReveal.arrived() - seenArrived);
+        if (unread > 0) {
+            String n = Integer.toString(Math.min(unread, 99));
+            int px = l.len(UNREAD_PX);
+            double w = Math.max(HudLayout.COUNT, GuiText.widthPx(n, px, true, 0) / k + 8);
+            Rect c = l.logCount(w);
+            GuiMaterial.hudPart(context, HudPart.COUNT, c.x(), c.y(), c.w(), c.h(), k);
+            GuiText.drawPx(context, n, c.x(), c.y() + (c.h() - GuiText.linePxAt(px, true)) / 2, c.w(), px, true,
+                    GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.CENTER, 0);
+        }
+        String key = keyLabel(HeavySeasClient.logKey());
+        drawKey(context, l, l.logKey(keyWidthDesign(l, key)), key, false);
+    }
+
+    /** 展开的那一列：天候卡 · 效果说明签（带尖角）· 航海日志。竖向在稿子像素里往下累加，最后才换成物理像素。 */
+    private static void drawDrawer(DrawContext context, HudLayout l, HudView view, long now, int scale, int maxEntries) {
+        double k = l.k();
+        double y = HudLayout.DOCK_Y;
+        String weather = view.weather();
+        if (!weather.isEmpty()) {
+            Rect card = l.drawerCard();
+            GuiMaterial.hudPart(context, HudPart.CARD_SHADOW, card.x(), card.y(), card.w(), card.h(), k);
+            CardTexture.drawWeatherPx(context, weather, card.x(), card.y(), card.w(), card.h());
+            y += HudLayout.DRAWER_CARD_H;
+            // 效果说明签：样张 .tip（尖角指着卡的横向正中）
+            String effect = Text.translatable("heavyseas.weather.effect." + weather).getString();
+            int textPx = l.len(HudLayout.TIP_TEXT);
+            int box = l.len(HudLayout.DRAWER_W - 2 * HudLayout.TIP_PAD_X);
+            int lines = GuiText.paragraphLines(effect, box, textPx, false, TIP_LINES);
+            double h = HudLayout.TIP_PAD_T + lines * HudLayout.TIP_LINE + HudLayout.TIP_PAD_B;
+            Rect tip = l.drawerBlock(y, HudLayout.TIP_OVERLAP, h);
+            GuiMaterial.hudPart(context, HudPart.ENAMEL, tip.x(), tip.y(), tip.w(), tip.h(), k);
+            int ptr = l.len(HudLayout.TIP_POINTER);
+            GuiMaterial.hudPart(context, HudPart.TIP_POINTER,
+                    l.xRight(HudLayout.drawerCenterDesign() - HudLayout.TIP_POINTER / 2),
+                    tip.y() + l.len(HudLayout.TIP_POINTER_TOP), ptr, ptr, k);
+            GuiText.paragraphPx(context, effect, tip.x() + l.len(HudLayout.TIP_PAD_X), tip.y() + l.len(HudLayout.TIP_PAD_T),
+                    box, textPx, false, GuiLanguage.Hud.ENAMEL_LINE, TIP_LINES, l.len(HudLayout.TIP_LINE));
+            y += HudLayout.DRAWER_GAP - HudLayout.TIP_OVERLAP + h;
+        }
+        drawLog(context, l, view, now, y, scale, maxEntries);
+    }
+
+    /** 航海日志（样张 b-2 的 .log）：栏头「航海日志 · 第几天」+ 图钉 + 日志键，下面最新的几条，最底下一道自动收回的短横。 */
+    private static void drawLog(DrawContext context, HudLayout l, HudView view, long now, double aboveBottom, int scale,
+                                int maxEntries) {
+        List<Text> notes = view.notifications();
+        if (notes.isEmpty()) {
+            return;
+        }
+        double k = l.k();
+        int textPx = l.len(HudLayout.LOG_TEXT);
+        int labelPx = l.len(HudLayout.LOG_HEAD_TEXT);
+        int labelW = l.len(HudLayout.LOG_LABEL_W);
+        int textX0 = l.len(HudLayout.LOG_PAD_X + HudLayout.LOG_LABEL_W + HudLayout.LOG_LABEL_GAP);
+        int textBox = l.len(HudLayout.DRAWER_W - 2 * HudLayout.LOG_PAD_X - HudLayout.LOG_LABEL_W - HudLayout.LOG_LABEL_GAP);
+        int lineStep = l.len(HudLayout.LOG_LINE);
+        boolean autoclose = !SidebarReveal.pinned();
+        // 最新的在最上；最近一批标「刚刚」、不压淡，更早的标类别、压淡（样张 .log .old）
+        int batch = Math.max(1, SidebarReveal.lastBatch());
+        List<Entry> entries = new ArrayList<>();
+        for (int i = notes.size() - 1; i >= 0 && entries.size() < maxEntries; i--) {
+            Text note = notes.get(i);
+            int age = notes.size() - 1 - i;
+            boolean fresh = age < batch;
+            String label = fresh ? (age == 0 ? Text.translatable("heavyseas.hud.log.just_now").getString() : "")
+                    : category(note);
+            int lines = GuiText.paragraphLines(note.getString(), textBox, textPx, false, LOG_LINES_PER_ENTRY);
+            entries.add(new Entry(note, label, fresh, lines));
+        }
+        // 放不下就从最旧的那条往回减：日志底边不许压到热栏（热栏 22 个 GUI 单位，贴底）
+        int hotbarTop = l.height() - 22 * scale;
+        double fixed = HudLayout.LOG_PAD_T + HudLayout.LOG_HEAD_H + HudLayout.LOG_HEAD_GAP + HudLayout.LOG_PAD_B
+                + (autoclose ? HudLayout.AUTOCLOSE_GAP + HudLayout.AUTOCLOSE_H : 0);
+        double h;
+        while (true) {
+            int lines = entries.stream().mapToInt(Entry::lines).sum();
+            h = fixed + lines * HudLayout.LOG_LINE;
+            Rect probe = l.drawerBlock(aboveBottom, 0, h);
+            if (probe.bottom() + l.len(8) <= hotbarTop || entries.size() <= 1) {
+                break;
+            }
+            entries.remove(entries.size() - 1);
+        }
+        Rect log = l.drawerBlock(aboveBottom, 0, h);
+        GuiMaterial.hudPart(context, HudPart.ENAMEL, log.x(), log.y(), log.w(), log.h(), k);
+        int line = GuiLanguage.Hud.ENAMEL_LINE;
+        int x0 = log.x() + l.len(HudLayout.LOG_PAD_X);
+        int headTop = log.y() + l.len(HudLayout.LOG_PAD_T);
+        int headH = l.len(HudLayout.LOG_HEAD_H);
+        // 栏头：左「航海日志 · 第几天」（字距 4），右图钉 + 日志键
+        String title = Text.translatable("heavyseas.hud.log_title",
+                Text.translatableWithFallback("heavyseas.numeral." + view.turn(), Integer.toString(view.turn()))).getString();
+        GuiText.drawPx(context, title, x0, headTop + (headH - GuiText.linePxAt(labelPx, false)) / 2,
+                log.w() - 2 * l.len(HudLayout.LOG_PAD_X), labelPx, false, line, GuiText.Align.LEFT,
+                (int) Math.round(HEAD_SPACING * k));
+        String key = keyLabel(HeavySeasClient.logKey());
+        double keyW = keyWidthDesign(l, key);
+        int kw = l.len(keyW);
+        Rect kr = new Rect(log.right() - l.len(HudLayout.LOG_PAD_X) - kw, headTop, kw, l.len(HudLayout.KEY));
+        drawKey(context, l, kr, key, false);
+        int icon = l.len(HudLayout.ICON);
+        GuiMaterial.hudIcon(context, HudPart.IC_PIN, kr.x() - l.len(5) - icon, headTop + (headH - icon) / 2, icon, icon,
+                line, k);
+        int y = headTop + headH + l.len(HudLayout.LOG_HEAD_GAP);
+        for (Entry e : entries) {
+            int color = e.fresh() ? noteInk(e.note()) : GuiLanguage.Hud.alpha(noteInk(e.note()), GuiLanguage.Hud.LOG_OLD_ALPHA);
+            if (!e.label().isEmpty()) {
+                float a = GuiLanguage.Hud.LOG_LABEL_ALPHA * (e.fresh() ? 1f : GuiLanguage.Hud.LOG_OLD_ALPHA);
+                // 样张 .log .l i：13px、行高 1.75、padding-top 2，与正文顶对齐
+                // 右沿对齐在那一格的右边；框往左伸进内边距 —— 小窗口里字号有地板（12 px），
+                // 「刚刚」两个字比按比例缩下来的 34 宽，不伸就被截成「…」（2026-09-30 854×480 实拍）
+                int pad = l.len(HudLayout.LOG_PAD_X) - 1;
+                GuiText.drawPx(context, e.label(), x0 - pad, y + l.len(2)
+                                + (l.len(HudLayout.LOG_HEAD_TEXT * 1.75) - GuiText.linePxAt(labelPx, false)) / 2,
+                        labelW + pad, labelPx, false, GuiLanguage.Hud.alpha(line, a), GuiText.Align.RIGHT, 0);
+            }
+            GuiText.paragraphPx(context, e.note().getString(), log.x() + textX0, y, textBox, textPx, false, color,
+                    LOG_LINES_PER_ENTRY, lineStep);
+            y += e.lines() * lineStep;
+        }
+        if (autoclose) {
+            int barW = Math.round(l.len(HudLayout.DRAWER_W - 2 * HudLayout.LOG_PAD_X) * SidebarReveal.remaining(now));
+            int by = y + l.len(HudLayout.AUTOCLOSE_GAP);
+            context.fill(x0, by, x0 + barW, by + Math.max(1, l.len(HudLayout.AUTOCLOSE_H)), GuiLanguage.Hud.INK2);
+        }
+    }
+
+    private record Entry(Text note, String label, boolean fresh, int lines) {
+    }
+
+    /** 播报印在搪瓷上：服务端标了红（战斗结算）的用日志里的朱砂，其余一律深墨（样张 .log 与 .cinn）。 */
+    private static int noteInk(Text entry) {
+        return noteColor(entry) == GuiLanguage.cinnabar() ? GuiLanguage.Hud.LOG_CINNABAR : GuiLanguage.Hud.ENAMEL_LINE;
+    }
+
+    /**
+     * 一条旧播报属于哪一类（样张 b-2 左边那一格：物资 · 天候……）：按服务端文本键的前缀归，归不上的不标。
+     * 键是服务端 {@code GameFlow.broadcast} 发的那一串，客户端收到的仍是可翻译文本。
+     */
+    private static final String NAMESPACE = "heavyseas.";
+
+    private static String category(Text note) {
+        if (!(note.getContent() instanceof TranslatableTextContent t)) {
+            return "";
+        }
+        // 去掉命名空间再比前缀：带着命名空间写的前缀读起来像一个 lang 键，checkLangKeys 会当成缺键（2026-09-30 实测）
+        String key = t.getKey().startsWith(NAMESPACE) ? t.getKey().substring(NAMESPACE.length()) : "";
+        String cat;
+        if (key.startsWith("game.weather")) {
+            cat = "weather";
+        } else if (key.startsWith("game.thirst")) {
+            cat = "thirst";
+        } else if (key.startsWith("game.provision") || key.startsWith("game.card_played")) {
+            cat = "provision";
+        } else if (key.startsWith("game.row") || key.startsWith("game.helmsman") || key.startsWith("game.compass")
+                || key.startsWith("game.overboard") || key.startsWith("row.") || key.startsWith("overboard.")) {
+            cat = "navigation";
+        } else if (key.startsWith("contest.") || key.startsWith("command.swapped")) {
+            cat = "contest";
+        } else if (key.startsWith("game.your_turn") || key.startsWith("game.seat") || key.startsWith("command.passed")) {
+            cat = "action";
+        } else if (key.startsWith("endgame.")) {
+            cat = "endgame";
+        } else {
+            return "";
+        }
+        return Text.translatable("heavyseas.hud.log.cat." + cat).getString();
+    }
+
+    // ---------------------------------------------------------------- 键帽
+
+    /** 键帽宽（稿子像素）：样张 {@code .key { min-width: 26px; padding: 0 7px }}。 */
+    private static double keyWidthDesign(HudLayout l, String key) {
+        return Math.max(HudLayout.KEY, GuiText.widthPx(key, l.len(KEY_PX), true, 0) / l.k() + 2 * HudLayout.KEY_PAD_X);
+    }
+
+    /** 一枚键帽：浅的（状态牌 · 日志）或金签上那种深底金字的。字 600 14px。 */
+    private static void drawKey(DrawContext context, HudLayout l, Rect r, String key, boolean onRibbon) {
+        GuiMaterial.hudPart(context, onRibbon ? HudPart.RIBBON_KEY : HudPart.KEY, r.x(), r.y(), r.w(), r.h(), l.k());
+        int px = l.len(KEY_PX);
+        GuiText.drawPx(context, key, r.x(), r.y() + (r.h() - GuiText.linePxAt(px, true)) / 2, r.w(), px, true,
+                onRibbon ? GuiLanguage.Hud.RIBBON_TOP : GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.CENTER, 0);
     }
 
     // ---------------------------------------------------------------- 对局界面里的日志（最后一层）
@@ -388,29 +598,31 @@ public final class GameHud {
         }
         long now = System.currentTimeMillis();
         SidebarReveal.observe(view.notifications(), now);
+        // 计分那一面不自己滑出来：它会盖住标题右头几秒（用户 2026-09-30 判「要例外」，验收清单第 3 条）。钉住照旧。
+        if (client.currentScreen instanceof ScoreScreen && !SidebarReveal.pinned()) {
+            return;
+        }
         float open = SidebarReveal.openness(now);
         if (open <= 0f) {
             return;                          // 收着的时候一个像素都不画 —— 第一刀把这块屏幕让给了牌
         }
-        // ❗**盖在舞台上**，不占版面：这里用「看得见的那一份」几何（visible = true），
-        //   而 sidebarLayout 给各面的仍是 visible = false —— 舞台一个像素都不动。
-        //   否则每来一条播报整屏就要重排一次，那正是 §7.13 要避免的割裂感。
-        NotificationSidebarLayout overlay =
-                NotificationSidebarLayout.of(context.getScaledWindowWidth(), true);
-        int slide = Math.round((1f - open) * (overlay.sidebarWidth() + NotificationSidebarLayout.MARGIN));
-        // ❗自己滑出来的那一下**只给「刚刚发生了什么」**：最新的两条，不带天候卡。
-        //   整本日志加天候卡有半屏高，实拍到它盖住了右边三张牌与两个座位 ——
-        //   而牌是主体（§7.8）。要看全的按 L 钉住：钉住是你自己要的，盖住也是你自己认的。
-        List<Text> shown = view.notifications();
-        String weather = view.weather();
-        if (!SidebarReveal.pinned()) {
-            shown = shown.subList(0, Math.min(REVEAL_LINES, shown.size()));
-            weather = "";
+        // ❗**盖在舞台上**，不占版面：舞台一个像素都不动，否则每来一条播报整屏就要重排一次（§7.13）。
+        // 2026-09-30 起与主画面展开那一列同一个画法（样张 b-2 的日志：搪瓷 · 栏头第几天 · 左列类别 · 自动收回的短横）：
+        // 自己滑出来那一下**只给「刚刚发生了什么」**，最新的两条、不带天候卡；按 L 钉住才给整列（天候卡 · 说明签 · 日志）。
+        // ❗此前这里取的是 {@code subList(0, 2)} —— 服务端把新的接在末尾，那是**最旧**的两条（实拍：行动一面滑出来的是开局那几句「第 N 座」）。
+        int scale = guiScale(client);
+        HudLayout layout = HudLayout.of(client.getWindow().getFramebufferWidth(), client.getWindow().getFramebufferHeight(), scale);
+        int slide = Math.round((1f - open) * (layout.len(HudLayout.DRAWER_W + HudLayout.DOCK_RIGHT) + layout.len(20)));
+        MatrixStack matrices = context.getMatrices();
+        matrices.push();
+        matrices.scale(1f / scale, 1f / scale, 1f);
+        matrices.translate(slide, 0, 0);
+        if (SidebarReveal.pinned()) {
+            drawDrawer(context, layout, view, now, scale, LOG_ENTRIES);
+        } else {
+            drawLog(context, layout, view, now, HudLayout.DOCK_Y - HudLayout.DRAWER_GAP, scale, REVEAL_LINES);
         }
-        context.getMatrices().push();
-        context.getMatrices().translate(slide, 0, 0);
-        drawNotifications(context, client, weather, shown, overlay);
-        context.getMatrices().pop();
+        matrices.pop();
     }
 
     /** 自己滑出来时最多给几条。再多就成了「整本日志盖住牌」，那是钉住才该发生的事。 */
@@ -423,64 +635,6 @@ public final class GameHud {
         return NotificationSidebarLayout.of(screenWidth, visible);
     }
 
-    /**
-     * 系统播报的侧栏：最新事件在最上面，保留最多八条，不污染聊天历史。
-     *
-     * <p>播报文本自带的样式（服务端给战斗结算标的红）照原样显示 —— 那是服务端的事。
-     */
-    private static void drawNotifications(DrawContext context, MinecraftClient client,
-                                          String weather, List<Text> notifications,
-                                          NotificationSidebarLayout layout) {
-        int width = layout.sidebarWidth();
-        if ((notifications.isEmpty() && weather.isEmpty()) || width <= 0) {
-            return;
-        }
-        int x = layout.sidebarX();
-        int y = MARGIN;
-        if (!weather.isEmpty()) {
-            int cardW = Math.min(width, 168);
-            int cardH = cardW * 5 / 7;
-            CardTexture.drawWeather(context, weather, x + (width - cardW) / 2, y, cardW, cardH);
-            y += cardH + MARGIN;
-        }
-        if (notifications.isEmpty()) {
-            return;
-        }
-        int inner = width - 2 * MARGIN;
-        // 第一条是栏名（次要色），下面才是播报，最新的在最上。
-        List<Text> entries = new ArrayList<>();
-        entries.add(Text.translatable("heavyseas.hud.notifications"));
-        for (int i = notifications.size() - 1; i >= 0; i--) {
-            entries.add(notifications.get(i));
-        }
-        // 天候卡已经占掉上半截；按剩余高度裁，而不是按整屏高度裁。否则低分辨率下
-        // 八条长通知会把侧栏画出屏幕底边。先量后画：放不下的那一条整条不要，不画半条。
-        int bottomSafe = client.currentScreen == null ? HUD_BOTTOM_SAFE : 2 * MARGIN;
-        int room = context.getScaledWindowHeight() - y - bottomSafe - 2 * MARGIN;
-        int used = 0;
-        int shown = 0;
-        for (Text entry : entries) {
-            int h = GuiText.height(entry.getString(), inner, GuiText.BODY, false, MAX_LINES_PER_NOTE);
-            if (used + h > room) {
-                break;
-            }
-            used += h;
-            shown++;
-        }
-        if (shown == 0) {
-            return;
-        }
-        GuiMaterial.tag(context, x, y, width, used + 2 * MARGIN);
-        int textY = y + MARGIN;
-        for (int i = 0; i < shown; i++) {
-            Text entry = entries.get(i);
-            textY += GuiText.draw(context, entry.getString(), x + MARGIN, textY, inner, GuiText.BODY, false,
-                    GuiLanguage.onTag(i == 0 ? GuiLanguage.muted() : noteColor(entry)), GuiText.Align.LEFT, MAX_LINES_PER_NOTE);
-        }
-    }
-
-    /** 一条播报最多折几行；再长就截断 —— 侧栏是提要，全文该去的地方不是这里。 */
-    private static final int MAX_LINES_PER_NOTE = 4;
 
     /** 播报自带的颜色（服务端给战斗结算标的红）照原样用；没标色的是纸色。 */
     private static int noteColor(Text entry) {
@@ -495,21 +649,6 @@ public final class GameHud {
 
     private static String keyLabel(KeyBinding key) {
         return key.getBoundKeyLocalizedText().getString();
-    }
-
-    private static int keyRowH() {
-        return GuiText.lineHeight(GuiText.BODY, false) + GuiMaterial.KEY_PAD_TOP + GuiMaterial.KEY_PAD_BOTTOM;
-    }
-
-    private static int keycapW(String key) {
-        return GuiText.width(key, GuiText.BODY, false) + 2 * GuiMaterial.KEY_PAD_X;
-    }
-
-    private static void drawKeycap(DrawContext context, String key, int x, int y) {
-        int w = keycapW(key);
-        GuiMaterial.keycap(context, x, y, w, keyRowH());
-        GuiText.line(context, Text.literal(key), x + 1, y + GuiMaterial.KEY_PAD_TOP, w - 2, GuiText.BODY, false,
-                GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.CENTER);
     }
 
     /** 第几天：罗马数字（样张 b-1）。一局到不了几十天，写到 39 就够。 */

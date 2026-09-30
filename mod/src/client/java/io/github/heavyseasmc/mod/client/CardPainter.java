@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.card.CardFace;
@@ -243,11 +244,24 @@ final class CardPainter {
     }
 
     /** 一律经 {@link CardTexture#smooth}：多级纹理 + 线性过滤，缩小时才不闪。 */
+    /**
+     * 画一层（边框层 · 画层）。
+     *
+     * <p>❗混合要分开写透明度那一路：Minecraft 的 {@code defaultBlendFunc} 是
+     * {@code (SRC_ALPHA, ONE_MINUS_SRC_ALPHA, ONE, ZERO)} —— 透明度<b>被最后画的那一层覆盖</b>，不是叠加。
+     * 画上屏幕时没人看帧缓冲的透明度，看不出来；合成进牌的贴图（{@link CardComposite}）时，
+     * 画层里 22% 不透明的那一片海天就把整条插画带的透明度改成了 22%，牌的中段变成半透明，
+     * 背后是什么颜色就透出什么颜色 —— 2026-09-30 主画面展开的天候卡压在夜空上，那一条整个发灰（实拍 (92,93,93)，
+     * 纸上应为 (194,194,171)）。透明度按 {@code (ONE, ONE_MINUS_SRC_ALPHA)} 叠加，纸是不透明的，合成出来就还是不透明。
+     */
     private static void blit(DrawContext context, Identifier id, int x, int y, int w, int h) {
         if (w <= 0 || h <= 0) {
             return;
         }
         RenderSystem.enableBlend();
+        RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA,
+                GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
         context.drawTexture(CardTexture.smooth(id), x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+        RenderSystem.defaultBlendFunc();
     }
 }

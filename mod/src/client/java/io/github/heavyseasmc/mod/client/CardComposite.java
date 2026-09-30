@@ -53,6 +53,8 @@ final class CardComposite {
     private static final int MAX_CACHED = 12;
     /** 一 tick 最多合成几张：合成一张要分配一块 600×840 的纹理，扎堆做会掉帧。 */
     private static final int PER_TICK = 1;
+    /** 合成出来的牌中心至少这么不透明（/255）：边框层在那里是满纸，混合写对了就是 255。 */
+    private static final int OPAQUE_FLOOR = 250;
     /** 合成用的坐标系原点推到这么远 —— 与 Minecraft 画 GUI 时用的同一组值（GameRenderer）。 */
     private static final float NEAR = 1000.0F;
     private static final float FAR = 21000.0F;
@@ -61,7 +63,7 @@ final class CardComposite {
     private record Job(String key, CardFace face, String tier, int texW, int texH) {
     }
 
-    private record Baked(Identifier id, Framebuffer framebuffer) {
+    private record Baked(Identifier id, Framebuffer framebuffer, int centerAlpha) {
     }
 
     /** 合成好的。按最近用过排序 —— 挤掉的那张连帧缓冲一起删。 */
@@ -116,7 +118,14 @@ final class CardComposite {
                 // ❗这一行是闸门的来源：合成失败时老路还在，屏幕上只是「回到从前」——
                 //   而「从前」与「现在」在任何机器判据上都一样。不报数就没人知道它没生效
                 //   （与「那行『字体 X』只是参数回显」同一个形状）。
-                LOGGER.info("牌面已合成：{}（累计 {} 张，缓存 {}）", job.key(), composed, READY.size());
+                Baked baked = READY.get(job.key());
+                LOGGER.info("牌面已合成：{}（累计 {} 张，缓存 {}，中心不透明度 {}）", job.key(), composed, READY.size(),
+                        baked.centerAlpha());
+                if (baked.centerAlpha() < OPAQUE_FLOOR) {
+                    // 边框层是满纸，牌中心必须不透明；透明度那一路混错时会掉到画层那一片的 22%（2026-09-30）
+                    LOGGER.warn("牌面合成不透明度不对：{} 中心只有 {} / 255 —— 牌会透出背后的颜色", job.key(),
+                            baked.centerAlpha());
+                }
             } catch (RuntimeException e) {
                 // 合成不出来不是致命的：老路还在。但要说一声，否则「一直是老样子」没人知道为什么。
                 LOGGER.warn("牌面合成失败（{}），这张牌继续走老路画：{}", job.key(), e.toString());
@@ -174,6 +183,11 @@ final class CardComposite {
         //   档位由调用方按屏幕上的大小定好了 —— 合成只改采样时机，不改版式。
         CardPainter.paint(context, job.face(), job.tier(), 0, 0, job.texW(), job.texH(), 1);
         context.draw();
+        // 正向对照：读回牌中心那一个像素的不透明度（边框层在那里是满纸）。「合成出来了」不等于「合成对了」。
+        java.nio.ByteBuffer center = org.lwjgl.BufferUtils.createByteBuffer(4);
+        org.lwjgl.opengl.GL11.glReadPixels(job.texW() / 2, job.texH() / 2, 1, 1, org.lwjgl.opengl.GL11.GL_RGBA,
+                org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, center);
+        int centerAlpha = center.get(3) & 0xFF;
 
         RenderSystem.enableCull();
         stack.popMatrix();
@@ -190,7 +204,7 @@ final class CardComposite {
 
         Identifier id = Identifier.of(HeavySeasMod.MOD_ID, "composite/" + job.key().toLowerCase(java.util.Locale.ROOT));
         client.getTextureManager().registerTexture(id, new FboTexture(fb));
-        return new Baked(id, fb);
+        return new Baked(id, fb, centerAlpha);
     }
 
     /**

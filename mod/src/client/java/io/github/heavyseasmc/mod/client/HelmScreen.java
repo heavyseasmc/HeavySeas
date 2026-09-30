@@ -171,10 +171,7 @@ public final class HelmScreen extends GameScreen {
             context.getMatrices().pop();
         }
 
-        // 说明只写一处：查看态里它在签子上，摊开时它在舞台底下。
-        if (gathered <= 0f) {
-            drawHint(context, l);
-        }
+        // 说明只写一处：查看态里它在签子上（摊开时牌下面那一行 2026-09-30 用户判去掉）。
         // 航海牌没有牌名，签子上只有说明。
         if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
             drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
@@ -192,7 +189,9 @@ public final class HelmScreen extends GameScreen {
     private Layout layout(Bands b) {
         int n = Math.max(1, offer.size());
         int seaY = b.stageTop();
-        int hintY = footerTop(b, 2);                     // 这一张牌会做什么，最多两行
+        // 牌下面那一行完整说明（落海 · 口渴…）用户 2026-09-30 判去掉（验收清单第 9 条）：牌整格占满舞台，
+        // 完整内容仍在查看态的签子里（U / 右键）。
+        int hintY = b.stageBottom() + HINT_GAP;
         int top = seaY + lineStep();
         int avail = hintY - HINT_GAP - top;
         // 先按偏大的卡算出留空，再据此定卡高：留空只会偏大一点，卡绝不会反过来压上划船堆那一行。
@@ -202,14 +201,6 @@ public final class HelmScreen extends GameScreen {
         int cardsTop = cardsTopIn(top, hintY - HINT_GAP, h, room);
         int rowW = cardRowWidth(n, w);
         return new Layout(w, h, (width - rowW) / 2, cardsTop, rowW, seaY, hintY);
-    }
-
-    /** 说明只跟高亮走：那张牌的完整内容（牌面上的字可能小到读不清），下面一行说这一面要你做什么。 */
-    private void drawHint(DrawContext context, Layout l) {
-        if (highlight < 0 || highlight >= offer.size()) {
-            return;
-        }
-        drawParagraph(context, NavCardText.describe(offer.get(highlight), view.seats()), l.hintY(), 2, GuiLanguage.ink());
     }
 
     private int indexAt(int mouseX, int mouseY, Layout l) {

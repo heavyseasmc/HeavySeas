@@ -181,6 +181,7 @@ public final class HeavySeasClient implements ClientModInitializer {
                 ClientPrefs.toggleTheme();
             }
             CardComposite.tick(client);      // 一 tick 合成一张牌；渲染中途不动帧缓冲
+            OverboardCue.tick(client);       // 有人落海：溅水一声 · 四边朱砂一闪（ADR-0048）
             while (logKey.wasPressed()) {
                 SidebarReveal.togglePin();
                 LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");

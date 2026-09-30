@@ -6,6 +6,7 @@ import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import io.github.heavyseasmc.mod.ui.SheetLayout;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
@@ -166,32 +167,38 @@ public final class ProvisionScreen extends GameScreen {
     }
 
     /**
-     * 一帧的版面，全部以 GUI 单位计。带位归 {@link Bands}，这里只排舞台那一格里的东西。
+     * 一帧的版面。几何在 {@link CardRow#provision} 里按物理像素算（可单测），这里换成画牌用的 GUI 单位。
      *
-     * @param perRow  一排几张（一排就是全部；两排时上排多一张）
-     * @param rowStep 上下两排之间隔多远（牌高 + 「顿」要的留空）
-     * @param screenW 窗口宽：每一排各自居中
+     * @param px   物理像素的那一份（说明签直接用它）
+     * @param lift 抽出来那张往上提多少（GUI 单位）
      */
-    private record Layout(int w, int h, int cardsTop, int rowW, int n, int perRow, int rowStep, int screenW) {
+    private record Layout(CardRow.Provision px, int s, int w, int h, int n, float lift) {
 
-        int cardX(int i) {
-            int row = i / perRow;
-            int inRow = Math.min(perRow, n - row * perRow);
-            int rowLeft = (screenW - cardRowWidth(inRow, w)) / 2;
-            return rowLeft + (i - row * perRow) * (w + CARD_GAP);
+        float cardX(int i) {
+            return px.cardX(i) / (float) s;
         }
 
-        int cardTop(int i) {
-            return cardsTop + (i / perRow) * rowStep;
+        float cardTop(int i) {
+            return px.top() / (float) s;
         }
 
-        int left() {
-            return (screenW - rowW) / 2;
+        float left() {
+            return px.left() / (float) s;
+        }
+
+        float step() {
+            return px.step() / (float) s;
+        }
+
+        int rowW() {
+            return Math.round(((n - 1) * px.step() + px.w()) / (float) s);
+        }
+
+        /** 叠着没有（张数多到放不下并排时才叠）。 */
+        boolean stacked() {
+            return n > 1 && px.step() < px.w();
         }
     }
-
-    /** 一排牌（连头上的留空）占不到舞台的这个比例时，才考虑排成两排。 */
-    private static final float TWO_ROWS_EMPTY = 0.5f;
 
     /**
      * 这一帧舞台里的版面。
@@ -200,41 +207,56 @@ public final class ProvisionScreen extends GameScreen {
      * 窗口随时会被拖大拖小，界面尺寸也随时会在设置里改，缓存下来的版面会跟画面对不上。
      */
     private Layout layout(Bands b) {
+        // ADR-0049（用户 2026-10-01 看样图定的 F）：牌可以叠，选中那张「抽出来」，说明签小一号挂在牌排下面。
+        // 2026-09-30 照样张 b-3 是固定一排 124 宽；再往前是按舞台放大、放不下排两排。
         int n = Math.max(1, data.offer().size());
-        // ❗牌名不再单占一行：第三刀之后它印在牌上（CardTexture 实时排字）。
-        // 同一个名字在屏幕上出现两次是这一刀带出来的重复，省下的高度全还给牌 —— 用户 2026-09-22：「卡牌太小」。
-        // 舞台整格都给牌：规矩那一句拿掉了（箱子怎么传，动效已经演出来了），
-        // 牌自己的内容藏在查看态里（按 U / 右键）。
-        int bottom = b.stageBottom();
-        int avail = bottom - b.stageTop();
-        // 卡顶要留多少空，取决于卡有多高（「顿」放大 7%，绕底边，长出来的那一截全在上面）；
-        // 而卡有多高又取决于留了多少空。先按一个偏大的 h 算出空，再据此定 h ——
-        // 空只会偏大一点点，卡因此略小一点点，绝不会反过来压上座位轨。
-        int room = snapRoom(cardHeightFor(n, avail - snapRoom(0)));
-        int h = cardHeightFor(n, avail - room);
-        int perRow = n;
-        // 一排放不下、卡被宽度卡小时，试两排（总纲 §7.8：舞台先给牌）。
-        // ❗界面尺寸 1 时一排八张被宽度卡在舞台高的四成，上下各空一大截（O32，2026-09-24 实拍）；
-        //   界面尺寸自动（1280×720 下是 3）时两排反而更小，照旧一排 —— 按算出来的大小选，不按界面尺寸写死。
-        // ❗判的是「一排之后舞台还空着一大半」，不是「两排大多少」：两排时每排头上都要留「顿」的空，
-        //   界面尺寸 1 的八张牌换成两排只大 6%（209 → 222 个单位，实测）—— 牌几乎没长，舞台却从空一大半变成铺满。
-        //   用户抱怨的是后者（O32：「舞台空了一大半」）。两排不许比一排小。
-        if (n >= 4 && h + room < avail * TWO_ROWS_EMPTY) {
-            int per2 = (n + 1) / 2;
-            int room2 = snapRoom(cardHeightFor(per2, (avail - 2 * snapRoom(0)) / 2));
-            int h2 = cardHeightFor(per2, (avail - 2 * room2) / 2);
-            if (h2 >= h) {
-                perRow = per2;
-                room = room2;
-                h = h2;
-            }
+        SheetLayout sl = sheet();
+        int s = guiScale();
+        CardRow.Provision px = CardRow.provision(sl, n, GuiLanguage.SNAP_PEAK_RISE * s, GuiLanguage.SNAP_PEAK_SCALE - 1f,
+                tipLines(sl));
+        int w = Math.max(8, Math.round(px.w() / (float) s));
+        return new Layout(px, s, w, GuiLanguage.cardHeight(w), n, (float) (CardRow.PULL_LIFT * sl.k() / s));
+    }
+
+    /** 上一次记下的版面（见 {@link #logLayout}）。 */
+    private String loggedLayout = "";
+
+    /**
+     * 这一箱、这一档窗口的版面记一行（与语言无关，物理像素），变了才记。
+     *
+     * <p>牌叠起来之后，截图里靠「牌与牌之间的空隙」已经分不出一张一张（ADR-0049）——
+     * 客户端回归（hover_test · click_test · pass_test · snap_test）要从这一行知道每张在哪。
+     * 判据照旧看金框落在哪、界面报看的是第几张；这一行只管「往哪儿点、往哪儿看」。
+     */
+    private void logLayout(Layout l) {
+        CardRow.Provision p = l.px();
+        String key = l.n() + "/" + p.w() + "/" + p.h() + "/" + p.step() + "/" + p.left() + "/" + p.top();
+        if (!key.equals(loggedLayout)) {
+            loggedLayout = key;
+            LOGGER.info("补给箱版面：{} 张 · 牌宽 {} · 牌高 {} · 间距 {} · 左沿 {} · 顶 {}（物理像素）",
+                    l.n(), p.w(), p.h(), p.step(), p.left(), p.top());
         }
-        int rows = (n + perRow - 1) / perRow;
-        int w = GuiLanguage.cardWidth(h);
-        int rowStep = h + room;
-        int cardsTop = cardsTopIn(b.stageTop(), bottom, h + (rows - 1) * rowStep, room);
-        int rowW = cardRowWidth(perRow, w);
-        return new Layout(w, h, cardsTop, rowW, n, perRow, rowStep, width);
+    }
+
+    /** 说明签正文那一栏多宽（物理像素）：这一箱里最长的那条效果放得进一行就好，不窄于 400、不宽于 560（稿子像素）。 */
+    private int tipBox(SheetLayout l) {
+        int bodyPx = l.len(CardRow.TIP_BODY_PX);
+        int widest = 0;
+        for (String card : data.offer()) {
+            widest = Math.max(widest, GuiText.widthPx(provisionEffect(card).getString(), bodyPx, false, 0));
+        }
+        return Math.max(l.len(TIP_MIN_W), Math.min(l.len(TIP_MAX_W), widest + l.len(2)));
+    }
+
+    /** 说明签效果那一段留几行：这一箱里最长的那条要几行（最多 3）。整箱不变 —— 签子一高一矮，牌排会跟着上下跳。 */
+    private int tipLines(SheetLayout l) {
+        int box = tipBox(l);
+        int bodyPx = l.len(CardRow.TIP_BODY_PX);
+        int lines = 1;
+        for (String card : data.offer()) {
+            lines = Math.max(lines, GuiText.paragraphLines(provisionEffect(card).getString(), box, bodyPx, false, 3));
+        }
+        return lines;
     }
 
     /** 座位轨是<b>这一条链</b>（箱子传到哪了），不是座位序 —— 所以覆写它。**公开信息**，等待要看得见（决策 ⑨）。 */
@@ -244,15 +266,13 @@ public final class ProvisionScreen extends GameScreen {
         if (chain.isEmpty() || b.railH() == 0) {
             return;
         }
-        int cell = railCell(chain.size());
-        int left = (width - chain.size() * cell) / 2;
         for (int i = 0; i < chain.size(); i++) {
             boolean done = i < data.at();
             boolean here = i == data.at();
-            // 每个名字只许占自己那一格：格子窄（界面尺寸 1、八个人）时缩字号，绝不压到邻座。
-            drawSeat(context, chain.get(i), left + i * cell, b.railY(), cell, b, here ? GuiLanguage.gold() : 0,
-                    !done && !here, here ? GuiLanguage.gold() : (done ? GuiLanguage.muted() : GuiLanguage.dim()),
-                    done ? GuiLanguage.verdigris() : GuiLanguage.ground());
+            boolean you = view.seated() && chain.get(i).equals(view.character());
+            // 样张 b-3：箱在谁手里，那一格铜绿圈、头上一只铜绿的箱、名字亮着；你是金圈；还没传到的淡下去。
+            drawSeatAt(context, chain.get(i), i, chain.size(), here ? GuiLanguage.verdigris() : you ? GuiLanguage.gold() : 0,
+                    false, here || you, here);        // 样张：头像都是实的，只有名字按亮 / 次墨分
         }
     }
 
@@ -266,6 +286,7 @@ public final class ProvisionScreen extends GameScreen {
         long dt = frameDelta(now);
         Bands b = drawChrome(context, projection());
         Layout l = layout(b);
+        logLayout(l);
         Inspect in = inspect(b);
         float gathered = gathered(now);
         float snapP = GuiLanguage.snap(now, snapAt);
@@ -300,8 +321,10 @@ public final class ProvisionScreen extends GameScreen {
             String card = offer.get(highlight);
             drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
                     provisionCaption(card), provisionName(card), provisionEffect(card));
+        } else if (gathered <= 0f && passAt == 0L && highlight >= 0 && highlight < offer.size()) {
+            drawTip(context, l, offer.get(highlight));
         }
-        drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
+        drawFootBand(context, b, List.of(keys("swap_card", "←", "→")), inspectHints("keep"), now,
                 new Countdown(data.deadlineMs(),
                         Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD, l.rowW()));
     }
@@ -350,7 +373,9 @@ public final class ProvisionScreen extends GameScreen {
         // ❗「抬」要一直保持到「传」真的开始：替你选的那一路，「传」的起点是「顿」播完的那一刻（一个将来的时刻）。
         //   第一版写成 passAt == 0 —— 服务端那一包一到 passAt 就有值了，抬起的 9 个单位在「顿」的同时落回去，
         //   正好把「顿」往上那一下抵掉（snap_test 量到超时那一路抬起 0.0 px，2026-09-25）。
-        lift[i] = GuiLanguage.approach(lift[i], hi && !passing ? GuiLanguage.LIFT_PX : 0f, dt);
+        lift[i] = GuiLanguage.approach(lift[i], hi && !passing ? l.lift() : 0f, dt);
+        // 抽出来（ADR-0049）：转多少跟着提了多少走；收成一叠（查看态）时转回平放。
+        float pull = l.lift() > 0f ? lift[i] / l.lift() * (1f - gathered) : 0f;
 
         int depth = hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight));
         CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardTop(i) + l.h(), l.w(), l.h(), depth);
@@ -383,16 +408,77 @@ public final class ProvisionScreen extends GameScreen {
 
         context.getMatrices().push();
         context.getMatrices().translate(cx, bottom, 0);
+        CardRow.rotate(context, passing ? 0f : pull);
         context.getMatrices().scale(scale, scale, 1f);
         context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
         drawCardShadow(context, pose.w(), pose.h(), Math.abs(rise) + lift[i] * (1f - gathered));
+        // 叠着时左边缘一道细影落在下面那张上 —— 左边那张被抽走了就不画（那里此刻是桌面）。
+        if (l.stacked() && i > 0 && !hi && i - 1 != highlight && gathered <= 0f && !passing) {
+            CardRow.edgeShadow(context, pose.h(), l.s(), sheet().k());
+        }
+        boolean dimmed = !hi && !passing;
+        if (dimmed) {
+            CardRow.dim(context);
+        }
         CardTexture.drawProvision(context, offer.get(i), 0, 0, pose.w(), pose.h());
+        if (dimmed) {
+            CardRow.undim(context);
+        }
         if (hi && !passing) {
             // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
             // 传走的那一下不带框：它已经不是「你正在选的」，是「你的了」。
             drawCardFrame(context, pose.w(), pose.h());
         }
         context.getMatrices().pop();
+    }
+
+    /** 说明签正文最窄、最宽（稿子像素）。样图 F 是 400；英文长的那几条放宽到 560 再折行。 */
+    private static final double TIP_MIN_W = 400;
+    private static final double TIP_MAX_W = 560;
+
+    /**
+     * 选中那张下面挂的说明签（ADR-0049，样图 F 的小一号）：类别 · 牌堆里共几张 / 牌名 / 一句效果。
+     * 签子横向跟着那张牌走、夹在板里；尖角指着那张的牌底中点（转也是绕它转的，所以它不跟着歪）。
+     * 高度按这一箱最长的那条留（{@link #tipLines}），与牌排一起在 {@link CardRow#provision} 里排定，不压倒计时。
+     */
+    private void drawTip(DrawContext context, Layout lay, String card) {
+        Text caption = provisionCaption(card);
+        SheetLayout l = sheet();
+        double k = l.k();
+        CardRow.Provision px = lay.px();
+        int cardCx = px.cardX(highlight) + px.w() / 2;
+        int bodyBox = tipBox(l);
+        int w = bodyBox + 2 * l.len(CardRow.TIP_PAD_X);
+        var sheetBox = l.sheet();
+        int x = Math.max(sheetBox.x() + l.len(16), Math.min(sheetBox.right() - l.len(16) - w, cardCx - w / 2));
+        int top = px.tipTop();
+        int h = px.tipH();
+        int bodyPx = l.len(CardRow.TIP_BODY_PX);
+        int maxLines = (int) Math.round((h - l.len(CardRow.tipHeight(0))) / (CardRow.TIP_BODY_LINE * k));
+        String effect = provisionEffect(card).getString();
+        int ink = GuiLanguage.Hud.ENAMEL_LINE;
+        pxBegin(context);
+        GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.ENAMEL, x, top, w, h, k);
+        int ptr = l.len(16);
+        GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.TIP_POINTER,
+                Math.max(x + ptr, Math.min(x + w - 2 * ptr, cardCx - ptr / 2)), top - l.len(CardRow.TIP_PTR), ptr, ptr, k);
+        int tx = x + l.len(CardRow.TIP_PAD_X);
+        int y = top + l.len(CardRow.TIP_PAD_T);
+        if (caption != null) {
+            int capPx = l.len(CardRow.TIP_CAP_PX);
+            GuiText.drawPx(context, caption.getString(), tx,
+                    y + (l.len(CardRow.TIP_CAP_LINE) - GuiText.linePxAt(capPx, false)) / 2,
+                    bodyBox, capPx, false, GuiLanguage.Hud.alpha(ink, 0.7f), GuiText.Align.LEFT, (int) Math.round(3 * k));
+        }
+        y += l.len(CardRow.TIP_CAP_LINE);
+        int namePx = l.len(CardRow.TIP_NAME_PX);
+        GuiText.drawPx(context, provisionName(card).getString(), tx,
+                y + (l.len(CardRow.TIP_NAME_LINE) - GuiText.linePxAt(namePx, true)) / 2,
+                bodyBox, namePx, true, ink, GuiText.Align.LEFT, (int) Math.round(3 * k));
+        y += l.len(CardRow.TIP_NAME_LINE + CardRow.TIP_BODY_GAP);
+        GuiText.paragraphPx(context, effect, tx, y, bodyBox, bodyPx, false, ink, Math.max(1, maxLines),
+                l.len(CardRow.TIP_BODY_LINE));
+        pxEnd(context);
     }
 
     /**
@@ -406,31 +492,18 @@ public final class ProvisionScreen extends GameScreen {
         if (index >= chain.size()) {
             return new float[]{width + cardW, b.stageTop() + b.stageH() / 2f, cardW};
         }
-        if (chain.isEmpty() || b.railH() == 0) {
+        if (chain.isEmpty()) {
             return new float[]{width / 2f, b.topY(), Math.max(8, cardW / 4f)};
         }
-        int cell = railCell(chain.size());
-        int left = (width - chain.size() * cell) / 2;
-        float cx = left + index * cell + cell / 2f;
-        int full = b.avatar();
-        if (full <= 0) {
-            return new float[]{cx, b.railY() + textH() / 2f, Math.max(8, cell / 3f)};
-        }
-        int m = GuiMaterial.ringMargin(full);
-        int d = Math.max(1, Math.min(full, cell - 2 * m - 2));
-        return new float[]{cx, b.railY() + m + full / 2f, d};
+        var t = sheet().seatToken(index, chain.size());
+        float s = guiScale();
+        return new float[]{t.centerX() / s, t.centerY() / s, t.w() / s};
     }
 
-    /** 指针落在第几张上（一排或两排）。上边界把「抬」起来的那几像素算进去，与单排那一版同一条。 */
+    /** 指针落在第几张上。叠着时抽出来那张压在最上面，其余右边的压着左边的（{@link CardRow#indexAt}）。 */
     private int indexAt(int mouseX, int mouseY, Layout l) {
-        for (int i = 0; i < data.offer().size(); i++) {
-            int x = l.cardX(i);
-            int top = l.cardTop(i);
-            if (mouseX >= x && mouseX < x + l.w() && mouseY >= top - GuiLanguage.LIFT_PX && mouseY <= top + l.h()) {
-                return i;
-            }
-        }
-        return -1;
+        return CardRow.indexAt(mouseX, mouseY, l.left(), l.cardTop(0), l.step(), l.w(), l.h(), data.offer().size(),
+                highlight, l.lift());
     }
 
     private void setHighlight(int index) {

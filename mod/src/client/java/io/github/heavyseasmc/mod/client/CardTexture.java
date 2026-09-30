@@ -54,7 +54,7 @@ public final class CardTexture extends AbstractTexture {
     /** 牌背三档：根目录 L0，{@code lod1/}、{@code lod2/}（字标原地放大 / 只剩圆章）。 */
     private static final String[] BACK_TIER_DIRS = {BACK_DIR, BACK_DIR + "/lod1", BACK_DIR + "/lod2"};
     /** 进服时预载的目录：拼牌要用的全部分层素材，外加座位轨那八枚头像（口渴排也用它）。 */
-    private static final String[] PRELOAD_DIRS = {"textures/gui/cards", "textures/gui/portrait"};
+    private static final String[] PRELOAD_DIRS = {"textures/gui/cards", "textures/gui/portrait", "textures/gui/hud"};
 
     /** 已经换成本类载入的标识。只在渲染线程上碰。 */
     private static final Set<Identifier> REGISTERED = new HashSet<>();
@@ -73,13 +73,30 @@ public final class CardTexture extends AbstractTexture {
         try (InputStream in = resource.getInputStream()) {
             base = NativeImage.read(in);
         }
-        NativeImage[] levels = MipmapHelper.getMipmapLevelsImages(new NativeImage[]{base}, MIP_LEVELS);
-        TextureUtil.prepareImage(getGlId(), MIP_LEVELS, base.getWidth(), base.getHeight());
-        for (int level = 0; level <= MIP_LEVELS; level++) {
+        int mips = mipLevels(base.getWidth(), base.getHeight(), MIP_LEVELS);
+        NativeImage[] levels = MipmapHelper.getMipmapLevelsImages(new NativeImage[]{base}, mips);
+        TextureUtil.prepareImage(getGlId(), mips, base.getWidth(), base.getHeight());
+        for (int level = 0; level <= mips; level++) {
             NativeImage image = levels[level];
             // blur + mipmap = GL_LINEAR_MIPMAP_LINEAR；clamp 让卡边不去采对边的颜色。传完即释放。
             image.upload(level, 0, 0, 0, 0, image.getWidth(), image.getHeight(), true, true, true, true);
         }
+    }
+
+    /**
+     * 这张图最多缩几级：短边每缩一级减半，缩到 1 像素为止，再多一级就是 0×0。
+     *
+     * <p>❗2026-09-30 实拍：D1 的叉（13×13）与波纹（13 高）按固定 4 级缩，第 4 级是 0×0，
+     * {@code NativeImage} 当场抛「Invalid texture size: 0x0」—— 进服预载中途断掉，画到那一座时渲染线程再抛一次。
+     * 此前最小的件恰好都 ≥ 16，固定 4 级一直没出事。
+     */
+    static int mipLevels(int w, int h, int max) {
+        int levels = 0;
+        int side = Math.min(w, h);
+        while (levels < max && (side >> (levels + 1)) >= 1) {
+            levels++;
+        }
+        return levels;
     }
 
     // ---------------------------------------------------------------- 画一张牌
@@ -160,6 +177,90 @@ public final class CardTexture extends AbstractTexture {
                     .filter(id -> id.getNamespace().equals(HeavySeasMod.MOD_ID))
                     .forEach(CardTexture::ensure);
         }
+    }
+
+    // ---------------------------------------------------------------- 主画面 HUD（物理像素）
+
+    /** 天候卡边框层与画层的贴图尺寸（管线按 840×600 烘，{@code checkCardTextures} 守着）。 */
+    private static final int WEATHER_TEX_W = 840;
+    private static final int WEATHER_TEX_H = 600;
+    /** 逐行裁圆时把纹理坐标放大这么多倍再取整：一行只有一个像素高，对应的纹素是小数。 */
+    private static final int SUBTEXEL = 64;
+
+    /**
+     * 天候舷窗里那一小块画（样张 b-1 的 {@code .medal}）：整张天候卡（边框层 + 画层，不带字）按
+     * {@code background-size: 210% auto; background-position: 38% 47%} 取景，裁成直径 {@code d} 的圆。
+     *
+     * <p>在物理像素里逐行画：每一行一条横带，宽度是圆在这一行的弦长。圈外那一圈与内晕是装饰件
+     * {@code MEDAL}，由调用方随后盖上 —— 它把这里的边缘盖住，所以这里不做抗锯齿，只把圆放大半个像素。
+     */
+    static void drawWeatherDisc(DrawContext context, String weatherId, int x, int y, int d) {
+        if (weatherId.isEmpty() || d <= 0) {
+            return;
+        }
+        Identifier frame = ensure(Identifier.of(HeavySeasMod.MOD_ID, "textures/gui/cards/frame/weather/l0.png"));
+        Identifier art = ensure(Identifier.of(HeavySeasMod.MOD_ID, "textures/gui/cards/art/weather/" + weatherId + ".png"));
+        double imgW = 2.1 * d;
+        double imgH = imgW * WEATHER_TEX_H / WEATHER_TEX_W;
+        double offX = (d - imgW) * 0.38;
+        double offY = (d - imgH) * 0.47;
+        int tw = WEATHER_TEX_W * SUBTEXEL;
+        int th = WEATHER_TEX_H * SUBTEXEL;
+        double r = d / 2.0 + 0.5;
+        int[][] chords = new int[d][];
+        for (int row = 0; row < d; row++) {
+            double dy = row + 0.5 - d / 2.0;
+            if (Math.abs(dy) >= r) {
+                continue;
+            }
+            double hw = Math.sqrt(r * r - dy * dy);
+            int x0 = Math.max(0, (int) Math.round(d / 2.0 - hw));
+            int x1 = Math.min(d, (int) Math.round(d / 2.0 + hw));
+            if (x1 > x0) {
+                chords[row] = new int[]{x0, x1};
+            }
+        }
+        // 先把纸铺满，再画两层：❗fill 每画一次就把它那一层的混合收掉（关掉），夹在两层贴图中间的话，
+        //   后面那层画层就不混合、半透明的海天直接画成实色（2026-09-30 实拍：舷窗里一块块墨绿）。
+        for (int row = 0; row < d; row++) {
+            if (chords[row] != null) {
+                context.fill(x + chords[row][0], y + row, x + chords[row][1], y + row + 1, GuiLanguage.CARD_PAPER);
+            }
+        }
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+        for (int row = 0; row < d; row++) {
+            if (chords[row] == null) {
+                continue;
+            }
+            int x0 = chords[row][0];
+            int x1 = chords[row][1];
+            float u = (float) ((x0 - offX) / imgW * tw);
+            float v = (float) ((row - offY) / imgH * th);
+            int rw = (int) Math.round((x1 - x0) / imgW * tw);
+            int rh = (int) Math.round(1 / imgH * th);
+            context.drawTexture(frame, x + x0, y + row, x1 - x0, 1, u, v, rw, rh, tw, th);
+            context.drawTexture(art, x + x0, y + row, x1 - x0, 1, u, v, rw, rh, tw, th);
+        }
+    }
+
+    /**
+     * 展开时那张天候卡，在物理像素里画（主画面 HUD 的矩阵已经缩到 1 / 界面尺寸）。
+     * 档位按物理像素直接挑；合成还没好时走同一段画法，字按 1 倍排 —— 坐标系已经是物理像素，不能再缩一次。
+     */
+    static void drawWeatherPx(DrawContext context, String weatherId, int x, int y, int w, int h) {
+        CardFace face = CardFaces.weather(weatherId, Catalog.weatherGlyph(weatherId));
+        CardLayout layout = CardPainter.layout();
+        String tier = layout.tierFor(face.kind(), w, CardNameFit.titleUnits(face.kind()));
+        CardLayout.Shape shape = layout.shapeOf(face.kind());
+        Identifier composed = CardComposite.of(face, tier, shape.texW(), shape.texH());
+        if (composed != null) {
+            com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+            com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+            context.drawTexture(composed, x, y, w, h, 0f, 0f, 1, 1, 1, 1);
+            return;
+        }
+        CardPainter.paint(context, face, tier, x, y, w, h, 1);
     }
 
     /** 别的 GUI 贴图（材质 · 牌面的分层素材）也按这一套载入：多级纹理 + 线性过滤，缩放才平滑。 */
