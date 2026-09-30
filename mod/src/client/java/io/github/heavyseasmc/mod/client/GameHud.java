@@ -598,35 +598,23 @@ public final class GameHud {
         }
         long now = System.currentTimeMillis();
         SidebarReveal.observe(view.notifications(), now);
-        // 计分那一面不自己滑出来：它会盖住标题右头几秒（用户 2026-09-30 判「要例外」，验收清单第 3 条）。钉住照旧。
-        if (client.currentScreen instanceof ScoreScreen && !SidebarReveal.pinned()) {
+        // 纸板开着时<b>一律不自己滑出来</b>：它会压住纸板右上角与座位轨末尾那两座（用户 2026-10-01 定，ADR-0050 §5 ——
+        // 把 2026-09-30 计分面板那一条例外推广到每一面）。播报照数（observe 在上面，未读数挂在主画面的日志页签上，
+        // 纸板一收就看得见）；按 L 钉住照旧给整列。原先自己滑出来的那一支（最新两条、自动收回）整支删掉，
+        // 不留开关 —— 从结构上不可能再压上来。
+        if (!SidebarReveal.pinned()) {
             return;
         }
-        float open = SidebarReveal.openness(now);
-        if (open <= 0f) {
-            return;                          // 收着的时候一个像素都不画 —— 第一刀把这块屏幕让给了牌
-        }
-        // ❗**盖在舞台上**，不占版面：舞台一个像素都不动，否则每来一条播报整屏就要重排一次（§7.13）。
-        // 2026-09-30 起与主画面展开那一列同一个画法（样张 b-2 的日志：搪瓷 · 栏头第几天 · 左列类别 · 自动收回的短横）：
-        // 自己滑出来那一下**只给「刚刚发生了什么」**，最新的两条、不带天候卡；按 L 钉住才给整列（天候卡 · 说明签 · 日志）。
-        // ❗此前这里取的是 {@code subList(0, 2)} —— 服务端把新的接在末尾，那是**最旧**的两条（实拍：行动一面滑出来的是开局那几句「第 N 座」）。
+        // ❗**盖在舞台上**，不占版面：舞台一个像素都不动，否则每钉一次整屏就要重排一次（§7.13）。
+        // 与主画面展开那一列同一个画法（样张 b-2：天候卡 · 说明签 · 日志）。
         int scale = guiScale(client);
         HudLayout layout = HudLayout.of(client.getWindow().getFramebufferWidth(), client.getWindow().getFramebufferHeight(), scale);
-        int slide = Math.round((1f - open) * (layout.len(HudLayout.DRAWER_W + HudLayout.DOCK_RIGHT) + layout.len(20)));
         MatrixStack matrices = context.getMatrices();
         matrices.push();
         matrices.scale(1f / scale, 1f / scale, 1f);
-        matrices.translate(slide, 0, 0);
-        if (SidebarReveal.pinned()) {
-            drawDrawer(context, layout, view, now, scale, LOG_ENTRIES);
-        } else {
-            drawLog(context, layout, view, now, HudLayout.DOCK_Y - HudLayout.DRAWER_GAP, scale, REVEAL_LINES);
-        }
+        drawDrawer(context, layout, view, now, scale, LOG_ENTRIES);
         matrices.pop();
     }
-
-    /** 自己滑出来时最多给几条。再多就成了「整本日志盖住牌」，那是钉住才该发生的事。 */
-    private static final int REVEAL_LINES = 2;
 
     /** GameScreen 与实际绘制共用这一份几何；两边各算一遍仍会得到完全相同的边界。 */
     static NotificationSidebarLayout sidebarLayout(int screenWidth, HudView view) {

@@ -381,7 +381,9 @@ public final class SeasCommand {
     /**
      * 替身自动推进的开关（ADR-0019）。不带参数时只报当前值。
      *
-     * <p>对局中途切换时，从下一次「轮到谁」起生效：已经排下的那一步执行前会自己再看一眼开关。
+     * <p>对局中途切换时：关掉从下一步起生效（已经排下的那一步执行前会自己再看一眼开关）；
+     * 打开时，行动阶段里眼下停着的那一位替身当场补排上（QA HS-RUN-001：原先要等 60 秒超时或手动 pass，
+     * {@link GameFlow#resumeStandIn}）。
      * 那一行日志是 {@code playthrough-check.sh} 分开两局的界线，别改措辞。
      */
     private static int dummyAuto(CommandContext<ServerCommandSource> context, Boolean on) {
@@ -393,6 +395,9 @@ public final class SeasCommand {
         if (on != null) {
             component.setDummyAutoplay(on);
             LOGGER.info("替身自动推进：{}", on ? "开" : "关");
+            if (on && sea != null) {
+                GameFlow.resumeStandIn(sea, component);
+            }
         }
         boolean now = component.dummyAutoplay();
         context.getSource().sendFeedback(() -> Text.translatable("heavyseas.command.autoplay",
@@ -404,7 +409,12 @@ public final class SeasCommand {
     private static int status(CommandContext<ServerCommandSource> context) {
         GameComponent component = GameComponents.of(gameWorld(context));
         if (component.session().isEmpty()) {
-            int interrupted = component.interruptedTurn();
+            // ❗没有对局时 gameWorld() 退回执行者所在的世界（控制台是主世界），而「上一局中断在第几回合」
+            //   记在承载对局的雾海那个维度的组件里 —— 只读这一份，重启后永远是「没有对局」（QA HS-RUN-002）。
+            //   与 dummyAuto 那一条同一个坑：两局之间要问雾海，不问 gameWorld()。
+            ServerWorld sea = MistSea.world(context.getSource().getServer());
+            int interrupted = Math.max(component.interruptedTurn(),
+                    sea == null ? 0 : GameComponents.of(sea).interruptedTurn());
             context.getSource().sendFeedback(() -> interrupted > 0
                     ? Text.translatable("heavyseas.command.interrupted", interrupted)
                     : Text.translatable("heavyseas.command.no_game"), false);

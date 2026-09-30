@@ -10,18 +10,26 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/** A card and its recipient are confirmed together. */
+/**
+ * 一张牌连同收下它的人一起定：赠送给谁 · 落海那一窗把救生物资打给谁。
+ *
+ * <p>头像版（ADR-0050，用户 2026-10-01 看样图定）：左边是这张牌，右边一排收得下它的人，一眼看全 ——
+ * 原先一次只看一个人（物资牌 + 那一位的角色牌），按 ← → 一个个翻，再点一枚「赠送」按钮。
+ * 落海那一窗每个选项可能是不同的牌，所以左边那张跟着选中的那一项走。
+ */
 public final class CardChoiceScreen extends GameScreen {
+    /** 头像直径 · 一格多宽（稿子像素，样图）：赠送一排最多七个人，比医疗箱小一号。 */
+    private static final double TOKEN = 80;
+    private static final double CELL = 112;
+
     private final String gift;
     private final boolean fromFront;
     private final int token;
     private List<TableView.Play> choices = List.of();
-    private int selected;
-    private Box confirmBox;
-    private Box previousBox;
-    private Box nextBox;
+    private final PortraitPick pick = new PortraitPick(this, TOKEN, CELL);
 
     public CardChoiceScreen(String gift, boolean fromFront) {
         this(gift, fromFront, 0);
@@ -68,7 +76,7 @@ public final class CardChoiceScreen extends GameScreen {
             choices = table.seats().stream().filter(s -> !s.removed() && !s.id().equals(view.character()))
                     .map(s -> new TableView.Play(gift, s.id())).toList();
         }
-        selected = Math.max(0, Math.min(selected, choices.size() - 1));
+        pick.focus(Math.max(0, Math.min(pick.focus(), choices.size() - 1)));
         if (choices.isEmpty()) {
             close();
         }
@@ -82,12 +90,12 @@ public final class CardChoiceScreen extends GameScreen {
         if (choices.isEmpty()) {
             return;
         }
-        TableView.Play choice = choices.get(selected);
-        int bottom = b.stageBottom() - buttonHeight() - lineStep() - HINT_GAP - BORDER_ROOM;
-        // 落海窗口：先说谁要落海。原先这一面只有「救生圈 · 目标 · 给 X · 打出」，屏幕上一个字都不说情境 ——
-        // 全局情绪最高的那一下被做成了一张普通表单（ADR-0045 §1.4 B4）。朱砂：紧迫 · 不可逆。
+        long now = System.currentTimeMillis();
+        long dt = frameDelta(now);
         int stageTop = b.stageTop();
         if (token > 0) {
+            // 落海窗口：先说谁要落海。原先这一面只有「救生圈 · 目标 · 给 X · 打出」，屏幕上一个字都不说情境 ——
+            // 全局情绪最高的那一下被做成了一张普通表单（ADR-0045 §1.4 B4）。朱砂：紧迫 · 不可逆。
             List<String> swimmers = GameComponents.of(client.world).tableView().swimmers();
             if (!swimmers.isEmpty()) {
                 net.minecraft.text.MutableText names = Text.empty();
@@ -99,38 +107,29 @@ public final class CardChoiceScreen extends GameScreen {
                 }
                 drawLine(context, Text.translatable("heavyseas.overboard.pending", names), width / 2, stageTop,
                         GuiLanguage.cinnabar());
-                stageTop += lineStep() + HINT_GAP;
             }
+        } else {
+            drawLine(context, Text.translatable("heavyseas.trade.ask", provisionName(gift)), width / 2, stageTop,
+                    GuiLanguage.ink());
         }
-        int arrowW = buttonWidth(Text.literal("←"));
-        int h = cardHeightFor(2, bottom - stageTop - liftRoom(),
-                width - 2 * (SIDE + arrowW + BTN_GAP));
-        int w = GuiLanguage.cardWidth(h);
-        int top = cardsTopIn(stageTop, bottom, h, liftRoom());
-        int left = (width - 2 * w - CARD_GAP) / 2;
-        CardTexture.drawProvision(context, choice.card(), left, top, w, h);
-        CardTexture.drawCharacter(context, choice.target(), left + w + CARD_GAP, top, w, h);
-        previousBox = new Box(SIDE, top + (h - buttonHeight()) / 2, arrowW, buttonHeight());
-        nextBox = new Box(width - SIDE - arrowW, previousBox.y(), arrowW, buttonHeight());
-        if (selected > 0) {
-            drawButton(context, previousBox, Text.literal("←"), false, GuiLanguage.ink(), 0);
+        List<PortraitPick.Person> people = new ArrayList<>();
+        for (TableView.Play p : choices) {
+            people.add(new PortraitPick.Person(p.target(), 0, 0));
         }
-        if (selected + 1 < choices.size()) {
-            drawButton(context, nextBox, Text.literal("→"), false, GuiLanguage.ink(), 0);
-        }
-        drawLine(context, Text.translatable("heavyseas.trade.recipient", nameOf(choice.target())),
-                width / 2, bottom + HINT_GAP, GuiLanguage.ink());
-        Text label = Text.translatable(token > 0 ? "heavyseas.keys.play" : "heavyseas.trade.give");
-        confirmBox = new Box((width - buttonWidth(label)) / 2,
-                bottom + HINT_GAP + lineStep(), buttonWidth(label), buttonHeight());
-        drawButton(context, confirmBox, label, true, GuiLanguage.verdigris(), 0);
+        var l = sheet();
+        double top0 = Math.max(l.railBottom() + CardRow.RAIL_CLEAR * l.k(),
+                (stageTop + lineStep() + HINT_GAP) * (double) guiScale());
+        String card = choices.get(pick.focus()).card();
+        pick.render(context, mouseX, mouseY, dt, top0, people,
+                (ctx, x, y, w, h) -> CardTexture.drawProvision(ctx, card, x, y, w, h));
         Countdown countdown = token > 0 ? new Countdown(GameComponents.of(client.world).tableView().deadline(),
-                OverboardPhase.CHOOSE_MILLIS, w) : null;
+                OverboardPhase.CHOOSE_MILLIS, 0) : null;
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
-                List.of(confirm("Enter"), keys("cancel", "Esc")), System.currentTimeMillis(), countdown);
+                List.of(confirm("Enter"), keys("cancel", "Esc")), now, countdown);
     }
 
     private void commit() {
+        int selected = pick.focus();
         if (selected < 0 || selected >= choices.size()) {
             return;
         }
@@ -143,15 +142,9 @@ public final class CardChoiceScreen extends GameScreen {
 
     @Override
     protected boolean leftClick(double x, double y) {
-        if (previousBox != null && selected > 0 && previousBox.contains((int) x, (int) y)) {
-            selected--;
-            return true;
-        }
-        if (nextBox != null && selected + 1 < choices.size() && nextBox.contains((int) x, (int) y)) {
-            selected++;
-            return true;
-        }
-        if (confirmBox != null && confirmBox.contains((int) x, (int) y)) {
+        int i = pick.indexAt(x, y, choices.size());
+        if (i >= 0) {
+            pick.focus(i);
             commit();
             return true;
         }
@@ -160,11 +153,10 @@ public final class CardChoiceScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT) {
-            selected = Math.max(0, Math.min(choices.size() - 1, selected + (key == GLFW.GLFW_KEY_RIGHT ? 1 : -1)));
+        if (pick.keyPressed(key, choices.size())) {
             return true;
         }
-        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+        if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_SPACE) {
             commit();
             return true;
         }

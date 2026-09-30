@@ -31,15 +31,31 @@ public record CardFace(String kind, String id, Title title, List<Badge> badges, 
      * 牌名：一个 lang 键，外加要填进 {@code %s} 的角色（按 {@code heavyseas.nav.name_sep} 连起来）。
      * 物资 · 角色 · 天候的 {@code names} 为空。
      */
-    public record Title(String key, List<String> names) {
+    public record Title(String key, List<String> names, Tone tone) {
+
+        /**
+         * 牌名的字色（ADR-0050）。物资 · 角色 · 天候 · 航海一律 {@code INK}；
+         * 行动一族照原来按钮上的语义色：会伤人的朱砂（ADR-0018 §7.3 朱砂只给紧迫与伤害），
+         * 「什么都不按会发生的那件」次墨。牌面永远是纸，所以三色都取牌面的色阶，与主题无关。
+         */
+        public enum Tone { INK, HARM, QUIET }
 
         public Title {
             Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(tone, "tone");
             names = List.copyOf(names);
+        }
+
+        public Title(String key, List<String> names) {
+            this(key, names, Tone.INK);
         }
 
         public static Title of(String key) {
             return new Title(key, List.of());
+        }
+
+        public static Title of(String key, Tone tone) {
+            return new Title(key, List.of(), tone);
         }
     }
 

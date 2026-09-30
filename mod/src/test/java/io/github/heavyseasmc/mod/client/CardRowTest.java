@@ -102,6 +102,16 @@ class CardRowTest {
     }
 
     @Test
+    @DisplayName("1280×720 · 说明签 1 行：补给箱的牌回到样图 F 的 144 宽（用户 2026-10-01：宁可牌大、「顿」小一点）")
+    void provisionIsTheMockWidthAtTheDesignSize() {
+        // ADR-0050 §3：ADR-0049 §8 第 1 条（136 宽 · 提 24）被用户推翻；腾地方的是「顿」往上弹的幅度，不是牌。
+        SheetLayout l = SheetLayout.of(1280, 720, 3);
+        CardRow.Provision p = CardRow.provision(l, 8, GuiLanguage.SNAP_PEAK_RISE * 3, GuiLanguage.SNAP_PEAK_SCALE - 1f, 1);
+        assertEquals(144, p.w(), "牌宽");
+        assertEquals(30.0, CardRow.PULL_LIFT, 1e-9, "抽出来提多少（样图 F）");
+    }
+
+    @Test
     @DisplayName("张数变了按「哪一张」滑：中间少了一张，后面那张从它原来的位置滑过去，不先跳一格")
     void slideFollowsTheCardNotTheIndex() {
         CardRow.Slide slide = new CardRow.Slide();

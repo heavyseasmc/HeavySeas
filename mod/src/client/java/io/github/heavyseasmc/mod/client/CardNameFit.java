@@ -47,7 +47,8 @@ final class CardNameFit {
     private static final Map<String, String> PREFIXES = Map.of(
             "heavyseas.provision.", "provision",
             "heavyseas.character.", "character",
-            "heavyseas.weather.", "weather");
+            "heavyseas.weather.", "weather",
+            "heavyseas.actioncard.", "action");
     /** 航海卡的牌名模板：{@code %s} 填落海的那一位。每个模板 × 每个角色名都拼一遍。 */
     private static final String NAV_TITLE = "heavyseas.nav.title.";
     /** 浮点容差：界线正好卡在 16.0 px 时，乘除回来是 15.9999 —— 取整会掉一级（2026-09-24 实测天候卡就这样红过）。 */
@@ -69,7 +70,7 @@ final class CardNameFit {
     /** 这种牌最多几枚角标 —— 牌名要给它们让位。取自拼牌那一处，不在这里另数。 */
     static int maxBadges(String kind) {
         return kind.equals("character") ? CardFaces.characterBadges(0, 0).size()
-                : kind.equals("weather") ? 0 : 1;
+                : kind.equals("weather") || kind.equals("action") ? 0 : 1;
     }
 
     static void reset() {

@@ -59,6 +59,21 @@ public final class CardFaces {
         return new CardFace("provision", id, CardFace.Title.of("heavyseas.provision." + id), badges, List.of());
     }
 
+    // ---------------------------------------------------------------- 行动 · 表态 · 站队（ADR-0050）
+
+    /**
+     * 选一件事的那几张牌：只有插画与牌名，没有角标（它们不是物资，没有体力或分数可印）。
+     * 牌名的字色照原来按钮上的：抢夺 · 战斗朱砂（会伤人），什么也不做 · 旁观次墨（什么都不按就是它）。
+     */
+    public static CardFace action(ActionCard card) {
+        CardFace.Title.Tone tone = switch (card) {
+            case STEAL, FIGHT -> CardFace.Title.Tone.HARM;
+            case PASS, WATCH -> CardFace.Title.Tone.QUIET;
+            default -> CardFace.Title.Tone.INK;
+        };
+        return new CardFace("action", card.id(), CardFace.Title.of(card.titleKey(), tone), List.of(), List.of());
+    }
+
     // ---------------------------------------------------------------- 角色
 
     /** 角色的两枚角标：左体力、右生存（L1 / L2 不画图标，靠位置认 —— ADR-0039 §7.3）。 */

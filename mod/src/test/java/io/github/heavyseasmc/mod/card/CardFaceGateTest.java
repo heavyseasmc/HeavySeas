@@ -53,7 +53,8 @@ class CardFaceGateTest {
     private static final Path ART = Path.of("src", "main", "resources", "assets", "heavyseas", "textures", "gui", "cards", "art");
     private static final Path DATA = Path.of("..", "data");
     /** 每种牌至少这么多张；少于它就是没读到，不是都分得开。 */
-    private static final Map<String, Integer> MIN_CARDS = Map.of("provision", 15, "character", 6, "weather", 8, "nav", 25);
+    private static final Map<String, Integer> MIN_CARDS = Map.of("provision", 15, "character", 6, "weather", 8, "nav", 25,
+            "action", 8);
 
     // ---------------------------------------------------------------- 判据本体
 
@@ -274,7 +275,7 @@ class CardFaceGateTest {
         return CardLayout.parse(new StringReader(text.replace(from, to)));
     }
 
-    /** 全部真牌：物资 · 角色 · 天候 · 航海，与客户端画牌走同一个 {@link CardFaces}。 */
+    /** 全部真牌：物资 · 角色 · 天候 · 航海 · 行动（ADR-0050），与客户端画牌走同一个 {@link CardFaces}。 */
     static List<CardFace> faces() {
         RosterData roster = RosterLoader.load(DATA.resolve("roster").resolve("default.json"));
         Path provPath = DATA.resolve("provisions").resolve("default.json");
@@ -290,6 +291,9 @@ class CardFaceGateTest {
         NavigationLoader.load(DATA.resolve("navigation").resolve("default.json"), roster.ids(),
                         ProvisionLoader.loadIds(provPath))
                 .forEach(card -> out.add(CardFaces.nav(NavCardView.of(card))));
+        for (ActionCard a : ActionCard.values()) {
+            out.add(CardFaces.action(a));
+        }
         return out;
     }
 

@@ -389,6 +389,36 @@ public final class GameFlow {
         });
     }
 
+    /**
+     * 中途打开替身自动推进时，把眼下停着的那一位替身补排上（QA 2026-09-25 HS-RUN-001）。
+     *
+     * <p>替身的「什么也不做」只在「轮到谁」那一刻排程（{@link #announceTurn}）。开关在那之后才打开，
+     * 就没人去推这一位 —— 要等 60 秒行动超时，或者有人手动 pass（QA 实测 200 tick 仍停在首位替身）。
+     * 只补行动阶段：别的阶段（补给箱 · 口渴 · 表态 · 舵手）各有自己的窗口与超时，
+     * 轮到下一位替身时照开关走，本来就停不住。
+     *
+     * @return 补排了一步没有（没有对局 · 不在行动阶段 · 轮到的是真人 · 正在划船，都不补）
+     */
+    public static boolean resumeStandIn(ServerWorld world, GameComponent component) {
+        Optional<Session> maybe = component.session();
+        if (maybe.isEmpty() || !component.dummyAutoplay()) {
+            return false;
+        }
+        Session session = maybe.get();
+        if (session.state().phase() != Phase.ACTION || session.rower().isPresent()) {
+            return false;
+        }
+        Optional<CharacterId> actor = session.nextActor();
+        if (actor.isEmpty() || !component.occupantOf(actor.get()).map(GameComponent.Occupant::isDummy).orElse(false)) {
+            return false;
+        }
+        CharacterId dummy = actor.get();
+        LOGGER.info("替身自动推进：开关刚打开，补排眼下这一位 {}", dummy.value());
+        schedule(component, 0L, "替身 " + dummy.value() + " 什么也不做（开关刚打开）",
+                () -> ActionPhase.autoPass(world, component, dummy));
+        return true;
+    }
+
     /** 把一步排到之后的 tick（ADR-0019）。见 {@link GameComponent.Step}。 */
     static void schedule(GameComponent component, long delayMs, String what, Runnable step) {
         component.schedule(System.currentTimeMillis() + delayMs, what, step);

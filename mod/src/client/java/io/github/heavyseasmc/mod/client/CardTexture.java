@@ -140,6 +140,12 @@ public final class CardTexture extends AbstractTexture {
         drawFace(context, CardFaces.character(characterId, Catalog.characterBadges(characterId)), x, y, w, h);
     }
 
+    /** 行动 · 表态 · 站队那几张（ADR-0050）：与物资同一副边框，插画是线描图标，牌名从 lang 现排。 */
+    public static void drawAction(DrawContext context, io.github.heavyseasmc.mod.card.ActionCard card,
+                                  int x, int y, int w, int h) {
+        drawFace(context, CardFaces.action(card), x, y, w, h);
+    }
+
     /** 天候卡是横版 7:5；调用方负责按该比例排版。信息带里的效果图示取自目录（ADR-0040），没到就空着。 */
     public static void drawWeather(DrawContext context, String weatherId, int x, int y, int w, int h) {
         drawFace(context, CardFaces.weather(weatherId, Catalog.weatherGlyph(weatherId)), x, y, w, h);

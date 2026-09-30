@@ -110,8 +110,13 @@ final class CardPainter {
         // 行框高是字号的 1.25 倍（GuiText 的度量）：在标题带里垂直居中
         float mid = (t.top() + t.bottom()) / 2f;
         int top = y + Math.round((mid - size * 1.25f / 2f) * fy);
+        int ink = switch (title.tone()) {
+            case HARM -> GuiLanguage.CARD_HARM;
+            case QUIET -> GuiLanguage.CARD_QUIET;
+            case INK -> GuiLanguage.CARD_INK;
+        };
         GuiText.draw(context, resolve(title).getString(), x + Math.round(t.x() * fx), top, boxW, guiSize, true,
-                GuiLanguage.CARD_INK, GuiText.Align.LEFT, 1, false, textScale <= 0, textScale);
+                ink, GuiText.Align.LEFT, 1, false, textScale <= 0, textScale);
     }
 
     /** 牌名翻成当前语言。航海卡要把点名的角色按 {@code heavyseas.nav.name_sep} 连起来填进 {@code %s}。 */

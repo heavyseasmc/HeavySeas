@@ -23,7 +23,11 @@ character.<id>.svg    jeweler · collector · captain · mate · hostess · sail
 weather.<id>.svg      becalmed · clear_skies · dense_fog · gale · huge_wave
                       rain · scorching_heat · storm · sunday · sweltering
 nav.<id>.svg          nav_00 … nav_30
+action.<id>.svg       row · swap · steal · use · pass · agree · fight · attack · defend · watch
 ```
+
+行动 · 表态 · 站队那十张（`action.*`）不是物资：不在任何牌堆里、没有张数，只是把「选一件事」的按钮画成牌。
+id 与模组里的 `ActionCard` 常量（小写）一一对应，牌名在 lang 的 `heavyseas.actioncard.<id>`；插画是线描图标。
 
 航海牌没有名字，只有编号 —— 它与 `data/navigation` 共用这一套 id，`<title>` 末段印的就是 id。
 牌面上那句「医生落海」是**由数据现算的摘要**，不是给它起的专名：起了名就有了第二个真相源。

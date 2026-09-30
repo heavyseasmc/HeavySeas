@@ -26,8 +26,13 @@ final class CardRow {
 
     /** 抽出来往左转几度（上端往左歪；以牌底中点为轴）。 */
     static final float PULL_DEG = 6f;
-    /** 抽出来往上提多少（稿子像素）。样张 .lifted 是 16；要看得出离开了那一叠。 */
-    static final double PULL_LIFT = 24;
+    /**
+     * 抽出来往上提多少（稿子像素）。样张 .lifted 是 16；要看得出离开了那一叠。
+     *
+     * <p>ADR-0049 第一版是 24（给「顿」留地方）；用户 2026-10-01 看过游戏里的 136 宽之后定「宁可牌大、『顿』小一点」，
+     * 回到样图 F 的 30，腾地方的是 {@link GuiLanguage} 里「顿」往上弹的幅度（ADR-0050 §3）。
+     */
+    static final double PULL_LIFT = 30;
     /** 没选中的压到几成亮。 */
     static final float DIM = 0.86f;
     /** 叠着时左边缘那道细影多宽（稿子像素）、多深。 */

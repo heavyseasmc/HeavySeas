@@ -535,9 +535,11 @@ def checkCardTextures = tasks.register('checkCardTextures') {
     // 图标清单取自**用它的那一侧**（拼牌的代码），不是烘它的管线：管线漏烘一枚，这里才看得见。
     def facesSrc = file('src/main/java/io/github/heavyseasmc/mod/card/CardFaces.java')
     def painterSrc = file('src/client/java/io/github/heavyseasmc/mod/client/CardPainter.java')
+    // 行动 · 表态 · 站队（ADR-0050）不在 data 里：id 取自用它的那一侧（枚举常量名小写），理由同图标。
+    def actionSrc = file('src/main/java/io/github/heavyseasmc/mod/card/ActionCard.java')
     // 做成任务属性而不是局部变量：红测要能把它指向一份造坏的目录树，而不去改被跟踪的贴图。
     ext.cardsDir = file('src/main/resources/assets/heavyseas/textures/gui/cards')
-    inputs.files(dataFile, rosterFile, weatherFile, navFile, layoutFile, facesSrc, painterSrc)
+    inputs.files(dataFile, rosterFile, weatherFile, navFile, layoutFile, facesSrc, painterSrc, actionSrc)
     inputs.dir(ext.cardsDir).optional()
     doLast {
         def slurper = new groovy.json.JsonSlurper()
@@ -547,6 +549,9 @@ def checkCardTextures = tasks.register('checkCardTextures') {
                 character: ids(rosterFile, 'characters'),
                 weather  : ids(weatherFile, 'cards'),
                 nav      : ids(navFile, 'cards'),
+                // ❗不锚行首：枚举常量一行写好几个（ROW(…), SWAP(…), STEAL(…)），第一版按 ^ 取只认出每行第一个 ——
+                //   十张里查了三张，照样打印「核对通过」（2026-10-01 红测删 steal.png 时才照出来）
+                action   : (actionSrc.getText('UTF-8') =~ /\b([A-Z]+)\(Group\.[A-Z]+\)/).collect { it[1].toLowerCase() },
         ]
         cards.each { kind, list ->
             if (list.isEmpty()) {
@@ -635,7 +640,7 @@ def checkCardTextures = tasks.register('checkCardTextures') {
             throw new GradleException((['GUI 卡面贴图核对失败：']
                     + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
-        logger.lifecycle("GUI 贴图核对通过：插画 物资 ${cards.provision.size()} · 角色 ${cards.character.size()} · 天候 ${cards.weather.size()} · 航海 ${cards.nav.size()}（透明底）· 边框 ${cards.size()} 种 × ${tiers.size()} 档 · 牌背 ${tiers.size()} 档 · 图标 ${icons.size()} 枚，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
+        logger.lifecycle("GUI 贴图核对通过：插画 物资 ${cards.provision.size()} · 角色 ${cards.character.size()} · 天候 ${cards.weather.size()} · 航海 ${cards.nav.size()} · 行动 ${cards.action.size()}（透明底）· 边框 ${cards.size()} 种 × ${tiers.size()} 档 · 牌背 ${tiers.size()} 档 · 图标 ${icons.size()} 枚，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
     }
 }
 

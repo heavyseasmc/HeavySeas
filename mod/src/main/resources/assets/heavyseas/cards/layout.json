@@ -60,6 +60,7 @@
   "kinds": {
     "provision": {"shape": "portrait"},
     "character": {"shape": "portrait"},
+    "action": {"shape": "portrait", "_comment": "行动 · 表态 · 站队十张（ADR-0050）：与物资同一副边框，只有插画与牌名"},
     "weather": {
       "shape": "landscape",
       "_effect": "信息带（ADR-0040）：与航海卡的 roll 是同一种槽位，只是装的是效果图示。L2 没有底栏，带往下长、上沿不动。",

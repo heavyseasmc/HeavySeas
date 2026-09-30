@@ -40,7 +40,8 @@ class GuiGlyphCoverageTest {
     private static final Pattern LITERAL = Pattern.compile("\"((?:[^\"\\\\\\n]|\\\\.)*)\"");
     /** 牌名那几族 lang 键：它们在牌面上用粗体排。 */
     private static final Pattern CARD_NAME_KEY = Pattern.compile(
-            "heavyseas\\.(provision\\.[a-z0-9_]+|character\\.[a-z0-9_]+|weather\\.[a-z0-9_]+|nav\\.title\\..+|nav\\.name_sep)");
+            "heavyseas\\.(provision\\.[a-z0-9_]+|character\\.[a-z0-9_]+|weather\\.[a-z0-9_]+|nav\\.title\\..+|nav\\.name_sep"
+                    + "|actioncard\\.[a-z0-9_]+)");
 
     // ---------------------------------------------------------------- 判据本体
 

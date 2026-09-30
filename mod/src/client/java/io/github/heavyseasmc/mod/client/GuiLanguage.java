@@ -162,6 +162,10 @@ public final class GuiLanguage {
 
     /** 墨 {@code #241E1A}：印在纸色牌面上的字（ADR-0018 §7.3）。与主题无关 —— 牌面永远是纸。 */
     public static final int CARD_INK = 0xFF241E1A;
+    /** 牌面上的朱砂 {@code #A8402C}（样张 {@code --card-stamp}，牌底印章那一色）：行动一族里会伤人的那几张的牌名（ADR-0050）。 */
+    public static final int CARD_HARM = 0xFFA8402C;
+    /** 牌面上的次墨 {@code #55483B}（样张 {@code --card-ink2}）：「什么都不按就是它」那几张的牌名（ADR-0050）。 */
+    public static final int CARD_QUIET = 0xFF55483B;
     /** 纸 {@code #EADFC6}：牌面的底（样张 {@code --card-paper}）。舷窗里那一小块天候画、头像的底都是它。 */
     public static final int CARD_PAPER = 0xFFEADFC6;
 
@@ -606,10 +610,18 @@ public final class GuiLanguage {
     private static final float SNAP_X2 = .4f;
     private static final float SNAP_Y2 = 1.3f;
 
-    /** 关键帧：进度 → 上抬像素（负号向上）。与交互稿逐帧相同。 */
+    /**
+     * 关键帧：进度 → 上抬（GUI 单位，负号向上）· 缩放。
+     *
+     * <p>交互稿原是上抬 {@code -6 / 2}、缩放 {@code 1.07 / .98}。用户 2026-10-01：补给箱的牌「宁可牌大、『顿』小一点」
+     * （ADR-0050 §3）—— 上抬收到原来的 2/9，缩放收到 1.04；形状（先微沉 · 弹起放大 · 过冲 · 收住）不变，
+     * 「缩放保留」是用户 2026-09-30 判过的。这两个数是 1280×720 下补给箱恰好回到 144 宽的那一档（CardRowTest 钉着）。
+     * 版面按 {@link #SNAP_PEAK_RISE} / {@link #SNAP_PEAK_SCALE} 现算留空，
+     * snap_test 的阈值也从这两行现读，所以改这里不必去别处抄数。
+     */
     private static final float[] SNAP_STOPS = {0f, .45f, .70f, 1f};
-    private static final float[] SNAP_RISE = {0f, -6f, 2f, 0f};
-    private static final float[] SNAP_SCALE = {1f, 1.07f, .98f, 1f};
+    private static final float[] SNAP_RISE = {0f, -1.33f, .44f, 0f};
+    private static final float[] SNAP_SCALE = {1f, 1.04f, .99f, 1f};
 
     /** 「顿」峰值时最多抬起多少（GUI 单位，正数）。 */
     public static final float SNAP_PEAK_RISE;
