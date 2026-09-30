@@ -215,7 +215,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         // 航海这一段的公开部分（决策 ⑭）：划船堆几张、舵手是谁、挑牌还剩多久、执行的是哪一张。
         // ❗划船堆里是什么牌不在这里 —— 那一项下面只写给舵手。
         buf.writeVarInt(session.table().rowStack().size());
-        buf.writeString(g.helmsman().map(CharacterId::value).orElse(""));
+        buf.writeString(helmSeat(g).map(CharacterId::value).orElse(""));
         buf.writeVarLong(helmDeadline);
         Optional<NavigationCard> revealed = session.navigatedThisTurn();
         buf.writeBoolean(revealed.isPresent());
@@ -359,7 +359,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         }
         // 划船堆的牌只写给舵手，而且只在挑牌窗口里 —— 决策 ⑭：界面不能揭穿舵手，结算后只公开被执行的那一张。
         boolean picking = helmDeadline > 0 && g.phase() == Phase.NAVIGATION
-                && g.helmsman().map(id::equals).orElse(false);
+                && helmSeat(g).map(id::equals).orElse(false);
         List<NavigationCard> offer = picking ? session.table().rowStack() : List.of();
         buf.writeVarInt(offer.size());
         for (NavigationCard card : offer) {
@@ -698,6 +698,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      */
     private long helmDeadline;
     private int helmHighlight;
+    /**
+     * 开窗那一刻的舵手（ADR-0051 B5，用户 2026-10-01 拍板）：窗口开了就不换人。
+     *
+     * <p>舵手按「最靠船尾的清醒在线者」现算，协作者 2adbbe4 那一版在窗口里有人掉线 / 重连时换人并重开 12 秒 ——
+     * 划船堆的暗牌于是给到两个人看（规则 §12 舵手全知），反复断连还能让计时一直重开，指南针多抽的那张也算错人。
+     * 窗口里认这一位：谁能看到划船堆、谁的挑牌包算数、超时替谁挑。他掉线了就等超时按默认挑。
+     */
+    private CharacterId helmOwner;
 
     public long helmDeadline() {
         return helmDeadline;
@@ -705,6 +713,16 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void setHelmDeadline(long millis) {
         this.helmDeadline = millis;
+    }
+
+    /** 开窗时记下舵手；窗口开着时 {@link #helmSeat} 认它。 */
+    public void setHelmOwner(CharacterId owner) {
+        this.helmOwner = owner;
+    }
+
+    /** 窗口开着时是开窗那一刻的舵手；没开窗时按现在的局面算（公开信息：谁是舵手）。 */
+    public Optional<CharacterId> helmSeat(io.github.heavyseasmc.engine.state.GameState g) {
+        return helmDeadline > 0 && helmOwner != null ? Optional.of(helmOwner) : g.helmsman();
     }
 
     /** 舵手最后一次上报的高亮下标。超时时认它（用户 2026-09-15 定，与补给箱同一条规则）。 */
@@ -719,6 +737,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     public void clearHelm() {
         this.helmDeadline = 0L;
         this.helmHighlight = 0;
+        this.helmOwner = null;
     }
 
     /**

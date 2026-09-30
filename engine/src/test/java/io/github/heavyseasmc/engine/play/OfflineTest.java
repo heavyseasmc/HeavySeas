@@ -82,20 +82,31 @@ class OfflineTest {
         s.requireNoProvisionLost("offline draw");
     }
 
+    /**
+     * 持箱人中途掉线：箱子照旧在他手上，由补给箱的超时替他留一张（模组那一侧，决策 ⑧「局面不能卡住」）；
+     * 牌堆只减不增（规则基线 §8.1「抽完即止，不洗回」）。
+     *
+     * <p>ADR-0051（用户 2026-10-01 拍板，O36 B1）取代协作者 2adbbe4 那一版：跳过他、传到链尾把余牌放回牌堆底 ——
+     * 前面看过牌的人于是知道牌堆底是什么，牌堆本已空时还会让下一回合的物资阶段凭空复活。
+     * 开局时就掉线的人不进传递链、不拿新牌（{@link #offlineSeatsDoNotDrawProvisions}），那一条不变。
+     */
     @Test
-    void disconnectDuringProvisionPassesWithoutTakingAndReturnsRemainder() {
+    void disconnectDuringProvisionKeepsTheCrateAndPileOnlyShrinks() {
         Session s = session();
-        int total = s.table().provisionsLeft();
         s.beginProvision();
+        int left = s.table().provisionsLeft();
         s.setOffline(FIRST, true);
+        assertEquals(FIRST, s.provisionHolder().orElseThrow(), "掉线不换持箱人：等超时替他选");
+        s.provisionKeep(s.provisionOffer().getFirst());       // 模组那一侧的超时替他留第一张
+        assertEquals(1, s.state().stateOf(FIRST).hand().size());
         assertEquals(SECOND, s.provisionHolder().orElseThrow());
         s.provisionKeep(s.provisionOffer().getFirst());
         s.setOffline(LAST, true);
+        assertEquals(LAST, s.provisionHolder().orElseThrow(), "传到掉线的那一位也照旧停在他手上");
+        s.provisionKeep(s.provisionOffer().getFirst());
         assertFalse(s.provisionInProgress());
-        assertTrue(s.provisionOffer().isEmpty());
-        assertTrue(s.state().stateOf(FIRST).hand().isEmpty());
-        assertEquals(total - 1, s.table().provisionsLeft());
-        s.requireNoProvisionLost("offline pass");
+        assertEquals(left, s.table().provisionsLeft(), "牌堆只减不增：一张都没放回去");
+        s.requireNoProvisionLost("offline holder");
     }
 
     @Test

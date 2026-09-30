@@ -98,6 +98,7 @@ public final class NavigationPhase {
             return;
         }
         component.setHelmDeadline(System.currentTimeMillis() + PICK_MILLIS);
+        component.setHelmOwner(helm);         // 窗口开了就不换人（ADR-0051 B5）：之后掉线 / 重连都认这一位
         component.setHelmHighlight(0);        // 高亮一进界面就在第一张：它是「你的默认答案」
         LOGGER.info("舵手挑牌：{}（{}）· 划船堆 {} 张 · {} 秒", helm.value(), who.isDummy() ? "替身" : "真人",
                 stack, PICK_MILLIS / 1000);
@@ -115,7 +116,7 @@ public final class NavigationPhase {
         if (session.state().phase() != Phase.NAVIGATION) {
             return;
         }
-        Optional<CharacterId> helm = session.state().helmsman();
+        Optional<CharacterId> helm = component.helmSeat(session.state());
         Optional<CharacterId> seat = component.seatOf(player.getUuid());
         // ❗只有舵手说了算。不校验的话，任何人都能替舵手挑牌 —— 那是全船最强的权力位。
         if (helm.isEmpty() || seat.isEmpty() || !seat.get().equals(helm.get())) {
@@ -133,7 +134,7 @@ public final class NavigationPhase {
 
     /** 指令那条路（dev）：{@code /seas navigate <牌>} 在窗口里提前定。窗口开没开由指令层先查。 */
     public static void pickByCommand(ServerWorld world, GameComponent component, int index) {
-        CharacterId helm = component.requireSession().state().helmsman().orElseThrow();
+        CharacterId helm = component.helmSeat(component.requireSession().state()).orElseThrow();
         LOGGER.info("舵手（指令）：{} 挑了第 {} 张", helm.value(), index + 1);
         resolve(world, component, index);
     }
@@ -149,7 +150,8 @@ public final class NavigationPhase {
             Session session = component.requireSession();
             // 超时认当前高亮（不是随机）；舵手一次都没上报过（替身、离线）时就是第一张。
             int index = Math.min(component.helmHighlight(), Math.max(0, session.table().rowStack().size() - 1));
-            CharacterId helm = session.state().helmsman().orElseThrow();
+            // 窗口开着时认开窗那一刻的舵手（ADR-0051 B5）：他掉线了，这里就是「替掉线的舵手按默认挑」
+            CharacterId helm = component.helmSeat(session.state()).orElseThrow();
             LOGGER.info("舵手超时：替 {} 挑了第 {} 张（当前高亮）", helm.value(), index + 1);
             // ❗先告诉舵手「这张是替你挑的」，再结算。顺序不能反：结算那一刻就推投影，投影里没了划船堆，
             //   客户端就要关界面了 —— 通知落在它后面，就没有界面来播这一下「顿」（与补给箱同一个坑）。

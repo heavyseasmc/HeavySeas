@@ -106,7 +106,7 @@ public final class Session {
             }
             state = state.withState(who, state.stateOf(who).markActed());
         }
-        skipOfflineProvisionHolders();
+        // 补给箱在他手上时照旧在他手上：由模组那一侧的超时替他留一张，不跳过、不把余牌放回牌堆（ADR-0051 B1）
         Invariants.requireValid(state, context, "connection changed");
     }
 
@@ -269,18 +269,10 @@ public final class Session {
         }
         state = state.withState(holder, state.stateOf(holder).withCard(cardId));
         provisionAt++;
-        skipOfflineProvisionHolders();
+        // ❗链上掉线的人不跳过（ADR-0051 B1，取代 2adbbe4 那一版）：跳过到链尾时余牌要放回牌堆底，
+        //   而规则 §8.1 是「抽完即止，不洗回」—— 前面看过牌的人会知道底牌，牌堆本已空时下一回合的物资阶段还会复活。
+        //   掉线的持箱人由模组那一侧的超时替他留一张（决策 ⑧「局面不能卡住」）；开局时就掉线的人本来就不进链。
         Invariants.requireValid(state, context, "物资留牌后");
-    }
-
-    private void skipOfflineProvisionHolders() {
-        while (provisionAt < provisionChain.size() && state.isOffline(provisionChain.get(provisionAt))) {
-            provisionAt++;
-        }
-        if (provisionAt >= provisionChain.size() && !provisionOffer.isEmpty()) {
-            table.returnProvisions(provisionOffer);
-            provisionOffer.clear();
-        }
     }
 
     /**
@@ -1518,7 +1510,7 @@ public final class Session {
         if (!share.sources().contains(WATER)) {
             return 0;
         }
-        if (share.requiresConscious() && !state.canAct(id)) {
+        if (share.requiresConscious() && state.conditionOf(id) != Condition.CONSCIOUS) {
             return 0;
         }
         return Boolean.TRUE.equals(share.stacking().get(WATER)) ? thirstWatersSpent : Math.min(1, thirstWatersSpent);
@@ -1558,8 +1550,10 @@ public final class Session {
      */
     private boolean isOverboardImmune(GameState g, CharacterId id) {
         Ability ability = g.roster().get(id).ability();
+        // ❗「清醒」按伤势判，不按 canAct：掉线不改伤势，被动技能不因掉线失效（ADR-0051 B7，用户 2026-10-01）。
+        //   陪酒女蹭水 · 蹭酒与绝境回血三处同一条。
         if (ability instanceof Ability.OverboardImmune oi
-                && (!oi.requiresConscious() || g.canAct(id))) {
+                && (!oi.requiresConscious() || g.conditionOf(id) == Condition.CONSCIOUS)) {
             return true;
         }
         for (String cardId : g.stateOf(id).front()) {
@@ -1857,7 +1851,7 @@ public final class Session {
         }
         List<CharacterId> healed = new ArrayList<>();
         for (CharacterId id : state.bySeat()) {
-            if (!state.canAct(id) || state.stateOf(id).damage() == 0) {
+            if (state.conditionOf(id) != Condition.CONSCIOUS || state.stateOf(id).damage() == 0) {
                 continue;
             }
             state = state.withState(id, state.stateOf(id).healIfHurt(heal.amount()));
@@ -1961,7 +1955,7 @@ public final class Session {
         if (!share.sources().contains(cardId)) {
             return false;
         }
-        return !share.requiresConscious() || state.canAct(id);
+        return !share.requiresConscious() || state.conditionOf(id) == Condition.CONSCIOUS;
     }
 
     /** 蹭到的酒给几点体型。不叠加，所以按目录里那张牌的加值算一次。 */

@@ -283,6 +283,61 @@ class ProvisionEffectTest {
         }
     }
 
+    // ------------------------------------------------------------------ 离线（ADR-0051）
+
+    /**
+     * 掉线的人照伤势算清不清醒：被动技能与绝境回血不因掉线失效（用户 2026-10-01 拍板，O36 B7）。
+     * 协作者 2adbbe4 把这三处的「清醒」换成了 canAct（离线即不能行动），水手会因掉线直接淹死 ——
+     * 规则基线 §4.3 · §11.1 说的是「有意识」，而掉线不改伤势（ConnectionPhase 自己的注释也这么写）。
+     */
+    @Nested
+    @DisplayName("离线照伤势算清醒（ADR-0051）")
+    class OfflinePassives {
+
+        @Test
+        @DisplayName("❗掉线但伤势清醒的水手落海不受伤 —— 在线时 0 伤，掉线不该变成 1 伤")
+        void offlineSailorStillImmuneToOverboard() {
+            Session s = deal(List.of(mate(1), sailor(2)), "water", "water");
+            s.setOffline(SAILOR, true);
+            toNavigation(s);
+            s.navigate(card("o", 0, new Selector.Everyone(), new Selector.Nobody(), false, false), DRINKS_NOTHING);
+            assertEquals(Condition.CONSCIOUS, s.state().conditionOf(SAILOR));
+            assertEquals(0, s.state().stateOf(SAILOR).damage(), "水手免落水伤要求的是清醒，不是在线");
+            assertEquals(1, s.state().stateOf(MATE).damage(), "对照：大副没有这项技能，照样挨 1 点");
+        }
+
+        @Test
+        @DisplayName("掉线的陪酒女照样蹭别人喝的水")
+        void offlineHostessStillShares() {
+            Session s = deal(List.of(mate(1), kid(2), hostess(3)), "water", "water", "water");
+            s.row(HOSTESS, (cards, st, who) -> 0);
+            s.setOffline(HOSTESS, true);
+            toNavigation(s);
+            s.beginNavigate(card("t", 0, new Selector.Nobody(), new Selector.Everyone(), true, false));
+            s.decideThirst(List.of(MATE));
+            s.decideThirst(List.of(KID));
+            Session.ThirstPrompt her = s.thirstPending().orElseThrow();
+            assertEquals(HOSTESS, her.who());
+            assertEquals(2, her.shared(), "前面喝了两张，她蹭两次 —— 掉线不改她清不清醒");
+        }
+
+        @Test
+        @DisplayName("绝境回血回到掉线但伤势清醒的人身上（规则 §11.1「每个有意识的角色」）")
+        void rationHealsOfflineConscious() {
+            Session s = deal(List.of(mate(1), kid(2), sailor(3)), "ration", "water", "water");
+            s.applyFight(Fight.between(MATE, SAILOR));          // 水手输，扣 1
+            for (int i = 0; i < 4; i++) {
+                s.applyFight(Fight.between(MATE, KID));         // 打死小孩：船上要有尸体
+            }
+            assertEquals(Condition.DEAD, s.state().conditionOf(KID));
+            assertEquals(1, s.state().stateOf(SAILOR).damage());
+            s.setOffline(SAILOR, true);
+            List<CharacterId> healed = s.useRation(MATE, "ration");
+            assertTrue(healed.contains(SAILOR), "掉线的水手伤势清醒，照样回 1 点");
+            assertEquals(0, s.state().stateOf(SAILOR).damage());
+        }
+    }
+
     // ------------------------------------------------------------------ 阳伞
 
     @Nested
