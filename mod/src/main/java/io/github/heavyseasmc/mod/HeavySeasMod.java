@@ -35,6 +35,7 @@ import io.github.heavyseasmc.mod.world.MistSea;
 import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
+import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlockEntity;
 import io.github.heavyseasmc.mod.world.LobbyBoatEntity;
 import io.github.heavyseasmc.mod.world.LobbyBoat;
@@ -80,6 +81,7 @@ public final class HeavySeasMod implements ModInitializer {
         // 只用来挂模型的物品（布景 · 补给箱）：要在场景数据校验它们之前注册好。
         SceneItems.register();
         LobbyBoatBlock.register();
+        SkiffBlocks.register();
         LobbyBoatEntity.register();
         ServerChunkEvents.CHUNK_LOAD.register(LobbyBoatBlockEntity::restoreLegacyAnchors);
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。

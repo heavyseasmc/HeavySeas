@@ -1,0 +1,72 @@
+{
+  "variants": {
+    "facing=east,hanging=false,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "y": 270
+    },
+    "facing=east,hanging=false,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "y": 270
+    },
+    "facing=east,hanging=true,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270,
+      "y": 180
+    },
+    "facing=east,hanging=true,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270
+    },
+    "facing=north,hanging=false,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "y": 180
+    },
+    "facing=north,hanging=false,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "y": 180
+    },
+    "facing=north,hanging=true,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270,
+      "y": 90
+    },
+    "facing=north,hanging=true,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270,
+      "y": 270
+    },
+    "facing=south,hanging=false,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat"
+    },
+    "facing=south,hanging=false,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat"
+    },
+    "facing=south,hanging=true,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270,
+      "y": 270
+    },
+    "facing=south,hanging=true,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270,
+      "y": 90
+    },
+    "facing=west,hanging=false,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "y": 90
+    },
+    "facing=west,hanging=false,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "y": 90
+    },
+    "facing=west,hanging=true,side=left": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270
+    },
+    "facing=west,hanging=true,side=right": {
+      "model": "heavyseas:block/skiff/skiff_lifebuoy/lifebuoy_flat",
+      "x": 270,
+      "y": 180
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/nameplate",
+  "textures": {
+    "particle": "heavyseas:block/skiff/name_chen",
+    "t": "heavyseas:block/skiff/name_chen"
+  }
+}

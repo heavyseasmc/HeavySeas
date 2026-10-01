@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#tiller"},
+  "elements": [
+    {"from": [7, 6.5, 0], "to": [9, 8.5, 16], "faces": {"up": {"texture": "#tiller", "uv": [0, 0, 16, 2]}, "down": {"texture": "#tiller", "uv": [0, 0, 16, 2]}, "west": {"texture": "#tiller", "uv": [0, 0, 16, 2]}, "east": {"texture": "#tiller", "uv": [16, 0, 0, 2]}}}
+  ]
+}

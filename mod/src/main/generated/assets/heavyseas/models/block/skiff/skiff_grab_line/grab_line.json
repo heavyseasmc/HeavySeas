@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/grab_line",
+  "textures": {
+    "particle": "heavyseas:block/skiff/rope",
+    "r": "heavyseas:block/skiff/rope"
+  }
+}

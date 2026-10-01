@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/skiff/skiff_flarebox/flarebox"
+    },
+    "facing=north": {
+      "model": "heavyseas:block/skiff/skiff_flarebox/flarebox",
+      "y": 270
+    },
+    "facing=south": {
+      "model": "heavyseas:block/skiff/skiff_flarebox/flarebox",
+      "y": 90
+    },
+    "facing=west": {
+      "model": "heavyseas:block/skiff/skiff_flarebox/flarebox",
+      "y": 180
+    }
+  }
+}

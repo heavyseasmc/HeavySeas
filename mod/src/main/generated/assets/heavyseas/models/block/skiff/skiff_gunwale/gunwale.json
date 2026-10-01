@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/skiff/template/gunwale",
+  "textures": {
+    "in": "heavyseas:block/skiff/hull_inner",
+    "out": "heavyseas:block/skiff/hull_sheer",
+    "particle": "heavyseas:block/skiff/hull_sheer",
+    "rail": "heavyseas:block/skiff/teak_rail"
+  }
+}

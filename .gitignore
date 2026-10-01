@@ -26,3 +26,5 @@ docs/
 # 本地协作配置，不入库
 CLAUDE.md
 AGENTS.md
+# Fabric 批量生成工具（datagen）的缓存：只记上次写了哪些文件的哈希，生成物本身入库
+mod/src/main/generated/.cache/

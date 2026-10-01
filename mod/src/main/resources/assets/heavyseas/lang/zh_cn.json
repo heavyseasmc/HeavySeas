@@ -442,5 +442,6 @@
   "heavyseas.table.title": "公开物资",
   "heavyseas.table.offline": "离线",
   "heavyseas.seat.detail": "%s · 体力 %s/%s · %s（右键看面前的牌）",
-  "heavyseas.card_action.rejected": "现在不能打出这张牌。"
+  "heavyseas.card_action.rejected": "现在不能打出这张牌。",
+  "heavyseas.skiff.sail_too_rough": "风浪太大，帆升不起来"
 }

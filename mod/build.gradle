@@ -15,11 +15,29 @@ loom {
     // 客户端专用的代码（HUD、渲染）只能写在 src/client：main 里引用客户端类，专用服务端上一加载就崩，
     // 而开发环境与单人游戏都测不出。拆开之后这件事在编译期就失败 —— 拆之前实测，main 能直接编译过那种引用。
     splitEnvironmentSourceSets()
+}
 
+// 批量生成工具（ADR-0053 §5 · ADR-0056）：救生艇方块的方块状态文件与带贴图的模型，按方块的属性展开。
+// 生成物写进 src/main/generated 并入库（与卡面贴图一样：一份干净的克隆不跑生成器也能构建）；
+// 生成器自己的代码在单独的 datagen 源码集里，不进发给玩家的 jar。重跑：./gradlew :mod:runDatagen
+fabricApi {
+    configureDataGeneration {
+        createSourceSet = true
+        // ❗顺序是实测出来的：splitEnvironmentSourceSets() 必须在这之前（之后再调，它要改的属性已经定死）；
+        //   这一块又必须在 loom.mods 之前 —— Loom 按 modId 登记一份模组 heavyseas（带 datagen 源码集），
+        //   写在后面就与 loom.mods 里那一份撞名（Cannot add a ModSettings with name 'heavyseas'）。
+        //   不给 modId 也不行 —— Loom 要么要它、要么要 datagen 源码集里另有一份 fabric.mod.json（实测）。
+        modId = 'heavyseas'
+        strictValidation = false   // 大厅船那一块是手写的方块状态，不归生成器管
+    }
+}
+
+loom {
     mods {
         heavyseas {
             sourceSet sourceSets.main
             sourceSet sourceSets.client
+            sourceSet sourceSets.datagen
         }
     }
 
@@ -747,6 +765,195 @@ def checkSceneAssets = tasks.register('checkSceneAssets') {
 
 tasks.named('check') {
     dependsOn checkSceneAssets
+}
+
+// 救生艇方块（ADR-0056 · ADR-0057）：四份来源要互相对得上 ——
+//   SkiffBlocks.java 登记的方块 · 批量生成的方块状态与模型（src/main/generated）·
+//   decor_textures.py 写进来的模板与贴图（src/main/resources）· 雾海那条艇的结构（boat_hull.nbt）。
+// 哪一份改了、另一份没跟上，游戏里都不报错：只是某几格成了紫黑格子、整块看不见，或取到图集里别的贴图的颜色
+// （2026-10-02 灯杆横臂实拍成一条蓝紫色，就是贴图坐标越界）。
+def checkSkiffBlocks = tasks.register('checkSkiffBlocks') {
+    group = 'verification'
+    description = '救生艇：登记的方块都有方块状态 · 模型与模板与贴图都在 · 贴图坐标不越界 · 没有没人用的贴图 · 船体结构里的每个状态都有对应的方块状态'
+    // 任务属性而不是局部变量：红测要能把它们指向造坏的副本（docs/tools/build-redtests.sh）。
+    ext.resourcesDir = file('src/main/resources/assets/heavyseas')
+    ext.generatedDir = file('src/main/generated/assets/heavyseas')
+    ext.hullFile = file('src/main/resources/data/heavyseas/structure/boat_hull.nbt')
+    ext.blocksSource = file('src/main/java/io/github/heavyseasmc/mod/world/skiff/SkiffBlocks.java')
+    inputs.dir(ext.resourcesDir).optional()
+    inputs.dir(ext.generatedDir).optional()
+    inputs.file(ext.hullFile).optional()
+    inputs.file(ext.blocksSource).optional()
+    doLast {
+        def slurper = new groovy.json.JsonSlurper()
+        def problems = []
+        def rel = { File f -> f.path.replace('\\', '/').replaceFirst('^.*/assets/heavyseas/', '') }
+
+        // 1) Java 里登记了哪些方块（正向对照：一个都没扫到就是判据坏了）
+        def registered = ((ext.blocksSource.getText('UTF-8') =~ /add\("(skiff_[a-z_]+)"/).collect { it[1].toString() }) as Set
+        if (registered.isEmpty()) {
+            throw new GradleException("没在查：${ext.blocksSource.name} 里一个 add(\"skiff_…\") 都没扫到 —— 判据坏了，不是没有方块")
+        }
+
+        // 2) 方块状态文件：与登记的方块一一对应
+        def bsDir = new File(ext.generatedDir, 'blockstates')
+        def bsFiles = (bsDir.listFiles({ File f -> f.name.startsWith('skiff_') && f.name.endsWith('.json') } as FileFilter) ?: []) as List
+        if (bsFiles.isEmpty()) {
+            throw new GradleException("没在查：${bsDir} 下一个 skiff_*.json 都没有 —— 判据坏了，或者没跑 ./gradlew :mod:runDatagen")
+        }
+        def stateFiles = bsFiles.collect { (it.name - '.json').toString() } as Set
+        (registered - stateFiles).sort().each { problems << "方块 ${it} 登记了，但没有方块状态文件（改了 SkiffBlocks 之后要重跑 ./gradlew :mod:runDatagen）" }
+        (stateFiles - registered).sort().each { problems << "方块状态文件 ${it}.json 没有对应的方块（SkiffBlocks 里删了它，生成物没跟上）" }
+        def variants = [:]
+        def usedModels = [] as Set
+        bsFiles.each { File f ->
+            def json = slurper.parse(f, 'UTF-8') as Map
+            variants[(f.name - '.json').toString()] = (json.variants as Map).keySet().collect { it.toString() } as Set
+            (json.variants as Map).each { k, v -> usedModels << v.model.toString() }
+        }
+
+        // 3) 模型 → 模板 → 贴图
+        def modelFile = { String id ->
+            def path = id.substring(id.indexOf(':') + 1)
+            def g = new File(ext.generatedDir, "models/${path}.json")
+            if (g.isFile()) { return g }
+            def r = new File(ext.resourcesDir, "models/${path}.json")
+            return r.isFile() ? r : null
+        }
+        def usedTemplates = [] as Set
+        def usedTextures = [] as Set
+        usedModels.sort().each { String id ->
+            def f = modelFile(id)
+            if (f == null) { problems << "方块状态引用的模型 ${id} 不存在"; return }
+            def m = slurper.parse(f, 'UTF-8') as Map
+            def parent = m.parent?.toString()
+            if (parent == null || !parent.startsWith('heavyseas:block/skiff/template/')) {
+                problems << "${rel(f)}：父模型 ${parent} 不是救生艇模板"
+                return
+            }
+            usedTemplates << parent
+            (m.textures ?: [:]).each { k, v -> usedTextures << v.toString() }
+        }
+        // 游戏按元件位置自动算贴图坐标的规则（没写 uv 的面就用它）；越出 0–16 时游戏不报错，只是取到图集里相邻的别的贴图
+        def autoUv = [
+                north: { f, t -> [16 - t[0], 16 - t[1], 16 - f[0], 16 - f[1]] },
+                south: { f, t -> [f[0], 16 - t[1], t[0], 16 - f[1]] },
+                west : { f, t -> [f[2], 16 - t[1], t[2], 16 - f[1]] },
+                east : { f, t -> [16 - t[2], 16 - t[1], 16 - f[2], 16 - f[1]] },
+                up   : { f, t -> [f[0], f[2], t[0], t[2]] },
+                down : { f, t -> [f[0], 16 - t[2], t[0], 16 - f[2]] },
+        ]
+        def checkedFaces = 0
+        usedTemplates.sort().each { String id ->
+            def f = modelFile(id)
+            if (f == null) { problems << "模板 ${id} 不存在（要 models/${id.substring(id.indexOf(':') + 1)}.json）"; return }
+            def m = slurper.parse(f, 'UTF-8') as Map
+            (m.elements ?: []).eachWithIndex { el, i ->
+                ['from', 'to'].each { key ->
+                    (el[key] ?: []).eachWithIndex { v, axis ->
+                        if (v < -16 || v > 32) { problems << "${rel(f)}：元素 ${i} 的 ${key}.${'xyz'[axis]} = ${v}，越界 [−16, 32]" }
+                    }
+                }
+                (el.faces ?: [:]).each { dir, face ->
+                    def uv = face.uv ?: autoUv[dir.toString()](el.from, el.to)
+                    checkedFaces++
+                    if (uv.any { it < 0 || it > 16 }) {
+                        problems << "${rel(f)}：元素 ${i} 的 ${dir} 面贴图坐标 ${uv} 越出 0–16（游戏里会取到图集里别的贴图）"
+                    }
+                }
+            }
+        }
+        def pngSize = { File png ->
+            def head = new byte[24]
+            png.withInputStream { it.read(head) }
+            def sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+            if ((0..7).any { (head[it] & 0xFF) != sig[it] }) { return null }
+            def be = { int o -> ((head[o] & 0xFF) << 24) | ((head[o + 1] & 0xFF) << 16) | ((head[o + 2] & 0xFF) << 8) | (head[o + 3] & 0xFF) }
+            return [be(16), be(20)]
+        }
+        usedTextures.sort().each { String ref ->
+            if (!ref.startsWith('heavyseas:block/skiff/')) { problems << "贴图 ${ref} 不在 block/skiff/ 下"; return }
+            def png = new File(ext.resourcesDir, "textures/${ref.substring('heavyseas:'.length())}.png")
+            if (!png.isFile()) { problems << "贴图 ${ref} 不存在（要 ${rel(png)}）"; return }
+            def size = pngSize(png)
+            if (size == null) { problems << "${rel(png)}：不是 PNG" }
+            else if (size[0] != 16 || size[1] % 16 != 0) { problems << "${rel(png)}：${size[0]}×${size[1]}，应为 16 宽、高是 16 的倍数" }
+        }
+        // 没人用的贴图与模板：生成器改了名 / 删了件，旧文件还躺在 jar 里（也说明两边的清单不一致）
+        def texDir = new File(ext.resourcesDir, 'textures/block/skiff')
+        (texDir.listFiles({ File f -> f.name.endsWith('.png') } as FileFilter) ?: []).each { File f ->
+            if (!usedTextures.contains("heavyseas:block/skiff/${f.name - '.png'}".toString())) { problems << "${rel(f)}：没有任何模型用到" }
+        }
+        def tplDir = new File(ext.resourcesDir, 'models/block/skiff/template')
+        (tplDir.listFiles({ File f -> f.name.endsWith('.json') } as FileFilter) ?: []).each { File f ->
+            if (!usedTemplates.contains("heavyseas:block/skiff/template/${f.name - '.json'}".toString())) { problems << "${rel(f)}：没有任何模型用到" }
+        }
+
+        // 4) 船体结构：里面每个 heavyseas 方块的状态，都要在它的方块状态文件里有那一项（属性按名字排序拼成键）
+        def readNbt = { File f ->
+            def input = new DataInputStream(new BufferedInputStream(new java.util.zip.GZIPInputStream(new FileInputStream(f))))
+            def readTag
+            readTag = { int type ->
+                switch (type) {
+                    case 1: return input.readByte()
+                    case 2: return input.readShort()
+                    case 3: return input.readInt()
+                    case 4: return input.readLong()
+                    case 5: return input.readFloat()
+                    case 6: return input.readDouble()
+                    case 7: def b = new byte[input.readInt()]; input.readFully(b); return b
+                    case 8: return input.readUTF()
+                    case 9: def t = input.readByte() as int; def n = input.readInt(); return (0..<n).collect { readTag(t) }
+                    case 10:
+                        def map = [:]
+                        while (true) {
+                            def t = input.readByte() as int
+                            if (t == 0) { return map }
+                            // ❗名字必须先单独读出来：写成 map[input.readUTF()] = readTag(t) 时 Groovy 先算右边，
+                            //   先读了值再读名字，整个流就错位了（实测：读到一半撞上「标签 0」）
+                            def key = input.readUTF()
+                            map[key] = readTag(t)
+                        }
+                    case 11: return (0..<input.readInt()).collect { input.readInt() }
+                    case 12: return (0..<input.readInt()).collect { input.readLong() }
+                    default: throw new GradleException("${f.name}：不认识的 NBT 标签 ${type}")
+                }
+            }
+            try {
+                if (input.readByte() != 10) { throw new GradleException("${f.name}：根标签不是 Compound") }
+                input.readUTF()
+                return readTag(10)
+            } finally {
+                input.close()
+            }
+        }
+        def hull = readNbt(ext.hullFile)
+        def palette = hull.palette as List
+        def ours = palette.findAll { it.Name.toString().startsWith('heavyseas:') }
+        if (ours.isEmpty()) {
+            throw new GradleException("没在查：${ext.hullFile.name} 的调色板里一个 heavyseas 方块都没有 —— 船体不是新艇，或判据坏了")
+        }
+        ours.each { st ->
+            def name = st.Name.toString().substring('heavyseas:'.length())
+            def props = (st.Properties ?: [:]) as Map
+            def key = props.keySet().collect { it.toString() }.sort().collect { "${it}=${props[it]}" }.join(',')
+            if (!variants.containsKey(name)) {
+                problems << "${ext.hullFile.name}：方块 heavyseas:${name} 没有方块状态文件"
+            } else if (!variants[name].contains(key)) {
+                problems << "${ext.hullFile.name}：heavyseas:${name}[${key}] 在方块状态文件里没有这一项（结构生成器与 SkiffBlocks 的属性对不上）"
+            }
+        }
+
+        if (problems) {
+            throw new GradleException((['救生艇方块核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("救生艇方块核对通过：${registered.size()} 种方块 · ${usedModels.size()} 个模型 · ${usedTemplates.size()} 块模板" +
+                "（${checkedFaces} 个面的贴图坐标）· ${usedTextures.size()} 张贴图 · 船体里 ${ours.size()} 种状态")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkSkiffBlocks
 }
 
 // 生产 jar 里的 mixin 类必须已经翻成中间名（ADR-0034 §5.1.1）。

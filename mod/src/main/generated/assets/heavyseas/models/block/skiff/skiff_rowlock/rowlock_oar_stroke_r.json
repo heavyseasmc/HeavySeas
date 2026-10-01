@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/skiff/template/rowlock_oar_stroke_r",
+  "textures": {
+    "brass": "heavyseas:block/skiff/brass",
+    "oar": "heavyseas:block/skiff/oar",
+    "particle": "heavyseas:block/skiff/brass"
+  }
+}

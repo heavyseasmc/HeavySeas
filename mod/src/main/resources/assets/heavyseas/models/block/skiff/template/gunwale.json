@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#out"},
+  "elements": [
+    {"from": [0, 0, 0], "to": [16, 12, 16], "faces": {"west": {"texture": "#out", "uv": [0, 4, 16, 16]}, "north": {"texture": "#out", "uv": [0, 4, 16, 16]}, "south": {"texture": "#out", "uv": [0, 4, 16, 16]}, "east": {"texture": "#in", "uv": [0, 4, 16, 16]}}},
+    {"from": [0, 12, 0], "to": [16, 15, 16], "faces": {"up": {"texture": "#rail", "uv": [0, 0, 16, 16]}, "west": {"texture": "#rail", "uv": [0, 0, 16, 3]}, "east": {"texture": "#rail", "uv": [0, 4, 16, 7]}, "north": {"texture": "#rail", "uv": [0, 0, 16, 3]}, "south": {"texture": "#rail", "uv": [0, 0, 16, 3]}, "down": {"texture": "#rail", "uv": [0, 8, 16, 16]}}},
+    {"from": [-1, 10, 0], "to": [0, 13, 16], "faces": {"west": {"texture": "#rail", "uv": [0, 0, 16, 3]}, "up": {"texture": "#rail", "uv": [0, 4, 16, 5]}, "down": {"texture": "#rail", "uv": [0, 7, 16, 8]}, "north": {"texture": "#rail", "uv": [0, 0, 1, 3]}, "south": {"texture": "#rail", "uv": [0, 0, 1, 3]}}}
+  ]
+}

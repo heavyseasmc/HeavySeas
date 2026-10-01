@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
@@ -16,6 +17,7 @@ import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
 import io.github.heavyseasmc.mod.world.LobbyBoatEntity;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -26,6 +28,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.option.KeyBinding;
@@ -138,6 +141,8 @@ public final class HeavySeasClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         HudRenderCallback.EVENT.register(GameHud::render);
+        // 救生艇方块里只有帆（四角帆的斜边）与星徽（圆牌）的贴图有透明像素：按镂空画，其余照实心
+        BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getCutout(), SkiffBlocks.SAIL, SkiffBlocks.EMBLEM);
         GameScreenSidebar.register();
         // 别的界面（Minecraft 自带的进度 · 游戏菜单 · 聊天……）打开时也记一行，与 GameScreen 的「界面：打开 X」配对：
         // 回归脚本据此分得开「本模组那一面没弹」与「被别的界面盖住了」—— 此前两次都要截图才看出来

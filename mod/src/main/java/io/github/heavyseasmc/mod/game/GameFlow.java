@@ -14,6 +14,7 @@ import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
 import io.github.heavyseasmc.engine.weather.WeatherDeck;
+import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameData;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
@@ -180,6 +181,7 @@ public final class GameFlow {
         LOGGER.info("天候：{}（{}）", weather.id(), weather.effect().id());
         // 天候到世界（ADR-0034 §5.1.5）：雨 · 雷 · 时刻按雾表那一行；雾本身由投影带给客户端。
         MistSea.applyWeather(world, component, weather.id());
+        SkiffProps.onNewDay(world, component, weather.id(), session.state().turn());   // 灯油烧掉一档 · 帆按天候（ADR-0057）
         session.advancePhase();
         enterProvision(world, component);
     }
@@ -310,6 +312,9 @@ public final class GameFlow {
     public static void navigate(ServerWorld world, GameComponent component, NavigationCard pick) {
         Session session = component.requireSession();
         NavigationCard card = session.takeCardForNavigation(pick);
+        if (pick != null) {
+            SkiffProps.onHelm(world, component, card.id());       // 舵手挑了牌：舵往一边偏一下（只是样子）
+        }
         resolveNavigation(world, component, card);
     }
 

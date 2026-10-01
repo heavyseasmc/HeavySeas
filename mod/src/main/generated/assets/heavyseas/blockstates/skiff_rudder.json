@@ -1,0 +1,274 @@
+{
+  "variants": {
+    "facing=east,part=blade,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left",
+      "y": 270
+    },
+    "facing=east,part=blade,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left",
+      "y": 270
+    },
+    "facing=east,part=blade,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade",
+      "y": 270
+    },
+    "facing=east,part=blade,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade",
+      "y": 270
+    },
+    "facing=east,part=blade,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right",
+      "y": 270
+    },
+    "facing=east,part=blade,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right",
+      "y": 270
+    },
+    "facing=east,part=head,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left",
+      "y": 270
+    },
+    "facing=east,part=head,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left",
+      "y": 270
+    },
+    "facing=east,part=head,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head",
+      "y": 270
+    },
+    "facing=east,part=head,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head",
+      "y": 270
+    },
+    "facing=east,part=head,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right",
+      "y": 270
+    },
+    "facing=east,part=head,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right",
+      "y": 270
+    },
+    "facing=east,part=lower,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left",
+      "y": 270
+    },
+    "facing=east,part=lower,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left",
+      "y": 270
+    },
+    "facing=east,part=lower,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower",
+      "y": 270
+    },
+    "facing=east,part=lower,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower",
+      "y": 270
+    },
+    "facing=east,part=lower,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right",
+      "y": 270
+    },
+    "facing=east,part=lower,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right",
+      "y": 270
+    },
+    "facing=north,part=blade,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left",
+      "y": 180
+    },
+    "facing=north,part=blade,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left",
+      "y": 180
+    },
+    "facing=north,part=blade,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade",
+      "y": 180
+    },
+    "facing=north,part=blade,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade",
+      "y": 180
+    },
+    "facing=north,part=blade,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right",
+      "y": 180
+    },
+    "facing=north,part=blade,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right",
+      "y": 180
+    },
+    "facing=north,part=head,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left",
+      "y": 180
+    },
+    "facing=north,part=head,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left",
+      "y": 180
+    },
+    "facing=north,part=head,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head",
+      "y": 180
+    },
+    "facing=north,part=head,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head",
+      "y": 180
+    },
+    "facing=north,part=head,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right",
+      "y": 180
+    },
+    "facing=north,part=head,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right",
+      "y": 180
+    },
+    "facing=north,part=lower,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left",
+      "y": 180
+    },
+    "facing=north,part=lower,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left",
+      "y": 180
+    },
+    "facing=north,part=lower,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower",
+      "y": 180
+    },
+    "facing=north,part=lower,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower",
+      "y": 180
+    },
+    "facing=north,part=lower,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right",
+      "y": 180
+    },
+    "facing=north,part=lower,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right",
+      "y": 180
+    },
+    "facing=south,part=blade,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left"
+    },
+    "facing=south,part=blade,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left"
+    },
+    "facing=south,part=blade,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade"
+    },
+    "facing=south,part=blade,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade"
+    },
+    "facing=south,part=blade,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right"
+    },
+    "facing=south,part=blade,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right"
+    },
+    "facing=south,part=head,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left"
+    },
+    "facing=south,part=head,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left"
+    },
+    "facing=south,part=head,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head"
+    },
+    "facing=south,part=head,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head"
+    },
+    "facing=south,part=head,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right"
+    },
+    "facing=south,part=head,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right"
+    },
+    "facing=south,part=lower,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left"
+    },
+    "facing=south,part=lower,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left"
+    },
+    "facing=south,part=lower,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower"
+    },
+    "facing=south,part=lower,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower"
+    },
+    "facing=south,part=lower,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right"
+    },
+    "facing=south,part=lower,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right"
+    },
+    "facing=west,part=blade,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left",
+      "y": 90
+    },
+    "facing=west,part=blade,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_left",
+      "y": 90
+    },
+    "facing=west,part=blade,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade",
+      "y": 90
+    },
+    "facing=west,part=blade,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade",
+      "y": 90
+    },
+    "facing=west,part=blade,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right",
+      "y": 90
+    },
+    "facing=west,part=blade,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_blade_right",
+      "y": 90
+    },
+    "facing=west,part=head,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left",
+      "y": 90
+    },
+    "facing=west,part=head,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_left",
+      "y": 90
+    },
+    "facing=west,part=head,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head",
+      "y": 90
+    },
+    "facing=west,part=head,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head",
+      "y": 90
+    },
+    "facing=west,part=head,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right",
+      "y": 90
+    },
+    "facing=west,part=head,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_head_right",
+      "y": 90
+    },
+    "facing=west,part=lower,turn=left,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left",
+      "y": 90
+    },
+    "facing=west,part=lower,turn=left,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_left",
+      "y": 90
+    },
+    "facing=west,part=lower,turn=none,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower",
+      "y": 90
+    },
+    "facing=west,part=lower,turn=none,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower",
+      "y": 90
+    },
+    "facing=west,part=lower,turn=right,waterlogged=false": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right",
+      "y": 90
+    },
+    "facing=west,part=lower,turn=right,waterlogged=true": {
+      "model": "heavyseas:block/skiff/skiff_rudder/rudder_lower_right",
+      "y": 90
+    }
+  }
+}

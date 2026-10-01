@@ -9,6 +9,7 @@ import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
 import io.github.heavyseasmc.engine.weather.WeatherEffect;
+import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.data.SceneDataLoader;
@@ -448,6 +449,7 @@ public final class SeasCommand {
             }
             // 一次走完两步：指令没有「想一想」这回事。底下与划船一面是同一份规则（Session#row 就是那两步）。
             List<NavigationCard> drawn = ActionPhase.rowChoosing(session, actor, selected);
+            SkiffProps.onRow(world, component);
             context.getSource().sendFeedback(
                     () -> Text.translatable("heavyseas.command.rowed", GameFlow.characterName(actor), drawn.size()),
                     true);

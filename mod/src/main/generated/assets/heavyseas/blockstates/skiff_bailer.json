@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/skiff/skiff_bailer/bailer",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/skiff/skiff_bailer/bailer",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/skiff/skiff_bailer/bailer"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/skiff/skiff_bailer/bailer",
+      "y": 90
+    }
+  }
+}

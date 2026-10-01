@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/skiff/template/mast_arm",
+  "textures": {
+    "brass": "heavyseas:block/skiff/brass",
+    "p": "heavyseas:block/skiff/pole",
+    "particle": "heavyseas:block/skiff/pole"
+  }
+}

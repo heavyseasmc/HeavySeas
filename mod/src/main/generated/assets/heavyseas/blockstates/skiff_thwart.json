@@ -1,0 +1,139 @@
+{
+  "variants": {
+    "facing=east,seat=0": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart",
+      "y": 270
+    },
+    "facing=east,seat=1": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_1",
+      "y": 270
+    },
+    "facing=east,seat=2": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_2",
+      "y": 270
+    },
+    "facing=east,seat=3": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_3",
+      "y": 270
+    },
+    "facing=east,seat=4": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_4",
+      "y": 270
+    },
+    "facing=east,seat=5": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_5",
+      "y": 270
+    },
+    "facing=east,seat=6": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_6",
+      "y": 270
+    },
+    "facing=east,seat=7": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_7",
+      "y": 270
+    },
+    "facing=east,seat=8": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_8",
+      "y": 270
+    },
+    "facing=north,seat=0": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart",
+      "y": 180
+    },
+    "facing=north,seat=1": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_1",
+      "y": 180
+    },
+    "facing=north,seat=2": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_2",
+      "y": 180
+    },
+    "facing=north,seat=3": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_3",
+      "y": 180
+    },
+    "facing=north,seat=4": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_4",
+      "y": 180
+    },
+    "facing=north,seat=5": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_5",
+      "y": 180
+    },
+    "facing=north,seat=6": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_6",
+      "y": 180
+    },
+    "facing=north,seat=7": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_7",
+      "y": 180
+    },
+    "facing=north,seat=8": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_8",
+      "y": 180
+    },
+    "facing=south,seat=0": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart"
+    },
+    "facing=south,seat=1": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_1"
+    },
+    "facing=south,seat=2": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_2"
+    },
+    "facing=south,seat=3": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_3"
+    },
+    "facing=south,seat=4": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_4"
+    },
+    "facing=south,seat=5": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_5"
+    },
+    "facing=south,seat=6": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_6"
+    },
+    "facing=south,seat=7": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_7"
+    },
+    "facing=south,seat=8": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_8"
+    },
+    "facing=west,seat=0": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart",
+      "y": 90
+    },
+    "facing=west,seat=1": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_1",
+      "y": 90
+    },
+    "facing=west,seat=2": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_2",
+      "y": 90
+    },
+    "facing=west,seat=3": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_3",
+      "y": 90
+    },
+    "facing=west,seat=4": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_4",
+      "y": 90
+    },
+    "facing=west,seat=5": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_5",
+      "y": 90
+    },
+    "facing=west,seat=6": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_6",
+      "y": 90
+    },
+    "facing=west,seat=7": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_7",
+      "y": 90
+    },
+    "facing=west,seat=8": {
+      "model": "heavyseas:block/skiff/skiff_thwart/thwart_thwart_8",
+      "y": 90
+    }
+  }
+}

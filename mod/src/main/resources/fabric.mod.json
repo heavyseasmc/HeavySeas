@@ -13,7 +13,8 @@
   "entrypoints": {
     "main": ["io.github.heavyseasmc.mod.HeavySeasMod"],
     "client": ["io.github.heavyseasmc.mod.client.HeavySeasClient"],
-    "cardinal-components": ["io.github.heavyseasmc.mod.state.GameComponents"]
+    "cardinal-components": ["io.github.heavyseasmc.mod.state.GameComponents"],
+    "fabric-datagen": ["io.github.heavyseasmc.mod.datagen.HeavySeasDataGenerator"]
   },
   "mixins": [
     { "config": "heavyseas.client.mixins.json", "environment": "client" }

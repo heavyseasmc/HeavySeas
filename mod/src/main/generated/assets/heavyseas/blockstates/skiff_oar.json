@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "facing=east,part=blade,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade",
+      "y": 90
+    },
+    "facing=east,part=blade,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_l",
+      "y": 90
+    },
+    "facing=east,part=blade,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade",
+      "y": 270
+    },
+    "facing=east,part=blade,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_r",
+      "y": 270
+    },
+    "facing=east,part=handle,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle",
+      "y": 90
+    },
+    "facing=east,part=handle,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_l",
+      "y": 90
+    },
+    "facing=east,part=handle,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle",
+      "y": 270
+    },
+    "facing=east,part=handle,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_r",
+      "y": 270
+    },
+    "facing=north,part=blade,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade"
+    },
+    "facing=north,part=blade,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_l"
+    },
+    "facing=north,part=blade,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade",
+      "y": 180
+    },
+    "facing=north,part=blade,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_r",
+      "y": 180
+    },
+    "facing=north,part=handle,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle"
+    },
+    "facing=north,part=handle,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_l"
+    },
+    "facing=north,part=handle,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle",
+      "y": 180
+    },
+    "facing=north,part=handle,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_r",
+      "y": 180
+    },
+    "facing=south,part=blade,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade",
+      "y": 180
+    },
+    "facing=south,part=blade,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_l",
+      "y": 180
+    },
+    "facing=south,part=blade,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade"
+    },
+    "facing=south,part=blade,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_r"
+    },
+    "facing=south,part=handle,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle",
+      "y": 180
+    },
+    "facing=south,part=handle,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_l",
+      "y": 180
+    },
+    "facing=south,part=handle,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle"
+    },
+    "facing=south,part=handle,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_r"
+    },
+    "facing=west,part=blade,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade",
+      "y": 270
+    },
+    "facing=west,part=blade,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_l",
+      "y": 270
+    },
+    "facing=west,part=blade,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade",
+      "y": 90
+    },
+    "facing=west,part=blade,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_blade_stroke_r",
+      "y": 90
+    },
+    "facing=west,part=handle,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle",
+      "y": 270
+    },
+    "facing=west,part=handle,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_l",
+      "y": 270
+    },
+    "facing=west,part=handle,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle",
+      "y": 90
+    },
+    "facing=west,part=handle,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_oar/oar_handle_stroke_r",
+      "y": 90
+    }
+  }
+}

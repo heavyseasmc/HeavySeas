@@ -8,6 +8,7 @@ import io.github.heavyseasmc.engine.play.Contest;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
@@ -320,6 +321,7 @@ public final class ActionPhase {
 
     private static void finishRow(ServerWorld world, GameComponent component, CharacterId who) {
         Session session = component.requireSession();
+        SkiffProps.onRow(world, component);                       // 两舷插着的桨扫一下（只是样子，ADR-0057）
         GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowed", GameFlow.characterName(who),
                 session.table().rowStack().size()));
         GameFlow.finishAction(world, component, who);

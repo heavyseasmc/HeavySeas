@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/tiller_end",
+  "textures": {
+    "particle": "heavyseas:block/skiff/tiller",
+    "tiller": "heavyseas:block/skiff/tiller"
+  }
+}

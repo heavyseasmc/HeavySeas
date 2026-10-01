@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/skiff/template/cask",
+  "textures": {
+    "head": "heavyseas:block/skiff/cask_head",
+    "particle": "heavyseas:block/skiff/cask_side",
+    "side": "heavyseas:block/skiff/cask_side"
+  }
+}

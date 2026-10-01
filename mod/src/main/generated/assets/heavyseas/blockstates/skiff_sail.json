@@ -1,0 +1,1084 @@
+{
+  "variants": {
+    "belly=0,col=0,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 270
+    },
+    "belly=0,col=0,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 270
+    },
+    "belly=0,col=0,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 270
+    },
+    "belly=0,col=0,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_00",
+      "y": 270
+    },
+    "belly=0,col=0,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_10",
+      "y": 270
+    },
+    "belly=0,col=0,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_20",
+      "y": 270
+    },
+    "belly=0,col=0,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 180
+    },
+    "belly=0,col=0,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 180
+    },
+    "belly=0,col=0,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 180
+    },
+    "belly=0,col=0,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_00",
+      "y": 180
+    },
+    "belly=0,col=0,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_10",
+      "y": 180
+    },
+    "belly=0,col=0,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_20",
+      "y": 180
+    },
+    "belly=0,col=0,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00"
+    },
+    "belly=0,col=0,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10"
+    },
+    "belly=0,col=0,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20"
+    },
+    "belly=0,col=0,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_00"
+    },
+    "belly=0,col=0,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_10"
+    },
+    "belly=0,col=0,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_20"
+    },
+    "belly=0,col=0,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 90
+    },
+    "belly=0,col=0,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 90
+    },
+    "belly=0,col=0,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 90
+    },
+    "belly=0,col=0,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_00",
+      "y": 90
+    },
+    "belly=0,col=0,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_10",
+      "y": 90
+    },
+    "belly=0,col=0,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_20",
+      "y": 90
+    },
+    "belly=0,col=1,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 270
+    },
+    "belly=0,col=1,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 270
+    },
+    "belly=0,col=1,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 270
+    },
+    "belly=0,col=1,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_01",
+      "y": 270
+    },
+    "belly=0,col=1,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_11",
+      "y": 270
+    },
+    "belly=0,col=1,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_21",
+      "y": 270
+    },
+    "belly=0,col=1,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 180
+    },
+    "belly=0,col=1,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 180
+    },
+    "belly=0,col=1,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 180
+    },
+    "belly=0,col=1,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_01",
+      "y": 180
+    },
+    "belly=0,col=1,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_11",
+      "y": 180
+    },
+    "belly=0,col=1,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_21",
+      "y": 180
+    },
+    "belly=0,col=1,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01"
+    },
+    "belly=0,col=1,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11"
+    },
+    "belly=0,col=1,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21"
+    },
+    "belly=0,col=1,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_01"
+    },
+    "belly=0,col=1,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_11"
+    },
+    "belly=0,col=1,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_21"
+    },
+    "belly=0,col=1,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 90
+    },
+    "belly=0,col=1,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 90
+    },
+    "belly=0,col=1,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 90
+    },
+    "belly=0,col=1,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_01",
+      "y": 90
+    },
+    "belly=0,col=1,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_11",
+      "y": 90
+    },
+    "belly=0,col=1,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_21",
+      "y": 90
+    },
+    "belly=0,col=2,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 270
+    },
+    "belly=0,col=2,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 270
+    },
+    "belly=0,col=2,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 270
+    },
+    "belly=0,col=2,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_02",
+      "y": 270
+    },
+    "belly=0,col=2,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_12",
+      "y": 270
+    },
+    "belly=0,col=2,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_22",
+      "y": 270
+    },
+    "belly=0,col=2,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 180
+    },
+    "belly=0,col=2,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 180
+    },
+    "belly=0,col=2,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 180
+    },
+    "belly=0,col=2,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_02",
+      "y": 180
+    },
+    "belly=0,col=2,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_12",
+      "y": 180
+    },
+    "belly=0,col=2,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_22",
+      "y": 180
+    },
+    "belly=0,col=2,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02"
+    },
+    "belly=0,col=2,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12"
+    },
+    "belly=0,col=2,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22"
+    },
+    "belly=0,col=2,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_02"
+    },
+    "belly=0,col=2,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_12"
+    },
+    "belly=0,col=2,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_22"
+    },
+    "belly=0,col=2,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 90
+    },
+    "belly=0,col=2,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 90
+    },
+    "belly=0,col=2,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 90
+    },
+    "belly=0,col=2,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_02",
+      "y": 90
+    },
+    "belly=0,col=2,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_12",
+      "y": 90
+    },
+    "belly=0,col=2,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_22",
+      "y": 90
+    },
+    "belly=0,col=3,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 270
+    },
+    "belly=0,col=3,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 270
+    },
+    "belly=0,col=3,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 270
+    },
+    "belly=0,col=3,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_03",
+      "y": 270
+    },
+    "belly=0,col=3,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_13",
+      "y": 270
+    },
+    "belly=0,col=3,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_23",
+      "y": 270
+    },
+    "belly=0,col=3,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 180
+    },
+    "belly=0,col=3,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 180
+    },
+    "belly=0,col=3,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 180
+    },
+    "belly=0,col=3,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_03",
+      "y": 180
+    },
+    "belly=0,col=3,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_13",
+      "y": 180
+    },
+    "belly=0,col=3,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_23",
+      "y": 180
+    },
+    "belly=0,col=3,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03"
+    },
+    "belly=0,col=3,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13"
+    },
+    "belly=0,col=3,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23"
+    },
+    "belly=0,col=3,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_03"
+    },
+    "belly=0,col=3,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_13"
+    },
+    "belly=0,col=3,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_23"
+    },
+    "belly=0,col=3,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 90
+    },
+    "belly=0,col=3,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 90
+    },
+    "belly=0,col=3,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 90
+    },
+    "belly=0,col=3,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_03",
+      "y": 90
+    },
+    "belly=0,col=3,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_13",
+      "y": 90
+    },
+    "belly=0,col=3,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x0_sail_23",
+      "y": 90
+    },
+    "belly=1,col=0,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 270
+    },
+    "belly=1,col=0,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 270
+    },
+    "belly=1,col=0,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 270
+    },
+    "belly=1,col=0,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_00",
+      "y": 270
+    },
+    "belly=1,col=0,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_10",
+      "y": 270
+    },
+    "belly=1,col=0,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_20",
+      "y": 270
+    },
+    "belly=1,col=0,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 180
+    },
+    "belly=1,col=0,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 180
+    },
+    "belly=1,col=0,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 180
+    },
+    "belly=1,col=0,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_00",
+      "y": 180
+    },
+    "belly=1,col=0,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_10",
+      "y": 180
+    },
+    "belly=1,col=0,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_20",
+      "y": 180
+    },
+    "belly=1,col=0,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00"
+    },
+    "belly=1,col=0,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10"
+    },
+    "belly=1,col=0,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20"
+    },
+    "belly=1,col=0,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_00"
+    },
+    "belly=1,col=0,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_10"
+    },
+    "belly=1,col=0,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_20"
+    },
+    "belly=1,col=0,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 90
+    },
+    "belly=1,col=0,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 90
+    },
+    "belly=1,col=0,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 90
+    },
+    "belly=1,col=0,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_00",
+      "y": 90
+    },
+    "belly=1,col=0,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_10",
+      "y": 90
+    },
+    "belly=1,col=0,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_20",
+      "y": 90
+    },
+    "belly=1,col=1,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 270
+    },
+    "belly=1,col=1,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 270
+    },
+    "belly=1,col=1,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 270
+    },
+    "belly=1,col=1,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_01",
+      "y": 270
+    },
+    "belly=1,col=1,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_11",
+      "y": 270
+    },
+    "belly=1,col=1,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_21",
+      "y": 270
+    },
+    "belly=1,col=1,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 180
+    },
+    "belly=1,col=1,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 180
+    },
+    "belly=1,col=1,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 180
+    },
+    "belly=1,col=1,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_01",
+      "y": 180
+    },
+    "belly=1,col=1,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_11",
+      "y": 180
+    },
+    "belly=1,col=1,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_21",
+      "y": 180
+    },
+    "belly=1,col=1,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01"
+    },
+    "belly=1,col=1,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11"
+    },
+    "belly=1,col=1,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21"
+    },
+    "belly=1,col=1,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_01"
+    },
+    "belly=1,col=1,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_11"
+    },
+    "belly=1,col=1,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_21"
+    },
+    "belly=1,col=1,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 90
+    },
+    "belly=1,col=1,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 90
+    },
+    "belly=1,col=1,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 90
+    },
+    "belly=1,col=1,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_01",
+      "y": 90
+    },
+    "belly=1,col=1,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_11",
+      "y": 90
+    },
+    "belly=1,col=1,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_21",
+      "y": 90
+    },
+    "belly=1,col=2,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 270
+    },
+    "belly=1,col=2,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 270
+    },
+    "belly=1,col=2,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 270
+    },
+    "belly=1,col=2,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_02",
+      "y": 270
+    },
+    "belly=1,col=2,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_12",
+      "y": 270
+    },
+    "belly=1,col=2,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_22",
+      "y": 270
+    },
+    "belly=1,col=2,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 180
+    },
+    "belly=1,col=2,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 180
+    },
+    "belly=1,col=2,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 180
+    },
+    "belly=1,col=2,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_02",
+      "y": 180
+    },
+    "belly=1,col=2,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_12",
+      "y": 180
+    },
+    "belly=1,col=2,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_22",
+      "y": 180
+    },
+    "belly=1,col=2,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02"
+    },
+    "belly=1,col=2,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12"
+    },
+    "belly=1,col=2,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22"
+    },
+    "belly=1,col=2,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_02"
+    },
+    "belly=1,col=2,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_12"
+    },
+    "belly=1,col=2,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_22"
+    },
+    "belly=1,col=2,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 90
+    },
+    "belly=1,col=2,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 90
+    },
+    "belly=1,col=2,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 90
+    },
+    "belly=1,col=2,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_02",
+      "y": 90
+    },
+    "belly=1,col=2,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_12",
+      "y": 90
+    },
+    "belly=1,col=2,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_22",
+      "y": 90
+    },
+    "belly=1,col=3,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 270
+    },
+    "belly=1,col=3,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 270
+    },
+    "belly=1,col=3,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 270
+    },
+    "belly=1,col=3,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_03",
+      "y": 270
+    },
+    "belly=1,col=3,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_13",
+      "y": 270
+    },
+    "belly=1,col=3,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_23",
+      "y": 270
+    },
+    "belly=1,col=3,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 180
+    },
+    "belly=1,col=3,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 180
+    },
+    "belly=1,col=3,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 180
+    },
+    "belly=1,col=3,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_03",
+      "y": 180
+    },
+    "belly=1,col=3,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_13",
+      "y": 180
+    },
+    "belly=1,col=3,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_23",
+      "y": 180
+    },
+    "belly=1,col=3,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03"
+    },
+    "belly=1,col=3,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13"
+    },
+    "belly=1,col=3,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23"
+    },
+    "belly=1,col=3,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_03"
+    },
+    "belly=1,col=3,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_13"
+    },
+    "belly=1,col=3,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_23"
+    },
+    "belly=1,col=3,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 90
+    },
+    "belly=1,col=3,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 90
+    },
+    "belly=1,col=3,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 90
+    },
+    "belly=1,col=3,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_03",
+      "y": 90
+    },
+    "belly=1,col=3,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_13",
+      "y": 90
+    },
+    "belly=1,col=3,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x1_sail_23",
+      "y": 90
+    },
+    "belly=2,col=0,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 270
+    },
+    "belly=2,col=0,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 270
+    },
+    "belly=2,col=0,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 270
+    },
+    "belly=2,col=0,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_00",
+      "y": 270
+    },
+    "belly=2,col=0,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_10",
+      "y": 270
+    },
+    "belly=2,col=0,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_20",
+      "y": 270
+    },
+    "belly=2,col=0,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 180
+    },
+    "belly=2,col=0,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 180
+    },
+    "belly=2,col=0,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 180
+    },
+    "belly=2,col=0,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_00",
+      "y": 180
+    },
+    "belly=2,col=0,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_10",
+      "y": 180
+    },
+    "belly=2,col=0,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_20",
+      "y": 180
+    },
+    "belly=2,col=0,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00"
+    },
+    "belly=2,col=0,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10"
+    },
+    "belly=2,col=0,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20"
+    },
+    "belly=2,col=0,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_00"
+    },
+    "belly=2,col=0,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_10"
+    },
+    "belly=2,col=0,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_20"
+    },
+    "belly=2,col=0,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_00",
+      "y": 90
+    },
+    "belly=2,col=0,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_10",
+      "y": 90
+    },
+    "belly=2,col=0,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_20",
+      "y": 90
+    },
+    "belly=2,col=0,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_00",
+      "y": 90
+    },
+    "belly=2,col=0,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_10",
+      "y": 90
+    },
+    "belly=2,col=0,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_20",
+      "y": 90
+    },
+    "belly=2,col=1,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 270
+    },
+    "belly=2,col=1,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 270
+    },
+    "belly=2,col=1,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 270
+    },
+    "belly=2,col=1,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_01",
+      "y": 270
+    },
+    "belly=2,col=1,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_11",
+      "y": 270
+    },
+    "belly=2,col=1,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_21",
+      "y": 270
+    },
+    "belly=2,col=1,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 180
+    },
+    "belly=2,col=1,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 180
+    },
+    "belly=2,col=1,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 180
+    },
+    "belly=2,col=1,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_01",
+      "y": 180
+    },
+    "belly=2,col=1,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_11",
+      "y": 180
+    },
+    "belly=2,col=1,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_21",
+      "y": 180
+    },
+    "belly=2,col=1,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01"
+    },
+    "belly=2,col=1,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11"
+    },
+    "belly=2,col=1,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21"
+    },
+    "belly=2,col=1,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_01"
+    },
+    "belly=2,col=1,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_11"
+    },
+    "belly=2,col=1,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_21"
+    },
+    "belly=2,col=1,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_01",
+      "y": 90
+    },
+    "belly=2,col=1,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_11",
+      "y": 90
+    },
+    "belly=2,col=1,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_21",
+      "y": 90
+    },
+    "belly=2,col=1,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_01",
+      "y": 90
+    },
+    "belly=2,col=1,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_11",
+      "y": 90
+    },
+    "belly=2,col=1,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_21",
+      "y": 90
+    },
+    "belly=2,col=2,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 270
+    },
+    "belly=2,col=2,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 270
+    },
+    "belly=2,col=2,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 270
+    },
+    "belly=2,col=2,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_02",
+      "y": 270
+    },
+    "belly=2,col=2,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_12",
+      "y": 270
+    },
+    "belly=2,col=2,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_22",
+      "y": 270
+    },
+    "belly=2,col=2,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 180
+    },
+    "belly=2,col=2,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 180
+    },
+    "belly=2,col=2,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 180
+    },
+    "belly=2,col=2,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_02",
+      "y": 180
+    },
+    "belly=2,col=2,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_12",
+      "y": 180
+    },
+    "belly=2,col=2,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_22",
+      "y": 180
+    },
+    "belly=2,col=2,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02"
+    },
+    "belly=2,col=2,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12"
+    },
+    "belly=2,col=2,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22"
+    },
+    "belly=2,col=2,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_02"
+    },
+    "belly=2,col=2,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_12"
+    },
+    "belly=2,col=2,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_22"
+    },
+    "belly=2,col=2,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_02",
+      "y": 90
+    },
+    "belly=2,col=2,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_12",
+      "y": 90
+    },
+    "belly=2,col=2,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_22",
+      "y": 90
+    },
+    "belly=2,col=2,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_02",
+      "y": 90
+    },
+    "belly=2,col=2,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_12",
+      "y": 90
+    },
+    "belly=2,col=2,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_22",
+      "y": 90
+    },
+    "belly=2,col=3,facing=east,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 270
+    },
+    "belly=2,col=3,facing=east,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 270
+    },
+    "belly=2,col=3,facing=east,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 270
+    },
+    "belly=2,col=3,facing=east,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_03",
+      "y": 270
+    },
+    "belly=2,col=3,facing=east,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_13",
+      "y": 270
+    },
+    "belly=2,col=3,facing=east,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_23",
+      "y": 270
+    },
+    "belly=2,col=3,facing=north,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 180
+    },
+    "belly=2,col=3,facing=north,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 180
+    },
+    "belly=2,col=3,facing=north,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 180
+    },
+    "belly=2,col=3,facing=north,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_03",
+      "y": 180
+    },
+    "belly=2,col=3,facing=north,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_13",
+      "y": 180
+    },
+    "belly=2,col=3,facing=north,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_23",
+      "y": 180
+    },
+    "belly=2,col=3,facing=south,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03"
+    },
+    "belly=2,col=3,facing=south,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13"
+    },
+    "belly=2,col=3,facing=south,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23"
+    },
+    "belly=2,col=3,facing=south,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_03"
+    },
+    "belly=2,col=3,facing=south,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_13"
+    },
+    "belly=2,col=3,facing=south,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_23"
+    },
+    "belly=2,col=3,facing=west,raised=false,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_03",
+      "y": 90
+    },
+    "belly=2,col=3,facing=west,raised=false,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_13",
+      "y": 90
+    },
+    "belly=2,col=3,facing=west,raised=false,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/empty_sail_23",
+      "y": 90
+    },
+    "belly=2,col=3,facing=west,raised=true,row=0": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_03",
+      "y": 90
+    },
+    "belly=2,col=3,facing=west,raised=true,row=1": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_13",
+      "y": 90
+    },
+    "belly=2,col=3,facing=west,raised=true,row=2": {
+      "model": "heavyseas:block/skiff/skiff_sail/sail_panel_x2_sail_23",
+      "y": 90
+    }
+  }
+}

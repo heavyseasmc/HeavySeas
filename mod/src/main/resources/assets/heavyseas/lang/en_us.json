@@ -442,5 +442,6 @@
   "heavyseas.table.title": "Public Cards",
   "heavyseas.table.offline": "Offline",
   "heavyseas.seat.detail": "%s · strength %s/%s · %s (right-click: cards in front)",
-  "heavyseas.card_action.rejected": "That card cannot be played now."
+  "heavyseas.card_action.rejected": "That card cannot be played now.",
+  "heavyseas.skiff.sail_too_rough": "Too rough to raise the sail"
 }

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/lifebuoy_flat",
+  "textures": {
+    "particle": "heavyseas:block/skiff/lifebuoy",
+    "t": "heavyseas:block/skiff/lifebuoy"
+  }
+}
