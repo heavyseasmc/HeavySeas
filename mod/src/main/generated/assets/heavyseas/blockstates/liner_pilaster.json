@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster",
+      "y": 90
+    }
+  }
+}

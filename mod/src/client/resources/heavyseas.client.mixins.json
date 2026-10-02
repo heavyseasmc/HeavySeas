@@ -5,11 +5,13 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "BackgroundRendererMixin",
+    "ClientWorldPropertiesMixin",
     "InGameHudMixin",
     "KeyBindingPriorityMixin",
     "LobbyBoatTargetingMixin",
     "NativeImageMixin",
-    "TrueTypeFontMixin"
+    "TrueTypeFontMixin",
+    "WorldWeatherMixin"
   ],
   "injectors": {
     "defaultRequire": 1

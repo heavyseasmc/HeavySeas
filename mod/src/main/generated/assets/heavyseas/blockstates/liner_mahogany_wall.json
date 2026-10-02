@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_mahogany_wall/cube_front",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_mahogany_wall/cube_front",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_mahogany_wall/cube_front"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_mahogany_wall/cube_front",
+      "y": 90
+    }
+  }
+}

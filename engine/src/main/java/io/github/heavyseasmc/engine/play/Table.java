@@ -108,6 +108,11 @@ public final class Table {
         return provisionPile.size();
     }
 
+    /** 物资牌堆此刻的顺序，顶上的在前。只读的一份拷贝（调试查看与导出用，ADR-0060）。 */
+    public List<String> provisionPileOrder() {
+        return List.copyOf(provisionPile);
+    }
+
     /**
      * 牌堆里还剩几张这个 id（<b>夹具用</b>，与 {@link #takeFromProvisionPile} 成对）。
      *

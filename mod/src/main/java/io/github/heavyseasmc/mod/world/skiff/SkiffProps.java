@@ -257,6 +257,64 @@ public final class SkiffProps {
         }
     }
 
+    // ---------------------------------------------------------------- 调试口（ADR-0060）
+
+    /**
+     * {@code /seas debug skiff oil}：这一局船体里每一盏灯的油一律定为 {@code oil} 档（0–4）。只改方块状态，不碰规则。
+     *
+     * @return 灯在哪几格；空 = 这一局没有船体，或船体里没有灯
+     */
+    public static List<BlockPos> debugSetOil(ServerWorld world, GameComponent component, int oil) {
+        List<BlockPos> lanterns = new ArrayList<>();
+        hullBox(component).ifPresent(box -> {
+            for (BlockPos p : BlockPos.iterate(box.getMinX(), box.getMinY(), box.getMinZ(),
+                    box.getMaxX(), box.getMaxY(), box.getMaxZ())) {
+                if (world.getBlockState(p).isOf(SkiffBlocks.LANTERN)) {
+                    lanterns.add(p.toImmutable());
+                }
+            }
+        });
+        for (BlockPos p : lanterns) {
+            BlockState s = world.getBlockState(p);
+            if (s.get(SkiffBlocks.OIL) != oil) {
+                world.setBlockState(p, s.with(SkiffBlocks.OIL, oil), Block.NOTIFY_ALL);
+            }
+        }
+        // 与语言无关的一行，带上灯在哪几格：回归脚本拿它去世界里逐格核对（判据取自世界，不取自这一行）
+        LOGGER.info("艇上：调试 · 灯油定为 {} 档 · {} 盏 · {}", oil, lanterns.size(), positions(lanterns));
+        return List.copyOf(lanterns);
+    }
+
+    /**
+     * {@code /seas debug skiff sail up | down}：升 / 收帆。❗调试口<b>不问风浪</b>（右键那条路问）——
+     * 要看的正是「暴风雨天升着帆」这种局面；第二天开头照常按天候自动收（{@link #onNewDay}）。
+     *
+     * @return 帆面在哪几格；空 = 这一局没有船体，或船体里没有帆
+     */
+    public static List<BlockPos> debugSetSail(ServerWorld world, GameComponent component, boolean raise) {
+        List<BlockPos> sails = new ArrayList<>();
+        List<BlockPos> yards = new ArrayList<>();
+        hullBox(component).ifPresent(box -> find(world, box, sails, yards));
+        String weather = currentWeather(world).orElse(null);
+        if (!sails.isEmpty()) {
+            setSail(world, sails, yards, raise, Rules.bellyFor(weather));
+        }
+        LOGGER.info("艇上：调试 · {}帆 · 天候 {} · 鼓 {} · {} 块帆面 · {}", raise ? "升" : "收", weather,
+                Rules.bellyFor(weather), sails.size(), positions(sails));
+        return List.copyOf(sails);
+    }
+
+    private static String positions(List<BlockPos> at) {
+        StringBuilder out = new StringBuilder();
+        for (BlockPos p : at) {
+            if (!out.isEmpty()) {
+                out.append("; ");
+            }
+            out.append(p.getX()).append(' ').append(p.getY()).append(' ').append(p.getZ());
+        }
+        return out.isEmpty() ? "（无）" : out.toString();
+    }
+
     // ---------------------------------------------------------------- 小工具
 
     private static Optional<BlockBox> hullBox(GameComponent component) {

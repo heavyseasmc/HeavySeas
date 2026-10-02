@@ -43,6 +43,13 @@ class GuiGlyphCoverageTest {
             "heavyseas\\.(provision\\.[a-z0-9_]+|character\\.[a-z0-9_]+|weather\\.[a-z0-9_]+|nav\\.title\\..+|nav\\.name_sep"
                     + "|actioncard\\.[a-z0-9_]+)");
 
+    /**
+     * 方块、物品、实体、创造物品栏页签的名字：游戏自己的界面（物品提示、物品栏、F3）用 Minecraft 自带的字画，
+     * 不经 GuiText —— 本模组的字体子集不必、也不该为它们扩（ADR-0058 Q6 起这几族一下子多了三十来条）。
+     * 若本模组自己的界面也引用了其中某一条（客户端源码里出现这个键），它照旧要查。
+     */
+    private static final Pattern VANILLA_RENDERED_KEY = Pattern.compile("(block|item|entity|itemGroup)\\.heavyseas\\..+");
+
     // ---------------------------------------------------------------- 判据本体
 
     /** 返回「这个字 → 出现在哪」里字体显示不了的那些。空 = 通过。 */
@@ -99,13 +106,19 @@ class GuiGlyphCoverageTest {
         Map<Integer, String> bold = new TreeMap<>();
         java.util.Set<String> world = worldOnlyKeys();
         assertTrue(!world.isEmpty(), "头顶名牌那几条 lang 键一条都没认出来 —— 排除规则坏了，不是没有");
+        java.util.Set<String> clientKeys = keysReferencedByClient();
         int read = 0;
+        int vanillaRendered = 0;
         for (String lang : List.of("zh_cn", "en_us")) {
             JsonObject json = JsonParser.parseString(Files.readString(LANG_DIR.resolve(lang + ".json"),
                     StandardCharsets.UTF_8)).getAsJsonObject();
             for (var e : json.entrySet()) {
                 if (world.contains(e.getKey())) {
                     continue;                            // 头顶名牌画在世界里、用 Minecraft 自带的字，不经 GuiText
+                }
+                if (VANILLA_RENDERED_KEY.matcher(e.getKey()).matches() && !clientKeys.contains(e.getKey())) {
+                    vanillaRendered++;
+                    continue;                            // 方块 / 物品 / 实体 / 页签名：游戏自己的界面画，见 VANILLA_RENDERED_KEY
                 }
                 read++;
                 String value = e.getValue().getAsString();
@@ -116,9 +129,24 @@ class GuiGlyphCoverageTest {
             }
         }
         assertTrue(read > 200 && bold.size() > 40, "只读到 " + read + " 条 lang、牌名 " + bold.size() + " 个字 —— 没在查");
+        // 正向对照：两种语言里方块 / 物品名至少该认出二十几条；一条都没有时「放过了」与「规则写坏了」长得一样
+        assertTrue(vanillaRendered >= 40, "游戏自己画的名字只认出 " + vanillaRendered + " 条 —— 排除规则坏了");
         List<String> problems = new java.util.ArrayList<>(missing(font("serif.ttf"), regular));
         missing(font("serif_bold.ttf"), bold).forEach(p -> problems.add("粗体 " + p));
         assertEquals(List.of(), problems, String.join("\n", problems));
+    }
+
+    @Test
+    @DisplayName("红测：只放过游戏自己画的那几族名字（方块 · 物品 · 实体 · 页签），本模组界面的键一条不放")
+    void vanillaRenderedKeysAreOnlyThoseFamilies() {
+        for (String k : List.of("block.heavyseas.skiff_hull", "item.heavyseas.gull_spawn_egg", "entity.heavyseas.gull",
+                "itemGroup.heavyseas.building")) {
+            assertTrue(VANILLA_RENDERED_KEY.matcher(k).matches(), k + " 该放过");
+        }
+        for (String k : List.of("heavyseas.provision.water", "heavyseas.hud.sea", "heavyseas.block.hull",
+                "blockheavyseas.x", "block.heavyseas", "item.minecraft.stick")) {
+            assertTrue(!VANILLA_RENDERED_KEY.matcher(k).matches(), k + " 不该放过");
+        }
     }
 
     @Test
@@ -148,6 +176,21 @@ class GuiGlyphCoverageTest {
      * 只在头顶名牌里用的 lang 键：{@code Nameplates.java} 里出现、客户端源码里一次都没出现的那些。
      * 从源码现取，不抄一张表 —— 表会过期（证伪表「判据里的每个字面量都是一颗定时器」）。
      */
+    /** 客户端源码里以字面量出现的 lang 键（任何命名空间）：本模组自己的界面会拿去排的那些。 */
+    private static java.util.Set<String> keysReferencedByClient() throws IOException {
+        Pattern key = Pattern.compile("\"((?:block|item|entity|itemGroup)\\.heavyseas\\.[A-Za-z0-9_.]+)\"");
+        java.util.Set<String> out = new TreeSet<>();
+        try (Stream<Path> files = Files.walk(CLIENT_SRC)) {
+            for (Path f : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                Matcher m = key.matcher(Files.readString(f, StandardCharsets.UTF_8));
+                while (m.find()) {
+                    out.add(m.group(1));
+                }
+            }
+        }
+        return out;
+    }
+
     private static java.util.Set<String> worldOnlyKeys() throws IOException {
         Pattern key = Pattern.compile("\"(heavyseas\\.[a-z0-9_.]+)\"");
         java.util.Set<String> world = new TreeSet<>();

@@ -167,22 +167,15 @@ public final class MistSea {
             component.clearSceneLeftover();
             LOGGER.info("场景已收：解除强加载 {} 个 chunk", leftover.forcedChunks().size());
         });
-        clock(sea).resetWeather();                 // 雨与雷是这一局按天候开的，收场时放晴
         component.clearLayoutId();
     }
 
-    /**
-     * 时刻与天气该写给哪个世界：<b>主世界</b>，不是雾海那个维度。
-     *
-     * <p>2026-09-19 换地图演练实测：日志打着「时刻 13000」，维度里 {@code time query} 却是 19531 → 10 秒后 19731，
-     * 钟一直在走。查 1.21.1 字节码：主世界之外的 {@code ServerWorld} 拿到的是 {@code UnmodifiableLevelProperties}，
-     * 它的 {@code setTimeOfDay / setRaining / setThundering / setRainTime / setClearWeatherTime / setThunderTime}
-     * 六个方法的方法体全是一句 {@code return}，读则转给主世界那份。全服只有一口钟、一场雨，
-     * Minecraft 自己的 {@code /weather} 指令也是写 {@code getOverworld()}。于是大厅（主世界）里的人会同时看见雾海的昼夜与雨——这是游戏本身的形状，不是我们的选择。
+    /*
+     * 时刻与天气不再写给任何世界（ADR-0058 §4，2026-10-02）。此前写的是主世界那口钟与那场雨 ——
+     * 主世界之外的 ServerWorld 拿到的是 UnmodifiableLevelProperties，写进去是空操作（ADR-0034 §10.4 实测），
+     * 于是对局每天把全服的钟拨到当日天候那一行，大厅里的人也跟着变天。现在由 PlayerSky 按人发天色、客户端照画，
+     * 主世界的钟与雨归主世界自己。
      */
-    private static ServerWorld clock(ServerWorld sea) {
-        return sea.getServer().getOverworld();
-    }
 
     private static void escrow(GameComponent component, ServerPlayerEntity player) {
         for (ServerWorld world : player.server.getWorlds()) {
@@ -288,44 +281,18 @@ public final class MistSea {
         }
     }
 
-    /** 雨与时刻钉多久：一天的对局远不到这个数，中途不会自己放晴。 */
-    private static final int WEATHER_HOLD_TICKS = 6_000_000;
-
-    /** 时刻每隔这么多 tick 钉一次：{@code doDaylightCycle} 是全服规则，不能只关这一个维度。 */
-    private static final int TIME_PIN_INTERVAL = 20;
-
     /**
-     * 天候到世界（ADR-0034 §5.1.5）：按雾表那一行开雨雷、钉时刻。每天翻出天候时调一次，{@code /seas dev weather} 也调。
+     * 天候到世界（ADR-0034 §5.1.5）：每天翻出天候时调一次，{@code /seas debug weather now} 也调。
      *
-     * <p>雾本身不在这里：客户端按投影里的 {@code HudView.Fog} 渲染（§5.1.2）。M4 那版的 BLINDNESS 已经拿掉。
+     * <p>这里只记一行：昼夜与雨雷由 {@link PlayerSky} 按人发给这一局里的人，各自的客户端照画（ADR-0058 §4）——
+     * 不再拨主世界的钟。雾本身也不在这里：客户端按投影里的 {@code HudView.Fog} 渲染（§5.1.2）。
      */
     public static void applyWeather(ServerWorld world, GameComponent component, String weatherId) {
         FogTable.Entry entry = SceneDataLoader.fogFor(component.layoutId().orElse(SceneDataLoader.DEFAULT), weatherId);
-        ServerWorld clock = clock(world);            // 写雾海那个维度是空操作，见 clock()
-        clock.setWeather(entry.rain() ? 0 : WEATHER_HOLD_TICKS, entry.rain() ? WEATHER_HOLD_TICKS : 0,
-                entry.rain(), entry.thunder());
-        clock.setTimeOfDay(entry.time());
-        // 与语言无关的一行。❗它只证明「写了」，不证明「落到了世界上」——2026-09-19 前这行照打、钟照走；
-        // 要核对得在维度里 time query 两次（ADR-0034 §10.4）。
-        LOGGER.info("天候到世界：{} · 雨 {} · 雷 {} · 时刻 {} · 雾 {}/{} · 钟 {}", weatherId, entry.rain(), entry.thunder(),
-                entry.time(), entry.start(), entry.end(), clock.getRegistryKey().getValue());
-    }
-
-    /** 每 20 tick 把时刻钉回当日天候那一行；对局外什么都不做。 */
-    public static void tick(MinecraftServer server) {
-        if (server.getTicks() % TIME_PIN_INTERVAL != 0) {
-            return;
-        }
-        ServerWorld sea = world(server);
-        if (sea == null) {
-            return;
-        }
-        GameComponent component = GameComponents.of(sea);
-        if (component.session().isEmpty() || component.layoutId().isEmpty()) {
-            return;
-        }
-        String weather = component.requireSession().currentWeather().map(card -> card.id()).orElse("");
-        clock(sea).setTimeOfDay(SceneDataLoader.fogFor(component.layoutId().get(), weather).time());
+        // 与语言无关的一行（脚本按「天候到世界：<id>」认今天是什么天）。❗它只是参数回显：
+        // 画没画成要看客户端那一行「天色：收到 …」与截图（sky_test.py），不看这里。
+        LOGGER.info("天候到世界：{} · 雨 {} · 雷 {} · 时刻 {} · 雾 {}/{} · 按人画天色（主世界的钟不动）", weatherId,
+                entry.rain(), entry.thunder(), entry.time(), entry.start(), entry.end());
     }
 
     private static void checkpoint(MinecraftServer server, String reason) {

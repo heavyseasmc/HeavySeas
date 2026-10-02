@@ -1,33 +1,243 @@
 {
   "variants": {
-    "facing=east,side=left": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem",
+    "facing=east,number=1,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1",
       "y": 90
     },
-    "facing=east,side=right": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem",
+    "facing=east,number=1,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1",
       "y": 270
     },
-    "facing=north,side=left": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem"
+    "facing=east,number=2,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2",
+      "y": 90
     },
-    "facing=north,side=right": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem",
-      "y": 180
-    },
-    "facing=south,side=left": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem",
-      "y": 180
-    },
-    "facing=south,side=right": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem"
-    },
-    "facing=west,side=left": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem",
+    "facing=east,number=2,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2",
       "y": 270
     },
-    "facing=west,side=right": {
-      "model": "heavyseas:block/skiff/skiff_emblem/emblem",
+    "facing=east,number=3,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3",
+      "y": 90
+    },
+    "facing=east,number=3,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3",
+      "y": 270
+    },
+    "facing=east,number=4,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4",
+      "y": 90
+    },
+    "facing=east,number=4,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4",
+      "y": 270
+    },
+    "facing=east,number=5,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5",
+      "y": 90
+    },
+    "facing=east,number=5,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5",
+      "y": 270
+    },
+    "facing=east,number=6,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6",
+      "y": 90
+    },
+    "facing=east,number=6,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6",
+      "y": 270
+    },
+    "facing=east,number=7,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7",
+      "y": 90
+    },
+    "facing=east,number=7,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7",
+      "y": 270
+    },
+    "facing=east,number=8,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8",
+      "y": 90
+    },
+    "facing=east,number=8,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8",
+      "y": 270
+    },
+    "facing=north,number=1,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1"
+    },
+    "facing=north,number=1,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1",
+      "y": 180
+    },
+    "facing=north,number=2,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2"
+    },
+    "facing=north,number=2,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2",
+      "y": 180
+    },
+    "facing=north,number=3,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3"
+    },
+    "facing=north,number=3,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3",
+      "y": 180
+    },
+    "facing=north,number=4,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4"
+    },
+    "facing=north,number=4,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4",
+      "y": 180
+    },
+    "facing=north,number=5,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5"
+    },
+    "facing=north,number=5,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5",
+      "y": 180
+    },
+    "facing=north,number=6,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6"
+    },
+    "facing=north,number=6,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6",
+      "y": 180
+    },
+    "facing=north,number=7,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7"
+    },
+    "facing=north,number=7,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7",
+      "y": 180
+    },
+    "facing=north,number=8,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8"
+    },
+    "facing=north,number=8,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8",
+      "y": 180
+    },
+    "facing=south,number=1,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1",
+      "y": 180
+    },
+    "facing=south,number=1,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1"
+    },
+    "facing=south,number=2,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2",
+      "y": 180
+    },
+    "facing=south,number=2,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2"
+    },
+    "facing=south,number=3,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3",
+      "y": 180
+    },
+    "facing=south,number=3,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3"
+    },
+    "facing=south,number=4,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4",
+      "y": 180
+    },
+    "facing=south,number=4,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4"
+    },
+    "facing=south,number=5,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5",
+      "y": 180
+    },
+    "facing=south,number=5,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5"
+    },
+    "facing=south,number=6,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6",
+      "y": 180
+    },
+    "facing=south,number=6,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6"
+    },
+    "facing=south,number=7,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7",
+      "y": 180
+    },
+    "facing=south,number=7,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7"
+    },
+    "facing=south,number=8,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8",
+      "y": 180
+    },
+    "facing=south,number=8,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8"
+    },
+    "facing=west,number=1,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1",
+      "y": 270
+    },
+    "facing=west,number=1,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_1",
+      "y": 90
+    },
+    "facing=west,number=2,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2",
+      "y": 270
+    },
+    "facing=west,number=2,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_2",
+      "y": 90
+    },
+    "facing=west,number=3,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3",
+      "y": 270
+    },
+    "facing=west,number=3,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_3",
+      "y": 90
+    },
+    "facing=west,number=4,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4",
+      "y": 270
+    },
+    "facing=west,number=4,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_4",
+      "y": 90
+    },
+    "facing=west,number=5,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5",
+      "y": 270
+    },
+    "facing=west,number=5,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_5",
+      "y": 90
+    },
+    "facing=west,number=6,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6",
+      "y": 270
+    },
+    "facing=west,number=6,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_6",
+      "y": 90
+    },
+    "facing=west,number=7,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7",
+      "y": 270
+    },
+    "facing=west,number=7,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_7",
+      "y": 90
+    },
+    "facing=west,number=8,side=left": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8",
+      "y": 270
+    },
+    "facing=west,number=8,side=right": {
+      "model": "heavyseas:block/skiff/skiff_emblem/emblem_boat_number_8",
       "y": 90
     }
   }

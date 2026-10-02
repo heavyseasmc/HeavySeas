@@ -19,7 +19,6 @@ import io.github.heavyseasmc.mod.game.DesignationPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.game.NavigationPhase;
 import io.github.heavyseasmc.mod.game.ThirstPhase;
-import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.world.Backdrop;
@@ -39,9 +38,6 @@ import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +68,7 @@ public final class SeasCommand {
      */
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
-    private static com.mojang.brigadier.Command<ServerCommandSource> guarded(
+    static com.mojang.brigadier.Command<ServerCommandSource> guarded(
             com.mojang.brigadier.Command<ServerCommandSource> inner) {
         return context -> {
             try {
@@ -89,7 +85,7 @@ public final class SeasCommand {
     }
 
     /** 角色 id 的补全：只补当前这一局里真的存在的角色，避免补出一个 7 人局才有的名字。 */
-    private static final SuggestionProvider<ServerCommandSource> CHARACTERS = (context, builder) -> {
+    static final SuggestionProvider<ServerCommandSource> CHARACTERS = (context, builder) -> {
         GameComponent component = GameComponents.of(gameWorld(context));
         component.session().ifPresentOrElse(
                 session -> session.state().bySeat().forEach(id -> builder.suggest(id.value())),
@@ -99,17 +95,16 @@ public final class SeasCommand {
     };
 
     /** 天候 id 直接来自本次加载的数据，不在命令里维护第二张白名单。 */
-    private static final SuggestionProvider<ServerCommandSource> WEATHERS = (context, builder) -> {
+    static final SuggestionProvider<ServerCommandSource> WEATHERS = (context, builder) -> {
         GameDataLoader.require().weather().forEach(card -> builder.suggest(card.id()));
         return builder.buildFuture();
     };
 
+    /**
+     * 整棵 {@code /seas}，生产服与开发环境<b>同一棵</b>（ADR-0060 D2）：原先只在开发环境注册的 {@code /seas dev}
+     * 并进了 {@code /seas debug}（{@link DebugCommand}），靠权限挡，不再靠「生产服根本没有」。
+     */
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        register(dispatcher, FabricLoader.getInstance().isDevelopmentEnvironment());
-    }
-
-    /** 这个重载只为机械证明生产命令树不含 {@code /seas dev}。 */
-    static void register(CommandDispatcher<ServerCommandSource> dispatcher, boolean developmentEnvironment) {
         dispatcher.register(CommandManager.literal("seas")
                 .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                 .then(CommandManager.literal("start")
@@ -241,69 +236,9 @@ public final class SeasCommand {
                         .executes(guarded(context -> navigate(context, null)))
                         .then(CommandManager.argument("card", StringArgumentType.word())
                                 .executes(guarded(context -> navigate(context,
-                                        StringArgumentType.getString(context, "card")))))));
-        if (developmentEnvironment) {
-            dispatcher.register(CommandManager.literal("seas")
-                    .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
-                    .then(CommandManager.literal("dev")
-                            .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
-                            .then(CommandManager.literal("roster")
-                                    .executes(guarded(context -> devRoster(context, 6)))
-                                    .then(CommandManager.argument("players", IntegerArgumentType.integer(6, 8))
-                                            .executes(guarded(context -> devRoster(context,
-                                                    IntegerArgumentType.getInteger(context, "players"))))))
-                            .then(CommandManager.literal("weather")
-                                    .then(CommandManager.argument("id", StringArgumentType.word())
-                                            .suggests(WEATHERS)
-                                            .executes(guarded(SeasCommand::devWeather))))));
-        }
-    }
-
-    /** 用一个真实连接收到正式阵容包；确认按钮仍会走生产 {@code StartVoyageC2S} 校验。 */
-    private static int devRoster(CommandContext<ServerCommandSource> context, int players) {
-        ServerPlayerEntity player = context.getSource().getPlayer();
-        if (player == null) {
-            context.getSource().sendError(Text.literal("/seas dev roster 必须由游戏客户端玩家执行"));
-            return 0;
-        }
-        RosterConfigS2C packet = RosterConfigS2C.from(player.getBlockPos().asLong(), players,
-                GameDataLoader.require().roster());
-        ServerPlayNetworking.send(player, packet);
-        LOGGER.info("开发验收：向 {} 打开 {} 人阵容面板", player.getGameProfile().getName(), players);
-        return 1;
-    }
-
-    /**
-     * 把当前天候临时覆盖成指定数据牌，只用于客户端截图/断言。
-     * 下一次正式抽天候时覆盖自动消失，牌堆、弃牌堆与随机次序均不改变。
-     */
-    private static int devWeather(CommandContext<ServerCommandSource> context) {
-        ServerWorld world = gameWorld(context);
-        GameComponent component = GameComponents.of(world);
-        if (component.session().isEmpty()) {
-            context.getSource().sendError(Text.translatable("heavyseas.command.no_game"));
-            return 0;
-        }
-        String raw = StringArgumentType.getString(context, "id");
-        WeatherCard weather = GameDataLoader.require().weather().stream()
-                .filter(card -> card.id().equals(raw))
-                .findFirst().orElse(null);
-        if (weather == null) {
-            context.getSource().sendError(Text.literal("未知天候：" + raw));
-            return 0;
-        }
-        component.requireSession().table().weather()
-                .orElseThrow(() -> new IllegalStateException("当前对局没有天候牌堆"))
-                .overrideCurrentUntilNextDraw(weather);
-        // 雨 · 雷 · 时刻也跟着换，否则截图里只有雾变了、天没变（ADR-0034 §5.1.5）。
-        MistSea.applyWeather(world, component, weather.id());
-        component.notify(Text.translatable("heavyseas.game.weather",
-                Text.translatable("heavyseas.weather." + weather.id()),
-                Text.translatable("heavyseas.weather.effect." + weather.id()))
-                .formatted(Formatting.AQUA));
-        GameComponents.sync(world);
-        LOGGER.info("开发验收：天候临时覆盖为 {}（{}）", weather.id(), weather.effect().id());
-        return 1;
+                                        StringArgumentType.getString(context, "card"))))))
+                // 只有管理员能用的调试指令（ADR-0060）：每一个节点自己也要 2 级，见 DebugCommand
+                .then(DebugCommand.tree()));
     }
 
     /** 已加载的布局 id：从场景数据现取，不在命令里维护第二张表。 */
@@ -642,7 +577,7 @@ public final class SeasCommand {
     }
 
     /** Console commands still originate in the overworld after players cross into M4's match dimension. */
-    private static ServerWorld gameWorld(CommandContext<ServerCommandSource> context) {
+    static ServerWorld gameWorld(CommandContext<ServerCommandSource> context) {
         ServerWorld sea = MistSea.world(context.getSource().getServer());
         if (sea != null && GameComponents.of(sea).session().isPresent()) {
             return sea;
@@ -908,7 +843,7 @@ public final class SeasCommand {
     }
 
     /** 显示名走 lang 键，与卡面同一套（O17：文案从卡面提取，不另写一遍）。 */
-    private static Text provisionName(String cardId) {
+    static Text provisionName(String cardId) {
         return Text.translatable("heavyseas.provision." + cardId);
     }
 
@@ -950,7 +885,7 @@ public final class SeasCommand {
     }
 
     /** 取一个角色参数并核对它在这一局里。 */
-    private static Optional<CharacterId> named(CommandContext<ServerCommandSource> context,
+    static Optional<CharacterId> named(CommandContext<ServerCommandSource> context,
                                                Session session, String argument) {
         String raw = StringArgumentType.getString(context, argument);
         Optional<CharacterId> found = session.state().bySeat().stream()

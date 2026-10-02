@@ -1,93 +1,93 @@
 {
   "variants": {
-    "char=bei,facing=east,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei",
+    "facing=east,segment=left,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left",
       "y": 90
     },
-    "char=bei,facing=east,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei",
+    "facing=east,segment=left,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left",
       "y": 270
     },
-    "char=bei,facing=north,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei"
-    },
-    "char=bei,facing=north,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei",
-      "y": 180
-    },
-    "char=bei,facing=south,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei",
-      "y": 180
-    },
-    "char=bei,facing=south,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei"
-    },
-    "char=bei,facing=west,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei",
-      "y": 270
-    },
-    "char=bei,facing=west,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_bei",
+    "facing=east,segment=middle,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle",
       "y": 90
     },
-    "char=chen,facing=east,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen",
+    "facing=east,segment=middle,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle",
+      "y": 270
+    },
+    "facing=east,segment=right,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right",
       "y": 90
     },
-    "char=chen,facing=east,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen",
+    "facing=east,segment=right,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right",
       "y": 270
     },
-    "char=chen,facing=north,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen"
+    "facing=north,segment=left,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left"
     },
-    "char=chen,facing=north,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen",
+    "facing=north,segment=left,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left",
       "y": 180
     },
-    "char=chen,facing=south,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen",
+    "facing=north,segment=middle,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle"
+    },
+    "facing=north,segment=middle,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle",
       "y": 180
     },
-    "char=chen,facing=south,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen"
+    "facing=north,segment=right,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right"
     },
-    "char=chen,facing=west,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen",
+    "facing=north,segment=right,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right",
+      "y": 180
+    },
+    "facing=south,segment=left,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left",
+      "y": 180
+    },
+    "facing=south,segment=left,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left"
+    },
+    "facing=south,segment=middle,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle",
+      "y": 180
+    },
+    "facing=south,segment=middle,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle"
+    },
+    "facing=south,segment=right,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right",
+      "y": 180
+    },
+    "facing=south,segment=right,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right"
+    },
+    "facing=west,segment=left,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left",
       "y": 270
     },
-    "char=chen,facing=west,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_chen",
+    "facing=west,segment=left,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_left",
       "y": 90
     },
-    "char=hao,facing=east,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao",
+    "facing=west,segment=middle,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle",
+      "y": 270
+    },
+    "facing=west,segment=middle,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_middle",
       "y": 90
     },
-    "char=hao,facing=east,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao",
+    "facing=west,segment=right,side=left": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right",
       "y": 270
     },
-    "char=hao,facing=north,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao"
-    },
-    "char=hao,facing=north,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao",
-      "y": 180
-    },
-    "char=hao,facing=south,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao",
-      "y": 180
-    },
-    "char=hao,facing=south,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao"
-    },
-    "char=hao,facing=west,side=left": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao",
-      "y": 270
-    },
-    "char=hao,facing=west,side=right": {
-      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_hao",
+    "facing=west,segment=right,side=right": {
+      "model": "heavyseas:block/skiff/skiff_nameplate/nameplate_name_right",
       "y": 90
     }
   }

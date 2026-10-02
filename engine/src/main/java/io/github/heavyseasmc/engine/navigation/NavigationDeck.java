@@ -56,6 +56,11 @@ public final class NavigationDeck {
         return pile.isEmpty();
     }
 
+    /** 牌堆此刻的顺序，顶上的在前。只读的一份拷贝（调试查看与导出用，ADR-0060）。 */
+    public List<NavigationCard> order() {
+        return List.copyOf(pile);
+    }
+
     /**
      * 从顶抽一张。
      *

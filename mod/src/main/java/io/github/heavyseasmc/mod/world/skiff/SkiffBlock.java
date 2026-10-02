@@ -6,6 +6,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
+import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.WorldAccess;
 import net.minecraft.entity.player.PlayerEntity;
@@ -66,6 +67,22 @@ public final class SkiffBlock extends Block {
 
     void defaultTo(BlockState state) {
         setDefaultState(state);
+    }
+
+    /**
+     * 从创造物品栏拿来摆：看得见的那一版（{@link SkiffBlocks#displayState}），船头朝玩家面朝的方向；放进水里的那几样带水。
+     * 船体结构不走这里（模板直接写状态）；座位号、帆格、名牌段、左右舷这些用调试棒切。
+     */
+    @Override
+    public BlockState getPlacementState(ItemPlacementContext ctx) {
+        BlockState s = SkiffBlocks.displayState(this);
+        if (s.contains(Properties.HORIZONTAL_FACING)) {
+            s = s.with(Properties.HORIZONTAL_FACING, ctx.getHorizontalPlayerFacing());
+        }
+        if (s.contains(SkiffBlocks.WATERLOGGED)) {
+            s = s.with(SkiffBlocks.WATERLOGGED, ctx.getWorld().getFluidState(ctx.getBlockPos()).isOf(Fluids.WATER));
+        }
+        return s;
     }
 
     /** 这个状态的样子，朝向已经算进 y 旋转里（模板一律按「船头朝南」作画）。 */

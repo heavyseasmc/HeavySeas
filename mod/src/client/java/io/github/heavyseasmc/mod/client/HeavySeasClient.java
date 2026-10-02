@@ -7,6 +7,7 @@ import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.net.CatalogS2C;
+import io.github.heavyseasmc.mod.net.SkyS2C;
 import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.state.ContestView;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
@@ -220,6 +221,10 @@ public final class HeavySeasClient implements ClientModInitializer {
                     LOGGER.info("牌目录：收到 {} 种物资、{} 个角色、{} 种天候（带效果图示的 {} 种）",
                             Catalog.size(), Catalog.characters(), Catalog.weathers(), Catalog.weathersWithGlyph());
                 }));
+        // 这个人的天该画成什么样（ADR-0054 §9.8 D12 第 4 条 (a)）；掉线就不再接管。
+        ClientPlayNetworking.registerGlobalReceiver(SkyS2C.ID, (payload, context) ->
+                context.client().execute(() -> SkyOverride.accept(payload)));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> SkyOverride.clear());
         ClientPlayNetworking.registerGlobalReceiver(RosterConfigS2C.ID, (payload, context) ->
                 context.client().execute(() -> context.client().setScreen(new RosterScreen(payload))));
         // 「这张是替你挑的」（舵手超时）。次序的道理与上面相同：先到，结算后的那一次投影后到。

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/pilaster",
+  "textures": {
+    "p": "heavyseas:block/liner/pilaster",
+    "particle": "heavyseas:block/liner/pilaster"
+  }
+}

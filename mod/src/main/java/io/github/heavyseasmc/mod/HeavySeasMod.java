@@ -9,6 +9,7 @@ import io.github.heavyseasmc.mod.game.ContestPhase;
 import io.github.heavyseasmc.mod.game.ConnectionPhase;
 import io.github.heavyseasmc.mod.game.OverboardPhase;
 import io.github.heavyseasmc.mod.game.CardActions;
+import io.github.heavyseasmc.mod.game.DebugNext;
 import io.github.heavyseasmc.mod.net.CardActionC2S;
 import io.github.heavyseasmc.mod.game.DesignationPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
@@ -24,6 +25,7 @@ import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.net.RowDecisionC2S;
 import io.github.heavyseasmc.mod.net.CatalogS2C;
+import io.github.heavyseasmc.mod.net.SkyS2C;
 import io.github.heavyseasmc.mod.net.RosterConfigS2C;
 import io.github.heavyseasmc.mod.net.StartVoyageC2S;
 import io.github.heavyseasmc.mod.net.ThirstActionC2S;
@@ -32,9 +34,12 @@ import io.github.heavyseasmc.mod.net.WaterDonationC2S;
 import io.github.heavyseasmc.mod.world.SeatEntity;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.MistSea;
+import io.github.heavyseasmc.mod.world.PlayerSky;
+import io.github.heavyseasmc.mod.world.CreativeTabs;
 import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
+import io.github.heavyseasmc.mod.world.liner.LinerBlocks;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlockEntity;
 import io.github.heavyseasmc.mod.world.LobbyBoatEntity;
@@ -82,12 +87,14 @@ public final class HeavySeasMod implements ModInitializer {
         SceneItems.register();
         LobbyBoatBlock.register();
         SkiffBlocks.register();
+        LinerBlocks.register();                        // 大邮轮那一族装饰方块（ADR-0062）
         LobbyBoatEntity.register();
         ServerChunkEvents.CHUNK_LOAD.register(LobbyBoatBlockEntity::restoreLegacyAnchors);
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。
         SeatEntity.register();
         PlayerBodies.register();
         GullEntity.register();
+        CreativeTabs.register();                       // 物品都登记完之后：本模组自己的三页（ADR-0058 Q6）
         // ❗孤儿座位：加载事件只登记，tick 末尾才清。加载回调仍在实体管理器的遍历里，
         //   当场 discard 会让存档检查点抛 ConcurrentModificationException。
         ServerEntityEvents.ENTITY_LOAD.register(Seats::onSeatLoaded);
@@ -96,6 +103,11 @@ public final class HeavySeasMod implements ModInitializer {
             server.getWorlds().forEach(Nameplates::clear);
             // 船体是真方块、走廊是强加载票，都进存档：崩在对局中时这里清（ADR-0034 §5.2）。
             MistSea.resetScene(server);
+        });
+        // 调试指令给「下一局」定的东西与指定的天色（ADR-0060）只活一次运行：单人游戏同一个进程里再开一个世界，不能带过去。
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            DebugNext.clear();
+            PlayerSky.resetForced();
         });
         // M4 crash recovery: the match itself is intentionally ephemeral, but escrowed real inventories are not.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
@@ -113,8 +125,10 @@ public final class HeavySeasMod implements ModInitializer {
                         LOGGER.warn("牌目录没发出去（提示签上会少「类别 · 共几张」、角标空着）：{}", e.toString());
                     }
                 }));
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
-                ConnectionPhase.connected(handler.player, false));
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            ConnectionPhase.connected(handler.player, false);
+            PlayerSky.forget(handler.player);
+        });
         // 指定模式（ADR-0025）：世界里右键一个人就是「我要对他动手」。
         // ❗只在指定模式里才作数，其余一律放行 —— 吃掉别人的右键会让人觉得「右键偶尔失灵」。
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) ->
@@ -128,6 +142,8 @@ public final class HeavySeasMod implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(ProvisionAutoPickS2C.ID, ProvisionAutoPickS2C.CODEC);
         PayloadTypeRegistry.playS2C().register(RosterConfigS2C.ID, RosterConfigS2C.CODEC);
         PayloadTypeRegistry.playS2C().register(CatalogS2C.ID, CatalogS2C.CODEC);
+        // 每个人的屏幕各自画天色（ADR-0054 §9.8 D12 第 4 条 (a)）：服务端按人决定，客户端照画。
+        PayloadTypeRegistry.playS2C().register(SkyS2C.ID, SkyS2C.CODEC);
         PayloadTypeRegistry.playC2S().register(StartVoyageC2S.ID, StartVoyageC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(StartVoyageC2S.ID,
                 (payload, context) -> context.player().server.execute(
@@ -180,6 +196,7 @@ public final class HeavySeasMod implements ModInitializer {
 
         // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
         ServerTickEvents.END_SERVER_TICK.register(Seats::tick);
+        ServerTickEvents.END_SERVER_TICK.register(PlayerSky::tick);
         ServerTickEvents.END_SERVER_TICK.register(PlayerBodies::tick);
         ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
         ServerTickEvents.END_SERVER_TICK.register(ActionPhase::tick);
@@ -190,7 +207,6 @@ public final class HeavySeasMod implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(DesignationPhase::tick);
         // 排程：替身的一步、航海结算后的停顿（ADR-0019）。
         ServerTickEvents.END_SERVER_TICK.register(GameFlow::tick);
-        ServerTickEvents.END_SERVER_TICK.register(MistSea::tick);
         ServerTickEvents.END_SERVER_TICK.register(Gulls::tick);
     }
 }

@@ -12,6 +12,6 @@ public final class HeavySeasDataGenerator implements DataGeneratorEntrypoint {
     @Override
     public void onInitializeDataGenerator(FabricDataGenerator generator) {
         FabricDataGenerator.Pack pack = generator.createPack();
-        pack.addProvider(SkiffModels::new);
+        pack.addProvider(DecorModels::new);           // 救生艇 · 大邮轮两族装饰方块（ADR-0056 · ADR-0062）
     }
 }

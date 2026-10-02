@@ -5,6 +5,8 @@ import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.MapColor;
 import net.minecraft.block.piston.PistonBehavior;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.sound.BlockSoundGroup;
@@ -64,7 +66,10 @@ public final class SkiffBlocks {
     public static final EnumProperty<Part> MAST_PART = EnumProperty.of("part", Part.class, Part.POLE, Part.ARM, Part.TOP);
     public static final EnumProperty<Part> YARD_PART = EnumProperty.of("part", Part.class, Part.YARD, Part.FORE);
     public static final EnumProperty<Part> END = EnumProperty.of("end", Part.class, Part.BOW, Part.STERN);
-    public static final EnumProperty<Part> CHAR = EnumProperty.of("char", Part.class, Part.BEI, Part.CHEN, Part.HAO);
+    /** 船名牌三格拼一块：从外面看的左 / 中 / 右（ADR-0058 Q5：两行英文，取代原来一格一个汉字）。 */
+    public static final EnumProperty<Part> SEGMENT = EnumProperty.of("segment", Part.class, Part.LEFT, Part.MIDDLE, Part.RIGHT);
+    /** 艇号牌上的号：北辰号吊艇架上 8 条艇，对局里坐的是 1 号（ADR-0058 Q2）。 */
+    public static final IntProperty NUMBER = IntProperty.of("number", 1, 8);
 
     /** 灯油 0–4 档 → 光照等级（ADR-0057：满油 15，快烧干 6，0 = 灭）。 */
     public static final int[] OIL_LIGHT = {0, 6, 10, 13, 15};
@@ -81,7 +86,7 @@ public final class SkiffBlocks {
 
     /** 多段件的段名（各个方块只用其中几个）。 */
     public enum Part implements StringIdentifiable {
-        BLADE, HANDLE, LOWER, HEAD, MID, END, POLE, ARM, TOP, YARD, FORE, BOW, STERN, BEI, CHEN, HAO;
+        BLADE, HANDLE, LOWER, HEAD, MID, END, POLE, ARM, TOP, YARD, FORE, BOW, STERN, LEFT, MIDDLE, RIGHT;
 
         @Override
         public String asString() {
@@ -142,7 +147,7 @@ public final class SkiffBlocks {
     public static final SkiffBlock FLAREBOX = add("skiff_flarebox", solid(MapColor.RED).nonOpaque().sounds(BlockSoundGroup.METAL),
             s -> look("flarebox", tex("side", "flarebox_side", "top", "flarebox_top"), 0, 90), FACING);
 
-    // ---------------------------------------------------------------- 舷外：救生圈 · 扶手绳 · 名牌 · 星徽
+    // ---------------------------------------------------------------- 舷外：救生圈 · 扶手绳 · 名牌 · 艇号牌
 
     public static final SkiffBlock LIFEBUOY = add("skiff_lifebuoy", loose(MapColor.RED).sounds(BlockSoundGroup.WOOL),
             s -> s.get(HANGING)
@@ -152,9 +157,9 @@ public final class SkiffBlocks {
     public static final SkiffBlock GRAB_LINE = add("skiff_grab_line", loose(MapColor.PALE_YELLOW).sounds(BlockSoundGroup.WOOL),
             s -> sided(s, look("grab_line", tex("r", "rope"))), FACING, SIDE);
     public static final SkiffBlock NAMEPLATE = add("skiff_nameplate", loose(MapColor.BROWN),
-            s -> sided(s, look("nameplate", tex("t", "name_" + s.get(CHAR).asString()))), FACING, SIDE, CHAR);
+            s -> sided(s, look("nameplate", tex("t", "name_" + s.get(SEGMENT).asString()))), FACING, SIDE, SEGMENT);
     public static final SkiffBlock EMBLEM = add("skiff_emblem", loose(MapColor.GOLD),
-            s -> sided(s, look("emblem", tex("t", "star_emblem"))), FACING, SIDE);
+            s -> sided(s, look("emblem", tex("t", "boat_number_" + s.get(NUMBER)))), FACING, SIDE, NUMBER);
 
     // ---------------------------------------------------------------- 灯 · 桅杆 · 横桁 · 帆
 
@@ -180,8 +185,34 @@ public final class SkiffBlocks {
     private SkiffBlocks() {
     }
 
+    /**
+     * 方块与物品一起登记（ADR-0058 §8 Q6：自制方块做成一整套方块与物品，进本模组自己的创造物品栏分类）。
+     * 物品只在创造模式里拿得到：方块挖不动、不掉东西、没有配方。
+     */
     public static void register() {
-        BLOCKS.forEach((name, block) -> Registry.register(Registries.BLOCK, Identifier.of(HeavySeasMod.MOD_ID, name), block));
+        BLOCKS.forEach((name, block) -> {
+            Identifier id = Identifier.of(HeavySeasMod.MOD_ID, name);
+            Registry.register(Registries.BLOCK, id, block);
+            Registry.register(Registries.ITEM, id, new BlockItem(block, new Item.Settings()));
+        });
+    }
+
+    /**
+     * 物品放下去、物品栏里画出来的那个状态：默认状态里有几样是「看不见」或「熄着」的（帆收着时是空模型、
+     * 提灯默认没油、横桁默认卷着帆）—— 拿来搭东西的人要的是看得见的那一版。
+     */
+    public static BlockState displayState(SkiffBlock block) {
+        BlockState s = block.getDefaultState();
+        if (s.contains(RAISED)) {
+            s = s.with(RAISED, true).with(BELLY, 1);
+        }
+        if (s.contains(OIL)) {
+            s = s.with(OIL, 4);
+        }
+        if (s.contains(FURLED)) {
+            s = s.with(FURLED, false);
+        }
+        return s;
     }
 
     /** 全部方块，按登记顺序（批量生成工具与判据用）。 */

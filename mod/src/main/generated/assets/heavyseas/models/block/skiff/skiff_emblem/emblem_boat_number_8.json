@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/emblem",
+  "textures": {
+    "particle": "heavyseas:block/skiff/boat_number_8",
+    "t": "heavyseas:block/skiff/boat_number_8"
+  }
+}

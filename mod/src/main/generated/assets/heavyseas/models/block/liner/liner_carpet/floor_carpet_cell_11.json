@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/floor",
+  "textures": {
+    "particle": "heavyseas:block/liner/carpet_cell_11",
+    "side": "heavyseas:block/liner/mahogany",
+    "top": "heavyseas:block/liner/carpet_cell_11"
+  }
+}

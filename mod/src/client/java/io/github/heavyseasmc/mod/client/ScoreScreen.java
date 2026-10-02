@@ -144,11 +144,19 @@ public final class ScoreScreen extends GameScreen {
         int y = sheetBox.y() + l.len(TITLE_Y);
         GuiText.drawPx(context, title, sheetBox.x(), y, sheetBox.w(), titlePx, false, GuiLanguage.ink(),
                 GuiText.Align.CENTER, l.len(3));
+        int subPx = l.len(14);
+        int subY = y + l.len(22 * 1.7) + l.len(2);
         if (landed) {
-            int subPx = l.len(14);
             GuiText.drawPx(context, Text.translatable("heavyseas.score.subline", e.alive()).getString(), sheetBox.x(),
-                    y + l.len(22 * 1.7) + l.len(2), sheetBox.w(), subPx, false,
+                    subY, sheetBox.w(), subPx, false,
                     GuiLanguage.Hud.alpha(GuiLanguage.ink(), 0.7f), GuiText.Align.CENTER, l.len(2));
+            subY += l.len(14 * 1.7);
+        }
+        // 这一局用过调试指令改了局面（ADR-0060 D3）：盖一枚章。用了就要看得见 —— 悄悄改比不能改更伤信任。
+        // ❗只量过几何（排在标题与左边那一列之间），没有真人看过；见 ADR-0060 §验证。
+        if (e.debugChanges() > 0) {
+            GuiText.drawPx(context, Text.translatable("heavyseas.debug.stamp", e.debugChanges()).getString(), sheetBox.x(),
+                    subY, sheetBox.w(), subPx, false, GuiLanguage.cinnabar(), GuiText.Align.CENTER, l.len(2));
         }
     }
 

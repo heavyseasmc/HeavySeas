@@ -1,7 +1,0 @@
-{
-  "parent": "heavyseas:block/skiff/template/emblem",
-  "textures": {
-    "particle": "heavyseas:block/skiff/star_emblem",
-    "t": "heavyseas:block/skiff/star_emblem"
-  }
-}

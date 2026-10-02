@@ -1,11 +1,9 @@
 package io.github.heavyseasmc.mod.game;
 
-import io.github.heavyseasmc.engine.model.Affinities;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Roster;
 import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
-import io.github.heavyseasmc.engine.navigation.NavigationDeck;
 import io.github.heavyseasmc.engine.play.NavigationReport;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.play.Table;
@@ -13,7 +11,6 @@ import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
-import io.github.heavyseasmc.engine.weather.WeatherDeck;
 import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameData;
@@ -107,8 +104,12 @@ public final class GameFlow {
         // 角色随机发（决策 ⑯）。dummy 预定的座位先扣掉，剩下的在真人之间随机分。
         List<CharacterId> open = new ArrayList<>(seats);
         open.removeAll(reservedForDummies);
-        List<CharacterId> shuffled = new ArrayList<>(open);
-        java.util.Collections.shuffle(shuffled, new Random(world.getRandom().nextLong()));
+        // 开局要洗的全从一个种子派生（ADR-0060）：指定了就用指定的，否则现取 —— 现取的种子不进日志（StartShuffle）。
+        Optional<DebugNext.Setting> seedSetting = DebugNext.seed();
+        Optional<DebugNext.Setting> weatherSetting = DebugNext.weather();
+        long seed = seedSetting.map(s -> Long.parseLong(s.value())).orElseGet(() -> world.getRandom().nextLong());
+        StartShuffle.Result dealt = StartShuffle.shuffle(data, roster, open, seed);
+        List<CharacterId> shuffled = dealt.humanSeats();
 
         Map<CharacterId, GameComponent.Occupant> occupants = new LinkedHashMap<>();
         for (CharacterId dummy : reservedForDummies) {
@@ -128,20 +129,25 @@ public final class GameFlow {
         }
 
         // ❗三副牌都要给。漏掉物资会让物资阶段静默跳过，漏掉天候会让四阶段兼容路径
-        //   静默退回三阶段；两种局面都照样能打到终局，所以必须在这里一次接齐。
-        Table table = new Table(
-                new NavigationDeck(data.navigation(), new Random(world.getRandom().nextLong())),
-                data.provisions(),
-                new WeatherDeck(data.weather(), new Random(world.getRandom().nextLong())),
-                new Random(world.getRandom().nextLong()));
+        //   静默退回三阶段；两种局面都照样能打到终局，所以必须在这里一次接齐（StartShuffle 一次洗齐）。
+        Table table = dealt.table();
+        // 第一天翻哪一张（/seas debug next weather）：只调顺序，不造牌。翻不出就不开这一局，并说清楚怎么办。
+        weatherSetting.ifPresent(w -> {
+            if (!table.weather().orElseThrow().stackNext(w.value())) {
+                throw new IllegalStateException("下一局第一天定为 %s，这一套天候里没有这一张（/seas debug next clear 清掉）"
+                        .formatted(w.value()));
+            }
+        });
         Session session = new Session("world=" + world.getRegistryKey().getValue(), roster, table);
         // 开局发爱恨（ADR-0022）：两个独立置换，全程保密。
         // ❗日志里不打谁爱谁、谁恨谁 —— 开服的人往往也是玩家。终局翻牌时才一张张写进日志。
-        session.dealAffinities(Affinities.random(roster, new Random(world.getRandom().nextLong())));
+        session.dealAffinities(dealt.affinities());
 
         GameComponent component = GameComponents.of(world);
         component.begin(session, occupants, humans.stream().map(ServerPlayerEntity::getUuid)
                 .collect(java.util.stream.Collectors.toSet()));
+        component.setGameRandom(new Random(dealt.gameSeed()));
+        DebugNext.clear();                    // 只管这一局：开成了就清，不会悄悄留到再下一局
         // ❗开局也是一次状态变化，先把投影推出去。各面的包（补给箱、划船、舵手）都在这之后发，
         //   而那几面要靠投影判「对局还在不在」—— 投影还没到就收到包的话，界面开出来又当场自己收掉。
         //   2026-09-16 实拍：船头那一位的补给箱一闪即没，然后干等 16 秒超时，屏幕上没有任何报错。
@@ -156,10 +162,19 @@ public final class GameFlow {
                     session.state().stateOf(id).seat(), characterName(id),
                     who.isDummy() ? Text.translatable("heavyseas.game.dummy") : Text.literal(who.label())));
         }
+        // 开局时生效的调试设定，记成这一局的改动（ADR-0060 D3）：全船右栏一行、计分面板的章里算一处。
+        seedSetting.ifPresent(s -> DebugTrace.atStart(world, component, s.who(), s.command(),
+                Text.translatable("heavyseas.debug.did.seed", s.value())));
+        weatherSetting.ifPresent(w -> DebugTrace.atStart(world, component, w.who(), w.command(),
+                Text.translatable("heavyseas.debug.did.first_weather", Text.translatable("heavyseas.weather." + w.value()))));
+        io.github.heavyseasmc.mod.world.PlayerSky.forced().ifPresent(sky -> DebugTrace.atStart(world, component,
+                sky.who(), sky.command(), Text.translatable("heavyseas.debug.did.sky_carried")));
         // ❗前半段的措辞被 playthrough-check.sh 与 playthrough_feed.py 盯着，只许往后加字段。
-        LOGGER.info("对局开始：{} 人局 · 座位 {} · 替身自动推进{} · 布局 {} · 维度 {}", players,
+        //   种子只在<b>指定了</b>时才打（那一局已经算调试过的局）；现取的种子不进日志，理由见 StartShuffle。
+        LOGGER.info("对局开始：{} 人局 · 座位 {} · 替身自动推进{} · 布局 {} · 维度 {}{}", players,
                 session.state().bySeat().stream().map(CharacterId::value).toList(),
-                component.dummyAutoplay() ? "开" : "关", layout.id(), layout.dimension());
+                component.dummyAutoplay() ? "开" : "关", layout.id(), layout.dimension(),
+                seedSetting.map(s -> " · 调试种子 " + s.value()).orElse(""));
         // 位次摆进世界（ADR-0024）。放在播报之后：摆船会再推一次投影，而开局那一帧已经推过了。
         Seats.place(world, component, layout, session.state().bySeat().size());
         enterWeather(world, component);
@@ -179,7 +194,7 @@ public final class GameFlow {
                 Text.translatable(weatherNameKey(weather)), Text.translatable(weatherEffectKey(weather)))
                 .formatted(Formatting.AQUA));
         LOGGER.info("天候：{}（{}）", weather.id(), weather.effect().id());
-        // 天候到世界（ADR-0034 §5.1.5）：雨 · 雷 · 时刻按雾表那一行；雾本身由投影带给客户端。
+        // 天候到世界（ADR-0034 §5.1.5）：只记一行；昼夜与雨雷由 PlayerSky 按人发、客户端照画（ADR-0058 §4），雾由投影带给客户端。
         MistSea.applyWeather(world, component, weather.id());
         SkiffProps.onNewDay(world, component, weather.id(), session.state().turn());   // 灯油烧掉一档 · 帆按天候（ADR-0057）
         session.advancePhase();
@@ -478,6 +493,10 @@ public final class GameFlow {
         }
         LOGGER.info("对局结束：{} · 第 {} 回合 · 存活 {} 人",
                 end.outcome().orElseThrow(), end.turn(), session.aliveCount());
+        if (component.debugged()) {
+            // D8（ADR-0060）：调试改过局面的局不计入长线进度。进度系统还没有，先把这一条记下来、让以后的那一侧认它。
+            LOGGER.info("本局有 {} 处调试改动：不计入长线进度", component.debugChanges());
+        }
         // ❗不再当场收起会话：终局序列（翻恨 → 翻爱 → 计分）走完才收（ADR-0022）。
         //   原先这里是 component.end() —— 「本阶段不计分」那句占位也一起拿掉了。
         sync(world);
@@ -493,12 +512,20 @@ public final class GameFlow {
     public static void landForFixture(ServerWorld world, GameComponent component) {
         Session session = component.requireSession();
         session.landForFixture();
+        LOGGER.info("夹具：直接靠岸（第 {} 回合）", session.state().turn());
+        afterFixtureLanding(world, component);
+    }
+
+    /**
+     * 海鸥已经被夹具 / 调试口凑满之后的那一段：停掉各面的计时，走正常的终局流程。
+     * {@code /seas land} 与 {@code /seas debug gulls}（ADR-0060）共用这一条 —— 「到 4 只走正常的靠岸流程」只此一份。
+     */
+    public static void afterFixtureLanding(ServerWorld world, GameComponent component) {
         component.clearActionWindow();
         component.clearProvisionTarget();
         component.clearProvision();
         component.clearHelm();
         component.clearThirst();
-        LOGGER.info("夹具：直接靠岸（第 {} 回合）", session.state().turn());
         announceOutcome(world, component);
     }
 
@@ -516,6 +543,11 @@ public final class GameFlow {
                     g.stateOf(id).seat(), characterName(id), occupantName(component, id),
                     s.size() - g.stateOf(id).damage(), s.size(),
                     conditionName(condition), g.stateOf(id).thirst().count()));
+        }
+        // 与计分面板那枚章同一个数（ADR-0060 D3）
+        if (component.debugChanges() > 0) {
+            out.add(Text.translatable("heavyseas.debug.stamp", component.debugChanges())
+                    .formatted(Formatting.LIGHT_PURPLE));
         }
         return out;
     }

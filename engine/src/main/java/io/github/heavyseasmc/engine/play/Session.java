@@ -2218,6 +2218,33 @@ public final class Session {
         Invariants.requireValid(state, context, "夹具靠岸后");
     }
 
+    /**
+     * <b>调试口</b>（ADR-0060，{@code /seas debug gulls}）：把海鸥数定为 {@code target}。
+     *
+     * <p>与 {@link #landForFixture} 同一族，只是可以停在半路（0–3 只）。凑够 {@value GameState#GULLS_TO_LAND} 只时
+     * 当场以靠岸结束 —— 那一刻与夹具靠岸是同一个局面，所以拦的也是同两条：划船 / 口渴还没定完时不许靠岸。
+     * 往下调是合法的（信号枪也会翻出「去掉一只海鸥」），负数不行。
+     *
+     * @throws IllegalArgumentException {@code target} 为负
+     * @throws IllegalStateException    这一局已经结束；或者要靠岸了，而划船 / 口渴还没定完
+     */
+    public void debugSetGulls(int target) {
+        if (target < 0) {
+            throw new IllegalArgumentException("%s 海鸥数不能为负：%d".formatted(context, target));
+        }
+        if (state.isOver()) {
+            throw new IllegalStateException("%s 这一局已经结束了".formatted(context));
+        }
+        if (target >= GameState.GULLS_TO_LAND) {
+            requireNoRowInProgress("调试靠岸");
+            requireNoThirstInProgress("调试靠岸");
+        }
+        GameState before = state;
+        state = state.withGulls(target - state.gulls());
+        Invariants.requireValid(state, context, "调试改海鸥后");
+        Invariants.requireValidTransition(before, state, context, "调试改海鸥");
+    }
+
     /** 连人带牌移出游戏：手牌与面前的牌随他离场（不进弃牌堆），他从船上消失（ADR-0022）。 */
     private void removeFromGame(CharacterId id) {
         SurvivorState s = state.stateOf(id);

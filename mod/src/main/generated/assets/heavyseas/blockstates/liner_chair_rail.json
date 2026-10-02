@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_chair_rail/chair_rail",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_chair_rail/chair_rail",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_chair_rail/chair_rail"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_chair_rail/chair_rail",
+      "y": 90
+    }
+  }
+}

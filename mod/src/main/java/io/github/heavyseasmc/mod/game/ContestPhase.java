@@ -216,7 +216,8 @@ public final class ContestPhase {
         Session session = component.requireSession();
         Contest contest = session.contest().orElseThrow();
         int size = session.state().stateOf(contest.target()).hand().size();
-        session.pickFromHand(world.getRandom().nextInt(size));
+        // 这一局自己的随机源（开局时由种子派生，ADR-0060）：指定了种子的一局，抢到哪一张也照样可复现
+        session.pickFromHand(component.gameRandom().nextInt(size));
         LOGGER.info("抢夺：{} 从 {} 手上随机抢走一张", contest.attacker().value(), contest.target().value());
         GameFlow.broadcast(world, Text.translatable("heavyseas.contest.stolen_hand",
                 GameFlow.characterName(contest.attacker()),

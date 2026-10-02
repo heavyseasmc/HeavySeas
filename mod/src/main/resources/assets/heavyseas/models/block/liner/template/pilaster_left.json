@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#p"},
+  "elements": [
+    {"from": [0, 0, 0], "to": [5, 16, 1.5], "faces": {"south": {"texture": "#p", "uv": [0, 0, 5, 16]}, "east": {"texture": "#p", "uv": [0, 0, 1.5, 16]}, "west": {"texture": "#p", "uv": [0, 0, 1.5, 16]}, "up": {"texture": "#p", "uv": [0, 0, 5, 1.5]}, "down": {"texture": "#p", "uv": [0, 0, 5, 1.5]}}}
+  ]
+}

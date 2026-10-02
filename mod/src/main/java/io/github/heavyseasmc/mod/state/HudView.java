@@ -124,15 +124,16 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
      * @param stage    正在哪一段；不在终局时为 {@code null}
      * @param flipped  这一轮已经翻开了几张
      * @param entries  按翻牌次序的每个人：这一轮翻开了的带着目标（没翻开的是空串），计分阶段带着合计（其余时候是 -1）
+     * @param debugChanges 这一局有几处调试改动（ADR-0060 D3）；0 = 没有。计分面板按它盖章
      */
     public record Endgame(GameState.Outcome outcome, int alive, EndgameProgress.Stage stage, int flipped,
-                          List<Entry> entries) {
+                          List<Entry> entries, int debugChanges) {
 
         public Endgame {
             entries = List.copyOf(Objects.requireNonNull(entries, "entries"));
         }
 
-        public static final Endgame NONE = new Endgame(null, 0, null, 0, List.of());
+        public static final Endgame NONE = new Endgame(null, 0, null, 0, List.of(), 0);
 
         public boolean active() {
             return stage != null;

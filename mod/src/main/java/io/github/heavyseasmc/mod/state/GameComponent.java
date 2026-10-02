@@ -258,6 +258,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                 buf.writeVarInt(scoring ? endgame.scores().get(who).total() : -1);
                 buf.writeBoolean(endgame.isWinner(who));
             }
+            // 计分面板上那枚章：这一局有几处调试改动（ADR-0060 D3）。公开 —— 用了调试，全船都该知道。
+            buf.writeVarInt(debugChanges());
         }
 
         // 进行中的换座位 / 抢夺（ADR-0023）：谁对谁 · 哪一段 · 还剩多久 · 两边站了谁 · 两边的体型和，全都**公开**。
@@ -527,7 +529,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             for (int i = 0; i < entryCount; i++) {
                 entries.add(new HudView.Endgame.Entry(buf.readString(), buf.readString(), buf.readVarInt(), buf.readBoolean()));
             }
-            endgame = new HudView.Endgame(outcome, alive, stage, flipped, entries);
+            int debugChanges = buf.readVarInt();
+            endgame = new HudView.Endgame(outcome, alive, stage, flipped, entries, debugChanges);
         }
         boolean hasContest = buf.readBoolean();
         Contest.Kind contestKind = Contest.Kind.SWAP;
@@ -953,6 +956,104 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         endgame = null;
         fogCleared = false;
         steps.clear();
+        debugEntries.clear();
+        gameRandom = new java.util.Random();
+    }
+
+    // ------------------------------------------------------------------ 调试留痕（ADR-0060）
+
+    /**
+     * 这一局里用过的一条调试指令。
+     *
+     * @param who     谁下的（玩家名；控制台是 Server，RCON 是 Rcon）
+     * @param turn    第几天
+     * @param command 指令原文
+     * @param changed 改了局面没有；只读的（查看 · 导出）为假
+     */
+    public record DebugEntry(String who, int turn, String command, boolean changed) {
+
+        public DebugEntry {
+            Objects.requireNonNull(who, "who");
+            Objects.requireNonNull(command, "command");
+        }
+    }
+
+    /**
+     * 这一局的调试记录。❗{@link #end()} <b>不清</b>：一局打完还要能 {@code /seas debug log} 看它；下一局开局时清。
+     * 不持久化 —— 对局本身就不持久化。
+     */
+    private final List<DebugEntry> debugEntries = new ArrayList<>();
+
+    public void recordDebug(DebugEntry entry) {
+        debugEntries.add(Objects.requireNonNull(entry, "entry"));
+    }
+
+    public List<DebugEntry> debugEntries() {
+        return List.copyOf(debugEntries);
+    }
+
+    /** 这一局有几处调试改动（计分面板上那枚章的数）。 */
+    public int debugChanges() {
+        return (int) debugEntries.stream().filter(DebugEntry::changed).count();
+    }
+
+    /** D8（ADR-0060）：调试改过局面的这一局，不计入以后的长线进度。 */
+    public boolean debugged() {
+        return debugChanges() > 0;
+    }
+
+    /**
+     * 这一局对局中途要用的随机源（抢夺时从手牌里随机挑一张）。开局时由开局那一串种子派生 ——
+     * 指定了种子（{@code /seas debug next seed}）的一局因此整局可复现，而不只是开局那一刻。
+     */
+    private java.util.Random gameRandom = new java.util.Random();
+
+    public java.util.Random gameRandom() {
+        return gameRandom;
+    }
+
+    public void setGameRandom(java.util.Random random) {
+        this.gameRandom = Objects.requireNonNull(random, "random");
+    }
+
+    /**
+     * {@code /seas debug timer now}（ADR-0060）：此刻开着的倒计时一律<b>立刻到点</b>。
+     *
+     * <p>只改「什么时候到点」，超时那一步仍由各阶段自己的 tick 照本来的规矩走 —— 不在这里替谁做决定。
+     *
+     * @return 到点了哪几面（与语言无关的名字：action · provision · helm · thirst · contest · designation · overboard）
+     */
+    public List<String> expireOpenWindows(long now) {
+        List<String> expired = new ArrayList<>();
+        if (actionDeadline > 0) {
+            actionDeadline = now;
+            expired.add("action");
+        }
+        if (provisionDeadline > 0) {
+            provisionDeadline = now;
+            expired.add("provision");
+        }
+        if (helmDeadline > 0) {
+            helmDeadline = now;
+            expired.add("helm");
+        }
+        if (thirstDeadline > 0) {
+            thirstDeadline = now;
+            expired.add("thirst");
+        }
+        if (contestDeadline > 0) {
+            contestDeadline = now;
+            expired.add("contest");
+        }
+        if (designationDeadline > 0) {
+            designationDeadline = now;
+            expired.add("designation");
+        }
+        if (overboardDeadline > 0) {
+            overboardDeadline = now;
+            expired.add("overboard");
+        }
+        return List.copyOf(expired);
     }
 
     public boolean belongsToActiveVoyage(UUID player) {
@@ -1198,6 +1299,11 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             notifications.removeFirst();
         }
         notificationJsonCache = null;
+    }
+
+    /** 右栏此刻的那几条（最多 {@value #MAX_NOTIFICATIONS} 条，旧的在前）。只读的一份拷贝：调试导出用（ADR-0060）。 */
+    public List<Text> notifications() {
+        return List.copyOf(notifications);
     }
 
     private List<String> notificationJson(RegistryWrapper.WrapperLookup registry) {

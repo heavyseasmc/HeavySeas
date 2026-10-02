@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "end=both,facing=east": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_both",
+      "y": 270
+    },
+    "end=both,facing=north": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_both",
+      "y": 180
+    },
+    "end=both,facing=south": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_both"
+    },
+    "end=both,facing=west": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_both",
+      "y": 90
+    },
+    "end=left,facing=east": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_left",
+      "y": 270
+    },
+    "end=left,facing=north": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_left",
+      "y": 180
+    },
+    "end=left,facing=south": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_left"
+    },
+    "end=left,facing=west": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_left",
+      "y": 90
+    },
+    "end=none,facing=east": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping",
+      "y": 270
+    },
+    "end=none,facing=north": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping",
+      "y": 180
+    },
+    "end=none,facing=south": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping"
+    },
+    "end=none,facing=west": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping",
+      "y": 90
+    },
+    "end=right,facing=east": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_right",
+      "y": 270
+    },
+    "end=right,facing=north": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_right",
+      "y": 180
+    },
+    "end=right,facing=south": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_right"
+    },
+    "end=right,facing=west": {
+      "model": "heavyseas:block/liner/liner_capping_mahogany/capping_right",
+      "y": 90
+    }
+  }
+}

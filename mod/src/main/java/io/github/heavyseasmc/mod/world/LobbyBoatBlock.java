@@ -2,7 +2,6 @@ package io.github.heavyseasmc.mod.world;
 
 import com.mojang.serialization.MapCodec;
 import io.github.heavyseasmc.mod.HeavySeasMod;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -15,7 +14,6 @@ import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroups;
 import net.minecraft.item.ItemPlacementContext;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -50,7 +48,7 @@ public final class LobbyBoatBlock extends BlockWithEntity {
         Registry.register(Registries.BLOCK, ID, BLOCK);
         Registry.register(Registries.ITEM, ID, ITEM);
         Registry.register(Registries.BLOCK_ENTITY_TYPE, ID, TYPE);
-        ItemGroupEvents.modifyEntriesEvent(ItemGroups.FUNCTIONAL).register(entries -> entries.add(ITEM));
+        // 进本模组自己的「物件与功能」那一页（CreativeTabs），不再放进游戏自带的「功能方块」。
     }
 
     @Override
