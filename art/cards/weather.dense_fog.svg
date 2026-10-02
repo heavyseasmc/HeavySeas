@@ -78,7 +78,7 @@
     <g id="rule-panel">
       <rect x="24" y="232.0" width="372" height="30.0" rx="2" fill="#CBB995" opacity="0.55"/>
       <rect x="24" y="232.0" width="372" height="30.0" rx="2" fill="none" stroke="#241E1A" stroke-width="1.0" opacity="0.6"/>
-      <text class="cjk" x="210" y="252.0" font-size="10" font-weight="500" text-anchor="middle" fill="#241E1A">忽略这回合出现的任何海鸥图示</text>
+      <text class="cjk" x="210" y="252.0" font-size="10" font-weight="500" text-anchor="middle" fill="#241E1A">今天不计海鸥图示</text>
     </g>
     <g id="footer">
       <g transform="rotate(-6 359.0 274.0)" opacity="0.6">
