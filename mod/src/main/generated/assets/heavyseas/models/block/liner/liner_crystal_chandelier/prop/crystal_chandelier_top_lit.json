@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/crystal_chandelier_top_lit",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/crystal_chandelier_top",
+    "g": "heavyseas:block/liner/prop/crystal_chandelier_top_glow_lit",
+    "particle": "heavyseas:block/liner/prop/crystal_chandelier_top"
+  }
+}

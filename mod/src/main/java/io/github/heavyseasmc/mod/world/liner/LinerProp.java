@@ -30,9 +30,11 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldAccess;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
@@ -43,6 +45,8 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  * <p>跨几格的件（两格高的灯、2 × 2 的大桌、两格的沙发）像床、门那样：<b>一件物品摆出整件</b>，空间不够就摆不下；
  * <b>拆掉任何一格，整件一起没</b>（每一格都认得自己的搭档该在哪、是哪一块，搭档不在了自己就变成空气，一格传一格）。
  * 灯<b>右键开关</b>，亮着时发光（灯柱 15 · 落地灯 14 · 台灯 12；两格高的灯只有上面那一格发光）。
+ * 顶灯与吊灯（ADR-0066）<b>只能挂在天花下</b>（摆的时候看正上方），整件往下长；吊灯只有灯身那几格发光（15）。
+ * 轮廓与碰撞箱都照外形拼几个盒子（{@link LinerPropShapes}），没有一件是整块的。
  * 台灯放在大桌上时整件下沉 3 像素落在桌布上（{@code on_table}，看正下方那一格）。
  *
  * <p>模型一律<b>正面朝北</b>作画（与游戏自带方块的约定一致，物品栏里才看得到正面），与 {@link LinerBlock} 的「朝南作画」不同：
@@ -56,7 +60,12 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
     public enum Part implements StringIdentifiable {
         LOWER(0, 0, 0), UPPER(0, 1, 0),
         NW(0, 0, 0), NE(1, 0, 0), SW(0, 0, 1), SE(1, 0, 1),
-        WEST(0, 0, 0), EAST(1, 0, 0);
+        WEST(0, 0, 0), EAST(1, 0, 0),
+        /** 水晶大吊灯（ADR-0066）：贴天花的吊杆那一格，正中 3 × 3 那一层的上面。 */
+        CROWN(1, 1, 1),
+        RING_NW(0, 0, 0), RING_N(1, 0, 0), RING_NE(2, 0, 0),
+        RING_W(0, 0, 1), RING_C(1, 0, 1), RING_E(2, 0, 1),
+        RING_SW(0, 0, 2), RING_S(1, 0, 2), RING_SE(2, 0, 2);
 
         final int x;
         final int y;
@@ -85,7 +94,13 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         /** 两格的沙发。 */
         SOFA,
         /** 一格的椅子。 */
-        CHAIR
+        CHAIR,
+        /** 一格的吸顶灯（ADR-0066）：只能挂在天花下。 */
+        CEILING_LAMP,
+        /** 两格高的吊灯：上面一格贴天花（摆的时候点中的那一格），下面一格是灯身、发光。 */
+        CHANDELIER,
+        /** 水晶大吊灯：贴天花的吊杆一格 + 下面 3 × 3 一层，共 10 格；那一层正中的十字五格发光。 */
+        GRAND_CHANDELIER
     }
 
     public static final net.minecraft.state.property.DirectionProperty FACING = Properties.HORIZONTAL_FACING;
@@ -95,6 +110,8 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
     public static final EnumProperty<Part> TALL = EnumProperty.of("part", Part.class, Part.LOWER, Part.UPPER);
     public static final EnumProperty<Part> QUAD = EnumProperty.of("part", Part.class, Part.NW, Part.NE, Part.SW, Part.SE);
     public static final EnumProperty<Part> PAIR = EnumProperty.of("part", Part.class, Part.WEST, Part.EAST);
+    public static final EnumProperty<Part> GRAND = EnumProperty.of("part", Part.class, Part.CROWN,
+            Part.RING_NW, Part.RING_N, Part.RING_NE, Part.RING_W, Part.RING_C, Part.RING_E, Part.RING_SW, Part.RING_S, Part.RING_SE);
 
     /**
      * 一件道具的说明。
@@ -141,9 +158,10 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
 
     private static EnumProperty<Part> partProperty(Kind kind) {
         return switch (kind) {
-            case TALL_LAMP -> TALL;
+            case TALL_LAMP, CHANDELIER -> TALL;
             case GRAND_TABLE -> QUAD;
             case SOFA -> PAIR;
+            case GRAND_CHANDELIER -> GRAND;
             default -> null;
         };
     }
@@ -156,7 +174,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         if (p != null) {
             builder.add(p);
         }
-        if (s.kind() == Kind.TALL_LAMP || s.kind() == Kind.TABLE_LAMP) {
+        if (Rules.isLamp(s.kind())) {
             builder.add(LIT);
         }
         if (s.kind() == Kind.TABLE_LAMP) {
@@ -168,12 +186,16 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         return spec;
     }
 
-    /** 亮着时的光照（两格高的灯只有上面那一格发光）。给方块设置的 {@code luminance} 用。 */
-    static int lightOf(BlockState s, int level) {
+    /**
+     * 亮着时的光照：跨几格的灯只有灯身那几格发光（{@link Rules#glows}）。给方块设置的 {@code luminance} 用 ——
+     * 方块状态在方块构造时就把光照算好存起来了，那时这个方块的 {@link #spec} 还没赋值，所以摆法由登记处直接传进来。
+     */
+    static int lightOf(Kind kind, BlockState s, int level) {
         if (!s.contains(LIT) || !s.get(LIT)) {
             return 0;
         }
-        return s.contains(TALL) && s.get(TALL) != Part.UPPER ? 0 : level;
+        EnumProperty<Part> p = partProperty(kind);
+        return p == null || Rules.glows(kind, s.get(p)) ? level : 0;
     }
 
     // ---------------------------------------------------------------- 样子
@@ -191,8 +213,26 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             case GRAND_TABLE -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(QUAD).asString(), tex("b", "prop/" + spec.texture()));
             case SOFA -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(PAIR).asString(), tex("b", "prop/" + spec.texture()));
             case CHAIR -> LinerLooks.look("prop/" + spec.model(), tex("b", "prop/" + spec.texture()));
+            case CEILING_LAMP -> LinerLooks.look("prop/" + spec.model() + "_" + st, tex("b", "prop/" + spec.texture(),
+                    "g", "prop/" + spec.glow() + "_" + st));
+            case CHANDELIER -> s.get(TALL) == Part.UPPER
+                    ? LinerLooks.look("prop/" + spec.model() + "_upper", tex("b", "prop/" + spec.model() + "_upper"))
+                    : LinerLooks.look("prop/" + spec.model() + "_lower_" + st, tex("b", "prop/" + spec.texture(),
+                    "g", "prop/" + spec.glow() + "_" + st));
+            case GRAND_CHANDELIER -> grandLook(s.get(GRAND), st);
         };
         return base.turned(yawOf(s.get(FACING)));
+    }
+
+    /** 水晶大吊灯的一格：吊杆 · 那一层正中的十字五格（斜件都在正中那一格的模型里）· 四个角（空模型，只占位）。 */
+    private LinerLooks.Look grandLook(Part p, String st) {
+        String m = "prop/" + spec.model();
+        return switch (p) {
+            case CROWN -> LinerLooks.look(m + "_top_" + st, tex("b", m + "_top", "g", m + "_top_glow_" + st));
+            case RING_NW, RING_NE, RING_SW, RING_SE -> LinerLooks.look(m + "_corner", tex("b", "prop/" + spec.texture()));
+            default -> LinerLooks.look(m + "_" + p.asString().substring("ring_".length()) + "_" + st,
+                    tex("b", "prop/" + spec.texture(), "g", "prop/" + spec.glow() + "_" + st));
+        };
     }
 
     @Override
@@ -200,6 +240,11 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         return switch (spec.kind()) {
             case TALL_LAMP -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.model() + "_lower",
                     "u", "prop/" + spec.model() + "_upper", "g", "prop/" + spec.glow() + "_lit"));
+            case CHANDELIER -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "u", "prop/" + spec.model() + "_upper", "g", "prop/" + spec.glow() + "_lit"));
+            case GRAND_CHANDELIER -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "g", "prop/" + spec.glow() + "_lit", "u", "prop/" + spec.model() + "_top",
+                    "h", "prop/" + spec.model() + "_top_glow_lit"));
             case GRAND_TABLE, SOFA -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture()));
             default -> null;
         };
@@ -218,6 +263,11 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         BlockState s = getDefaultState().with(FACING, facing);
         BlockPos anchorPos = ctx.getBlockPos();
         World world = ctx.getWorld();
+        // 顶灯与吊灯只能挂在天花下：点中的那一格（贴天花的那一块）正上方的底面中间那一块要是实的（与灯笼挂着时同一个判据）。
+        //   只在摆的时候看；摆好之后天花被拆了灯也不掉（挖不动、不掉东西的装饰件，结构里放下时也不该一块块碎掉）
+        if (Rules.hanging(spec.kind()) && !Block.sideCoversSmallSquare(world, anchorPos.up(), Direction.DOWN)) {
+            return null;
+        }
         if (part != null) {
             Part a = Rules.anchor(spec.kind());
             for (Part p : part.getValues()) {
@@ -353,13 +403,54 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         private Rules() {
         }
 
-        /** 摆的时候点中的那一格放哪一块：灯是下面那一格；沙发、大桌是「离人近、在人左手」的那一块，整件往人的右手、往远处长。 */
+        /**
+         * 摆的时候点中的那一格放哪一块：落地的灯是下面那一格；吊灯是贴天花的那一格（整件往下长）；
+         * 沙发、大桌是「离人近、在人左手」的那一块，整件往人的右手、往远处长。
+         */
         public static Part anchor(Kind kind) {
             return switch (kind) {
                 case TALL_LAMP -> Part.LOWER;
+                case CHANDELIER -> Part.UPPER;
+                case GRAND_CHANDELIER -> Part.CROWN;
                 case GRAND_TABLE -> Part.NE;
                 case SOFA -> Part.EAST;
                 default -> null;
+            };
+        }
+
+        /** 一件里有哪几块（与方块状态的 part 属性同一份清单；单格的件是空集）。单测按它把每一种、每一块都过一遍。 */
+        public static Set<Part> parts(Kind kind) {
+            return switch (kind) {
+                case TALL_LAMP, CHANDELIER -> EnumSet.of(Part.LOWER, Part.UPPER);
+                case GRAND_TABLE -> EnumSet.of(Part.NW, Part.NE, Part.SW, Part.SE);
+                case SOFA -> EnumSet.of(Part.WEST, Part.EAST);
+                case GRAND_CHANDELIER -> EnumSet.of(Part.CROWN, Part.RING_NW, Part.RING_N, Part.RING_NE, Part.RING_W, Part.RING_C,
+                        Part.RING_E, Part.RING_SW, Part.RING_S, Part.RING_SE);
+                default -> EnumSet.noneOf(Part.class);
+            };
+        }
+
+        /** 有开关、会发光的那几种。 */
+        public static boolean isLamp(Kind kind) {
+            return switch (kind) {
+                case TALL_LAMP, TABLE_LAMP, CEILING_LAMP, CHANDELIER, GRAND_CHANDELIER -> true;
+                default -> false;
+            };
+        }
+
+        /** 只能挂在天花下的那几种。 */
+        public static boolean hanging(Kind kind) {
+            return kind == Kind.CEILING_LAMP || kind == Kind.CHANDELIER || kind == Kind.GRAND_CHANDELIER;
+        }
+
+        /** 一件灯里亮着时发光的那几格：落地灯的灯头、吊灯的灯身、大吊灯那一层正中的十字五格（蜡烛灯都在这五格的模型里）。 */
+        public static boolean glows(Kind kind, Part p) {
+            return switch (kind) {
+                case TALL_LAMP -> p == Part.UPPER;
+                case CHANDELIER -> p == Part.LOWER;
+                case GRAND_CHANDELIER -> p == Part.RING_N || p == Part.RING_W || p == Part.RING_C || p == Part.RING_E
+                        || p == Part.RING_S;
+                default -> true;
             };
         }
 
@@ -410,6 +501,12 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                 case SE -> Part.SW;
                 case WEST -> Part.EAST;
                 case EAST -> Part.WEST;
+                case RING_NW -> Part.RING_NE;
+                case RING_NE -> Part.RING_NW;
+                case RING_W -> Part.RING_E;
+                case RING_E -> Part.RING_W;
+                case RING_SW -> Part.RING_SE;
+                case RING_SE -> Part.RING_SW;
                 default -> p;
             };
         }
