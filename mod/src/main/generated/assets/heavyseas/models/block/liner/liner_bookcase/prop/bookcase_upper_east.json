@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/bookcase_upper_east",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/bookcase",
+    "k": "heavyseas:block/liner/prop/bookcase_shelves",
+    "particle": "heavyseas:block/liner/prop/bookcase"
+  }
+}

@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 大邮轮装饰方块「看邻居」的纯规则（ADR-0062 §2）。放下去连不连、物品栏里长什么样，在游戏里实拍。 */
 final class LinerConnectRulesTest {
@@ -133,6 +135,84 @@ final class LinerConnectRulesTest {
         assertEquals("outer_left", p.shape(-2, -4), "西北");
         assertEquals("straight", p.shape(0, -1), "柱子南面中间");
         assertEquals("straight", p.shape(1, -3), "柱子东面中间：身后是柱子");
+    }
+
+    // ---------------------------------------------------------------- 贴附件第一组（ADR-0069 §2 ②）：门套 · 柱脚
+    // 同一组用例在 liner_build.py --self-test 的「规则抄本对照」里逐条再跑一遍（Python 抄本与这里必须同一个答案）
+
+    @Test
+    void casingPieceFollowsWhereOnTheWallYouClick() {
+        assertEquals("corner_right", LinerConnect.Rules.casingPart(0.1, 0.1), "左下角 → 门套在这一格左下角 = 门洞右上方那一块");
+        assertEquals("corner_left", LinerConnect.Rules.casingPart(0.9, 0.2), "右下角");
+        assertEquals("head", LinerConnect.Rules.casingPart(0.5, 0.0), "下沿正中 = 门楣");
+        assertEquals("jamb_right", LinerConnect.Rules.casingPart(0.2, 0.6), "左半 → 竖条贴左沿 = 门洞右边那一侧");
+        assertEquals("jamb_left", LinerConnect.Rules.casingPart(0.8, 0.99), "右半");
+    }
+
+    @Test
+    void casingCarriesTheLineBesideItButHeadsOnlyTheCornice() {
+        assertEquals("skirting", LinerConnect.Rules.casingTrim("jamb_left", "skirting", null));
+        assertEquals("chair_rail", LinerConnect.Rules.casingTrim("jamb_right", null, "chair_rail"));
+        assertEquals("none", LinerConnect.Rules.casingTrim("jamb_left", null, null));
+        assertEquals("none", LinerConnect.Rules.casingTrim("head", "skirting", "chair_rail"), "门楣不配踢脚、腰线");
+        assertEquals("cornice", LinerConnect.Rules.casingTrim("head", "chair_rail", "cornice"), "几样都有时薄檐口在前");
+        assertEquals("cornice", LinerConnect.Rules.casingTrim("corner_right", null, "cornice"));
+        assertEquals("none", LinerConnect.Rules.casingTrim("corner_left", "skirting", null));
+        assertTrue(LinerConnect.Rules.casingAllows("jamb_left", "skirting"));
+        assertFalse(LinerConnect.Rules.casingAllows("head", "chair_rail"));
+    }
+
+    /**
+     * 一面矮层的墙（室内 3 格）从左到右：踢脚 · 门套 · 门洞两格 · 门套 · 踢脚；顶上一排薄檐口 · 左上角 · 门楣两格 · 右上角 · 薄檐口。
+     * 门楣中间那两格两边都是门套：要跨过去找到薄檐口（只看紧挨着的邻居就漏了）。
+     */
+    @Test
+    void casingFindsTheLineAcrossTheOtherCasingPieces() {
+        String[] floor = {"skirting", "casing", null, null, "casing", "skirting"};
+        String[] top = {"cornice", "casing", "casing", "casing", "casing", "cornice"};
+        assertEquals("skirting", trimAt(floor, 1, "jamb_left"));
+        assertEquals("skirting", trimAt(floor, 4, "jamb_right"));
+        assertEquals("cornice", trimAt(top, 1, "corner_left"));
+        assertEquals("cornice", trimAt(top, 2, "head"), "门楣左边第一格：左手跨过左上角找到薄檐口");
+        assertEquals("cornice", trimAt(top, 3, "head"));
+        assertEquals("cornice", trimAt(top, 4, "corner_right"));
+        // 一排门楣两头都没有线（高房间里门楣不在顶上那一排）
+        assertEquals("none", trimAt(new String[]{null, "casing", "casing", "casing", null}, 2, "head"));
+    }
+
+    /**
+     * 客房走廊：左上角外侧紧挨着一盏吸顶灯（那一格没有檐口）—— 从门套另一头那条薄檐口接过来，门套顶上不缺一段
+     * （第一版只看外侧那一边：走廊里每扇门的一个上角都没有檐口）。
+     */
+    @Test
+    void aLampBesideOneCornerDoesNotBreakTheCorniceOverTheDoor() {
+        String[] top = {"lamp", "casing", "casing", "casing", "cornice"};
+        assertEquals("cornice", trimAt(top, 1, "corner_left"));
+        assertEquals("cornice", trimAt(top, 2, "head"));
+        assertEquals("cornice", trimAt(top, 3, "corner_right"));
+    }
+
+    @Test
+    void onlyTheLinesOnTheSameWallCount() {
+        assertEquals("skirting", LinerConnect.Rules.lineKind("liner_skirting", null));
+        assertEquals("skirting", LinerConnect.Rules.lineKind("liner_pilaster", "skirting"), "柱脚两侧那截踢脚");
+        assertEquals(null, LinerConnect.Rules.lineKind("liner_pilaster", "plinth"));
+        assertEquals("casing", LinerConnect.Rules.lineKind("liner_door_casing", null));
+        assertEquals(null, LinerConnect.Rules.lineKind("liner_cornice", null), "凸出檐口不并进门套");
+    }
+
+    private static String trimAt(String[] row, int i, String part) {
+        String left = LinerConnect.Rules.runBeside(k -> i - k >= 0 && !"lamp".equals(row[i - k]) ? row[i - k] : null);
+        String right = LinerConnect.Rules.runBeside(k -> i + k < row.length && !"lamp".equals(row[i + k]) ? row[i + k] : null);
+        return LinerConnect.Rules.casingTrim(part, left, right);
+    }
+
+    @Test
+    void pilasterGrowsABaseOnlyOnItsLowestBlock() {
+        assertEquals("none", LinerConnect.Rules.pilasterBase(false, true, true), "不是最下一格");
+        assertEquals("plinth", LinerConnect.Rules.pilasterBase(true, false, false), "两边没有踢脚：只有墩");
+        assertEquals("skirting", LinerConnect.Rules.pilasterBase(true, true, false), "一边有踢脚就把两侧那截踢脚一起画上");
+        assertEquals("skirting", LinerConnect.Rules.pilasterBase(true, false, true));
     }
 
     @Test

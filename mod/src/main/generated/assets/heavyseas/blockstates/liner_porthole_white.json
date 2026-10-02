@@ -1,0 +1,274 @@
+{
+  "variants": {
+    "cell=0,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 270
+    },
+    "cell=0,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 180
+    },
+    "cell=0,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0"
+    },
+    "cell=0,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 90
+    },
+    "cell=1,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 270
+    },
+    "cell=1,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 180
+    },
+    "cell=1,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1"
+    },
+    "cell=1,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 90
+    },
+    "cell=10,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 270
+    },
+    "cell=10,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 180
+    },
+    "cell=10,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r"
+    },
+    "cell=10,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 90
+    },
+    "cell=11,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 270
+    },
+    "cell=11,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 180
+    },
+    "cell=11,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r"
+    },
+    "cell=11,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 90
+    },
+    "cell=12,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 270
+    },
+    "cell=12,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 180
+    },
+    "cell=12,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0"
+    },
+    "cell=12,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 90
+    },
+    "cell=13,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 270
+    },
+    "cell=13,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 180
+    },
+    "cell=13,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1"
+    },
+    "cell=13,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 90
+    },
+    "cell=14,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 270
+    },
+    "cell=14,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 180
+    },
+    "cell=14,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l"
+    },
+    "cell=14,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 90
+    },
+    "cell=15,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 270
+    },
+    "cell=15,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 180
+    },
+    "cell=15,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l"
+    },
+    "cell=15,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 90
+    },
+    "cell=16,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 270
+    },
+    "cell=16,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 180
+    },
+    "cell=16,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r"
+    },
+    "cell=16,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 90
+    },
+    "cell=17,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 270
+    },
+    "cell=17,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 180
+    },
+    "cell=17,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r"
+    },
+    "cell=17,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 90
+    },
+    "cell=2,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 270
+    },
+    "cell=2,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 180
+    },
+    "cell=2,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l"
+    },
+    "cell=2,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 90
+    },
+    "cell=3,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 270
+    },
+    "cell=3,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 180
+    },
+    "cell=3,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l"
+    },
+    "cell=3,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 90
+    },
+    "cell=4,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 270
+    },
+    "cell=4,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 180
+    },
+    "cell=4,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r"
+    },
+    "cell=4,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 90
+    },
+    "cell=5,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 270
+    },
+    "cell=5,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 180
+    },
+    "cell=5,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r"
+    },
+    "cell=5,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 90
+    },
+    "cell=6,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 270
+    },
+    "cell=6,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0",
+      "y": 180
+    },
+    "cell=6,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0"
+    },
+    "cell=6,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 90
+    },
+    "cell=7,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 270
+    },
+    "cell=7,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1",
+      "y": 180
+    },
+    "cell=7,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1"
+    },
+    "cell=7,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 90
+    },
+    "cell=8,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 270
+    },
+    "cell=8,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0r",
+      "y": 180
+    },
+    "cell=8,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l"
+    },
+    "cell=8,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_0l",
+      "y": 90
+    },
+    "cell=9,facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 270
+    },
+    "cell=9,facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1r",
+      "y": 180
+    },
+    "cell=9,facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l"
+    },
+    "cell=9,facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_white/hull/porthole_hull/white_1l",
+      "y": 90
+    }
+  }
+}

@@ -40,6 +40,9 @@ import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
 import io.github.heavyseasmc.mod.world.liner.LinerBlocks;
+import io.github.heavyseasmc.mod.world.liner.LinerGlass;
+import io.github.heavyseasmc.mod.world.liner.LinerDoors;
+import io.github.heavyseasmc.mod.world.liner.LinerHull;
 import io.github.heavyseasmc.mod.world.liner.LinerProps;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlockEntity;
@@ -90,6 +93,10 @@ public final class HeavySeasMod implements ModInitializer {
         SkiffBlocks.register();
         LinerBlocks.register();                        // 大邮轮那一族装饰方块（ADR-0062）
         LinerProps.register();                         // 大邮轮的灯与家具（ADR-0063）
+        LinerGlass.register();                         // 大邮轮的玻璃一批：无缝窗 · 穹顶玻璃 · 穹顶的肋（ADR-0074）
+        LinerHull.register();                          // 北辰号的船壳板与舷窗（ADR-0069 §2 ① · ④）
+        LinerDoors.register();                         // 北辰号的门（ADR-0069 §2 ⑤）
+        io.github.heavyseasmc.mod.world.liner.LinerStairs.register();   // 北辰号大楼梯一族（ADR 草稿 stairs）
         LobbyBoatEntity.register();
         ServerChunkEvents.CHUNK_LOAD.register(LobbyBoatBlockEntity::restoreLegacyAnchors);
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/feature_post_middle",
+  "textures": {
+    "particle": "heavyseas:block/liner/stairs/feature_post",
+    "w": "heavyseas:block/liner/stairs/feature_post"
+  }
+}

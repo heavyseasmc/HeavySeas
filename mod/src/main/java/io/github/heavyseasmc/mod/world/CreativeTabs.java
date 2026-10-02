@@ -2,6 +2,9 @@ package io.github.heavyseasmc.mod.world;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.world.liner.LinerBlocks;
+import io.github.heavyseasmc.mod.world.liner.LinerGlass;
+import io.github.heavyseasmc.mod.world.liner.LinerDoors;
+import io.github.heavyseasmc.mod.world.liner.LinerHull;
 import io.github.heavyseasmc.mod.world.liner.LinerProps;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlock;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
@@ -44,6 +47,10 @@ public final class CreativeTabs {
                 .entries((context, entries) -> {
                     skiff(false).forEach(entries::add);
                     LinerBlocks.all().values().forEach(entries::add);   // 大邮轮那一族（ADR-0062）：墙、地、框、线脚全在这一页
+                    LinerGlass.all().values().forEach(entries::add);    // 大邮轮的玻璃一批（ADR-0074）
+                    LinerHull.all().values().forEach(entries::add);     // 船壳板与舷窗（ADR-0069 §2）
+                    LinerDoors.all().values().forEach(entries::add);    // 门（ADR-0069 §2 ⑤）
+                    io.github.heavyseasmc.mod.world.liner.LinerStairs.all().values().forEach(entries::add);   // 大楼梯一族（ADR 草稿 stairs）
                 })
                 .build());
         Registry.register(Registries.ITEM_GROUP, FITTINGS, FabricItemGroup.builder()

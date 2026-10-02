@@ -162,6 +162,88 @@ public final class LinerConnect {
             return f != null && f == facing;
         }
 
+        // ---------------------------------------------------------------- 贴附件第一组（ADR-0069 §2 ②）
+
+        /**
+         * 门套放下去是哪一块：看点在这一格墙面的哪儿（u 从站在正面看的人的左手 0 到右手 1，v 从下 0 到上 1）。
+         * 下面那三分之一是门楣一排（左三分之一 = 门洞右上角那一块，门套在这一格的左下角；右三分之一 = 左上角；中间 = 门楣），
+         * 上面那三分之二是两侧（点在左半 = 竖条贴着这一格的左沿 = 门洞右边那一侧）。
+         */
+        public static String casingPart(double u, double v) {
+            if (v < 1.0 / 3) {
+                return u < 1.0 / 3 ? "corner_right" : u > 2.0 / 3 ? "corner_left" : "head";
+            }
+            return u < 0.5 ? "jamb_right" : "jamb_left";
+        }
+
+        /** 门套的这一块许不许顺带画那条线：两侧许踢脚 · 腰线 · 薄檐口；门楣与上角只许薄檐口。 */
+        public static boolean casingAllows(String part, String trim) {
+            return trim.equals("none") || part.startsWith("jamb_") || trim.equals("cornice");
+        }
+
+        /**
+         * 门套这一格顺带画哪条线：往左右两边沿墙找下去，跨过同一面墙上的门套，碰到的第一个别的东西是踢脚 / 腰线 / 薄檐口，
+         * 就画那一条；几样都有时薄檐口 > 腰线 > 踢脚。两边都看：一边那一格被吸顶灯之类占了时，从门套另一头那条线接过来，门套顶上的檐口才不缺一段；
+         * 两侧往门洞那边看到的是门洞前那一格（空的），不碍事。不许的组合（门楣配踢脚之类）一律 {@code none}。
+         *
+         * @param left  左手那一边找到的线（{@code skirting} · {@code chair_rail} · {@code cornice}；没有 = {@code null}）
+         */
+        public static String casingTrim(String part, String left, String right) {
+            String best = "none";
+            for (String t : new String[]{"skirting", "chair_rail", "cornice"}) {
+                if (t.equals(left) || t.equals(right)) {
+                    best = t;
+                }
+            }
+            return casingAllows(part, best) ? best : "none";
+        }
+
+        /** 门套沿墙往一边找最多这么多格（跨过同一面墙上的门套）。 */
+        public static final int CASING_SCAN = 16;
+
+        /**
+         * 沿墙往一边找那条线：{@code at.apply(i)} 回答往那一边第 i 格（i 从 1 起）是什么 —— {@code casing}（同一面墙上的门套，跨过去接着找）·
+         * {@code skirting} · {@code chair_rail} · {@code cornice} · {@code null}（别的）。回碰到的第一条线，没有就 {@code null}。
+         */
+        public static String runBeside(IntFunction<String> at) {
+            for (int i = 1; i <= CASING_SCAN; i++) {
+                String k = at.apply(i);
+                if (!"casing".equals(k)) {
+                    return k;
+                }
+            }
+            return null;
+        }
+
+        /**
+         * 沿墙那一格对门套来说是什么（{@link #runBeside} 一格一格问的就是它；只认同一朝向的件，别的一律 {@code null}）：
+         * 门套 = {@code casing}（跨过去）· 踢脚条、带踢脚的柱脚（墩两侧那一截踢脚就是这条踢脚线）= {@code skirting} ·
+         * 腰线 = {@code chair_rail} · 薄檐口 = {@code cornice}。
+         *
+         * @param block 那一格的方块（{@code liner_door_casing} · {@code liner_skirting} · {@code liner_chair_rail} · {@code liner_cornice_thin} · 别的）
+         * @param base  它的柱脚属性（没有 = {@code null}）
+         */
+        public static String lineKind(String block, String base) {
+            return switch (block) {
+                case "liner_door_casing" -> "casing";
+                case "liner_skirting" -> "skirting";
+                case "liner_chair_rail" -> "chair_rail";
+                case "liner_cornice_thin" -> "cornice";
+                default -> "skirting".equals(base) ? "skirting" : null;
+            };
+        }
+
+        /**
+         * 壁柱这一格的柱脚：正下方不是同一根壁柱（同一种、同一朝向、同一边）= 最下一格 → 长出柱脚；
+         * 左右任一边紧挨着同一朝向的踢脚条 → 墩两侧那一截踢脚一起画。不是最下一格 = {@code none}。
+         */
+        public static String pilasterBase(boolean bottom, boolean skirtingLeft, boolean skirtingRight) {
+            if (!bottom) {
+                return "none";
+            }
+            return skirtingLeft || skirtingRight ? "skirting" : "plinth";
+        }
+
         /**
          * 地毯这一格画哪几边的毯边：不接地毯的那几边，按 n · e · s · w 的次序（与 {@code liner_decor.py} 的 CARPET_MASKS 一致）；
          * 四边都接着 = 空串（走花纹那几张）。

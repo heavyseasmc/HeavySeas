@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/pilaster_right_plinth_skirting",
+  "textures": {
+    "b": "heavyseas:block/liner/pilaster_base_mahogany",
+    "k": "heavyseas:block/liner/skirting",
+    "p": "heavyseas:block/liner/pilaster_mahogany",
+    "particle": "heavyseas:block/liner/pilaster_mahogany"
+  }
+}

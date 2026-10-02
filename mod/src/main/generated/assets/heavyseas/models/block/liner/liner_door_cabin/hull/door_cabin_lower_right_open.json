@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/hull/door_cabin_lower_right_open",
+  "textures": {
+    "f": "heavyseas:block/liner/hull/door_cabin_lower",
+    "m": "heavyseas:block/liner/hull/brass",
+    "particle": "heavyseas:block/liner/hull/door_cabin_lower"
+  }
+}

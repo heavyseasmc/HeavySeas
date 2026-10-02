@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/pilaster_right_plinth",
+  "textures": {
+    "b": "heavyseas:block/liner/pilaster_base_mahogany",
+    "p": "heavyseas:block/liner/pilaster_mahogany",
+    "particle": "heavyseas:block/liner/pilaster_mahogany"
+  }
+}

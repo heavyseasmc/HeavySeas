@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_none"
+    },
+    "east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_w"
+    },
+    "east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_s"
+    },
+    "east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_sw"
+    },
+    "east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_n"
+    },
+    "east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_nw"
+    },
+    "east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_ns"
+    },
+    "east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_nsw"
+    },
+    "east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_e"
+    },
+    "east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_ew"
+    },
+    "east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_es"
+    },
+    "east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_esw"
+    },
+    "east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_ne"
+    },
+    "east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_new"
+    },
+    "east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_nes"
+    },
+    "east=true,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_balustrade/stairs/balustrade_nesw"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/floor_ceiled",
+  "textures": {
+    "bottom": "heavyseas:block/liner/ceiling",
+    "particle": "heavyseas:block/liner/carpet_border_new",
+    "side": "heavyseas:block/liner/mahogany",
+    "top": "heavyseas:block/liner/carpet_border_new"
+  }
+}

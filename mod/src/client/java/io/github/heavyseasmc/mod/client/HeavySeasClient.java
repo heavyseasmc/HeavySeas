@@ -1,5 +1,8 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.world.liner.LinerGlass;
+import io.github.heavyseasmc.mod.world.liner.LinerDoors;
+import io.github.heavyseasmc.mod.world.liner.LinerHull;
 import io.github.heavyseasmc.mod.world.liner.LinerProps;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.HeavySeasMod;
@@ -147,6 +150,12 @@ public final class HeavySeasClient implements ClientModInitializer {
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getCutout(), SkiffBlocks.SAIL, SkiffBlocks.EMBLEM);
         // 大邮轮的灯与家具（ADR-0063）一律按镂空画：灯柱横担、灯罩流苏、台灯拉链是镂空片；别的件没有透明像素，按镂空画也一样
         LinerProps.all().values().forEach(b -> BlockRenderLayerMap.INSTANCE.putBlock(b, RenderLayer.getCutout()));
+        // 玻璃一批（ADR-0074）：窗与穹顶玻璃是半透明的（窗 20 %、穹顶 65 %），框与肋的像素是实的 —— 同一层画
+        BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getTranslucent(), LinerGlass.WINDOW, LinerGlass.DOME_GLASS);
+        // 舷窗与双开门有半透明的玻璃（ADR-0069 §2；要改成镂空：这一行换 getCutout()，并按 liner_hull.py 的 GLASS_MODE 重出玻璃贴图）
+        BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getTranslucent(), LinerHull.PORTHOLE_BLACK, LinerHull.PORTHOLE_WHITE,
+                LinerHull.PORTHOLE_INNER, LinerHull.PORTHOLE_INNER_PLAIN, LinerDoors.DOUBLE);
+        BlockRenderLayerMap.INSTANCE.putBlock(LinerDoors.CABIN, RenderLayer.getCutout());
         GameScreenSidebar.register();
         // 别的界面（Minecraft 自带的进度 · 游戏菜单 · 聊天……）打开时也记一行，与 GameScreen 的「界面：打开 X」配对：
         // 回归脚本据此分得开「本模组那一面没弹」与「被别的界面盖住了」—— 此前两次都要截图才看出来

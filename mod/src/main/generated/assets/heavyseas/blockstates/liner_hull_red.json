@@ -1,0 +1,58 @@
+{
+  "variants": {
+    "cell=0": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0_hull/red_0_hull/red_0_hull/red_0"
+    },
+    "cell=1": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1_hull/red_1_hull/red_1_hull/red_1"
+    },
+    "cell=10": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0l_hull/red_0r_hull/red_0r_hull/red_0l"
+    },
+    "cell=11": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1l_hull/red_1r_hull/red_1r_hull/red_1l"
+    },
+    "cell=12": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0_hull/red_0_hull/red_0l_hull/red_0r"
+    },
+    "cell=13": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1_hull/red_1_hull/red_1l_hull/red_1r"
+    },
+    "cell=14": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0r_hull/red_0l_hull/red_0l_hull/red_0r"
+    },
+    "cell=15": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1r_hull/red_1l_hull/red_1l_hull/red_1r"
+    },
+    "cell=16": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0l_hull/red_0r_hull/red_0l_hull/red_0r"
+    },
+    "cell=17": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1l_hull/red_1r_hull/red_1l_hull/red_1r"
+    },
+    "cell=2": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0r_hull/red_0l_hull/red_0_hull/red_0"
+    },
+    "cell=3": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1r_hull/red_1l_hull/red_1_hull/red_1"
+    },
+    "cell=4": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0l_hull/red_0r_hull/red_0_hull/red_0"
+    },
+    "cell=5": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1l_hull/red_1r_hull/red_1_hull/red_1"
+    },
+    "cell=6": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0_hull/red_0_hull/red_0r_hull/red_0l"
+    },
+    "cell=7": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1_hull/red_1_hull/red_1r_hull/red_1l"
+    },
+    "cell=8": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_0r_hull/red_0l_hull/red_0r_hull/red_0l"
+    },
+    "cell=9": {
+      "model": "heavyseas:block/liner/liner_hull_red/hull/plate_hull/red_1r_hull/red_1l_hull/red_1r_hull/red_1l"
+    }
+  }
+}

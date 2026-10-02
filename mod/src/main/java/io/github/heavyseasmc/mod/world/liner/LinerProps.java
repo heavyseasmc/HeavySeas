@@ -18,7 +18,8 @@ import java.util.Map;
 /**
  * 大邮轮的灯与家具（ADR-0063）：ADR-0061 §5 第二轮定稿的六件 —— 甲板灯柱 · 黄铜落地灯 · 绿罩台灯 · 2 × 2 大桌 ·
  * 两格切斯特菲尔德沙发 · 俱乐部扶手椅（后两件各有米色与绿丝绒两种布）；ADR-0066 加了挂在天花下的三种灯
- * （吸顶花玻璃 · 两格高的黄铜小吊灯 · 3 × 3 加吊杆共 10 格的水晶大吊灯）。
+ * （吸顶花玻璃 · 两格高的黄铜小吊灯 · 3 × 3 加吊杆共 10 格的水晶大吊灯）；客房与阅览室的家具（黄铜床 · 衣柜 · 盥洗台 ·
+ * 书柜 · 写字台 · 写字椅）与壁灯（ADR 草稿 furniture）。
  *
  * <p>通用件，不带船名；只在创造模式里拿（挖不动、不掉东西、没有配方，与大邮轮那一族的装饰方块相同），进「灯与家具」页。
  * 判据 {@code checkLinerBlocks} 与装饰方块共用一段（登记写法 {@code prop("liner_…")}）。
@@ -67,6 +68,29 @@ public final class LinerProps {
             MapColor.GOLD, BlockSoundGroup.LANTERN);
     public static final LinerProp CEILING_LIGHT_QUAD = prop("liner_ceiling_light_quad",
             new LinerProp.Spec(LinerProp.Kind.CEILING_QUAD, "ceiling_light_quad", "ceiling_light", "ceiling_light_glass", 15),
+            MapColor.GOLD, BlockSoundGroup.LANTERN);
+    // 客房与阅览室的家具（ADR 草稿 furniture；ADR-0069 §2 第 ⑥ 批）：客房按真人尺寸，阅览室的件往大里做
+    public static final LinerProp BED = prop("liner_bed",
+            new LinerProp.Spec(LinerProp.Kind.BED, "bed", "bed", null, 0),
+            MapColor.DARK_GREEN, BlockSoundGroup.WOOL);
+    public static final LinerProp WARDROBE = prop("liner_wardrobe",
+            new LinerProp.Spec(LinerProp.Kind.WARDROBE, "wardrobe", "wardrobe", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp WASHSTAND = prop("liner_washstand",
+            new LinerProp.Spec(LinerProp.Kind.WASHSTAND, "washstand", "washstand", null, 0),
+            MapColor.OFF_WHITE, BlockSoundGroup.WOOD);
+    public static final LinerProp BOOKCASE = prop("liner_bookcase",
+            new LinerProp.Spec(LinerProp.Kind.BOOKCASE, "bookcase", "bookcase", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp WRITING_TABLE = prop("liner_writing_table",
+            new LinerProp.Spec(LinerProp.Kind.WRITING_TABLE, "writing_table", "writing_table", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp WRITING_CHAIR = prop("liner_writing_chair",
+            new LinerProp.Spec(LinerProp.Kind.WRITING_CHAIR, "writing_chair", "writing_chair", null, 0),
+            MapColor.DARK_GREEN, BlockSoundGroup.WOOD);
+    // 壁灯（ADR-0069 §2 第 ② 批里那一盏；§4 倾向 A：贴在墙前那一格、墙拆了不掉）：亮度照主次取 12（主灯 15 · 落地灯 14 · 台灯 12）
+    public static final LinerProp WALL_SCONCE = prop("liner_wall_sconce",
+            new LinerProp.Spec(LinerProp.Kind.SCONCE, "wall_sconce", "wall_sconce", "wall_sconce_shade", 12),
             MapColor.GOLD, BlockSoundGroup.LANTERN);
 
     private LinerProps() {

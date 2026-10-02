@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/newel_lamp_es_off",
+  "textures": {
+    "b": "heavyseas:block/liner/stairs/newel",
+    "g": "heavyseas:block/liner/stairs/newel_glow_off",
+    "particle": "heavyseas:block/liner/stairs/newel"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "heavyseas:block/liner/liner_teak_deck_ceiled/floor_ceiled",
+      "y": 90
+    },
+    "axis=z": {
+      "model": "heavyseas:block/liner/liner_teak_deck_ceiled/floor_ceiled"
+    }
+  }
+}

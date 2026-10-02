@@ -1,0 +1,79 @@
+{
+  "variants": {
+    "facing=east,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_left",
+      "y": 270
+    },
+    "facing=east,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_right",
+      "y": 270
+    },
+    "facing=east,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_left",
+      "y": 270
+    },
+    "facing=east,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_right",
+      "y": 270
+    },
+    "facing=east,shape=straight": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting",
+      "y": 270
+    },
+    "facing=north,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_left",
+      "y": 180
+    },
+    "facing=north,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_right",
+      "y": 180
+    },
+    "facing=north,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_left",
+      "y": 180
+    },
+    "facing=north,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_right",
+      "y": 180
+    },
+    "facing=north,shape=straight": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting",
+      "y": 180
+    },
+    "facing=south,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_left"
+    },
+    "facing=south,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_right"
+    },
+    "facing=south,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_left"
+    },
+    "facing=south,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_right"
+    },
+    "facing=south,shape=straight": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting"
+    },
+    "facing=west,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_left",
+      "y": 90
+    },
+    "facing=west,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_inner_right",
+      "y": 90
+    },
+    "facing=west,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_left",
+      "y": 90
+    },
+    "facing=west,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting_outer_right",
+      "y": 90
+    },
+    "facing=west,shape=straight": {
+      "model": "heavyseas:block/liner/liner_skirting/skirting",
+      "y": 90
+    }
+  }
+}

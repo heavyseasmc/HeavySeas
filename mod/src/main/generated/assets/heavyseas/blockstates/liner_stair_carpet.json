@@ -1,0 +1,304 @@
+{
+  "variants": {
+    "facing=east,half=bottom,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight",
+      "y": 90
+    },
+    "facing=east,half=bottom,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight",
+      "y": 90
+    },
+    "facing=east,half=top,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left",
+      "y": 90
+    },
+    "facing=east,half=top,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left",
+      "y": 90
+    },
+    "facing=east,half=top,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right",
+      "y": 90
+    },
+    "facing=east,half=top,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right",
+      "y": 90
+    },
+    "facing=east,half=top,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left",
+      "y": 90
+    },
+    "facing=east,half=top,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left",
+      "y": 90
+    },
+    "facing=east,half=top,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right",
+      "y": 90
+    },
+    "facing=east,half=top,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right",
+      "y": 90
+    },
+    "facing=east,half=top,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight",
+      "y": 90
+    },
+    "facing=east,half=top,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight",
+      "y": 90
+    },
+    "facing=north,half=bottom,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left"
+    },
+    "facing=north,half=bottom,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left"
+    },
+    "facing=north,half=bottom,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right"
+    },
+    "facing=north,half=bottom,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right"
+    },
+    "facing=north,half=bottom,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left"
+    },
+    "facing=north,half=bottom,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left"
+    },
+    "facing=north,half=bottom,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right"
+    },
+    "facing=north,half=bottom,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right"
+    },
+    "facing=north,half=bottom,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight"
+    },
+    "facing=north,half=bottom,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight"
+    },
+    "facing=north,half=top,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left"
+    },
+    "facing=north,half=top,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left"
+    },
+    "facing=north,half=top,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right"
+    },
+    "facing=north,half=top,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right"
+    },
+    "facing=north,half=top,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left"
+    },
+    "facing=north,half=top,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left"
+    },
+    "facing=north,half=top,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right"
+    },
+    "facing=north,half=top,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right"
+    },
+    "facing=north,half=top,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight"
+    },
+    "facing=north,half=top,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight"
+    },
+    "facing=south,half=bottom,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight",
+      "y": 180
+    },
+    "facing=south,half=bottom,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight",
+      "y": 180
+    },
+    "facing=south,half=top,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left",
+      "y": 180
+    },
+    "facing=south,half=top,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left",
+      "y": 180
+    },
+    "facing=south,half=top,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right",
+      "y": 180
+    },
+    "facing=south,half=top,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right",
+      "y": 180
+    },
+    "facing=south,half=top,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left",
+      "y": 180
+    },
+    "facing=south,half=top,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left",
+      "y": 180
+    },
+    "facing=south,half=top,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right",
+      "y": 180
+    },
+    "facing=south,half=top,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right",
+      "y": 180
+    },
+    "facing=south,half=top,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight",
+      "y": 180
+    },
+    "facing=south,half=top,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight",
+      "y": 180
+    },
+    "facing=west,half=bottom,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_left",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_inner_right",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_left",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_outer_right",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight",
+      "y": 270
+    },
+    "facing=west,half=bottom,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/step_rod_straight",
+      "y": 270
+    },
+    "facing=west,half=top,shape=inner_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left",
+      "y": 270
+    },
+    "facing=west,half=top,shape=inner_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_left",
+      "y": 270
+    },
+    "facing=west,half=top,shape=inner_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right",
+      "y": 270
+    },
+    "facing=west,half=top,shape=inner_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_inner_right",
+      "y": 270
+    },
+    "facing=west,half=top,shape=outer_left,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left",
+      "y": 270
+    },
+    "facing=west,half=top,shape=outer_left,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_left",
+      "y": 270
+    },
+    "facing=west,half=top,shape=outer_right,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right",
+      "y": 270
+    },
+    "facing=west,half=top,shape=outer_right,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_outer_right",
+      "y": 270
+    },
+    "facing=west,half=top,shape=straight,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight",
+      "y": 270
+    },
+    "facing=west,half=top,shape=straight,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_stair_carpet/stairs/soffit_straight",
+      "y": 270
+    }
+  }
+}

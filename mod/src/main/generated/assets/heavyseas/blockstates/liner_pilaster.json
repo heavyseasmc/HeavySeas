@@ -1,18 +1,48 @@
 {
   "variants": {
-    "facing=east": {
+    "base=none,facing=east": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster",
       "y": 270
     },
-    "facing=north": {
+    "base=none,facing=north": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster",
       "y": 180
     },
-    "facing=south": {
+    "base=none,facing=south": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster"
     },
-    "facing=west": {
+    "base=none,facing=west": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster",
+      "y": 90
+    },
+    "base=plinth,facing=east": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 270
+    },
+    "base=plinth,facing=north": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 180
+    },
+    "base=plinth,facing=south": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth"
+    },
+    "base=plinth,facing=west": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 90
+    },
+    "base=skirting,facing=east": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 270
+    },
+    "base=skirting,facing=north": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 180
+    },
+    "base=skirting,facing=south": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting"
+    },
+    "base=skirting,facing=west": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
       "y": 90
     }
   }

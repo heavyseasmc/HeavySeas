@@ -1,33 +1,93 @@
 {
   "variants": {
-    "facing=east,side=left": {
+    "base=none,facing=east,side=left": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left",
       "y": 270
     },
-    "facing=east,side=right": {
+    "base=none,facing=east,side=right": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right",
       "y": 270
     },
-    "facing=north,side=left": {
+    "base=none,facing=north,side=left": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left",
       "y": 180
     },
-    "facing=north,side=right": {
+    "base=none,facing=north,side=right": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right",
       "y": 180
     },
-    "facing=south,side=left": {
+    "base=none,facing=south,side=left": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left"
     },
-    "facing=south,side=right": {
+    "base=none,facing=south,side=right": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right"
     },
-    "facing=west,side=left": {
+    "base=none,facing=west,side=left": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left",
       "y": 90
     },
-    "facing=west,side=right": {
+    "base=none,facing=west,side=right": {
       "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right",
+      "y": 90
+    },
+    "base=plinth,facing=east,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth",
+      "y": 270
+    },
+    "base=plinth,facing=east,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth",
+      "y": 270
+    },
+    "base=plinth,facing=north,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth",
+      "y": 180
+    },
+    "base=plinth,facing=north,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth",
+      "y": 180
+    },
+    "base=plinth,facing=south,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth"
+    },
+    "base=plinth,facing=south,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth"
+    },
+    "base=plinth,facing=west,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth",
+      "y": 90
+    },
+    "base=plinth,facing=west,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth",
+      "y": 90
+    },
+    "base=skirting,facing=east,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth_skirting",
+      "y": 270
+    },
+    "base=skirting,facing=east,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth_skirting",
+      "y": 270
+    },
+    "base=skirting,facing=north,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth_skirting",
+      "y": 180
+    },
+    "base=skirting,facing=north,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth_skirting",
+      "y": 180
+    },
+    "base=skirting,facing=south,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth_skirting"
+    },
+    "base=skirting,facing=south,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth_skirting"
+    },
+    "base=skirting,facing=west,side=left": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_left_plinth_skirting",
+      "y": 90
+    },
+    "base=skirting,facing=west,side=right": {
+      "model": "heavyseas:block/liner/liner_pilaster_mahogany/pilaster_right_plinth_skirting",
       "y": 90
     }
   }

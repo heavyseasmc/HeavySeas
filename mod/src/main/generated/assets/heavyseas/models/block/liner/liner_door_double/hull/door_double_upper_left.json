@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/hull/door_double_upper_left",
+  "textures": {
+    "f": "heavyseas:block/liner/hull/door_double_upper",
+    "g": "heavyseas:block/liner/hull/glass",
+    "m": "heavyseas:block/liner/hull/brass",
+    "particle": "heavyseas:block/liner/hull/door_double_upper"
+  }
+}

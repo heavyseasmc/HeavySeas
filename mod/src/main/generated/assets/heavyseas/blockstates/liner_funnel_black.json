@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "row=0": {
+      "model": "heavyseas:block/liner/liner_funnel_black/hull/plate_hull/black_0_hull/black_0_hull/black_0_hull/black_0"
+    },
+    "row=1": {
+      "model": "heavyseas:block/liner/liner_funnel_black/hull/plate_hull/black_1_hull/black_1_hull/black_1_hull/black_1"
+    }
+  }
+}

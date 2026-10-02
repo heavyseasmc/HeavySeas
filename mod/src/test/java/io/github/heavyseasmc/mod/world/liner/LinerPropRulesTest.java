@@ -20,6 +20,41 @@ final class LinerPropRulesTest {
     private static final Set<LinerProp.Part> QUAD = EnumSet.of(LinerProp.Part.NW, LinerProp.Part.NE, LinerProp.Part.SW, LinerProp.Part.SE);
     private static final Set<LinerProp.Part> PAIR = EnumSet.of(LinerProp.Part.WEST, LinerProp.Part.EAST);
     private static final Set<LinerProp.Part> TALL = EnumSet.of(LinerProp.Part.LOWER, LinerProp.Part.UPPER);
+    private static final Set<LinerProp.Part> BED = EnumSet.of(LinerProp.Part.FOOT, LinerProp.Part.HEAD);
+    private static final Set<LinerProp.Part> SHELF = EnumSet.of(LinerProp.Part.WEST, LinerProp.Part.EAST,
+            LinerProp.Part.UPPER_WEST, LinerProp.Part.UPPER_EAST);
+
+    @Test
+    void furnitureGrowsTheWayTheModelsAreDrawn() {
+        // ADR 草稿 furniture。人站在南边、面朝北摆（正面朝着人 = 朝南）：
+        BlockPos at = new BlockPos(4, 64, -9);
+        Direction facing = Direction.SOUTH;
+        // 床：点中的那一格是床尾，床头往远处长（同游戏自带的床）—— 面朝北的人，远处是北
+        assertEquals(LinerProp.Part.FOOT, LinerProp.Rules.anchor(LinerProp.Kind.BED));
+        assertEquals(at.north(), LinerProp.Rules.offset(at, LinerProp.Part.FOOT, LinerProp.Part.HEAD, facing));
+        // 衣柜、盥洗台：上面那一格
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.WARDROBE, LinerProp.Kind.WASHSTAND)) {
+            assertEquals(LinerProp.Part.LOWER, LinerProp.Rules.anchor(k), k + " 点中的是下面那一格");
+            assertEquals(TALL, LinerProp.Rules.parts(k), k + " 两格高");
+        }
+        // 书柜：点中的是下面一层人左手那一块，往人的右手（东）与上面长
+        LinerProp.Part a = LinerProp.Rules.anchor(LinerProp.Kind.BOOKCASE);
+        Set<BlockPos> shelf = new HashSet<>();
+        for (LinerProp.Part p : LinerProp.Rules.parts(LinerProp.Kind.BOOKCASE)) {
+            shelf.add(LinerProp.Rules.offset(at, a, p, facing));
+        }
+        assertEquals(Set.of(at, at.east(), at.up(), at.east().up()), shelf);
+        // 写字台：同沙发
+        assertEquals(LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.SOFA), LinerProp.Part.WEST, facing),
+                LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.WRITING_TABLE), LinerProp.Part.WEST, facing));
+        // 壁灯是灯（右键开关、发光），不挂天花；家具不是灯
+        assertEquals(true, LinerProp.Rules.isLamp(LinerProp.Kind.SCONCE));
+        assertEquals(true, LinerProp.Rules.glows(LinerProp.Kind.SCONCE, null));
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.BED, LinerProp.Kind.WARDROBE, LinerProp.Kind.WASHSTAND, LinerProp.Kind.BOOKCASE,
+                LinerProp.Kind.WRITING_TABLE, LinerProp.Kind.WRITING_CHAIR)) {
+            assertEquals(false, LinerProp.Rules.isLamp(k), k + " 不是灯");
+        }
+    }
 
     @Test
     void modelCellsTurnTheSameWayAsBlockStateRotation() {
@@ -52,7 +87,7 @@ final class LinerPropRulesTest {
 
     @Test
     void everyPartFindsEachPartnerExactlyWhereOffsetPutsIt() {
-        for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR, TALL)) {
+        for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR, TALL, BED, SHELF)) {
             for (Direction facing : HORIZONTAL) {
                 for (LinerProp.Part here : parts) {
                     int partners = 0;
@@ -64,8 +99,8 @@ final class LinerPropRulesTest {
                                     here + " 朝 " + facing + " 时，" + d + " 那一格的搭档 " + p);
                         }
                     }
-                    // 两格的件一个搭档；2 × 2 的大桌每一块挨着两块（斜对角那一块不挨着，靠一格传一格）
-                    assertEquals(parts == QUAD ? 2 : 1, partners, here + " 朝 " + facing);
+                    // 两格的件一个搭档；2 × 2 的大桌、竖着 2 × 2 的书柜每一块挨着两块（斜对角那一块不挨着，靠一格传一格）
+                    assertEquals(parts == QUAD || parts == SHELF ? 2 : 1, partners, here + " 朝 " + facing);
                 }
             }
         }
@@ -253,8 +288,8 @@ final class LinerPropRulesTest {
             }
         }
         // 正向对照：每一种、每一块都过了一遍（落地灯 2 · 台灯 1 · 大桌 4 · 沙发 2 · 椅子 1 · 吸顶灯 1 · 小吊灯 2 · 大吊灯 10
-        //   · 骑缝灯两格 2 · 2 × 2 4）
-        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10 + 2 + 4, checked);
+        //   · 骑缝灯两格 2 · 2 × 2 4 · 床 2 · 衣柜 2 · 盥洗台 2 · 书柜 4 · 写字台 2 · 写字椅 1 · 壁灯 1）
+        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10 + 2 + 4 + 2 + 2 + 2 + 4 + 2 + 1 + 1, checked);
     }
 
     @Test
@@ -265,7 +300,7 @@ final class LinerPropRulesTest {
         // 整件照镜子（世界里 x 取反）之后，每一块换成 mirrored 的那一块、朝向照镜子转 —— 各块之间的相对位置必须还对得上
         for (Direction facing : HORIZONTAL) {
             Direction mirroredFacing = facing.getAxis() == Direction.Axis.X ? facing.getOpposite() : facing;
-            for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR)) {
+            for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR, BED, SHELF, TALL)) {
                 for (LinerProp.Part a : parts) {
                     for (LinerProp.Part b : parts) {
                         BlockPos d = LinerProp.Rules.offset(BlockPos.ORIGIN, a, b, facing);

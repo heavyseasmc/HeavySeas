@@ -887,6 +887,7 @@ def checkDecorBlocks = { Task task, Map fam ->
             def size = pngSize(png)
             // 灯与家具（ADR-0061 §4 · ADR-0063）一件一张专用大图：prop/ 下的贴图许 16 / 32 / 64 的正方形；别的照旧 16 宽
             def prop = ref.startsWith("heavyseas:block/${fam.dir}/prop/".toString())
+            prop = prop || ref.startsWith("heavyseas:block/${fam.dir}/stairs/".toString())   // 大楼梯一族：栏杆、起步柱同灯与家具，一件一张专用图
             if (size == null) { problems << "${rel(png)}：不是 PNG" }
             else if (prop && !(size[0] in [16, 32, 64] && size[1] == size[0])) { problems << "${rel(png)}：${size[0]}×${size[1]}，灯与家具的贴图应为 16 / 32 / 64 的正方形" }
             else if (!prop && (size[0] != 16 || size[1] % 16 != 0)) { problems << "${rel(png)}：${size[0]}×${size[1]}，应为 16 宽、高是 16 的倍数" }
@@ -1046,15 +1047,20 @@ def checkLinerBlocks = tasks.register('checkLinerBlocks') {
     ext.resourcesDir = file('src/main/resources/assets/heavyseas')
     ext.generatedDir = file('src/main/generated/assets/heavyseas')
     ext.blocksSource = file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerBlocks.java')
-    ext.extraSources = [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerProps.java')]
+    ext.extraSources = [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerProps.java'),
+                        file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerGlass.java'),
+                        file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerHull.java'),
+                        file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerDoors.java')]
+    ext.extraSources += [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerStairs.java')]   // 大楼梯一族（登记写法 add("liner_…")）
     inputs.dir(ext.resourcesDir).optional()
     inputs.dir(ext.generatedDir).optional()
     inputs.file(ext.blocksSource).optional()
     inputs.files(ext.extraSources).optional()
     doLast { Task t ->
-        // 大框五款走 frame("liner_frame_…") 登记，灯与家具走 prop("liner_…")（LinerProps），其余走 add("liner_…")
+        // 大框五款走 frame("liner_frame_…") 登记，灯与家具走 prop("liner_…")（LinerProps），船壳与舷窗走 hull("liner_…")（LinerHull），
+        //   门走 door("liner_…")（LinerDoors），其余走 add("liner_…")
         checkDecorBlocks(t, [label: '大邮轮', prefix: 'liner_', dir: 'liner', blocksClass: 'LinerBlocks / LinerProps',
-                             registerPattern: /(?:add|frame|prop)\("(liner_[a-z_]+)"/, hull: false, scanTabs: false])
+                             registerPattern: /(?:add|frame|prop|glass|hull|door)\("(liner_[a-z_]+)"/, hull: false, scanTabs: false])
     }
 }
 

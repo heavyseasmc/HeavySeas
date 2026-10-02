@@ -1,0 +1,131 @@
+{
+  "variants": {
+    "shape=curb_e": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb",
+      "y": 90
+    },
+    "shape=curb_n": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb"
+    },
+    "shape=curb_ne": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_corner",
+      "y": 90
+    },
+    "shape=curb_nw": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_corner"
+    },
+    "shape=curb_rib_e": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_rib",
+      "y": 90
+    },
+    "shape=curb_rib_n": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_rib"
+    },
+    "shape=curb_rib_s": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_rib",
+      "y": 180
+    },
+    "shape=curb_rib_w": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_rib",
+      "y": 270
+    },
+    "shape=curb_s": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb",
+      "y": 180
+    },
+    "shape=curb_se": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_corner",
+      "y": 180
+    },
+    "shape=curb_sw": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb_corner",
+      "y": 270
+    },
+    "shape=curb_w": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_curb",
+      "y": 270
+    },
+    "shape=ring_e": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring",
+      "y": 90
+    },
+    "shape=ring_n": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring"
+    },
+    "shape=ring_ne": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring_corner",
+      "y": 90
+    },
+    "shape=ring_nw": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring_corner"
+    },
+    "shape=ring_s": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring",
+      "y": 180
+    },
+    "shape=ring_se": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring_corner",
+      "y": 180
+    },
+    "shape=ring_sw": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring_corner",
+      "y": 270
+    },
+    "shape=ring_w": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_ring",
+      "y": 270
+    },
+    "shape=sill_e": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill",
+      "y": 90
+    },
+    "shape=sill_n": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill"
+    },
+    "shape=sill_ne": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill_corner",
+      "y": 90
+    },
+    "shape=sill_nw": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill_corner"
+    },
+    "shape=sill_s": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill",
+      "y": 180
+    },
+    "shape=sill_se": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill_corner",
+      "y": 180
+    },
+    "shape=sill_sw": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill_corner",
+      "y": 270
+    },
+    "shape=sill_w": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_sill",
+      "y": 270
+    },
+    "shape=step_e": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_step",
+      "y": 90
+    },
+    "shape=step_n": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_step"
+    },
+    "shape=step_s": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_step",
+      "y": 180
+    },
+    "shape=step_w": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib_step",
+      "y": 270
+    },
+    "shape=x": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib",
+      "y": 90
+    },
+    "shape=z": {
+      "model": "heavyseas:block/liner/liner_dome_rib/glass/rib"
+    }
+  }
+}

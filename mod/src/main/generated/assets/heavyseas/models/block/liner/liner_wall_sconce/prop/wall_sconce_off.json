@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/wall_sconce_off",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/wall_sconce",
+    "g": "heavyseas:block/liner/prop/wall_sconce_shade_off",
+    "particle": "heavyseas:block/liner/prop/wall_sconce"
+  }
+}

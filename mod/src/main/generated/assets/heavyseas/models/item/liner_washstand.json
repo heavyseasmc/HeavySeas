@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/washstand_item",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/washstand",
+    "particle": "heavyseas:block/liner/prop/washstand"
+  }
+}

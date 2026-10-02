@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/casing_corner_left_cornice",
+  "textures": {
+    "c": "heavyseas:block/liner/door_casing",
+    "h": "heavyseas:block/liner/door_casing_head",
+    "n": "heavyseas:block/liner/cornice_thin",
+    "particle": "heavyseas:block/liner/door_casing"
+  }
+}

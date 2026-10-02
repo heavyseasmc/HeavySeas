@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/glass/dome_glass",
+  "textures": {
+    "glass": "heavyseas:block/liner/glass/dome_glass",
+    "particle": "heavyseas:block/liner/glass/dome_glass",
+    "side": "heavyseas:block/liner/glass/dome_glass_side"
+  }
+}

@@ -49,6 +49,8 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  * 骑缝的吸顶灯（ADR-0068）两格或 2 × 2 一件，灯身落在接缝上，像沙发、大桌那样往人的右手与远处长。
  * 轮廓与碰撞箱都照外形拼几个盒子（{@link LinerPropShapes}），没有一件是整块的。
  * 台灯放在大桌上时整件下沉 3 像素落在桌布上（{@code on_table}，看正下方那一格），并往桌子正中斜挪 3 像素（{@code table_corner}，ADR-0071）。
+ * 客房与阅览室的家具（ADR 草稿 furniture）：黄铜床 1 × 2（床头往远处长）· 衣柜与盥洗台一格宽两格高 · 书柜 2 × 2 竖着两格高 ·
+ * 写字台两格宽 · 写字椅一格；壁灯一格、背贴墙（朝向从点中的墙定，墙拆了不掉，没有碰撞箱）。
  *
  * <p>模型一律<b>正面朝北</b>作画（与游戏自带方块的约定一致，物品栏里才看得到正面），与 {@link LinerBlock} 的「朝南作画」不同：
  * 这里的 y 旋转是 北 0 · 东 90 · 南 180 · 西 270。
@@ -66,7 +68,11 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         CROWN(1, 1, 1),
         RING_NW(0, 0, 0), RING_N(1, 0, 0), RING_NE(2, 0, 0),
         RING_W(0, 0, 1), RING_C(1, 0, 1), RING_E(2, 0, 1),
-        RING_SW(0, 0, 2), RING_S(1, 0, 2), RING_SE(2, 0, 2);
+        RING_SW(0, 0, 2), RING_S(1, 0, 2), RING_SE(2, 0, 2),
+        /** 床（1 × 2）：床尾那一格（离摆的人近）与床头那一格（往远处长）。 */
+        FOOT(0, 0, 0), HEAD(0, 0, 1),
+        /** 书柜（2 × 2，竖着两格高）：下面一层用 {@link #WEST} · {@link #EAST}，上面一层是这两块。 */
+        UPPER_WEST(0, 1, 0), UPPER_EAST(1, 1, 0);
 
         final int x;
         final int y;
@@ -105,7 +111,24 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         /** 骑缝的吸顶灯（ADR-0068）：两格一件，灯身正落在两格的接缝上 —— 双数宽的走廊、客房才挂得到正中。两格都发光。 */
         CEILING_PAIR,
         /** 骑缝的吸顶灯，2 × 2 一件：灯身落在四格的交点上（两个方向都是双数宽的小屋）。四格都发光。 */
-        CEILING_QUAD
+        CEILING_QUAD,
+        /** 黄铜床（1 × 2）：床尾在点中的那一格，床头往远处长（同游戏自带的床）。 */
+        BED,
+        /** 衣柜（一格宽、两格高）：背贴墙。 */
+        WARDROBE,
+        /** 盥洗台（一格宽、两格高，连镜子）：背贴墙。 */
+        WASHSTAND,
+        /** 书柜（2 × 2，竖着两格高）：往人的右手与上面长。 */
+        BOOKCASE,
+        /** 写字台（两格宽、两个座位）：同沙发，往人的右手长。 */
+        WRITING_TABLE,
+        /** 写字椅（一格）。 */
+        WRITING_CHAIR,
+        /**
+         * 壁灯（一格，ADR-0069 §4 倾向 A）：贴在墙前那一格、背贴墙，朝向就是离墙的方向；摆的时候点中的那一面墙要是实的，
+         * 摆好之后墙拆了灯也不掉（与檐口、腰线这些挂墙件相同）。右键开关；没有碰撞箱（同游戏自带的墙上火把：走廊两格宽，不碰头）。
+         */
+        SCONCE
     }
 
     public static final net.minecraft.state.property.DirectionProperty FACING = Properties.HORIZONTAL_FACING;
@@ -125,6 +148,8 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
     public static final EnumProperty<Part> PAIR = EnumProperty.of("part", Part.class, Part.WEST, Part.EAST);
     public static final EnumProperty<Part> GRAND = EnumProperty.of("part", Part.class, Part.CROWN,
             Part.RING_NW, Part.RING_N, Part.RING_NE, Part.RING_W, Part.RING_C, Part.RING_E, Part.RING_SW, Part.RING_S, Part.RING_SE);
+    public static final EnumProperty<Part> BED_PART = EnumProperty.of("part", Part.class, Part.FOOT, Part.HEAD);
+    public static final EnumProperty<Part> SHELF = EnumProperty.of("part", Part.class, Part.WEST, Part.EAST, Part.UPPER_WEST, Part.UPPER_EAST);
 
     /**
      * 一件道具的说明。
@@ -171,10 +196,12 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
 
     private static EnumProperty<Part> partProperty(Kind kind) {
         return switch (kind) {
-            case TALL_LAMP, CHANDELIER -> TALL;
+            case TALL_LAMP, CHANDELIER, WARDROBE, WASHSTAND -> TALL;
             case GRAND_TABLE, CEILING_QUAD -> QUAD;
-            case SOFA, CEILING_PAIR -> PAIR;
+            case SOFA, CEILING_PAIR, WRITING_TABLE -> PAIR;
             case GRAND_CHANDELIER -> GRAND;
+            case BED -> BED_PART;
+            case BOOKCASE -> SHELF;
             default -> null;
         };
     }
@@ -238,6 +265,15 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                     tex("b", "prop/" + spec.texture(), "g", "prop/" + spec.glow() + "_" + st));
             case CEILING_QUAD -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(QUAD).asString() + "_" + st,
                     tex("b", "prop/" + spec.texture(), "g", "prop/" + spec.glow() + "_" + st));
+            // 客房与阅览室的家具（ADR 草稿 furniture）：每一块一个模板，贴图整件一张（书柜的书架里面另一张 #k）
+            case WARDROBE, WASHSTAND -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(TALL).asString(), tex("b", "prop/" + spec.texture()));
+            case BED -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(BED_PART).asString(), tex("b", "prop/" + spec.texture()));
+            case BOOKCASE -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(SHELF).asString(),
+                    tex("b", "prop/" + spec.texture(), "k", "prop/" + spec.texture() + "_shelves"));
+            case WRITING_TABLE -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(PAIR).asString(), tex("b", "prop/" + spec.texture()));
+            case WRITING_CHAIR -> LinerLooks.look("prop/" + spec.model(), tex("b", "prop/" + spec.texture()));
+            case SCONCE -> LinerLooks.look("prop/" + spec.model() + "_" + st, tex("b", "prop/" + spec.texture(),
+                    "g", "prop/" + spec.glow() + "_" + st));
         };
         return base.turned(yawOf(s.get(FACING)));
     }
@@ -267,6 +303,9 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             // 骑缝灯在物品栏里就是那一盏灯（整件只是挪了半格）
             case CEILING_PAIR, CEILING_QUAD -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
                     "g", "prop/" + spec.glow() + "_lit"));
+            case BED, WARDROBE, WASHSTAND, WRITING_TABLE -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture()));
+            case BOOKCASE -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_shelves"));
             default -> null;
         };
     }
@@ -280,6 +319,9 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
 
     @Override
     public BlockState getPlacementState(ItemPlacementContext ctx) {
+        if (spec.kind() == Kind.SCONCE) {
+            return sconcePlacement(ctx);
+        }
         Direction facing = ctx.getHorizontalPlayerFacing().getOpposite();           // 正面朝着摆它的人
         BlockState s = getDefaultState().with(FACING, facing);
         BlockPos anchorPos = ctx.getBlockPos();
@@ -311,6 +353,25 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             s = onTable(s, world.getBlockState(anchorPos.down()));
         }
         return s;
+    }
+
+    /**
+     * 壁灯贴到哪面墙上（照游戏自带的墙上火把）：按人看的方向依次试四个水平方向，那一边的那一格朝着灯的那一面是整面实的，
+     * 灯就背贴着它、朝向离墙的那一边。点中地面或天花时也照这个顺序找身边的墙；四面都没有墙就不摆。
+     */
+    private BlockState sconcePlacement(ItemPlacementContext ctx) {
+        World world = ctx.getWorld();
+        BlockPos pos = ctx.getBlockPos();
+        for (Direction d : ctx.getPlacementDirections()) {
+            if (d.getAxis().isHorizontal()) {
+                Direction facing = d.getOpposite();
+                BlockPos host = pos.offset(d);
+                if (world.getBlockState(host).isSideSolidFullSquare(world, host, facing)) {
+                    return getDefaultState().with(FACING, facing);
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -434,6 +495,12 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         return shapes.computeIfAbsent(state, this::shapeOf);
     }
 
+    /** 碰撞箱就是轮廓（Minecraft 默认），只有壁灯没有：同游戏自带的墙上火把，两格宽的走廊里走过去不碰头。 */
+    @Override
+    protected VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
+        return spec.kind() == Kind.SCONCE ? VoxelShapes.empty() : super.getCollisionShape(state, world, pos, context);
+    }
+
     private VoxelShape shapeOf(BlockState s) {
         Part p = part == null ? null : s.get(part);
         boolean onTable = s.contains(ON_TABLE) && s.get(ON_TABLE);
@@ -468,11 +535,12 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
          */
         public static Part anchor(Kind kind) {
             return switch (kind) {
-                case TALL_LAMP -> Part.LOWER;
+                case TALL_LAMP, WARDROBE, WASHSTAND -> Part.LOWER;
                 case CHANDELIER -> Part.UPPER;
                 case GRAND_CHANDELIER -> Part.CROWN;
                 case GRAND_TABLE, CEILING_QUAD -> Part.NE;
-                case SOFA, CEILING_PAIR -> Part.EAST;
+                case SOFA, CEILING_PAIR, WRITING_TABLE, BOOKCASE -> Part.EAST;      // 书柜：点中的是下面一层人左手那一块
+                case BED -> Part.FOOT;
                 default -> null;
             };
         }
@@ -480,9 +548,11 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         /** 一件里有哪几块（与方块状态的 part 属性同一份清单；单格的件是空集）。单测按它把每一种、每一块都过一遍。 */
         public static Set<Part> parts(Kind kind) {
             return switch (kind) {
-                case TALL_LAMP, CHANDELIER -> EnumSet.of(Part.LOWER, Part.UPPER);
+                case TALL_LAMP, CHANDELIER, WARDROBE, WASHSTAND -> EnumSet.of(Part.LOWER, Part.UPPER);
                 case GRAND_TABLE, CEILING_QUAD -> EnumSet.of(Part.NW, Part.NE, Part.SW, Part.SE);
-                case SOFA, CEILING_PAIR -> EnumSet.of(Part.WEST, Part.EAST);
+                case SOFA, CEILING_PAIR, WRITING_TABLE -> EnumSet.of(Part.WEST, Part.EAST);
+                case BED -> EnumSet.of(Part.FOOT, Part.HEAD);
+                case BOOKCASE -> EnumSet.of(Part.WEST, Part.EAST, Part.UPPER_WEST, Part.UPPER_EAST);
                 case GRAND_CHANDELIER -> EnumSet.of(Part.CROWN, Part.RING_NW, Part.RING_N, Part.RING_NE, Part.RING_W, Part.RING_C,
                         Part.RING_E, Part.RING_SW, Part.RING_S, Part.RING_SE);
                 default -> EnumSet.noneOf(Part.class);
@@ -502,7 +572,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         /** 有开关、会发光的那几种。 */
         public static boolean isLamp(Kind kind) {
             return switch (kind) {
-                case TALL_LAMP, TABLE_LAMP, CEILING_LAMP, CHANDELIER, GRAND_CHANDELIER, CEILING_PAIR, CEILING_QUAD -> true;
+                case TALL_LAMP, TABLE_LAMP, CEILING_LAMP, CHANDELIER, GRAND_CHANDELIER, CEILING_PAIR, CEILING_QUAD, SCONCE -> true;
                 default -> false;
             };
         }
@@ -579,6 +649,8 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                 case RING_E -> Part.RING_W;
                 case RING_SW -> Part.RING_SE;
                 case RING_SE -> Part.RING_SW;
+                case UPPER_WEST -> Part.UPPER_EAST;
+                case UPPER_EAST -> Part.UPPER_WEST;
                 default -> p;
             };
         }

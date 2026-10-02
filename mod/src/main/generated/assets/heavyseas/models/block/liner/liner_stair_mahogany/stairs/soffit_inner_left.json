@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/soffit_inner_left",
+  "textures": {
+    "particle": "heavyseas:block/liner/stairs/string",
+    "s": "heavyseas:block/liner/stairs/string",
+    "u": "heavyseas:block/liner/stairs/soffit"
+  }
+}

@@ -80,8 +80,84 @@ public final class LinerLooks {
         return java.util.Collections.unmodifiableMap(out);
     }
 
+    /**
+     * 贴附件第一组（ADR-0069 §2 ②）的轮廓：与 {@code liner_decor.py} 的 {@code attach_templates()} 同一套尺寸
+     * （LinerLooksTest 拿模板文件逐块对照）。踢脚条与薄檐口的拐角照檐口那一套算（内角 = 直段 + 沿侧墙那一段，外角 = 小方墩）。
+     */
+    private static Map<String, List<double[]>> withAttach(Map<String, List<double[]>> base) {
+        Map<String, List<double[]>> out = new java.util.HashMap<>(base);
+        out.put("floor_ceiled", List.of(box(0, 0, 0, 16, 16, 16)));
+        List<double[]> skirting = List.of(box(0, 0, 0, 16, 3, 1), box(0, 3, 0, 16, 4, 0.5));
+        List<double[]> corniceThin = List.of(box(0, 15, 0, 16, 16, 2), box(0, 13, 0, 16, 15, 1));
+        withCorners(out, "skirting", skirting);
+        withCorners(out, "cornice_thin", corniceThin);
+        // 门套 4 宽（第二轮：压边 1 · 平板 2 · 靠门洞的窄唇 1），门楣与上角 4 高
+        List<double[]> jamb = List.of(box(12, 0, 0, 16, 16, 1));
+        List<double[]> jambLow = List.of(box(12, 0, 0, 16, 13, 1));
+        List<double[]> plinth = List.of(box(11.5, 0, 0, 16, 4.5, 1.5), box(12, 4.5, 0, 16, 16, 1),
+                box(0, 0, 0, 11.5, 3, 1), box(0, 3, 0, 11.5, 4, 0.5));
+        List<double[]> rail = List.of(box(12, 0, 0, 16, 16, 1), box(0, 0, 0, 12, 2, 1));
+        List<double[]> head = List.of(box(0, 0, 0, 16, 4, 1));
+        List<double[]> corner = List.of(box(12, 0, 0, 16, 4, 1));
+        Map<String, List<double[]>> left = new java.util.LinkedHashMap<>();
+        left.put("jamb_left", jamb);
+        left.put("jamb_left_skirting", plinth);
+        left.put("jamb_left_chair_rail", rail);
+        left.put("jamb_left_cornice", concat(jambLow, corniceThin));
+        left.put("corner_left", corner);
+        left.put("corner_left_cornice", concat(corner, corniceThin));
+        left.forEach((name, boxes) -> {
+            out.put("casing_" + name, boxes);
+            out.put("casing_" + name.replace("left", "right"), mirrored(boxes));
+        });
+        out.put("casing_head", head);
+        out.put("casing_head_cornice", concat(head, corniceThin));
+        // 柱脚：墩 4 高前出 3 · 过渡 1 高前出 2 · 柱身从 5 起；两边有踢脚时加两侧那一截踢脚
+        List<double[]> white = List.of(box(5.5, 5, 0, 10.5, 16, 1.5), box(4.5, 4, 0, 11.5, 5, 2), box(3.5, 0, 0, 12.5, 4, 3));
+        out.put("pilaster_plinth", white);
+        out.put("pilaster_plinth_skirting", concat(white, List.of(box(0, 0, 0, 3.5, 4, 1), box(12.5, 0, 0, 16, 4, 1))));
+        List<double[]> wood = List.of(box(0, 5, 0, 5, 16, 1.5), box(0, 4, 0, 5.5, 5, 2), box(0, 0, 0, 6.5, 4, 3));
+        List<double[]> woodSkirting = concat(wood, List.of(box(6.5, 0, 0, 16, 4, 1)));
+        out.put("pilaster_left_plinth", wood);
+        out.put("pilaster_left_plinth_skirting", woodSkirting);
+        out.put("pilaster_right_plinth", mirrored(wood));
+        out.put("pilaster_right_plinth_skirting", mirrored(woodSkirting));
+        return out;
+    }
+
+    /** 直段 + 四种拐角（同 {@code liner_decor.py} 的 {@code corner_variants}）：每个盒子按自己的进深 d 转过去。 */
+    private static void withCorners(Map<String, List<double[]>> out, String name, List<double[]> straight) {
+        List<double[]> innerL = new java.util.ArrayList<>(straight);
+        List<double[]> innerR = new java.util.ArrayList<>(straight);
+        List<double[]> outerL = new java.util.ArrayList<>();
+        List<double[]> outerR = new java.util.ArrayList<>();
+        for (double[] b : straight) {
+            double d = b[5];
+            innerL.add(box(0, b[1], d, d, b[4], 16));
+            innerR.add(box(16 - d, b[1], d, 16, b[4], 16));
+            outerL.add(box(0, b[1], 0, d, b[4], d));
+            outerR.add(box(16 - d, b[1], 0, 16, b[4], d));
+        }
+        out.put(name, straight);
+        out.put(name + "_inner_left", innerL);
+        out.put(name + "_inner_right", innerR);
+        out.put(name + "_outer_left", outerL);
+        out.put(name + "_outer_right", outerR);
+    }
+
+    private static List<double[]> concat(List<double[]> a, List<double[]> b) {
+        List<double[]> out = new java.util.ArrayList<>(a);
+        out.addAll(b);
+        return out;
+    }
+
+    /** 左右镜像（x → 16 − x）。 */
+    private static List<double[]> mirrored(List<double[]> boxes) {
+        return boxes.stream().map(b -> box(16 - b[3], b[1], b[2], 16 - b[0], b[4], b[5])).toList();
+    }
+
     /** 每块模板的轮廓（模板坐标，单位像素）：与模型元件大致重合的几个盒子。整块的三种是满格。 */
-    private static final Map<String, List<double[]>> BOXES = withFrames(Map.ofEntries(
+    private static final Map<String, List<double[]>> BOXES = withAttach(withFrames(Map.ofEntries(
             Map.entry("cube", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("cube_front", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("floor", List.of(box(0, 0, 0, 16, 16, 16))),
@@ -103,7 +179,7 @@ public final class LinerLooks {
             Map.entry("capping", List.of(box(0, 0, 0, 16, 3, 2))),
             Map.entry("capping_left", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5))),
             Map.entry("capping_right", List.of(box(0, 0, 0, 16, 3, 2), box(11, 0, 0, 16, 16, 1.5))),
-            Map.entry("capping_both", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5), box(11, 0, 0, 16, 16, 1.5)))));
+            Map.entry("capping_both", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5), box(11, 0, 0, 16, 16, 1.5))))));
 
     private static double[] box(double x0, double y0, double z0, double x1, double y1, double z1) {
         return new double[]{x0, y0, z0, x1, y1, z1};
@@ -112,6 +188,11 @@ public final class LinerLooks {
     /** 模板里有哪些模板名（判据对得上号用）。 */
     public static Set<String> templates() {
         return BOXES.keySet();
+    }
+
+    /** 一块模板的轮廓盒子（模板坐标，没转过）；LinerLooksTest 拿它与模板文件里的元件对照。 */
+    static List<double[]> boxesOf(String template) {
+        return BOXES.get(template);
     }
 
     /** 按样子算轮廓：模板的盒子照方块状态的 y 旋转转过去（与 Minecraft 转模型同一个方向：y = 90 把北转到东）。 */

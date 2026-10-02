@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_porthole_inner/hull/porthole_inner",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_porthole_inner/hull/porthole_inner",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_porthole_inner/hull/porthole_inner"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_porthole_inner/hull/porthole_inner",
+      "y": 90
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/glass/rib_ring",
+  "textures": {
+    "particle": "heavyseas:block/liner/glass/dome_rib",
+    "rib": "heavyseas:block/liner/glass/dome_rib"
+  }
+}

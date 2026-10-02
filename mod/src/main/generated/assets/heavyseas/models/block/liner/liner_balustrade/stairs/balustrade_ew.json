@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/balustrade_ew",
+  "textures": {
+    "b": "heavyseas:block/liner/stairs/balustrade",
+    "particle": "heavyseas:block/liner/stairs/balustrade"
+  }
+}

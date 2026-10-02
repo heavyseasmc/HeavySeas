@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/wardrobe_upper",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/wardrobe",
+    "particle": "heavyseas:block/liner/prop/wardrobe"
+  }
+}

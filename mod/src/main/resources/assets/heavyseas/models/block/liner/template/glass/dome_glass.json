@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {"particle": "#glass"},
+  "elements": [
+    {"from": [0, 0, 0], "to": [16, 16, 16], "faces": {"north": {"texture": "#side", "cullface": "north"}, "south": {"texture": "#side", "cullface": "south"}, "east": {"texture": "#side", "cullface": "east"}, "west": {"texture": "#side", "cullface": "west"}, "up": {"texture": "#glass", "cullface": "up"}, "down": {"texture": "#glass", "cullface": "down"}}, "shade": false}
+  ]
+}

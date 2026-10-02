@@ -5,6 +5,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.world.liner.LinerBlocks;
+import io.github.heavyseasmc.mod.world.liner.LinerGlass;
+import io.github.heavyseasmc.mod.world.liner.LinerDoors;
+import io.github.heavyseasmc.mod.world.liner.LinerHull;
 import io.github.heavyseasmc.mod.world.liner.LinerLooks;
 import io.github.heavyseasmc.mod.world.liner.LinerProps;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlock;
@@ -61,6 +64,21 @@ final class DecorModels extends FabricModelProvider {
         LinerProps.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
                 name, block, s -> liner(block, s), block.getDefaultState(), false,
                 block.itemLook() == null ? null : liner(block.itemLook())));
+        // 玻璃一批（ADR-0074）：模板正面朝南，与大邮轮那一族的墙面件相同
+        LinerGlass.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
+                name, block, s -> liner((LinerLooks.Styled) block, s), block.getDefaultState(), true, null));
+        // 船壳板与舷窗（ADR-0069 §2）：舷窗正面朝南作画，物品栏里转半圈看正面；门（⑤）的物品是一整扇门缩小
+        LinerHull.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
+                name, block, s -> liner((LinerLooks.Styled) block, s), block.getDefaultState(), true, null));
+        LinerDoors.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
+                name, block, s -> liner(block, s), block.getDefaultState(), false, liner(block.itemLook())));
+        // 大楼梯一族（ADR 草稿 stairs）：楼梯朝北作画（高的那一边在北），物品栏里转半圈看踏步；收口照檐口朝南；斜栏杆 · 起步灯另有缩小的物品模板
+        io.github.heavyseasmc.mod.world.liner.LinerStairs.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR,
+                LinerLooks.TEXTURE_DIR, name, block, s -> liner((LinerLooks.Styled) block, s),
+                io.github.heavyseasmc.mod.world.liner.LinerStairs.displayState(block),
+                io.github.heavyseasmc.mod.world.liner.LinerStairs.frontInGui(block),
+                io.github.heavyseasmc.mod.world.liner.LinerStairs.itemLook(block) == null ? null
+                        : liner(io.github.heavyseasmc.mod.world.liner.LinerStairs.itemLook(block))));
     }
 
     @Override
