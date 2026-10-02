@@ -55,6 +55,8 @@ public final class LinerBlocks {
     public static final EnumProperty<WainscotPart> PART = EnumProperty.of("part", WainscotPart.class);
     public static final EnumProperty<PilasterSide> SIDE = EnumProperty.of("side", PilasterSide.class);
     public static final EnumProperty<CappingEnd> END = EnumProperty.of("end", CappingEnd.class);
+    /** 檐口、腰线拐不拐角（{@link LinerConnect.Rules#cornerShape}）。 */
+    public static final EnumProperty<CornerShape> SHAPE = EnumProperty.of("shape", CornerShape.class);
 
     /** 护墙这一段：素段 · 框左半 · 框中段 · 框右半 · 单格框（贴图后缀 c / l / m / r / s）。 */
     public enum WainscotPart implements StringIdentifiable {
@@ -105,6 +107,36 @@ public final class LinerBlocks {
         }
     }
 
+    /** 直 · 内角（屋角）· 外角（凸角）；左右按站在正面看的人算。 */
+    public enum CornerShape implements StringIdentifiable {
+        STRAIGHT, INNER_LEFT, INNER_RIGHT, OUTER_LEFT, OUTER_RIGHT;
+
+        static CornerShape of(String code) {
+            return valueOf(code.toUpperCase(Locale.ROOT));
+        }
+
+        /** 镜像之后左右对调。 */
+        CornerShape mirrored() {
+            return switch (this) {
+                case INNER_LEFT -> INNER_RIGHT;
+                case INNER_RIGHT -> INNER_LEFT;
+                case OUTER_LEFT -> OUTER_RIGHT;
+                case OUTER_RIGHT -> OUTER_LEFT;
+                default -> this;
+            };
+        }
+
+        /** 模板名的后缀：直的那一块没有后缀。 */
+        String suffix() {
+            return this == STRAIGHT ? "" : "_" + asString();
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
     private static final Map<String, LinerBlock> BLOCKS = new LinkedHashMap<>();
 
     // ---------------------------------------------------------------- 底面层：墙、平顶、甲板、地毯
@@ -133,10 +165,10 @@ public final class LinerBlocks {
             s -> look("cube_front", tex("front", "wainscot_" + s.get(PART).code, "back", "wall_white")), FACING, PART);
     public static final LinerBlock WAINSCOT_MAHOGANY = add("liner_wainscot_mahogany", solid(MapColor.DARK_RED), LinerBlock.Kind.WAINSCOT,
             s -> look("cube_front", tex("front", "wainscot_mahogany_" + s.get(PART).code, "back", "wall_white")), FACING, PART);
-    public static final LinerBlock CHAIR_RAIL = add("liner_chair_rail", piece(MapColor.OFF_WHITE), LinerBlock.Kind.WALL_PIECE,
-            s -> look("chair_rail", tex("t", "chair_rail")), FACING);
-    public static final LinerBlock CORNICE = add("liner_cornice", piece(MapColor.OFF_WHITE), LinerBlock.Kind.WALL_PIECE,
-            s -> look("cornice", tex("t", "cornice")), FACING);
+    public static final LinerBlock CHAIR_RAIL = add("liner_chair_rail", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
+            s -> look("chair_rail" + s.get(SHAPE).suffix(), tex("t", "chair_rail")), FACING, SHAPE);
+    public static final LinerBlock CORNICE = add("liner_cornice", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
+            s -> look("cornice" + s.get(SHAPE).suffix(), tex("t", "cornice")), FACING, SHAPE);
     public static final LinerBlock PILASTER = add("liner_pilaster", piece(MapColor.OFF_WHITE), LinerBlock.Kind.WALL_PIECE,
             s -> look("pilaster", tex("p", "pilaster")), FACING);
     public static final LinerBlock PILASTER_MAHOGANY = add("liner_pilaster_mahogany", piece(MapColor.DARK_RED), LinerBlock.Kind.PILASTER_SIDE,

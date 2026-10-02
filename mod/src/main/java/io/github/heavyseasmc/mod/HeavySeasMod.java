@@ -40,6 +40,7 @@ import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
 import io.github.heavyseasmc.mod.world.liner.LinerBlocks;
+import io.github.heavyseasmc.mod.world.liner.LinerProps;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.world.LobbyBoatBlockEntity;
 import io.github.heavyseasmc.mod.world.LobbyBoatEntity;
@@ -88,6 +89,7 @@ public final class HeavySeasMod implements ModInitializer {
         LobbyBoatBlock.register();
         SkiffBlocks.register();
         LinerBlocks.register();                        // 大邮轮那一族装饰方块（ADR-0062）
+        LinerProps.register();                         // 大邮轮的灯与家具（ADR-0063）
         LobbyBoatEntity.register();
         ServerChunkEvents.CHUNK_LOAD.register(LobbyBoatBlockEntity::restoreLegacyAnchors);
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。

@@ -2,6 +2,8 @@ package io.github.heavyseasmc.mod.world.liner;
 
 import net.minecraft.util.math.Direction;
 
+import java.util.function.IntFunction;
+
 /**
  * 「看邻居」的那几样（ADR-0062 §2；用户 2026-10-02 选「自动拼框」）：大框、护墙、顶帽、地毯放下去之后，
  * 由上下左右的邻居决定自己画哪一张。世界里那一半在 {@link LinerBlock}；这里是纯规则，单测在 {@code LinerConnectRulesTest}。
@@ -24,6 +26,26 @@ public final class LinerConnect {
 
     public static Direction viewerRight(Direction facing) {
         return facing.rotateYCounterclockwise();
+    }
+
+    /** 水平方向 ↔ 规则里用的编号：北 0 · 东 1 · 南 2 · 西 3（顺时针）。 */
+    public static int index(Direction d) {
+        return switch (d) {
+            case NORTH -> 0;
+            case EAST -> 1;
+            case SOUTH -> 2;
+            case WEST -> 3;
+            default -> throw new IllegalArgumentException(d.toString());
+        };
+    }
+
+    public static Direction direction(int index) {
+        return switch (index & 3) {
+            case 0 -> Direction.NORTH;
+            case 1 -> Direction.EAST;
+            case 2 -> Direction.SOUTH;
+            default -> Direction.WEST;
+        };
     }
 
     public static final class Rules {
@@ -90,6 +112,54 @@ public final class LinerConnect {
                 return "left";
             }
             return rightSame ? "none" : "right";
+        }
+
+        /**
+         * 檐口、腰线这一格拐不拐角（用户 2026-10-02「两个都做，先补墙角」）：与楼梯同一套判法。
+         * 「朝向」是正面朝的方向（编号见 {@link LinerConnect#index}）；{@code facingAt.apply(方向)} 回答那一边紧挨着的
+         * 同一种件朝哪（不是同一种件就回 {@code null}）。
+         *
+         * <ul>
+         *   <li>身后那一格是同一种件、朝向与自己垂直 → 外角（在凸角斜对着的那一格里补一个小方墩接住两条线）；</li>
+         *   <li>否则前面那一格是同一种件、朝向垂直 → 内角（屋角那一格：沿着两面墙拐过去）；</li>
+         *   <li>拐向的那一边已经有一个同朝向的同种件（这条线本来就接着往前走）→ 不拐，照直。</li>
+         * </ul>
+         * 左右按站在正面看的人算：拐向他左手那边是 {@code _left}。
+         */
+        public static String cornerShape(int facing, IntFunction<Integer> facingAt) {
+            int back = opposite(facing);                       // 楼梯那一套里的「朝向」= 背后
+            Integer behind = facingAt.apply(back);
+            if (behind != null && perpendicular(behind, facing)) {
+                int turn = opposite(behind);
+                if (!sameFacing(facingAt, opposite(turn), facing)) {
+                    return turn == ccw(back) ? "outer_left" : "outer_right";
+                }
+            }
+            Integer front = facingAt.apply(facing);
+            if (front != null && perpendicular(front, facing)) {
+                int turn = opposite(front);
+                if (!sameFacing(facingAt, turn, facing)) {
+                    return turn == ccw(back) ? "inner_left" : "inner_right";
+                }
+            }
+            return "straight";
+        }
+
+        static int opposite(int d) {
+            return (d + 2) & 3;
+        }
+
+        static int ccw(int d) {
+            return (d + 3) & 3;
+        }
+
+        private static boolean perpendicular(int a, int b) {
+            return (a & 1) != (b & 1);
+        }
+
+        private static boolean sameFacing(IntFunction<Integer> facingAt, int side, int facing) {
+            Integer f = facingAt.apply(side);
+            return f != null && f == facing;
         }
 
         /**

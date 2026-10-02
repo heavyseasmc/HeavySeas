@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#t"},
+  "elements": [
+    {"from": [13.5, 11, 0], "to": [16, 16, 2.5], "faces": {"south": {"texture": "#t", "uv": [0, 0, 2.5, 5]}, "down": {"texture": "#t", "uv": [0, 5, 2.5, 7.5]}, "up": {"texture": "#t", "uv": [0, 0, 2.5, 2.5]}, "west": {"texture": "#t", "uv": [0, 0, 2.5, 5]}}},
+    {"from": [14.75, 8, 0], "to": [16, 11, 1.25], "faces": {"south": {"texture": "#t", "uv": [0, 7, 1.25, 10]}, "down": {"texture": "#t", "uv": [0, 9, 1.25, 10]}, "west": {"texture": "#t", "uv": [0, 7, 1.25, 10]}}}
+  ]
+}

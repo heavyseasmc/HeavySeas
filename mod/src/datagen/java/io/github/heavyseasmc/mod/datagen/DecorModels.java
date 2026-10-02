@@ -4,9 +4,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.github.heavyseasmc.mod.HeavySeasMod;
-import io.github.heavyseasmc.mod.world.liner.LinerBlock;
 import io.github.heavyseasmc.mod.world.liner.LinerBlocks;
 import io.github.heavyseasmc.mod.world.liner.LinerLooks;
+import io.github.heavyseasmc.mod.world.liner.LinerProps;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlock;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.world.skiff.SkiffLooks;
@@ -32,8 +32,8 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * 自制装饰方块的方块状态文件与带贴图的方块模型（「形状 × 材质」批量出，ADR-0053 §5 · ADR-0056 · ADR-0062）：
- * 救生艇一族（{@code block/skiff/}）与大邮轮一族（{@code block/liner/}）。
+ * 自制装饰方块的方块状态文件与带贴图的方块模型（「形状 × 材质」批量出，ADR-0053 §5 · ADR-0056 · ADR-0062 · ADR-0063）：
+ * 救生艇一族（{@code block/skiff/}）与大邮轮一族（{@code block/liner/}，含灯与家具，模板与贴图在 {@code prop/} 下）。
  *
  * <p>每个方块的每个状态都问一遍它的 {@code look}：用哪块模板、贴哪几张图、转多少度 —— 与运行时算轮廓的是同一个函数。
  * 同一块模板配同一组贴图只出一个模型；模型名 = 模板名，同一块模板配了几组贴图时后面接上那几张会变的贴图名。
@@ -54,9 +54,13 @@ final class DecorModels extends FabricModelProvider {
     @Override
     public void generateBlockStateModels(BlockStateModelGenerator generator) {
         SkiffBlocks.all().forEach((name, block) -> family(generator, "skiff", SkiffLooks.TEMPLATE_DIR, SkiffLooks.TEXTURE_DIR,
-                name, block, s -> skiff(block.look(s)), SkiffBlocks.displayState(block), false));
+                name, block, s -> skiff(block.look(s)), SkiffBlocks.displayState(block), false, null));
         LinerBlocks.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
-                name, block, s -> liner(block, s), block.getDefaultState(), true));
+                name, block, s -> liner(block, s), block.getDefaultState(), true, null));
+        // 灯与家具（ADR-0063）：模型正面朝北作画，物品栏默认角度就看得到正面；跨几格的件的物品是一块整件缩小的模板
+        LinerProps.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
+                name, block, s -> liner(block, s), block.getDefaultState(), false,
+                block.itemLook() == null ? null : liner(block.itemLook())));
     }
 
     @Override
@@ -68,8 +72,11 @@ final class DecorModels extends FabricModelProvider {
         return new Look(l.template(), l.textures(), l.x(), l.y());
     }
 
-    private static Look liner(LinerBlock block, BlockState s) {
-        LinerLooks.Look l = block.look(s);
+    private static Look liner(LinerLooks.Styled block, BlockState s) {
+        return liner(block.look(s));
+    }
+
+    private static Look liner(LinerLooks.Look l) {
         return new Look(l.template(), l.textures(), 0, l.y());
     }
 
@@ -78,10 +85,11 @@ final class DecorModels extends FabricModelProvider {
      *
      * @param frontInGui 物品栏里要看见正面：模板一律正面朝南，而物品栏那一格默认看的是北面与东面 ——
      *                   大邮轮那一族的大框、墙板、挂墙的件从默认角度只看得见背面或一条边，所以物品模型在物品栏里转半圈
+     * @param itemLook   物品另有一块模板（跨几格的灯与家具：整件缩小，显示参数在模板里）；{@code null} = 用 display 那一格的方块模型
      */
     private static void family(BlockStateModelGenerator generator, String family, String templateDir, String textureDir,
                                String name, Block block, Function<BlockState, Look> lookOf, BlockState display,
-                               boolean frontInGui) {
+                               boolean frontInGui, Look itemLook) {
         Map<BlockState, Look> looks = new LinkedHashMap<>();
         for (BlockState state : block.getStateManager().getStates()) {
             looks.put(state, lookOf.apply(state));
@@ -101,7 +109,12 @@ final class DecorModels extends FabricModelProvider {
         });
         // 物品（创造物品栏里那一格、手里拿着的样子）= 摆出来看得见的那一版的模型
         Identifier itemParent = models.get(modelKey(lookOf.apply(display)));
-        if (frontInGui && display.contains(Properties.HORIZONTAL_FACING)) {
+        if (itemLook != null) {
+            JsonObject item = new JsonObject();
+            item.addProperty("parent", HeavySeasMod.MOD_ID + ":" + templateDir + itemLook.template());
+            item.add("textures", textures(textureDir, itemLook));
+            generator.modelCollector.accept(ModelIds.getItemModelId(block.asItem()), () -> item);
+        } else if (frontInGui && display.contains(Properties.HORIZONTAL_FACING)) {
             JsonObject item = new JsonObject();
             item.addProperty("parent", itemParent.toString());
             JsonObject gui = new JsonObject();
@@ -169,21 +182,26 @@ final class DecorModels extends FabricModelProvider {
             Identifier id = Identifier.of(HeavySeasMod.MOD_ID, path.toString());
             JsonObject model = new JsonObject();
             model.addProperty("parent", HeavySeasMod.MOD_ID + ":" + templateDir + look.template());
-            JsonObject textures = new JsonObject();
-            String first = null;
-            for (Map.Entry<String, String> e : look.textures().entrySet()) {
-                String ref = HeavySeasMod.MOD_ID + ":" + textureDir + e.getValue();
-                textures.addProperty(e.getKey(), ref);
-                if (first == null) {
-                    first = ref;
-                }
-            }
-            textures.addProperty("particle", first);
-            model.add("textures", textures);
+            model.add("textures", textures(textureDir, look));
             generator.modelCollector.accept(id, () -> model);
             ids.put(key, id);
         });
         return ids;
+    }
+
+    /** 纹理变量 → 贴图；第一张兼作碎屑贴图。 */
+    private static JsonObject textures(String textureDir, Look look) {
+        JsonObject textures = new JsonObject();
+        String first = null;
+        for (Map.Entry<String, String> e : look.textures().entrySet()) {
+            String ref = HeavySeasMod.MOD_ID + ":" + textureDir + e.getValue();
+            textures.addProperty(e.getKey(), ref);
+            if (first == null) {
+                first = ref;
+            }
+        }
+        textures.addProperty("particle", first);
+        return textures;
     }
 
     private static String modelKey(Look look) {

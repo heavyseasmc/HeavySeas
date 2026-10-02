@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/sofa_west",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/sofa_green",
+    "particle": "heavyseas:block/liner/prop/sofa_green"
+  }
+}

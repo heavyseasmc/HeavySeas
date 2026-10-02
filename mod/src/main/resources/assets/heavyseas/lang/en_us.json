@@ -542,5 +542,13 @@
   "block.heavyseas.liner_cornice": "Cornice",
   "block.heavyseas.liner_pilaster": "Painted Pilaster",
   "block.heavyseas.liner_pilaster_mahogany": "Mahogany Pilaster",
-  "block.heavyseas.liner_capping_mahogany": "Mahogany Capping"
+  "block.heavyseas.liner_capping_mahogany": "Mahogany Capping",
+  "block.heavyseas.liner_lamppost": "Deck Lamppost",
+  "block.heavyseas.liner_floor_lamp": "Brass Floor Lamp",
+  "block.heavyseas.liner_table_lamp": "Green-Shade Table Lamp",
+  "block.heavyseas.liner_grand_table": "Grand Round Table",
+  "block.heavyseas.liner_sofa_cream": "Chesterfield Sofa (Cream)",
+  "block.heavyseas.liner_sofa_green": "Chesterfield Sofa (Green Velvet)",
+  "block.heavyseas.liner_club_chair_cream": "Club Armchair (Cream)",
+  "block.heavyseas.liner_club_chair_green": "Club Armchair (Green Velvet)"
 }

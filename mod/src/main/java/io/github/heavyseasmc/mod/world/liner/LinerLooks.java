@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.world.liner;
 
+import net.minecraft.block.BlockState;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
@@ -38,6 +39,21 @@ public final class LinerLooks {
         }
     }
 
+    /**
+     * 大邮轮一族的方块都能回答「这个状态长什么样」：装饰方块（{@link LinerBlock}）与灯 / 家具（{@link LinerProp}）。
+     * 批量生成工具与运行时的轮廓用的是同一个回答。
+     */
+    public interface Styled {
+
+        /** 这个状态的样子，朝向已经算进 y 旋转里。 */
+        Look look(BlockState state);
+
+        /** 物品的样子：{@code null} = 用默认状态那一格的方块模型；跨几格的件给一块整件缩小的模板。 */
+        default Look itemLook() {
+            return null;
+        }
+    }
+
     static Look look(String template, Map<String, String> textures) {
         return new Look(template, textures, 0);
     }
@@ -61,7 +77,17 @@ public final class LinerLooks {
             Map.entry("cube_front", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("floor", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("chair_rail", List.of(box(0, 0, 0, 16, 2, 1))),
+            Map.entry("chair_rail_inner_left", List.of(box(0, 0, 0, 16, 2, 1), box(0, 0, 1, 1, 2, 16))),
+            Map.entry("chair_rail_inner_right", List.of(box(0, 0, 0, 16, 2, 1), box(15, 0, 1, 16, 2, 16))),
+            Map.entry("chair_rail_outer_left", List.of(box(0, 0, 0, 1, 2, 1))),
+            Map.entry("chair_rail_outer_right", List.of(box(15, 0, 0, 16, 2, 1))),
             Map.entry("cornice", List.of(box(0, 11, 0, 16, 16, 2.5), box(0, 8, 0, 16, 11, 1.25))),
+            Map.entry("cornice_inner_left", List.of(box(0, 11, 0, 16, 16, 2.5), box(0, 8, 0, 16, 11, 1.25),
+                    box(0, 11, 2.5, 2.5, 16, 16), box(0, 8, 1.25, 1.25, 11, 16))),
+            Map.entry("cornice_inner_right", List.of(box(0, 11, 0, 16, 16, 2.5), box(0, 8, 0, 16, 11, 1.25),
+                    box(13.5, 11, 2.5, 16, 16, 16), box(14.75, 8, 1.25, 16, 11, 16))),
+            Map.entry("cornice_outer_left", List.of(box(0, 11, 0, 2.5, 16, 2.5), box(0, 8, 0, 1.25, 11, 1.25))),
+            Map.entry("cornice_outer_right", List.of(box(13.5, 11, 0, 16, 16, 2.5), box(14.75, 8, 0, 16, 11, 1.25))),
             Map.entry("pilaster", List.of(box(5.5, 0, 0, 10.5, 16, 1.5))),
             Map.entry("pilaster_left", List.of(box(0, 0, 0, 5, 16, 1.5))),
             Map.entry("pilaster_right", List.of(box(11, 0, 0, 16, 16, 1.5))),

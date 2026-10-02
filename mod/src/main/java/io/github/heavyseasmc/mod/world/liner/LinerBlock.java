@@ -30,6 +30,7 @@ import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.LEFT;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.NORTH;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.RIGHT;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SHAPE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SIDE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SOUTH;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.UP;
@@ -43,7 +44,7 @@ import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.WEST;
  *
  * <p>❗属性只能在构造时经 {@link #PENDING} 传进来：{@code appendProperties} 在 {@code Block} 的构造器里就被调用。
  */
-public final class LinerBlock extends Block {
+public final class LinerBlock extends Block implements LinerLooks.Styled {
 
     /** 摆法：放下时朝哪、看哪几个邻居。 */
     public enum Kind {
@@ -55,8 +56,10 @@ public final class LinerBlock extends Block {
         FRAME,
         /** 护墙：正面朝着摆它的人，看正上方那块框。 */
         WAINSCOT,
-        /** 挂在墙上的件（腰线、檐口、壁柱）：贴在点中的那一面上，正面朝外。 */
+        /** 挂在墙上的件（白漆壁柱）：贴在点中的那一面上，正面朝外。 */
         WALL_PIECE,
+        /** 沿墙走的线（腰线、檐口）：同上，再按前后的同种件拐内角 / 外角（{@link LinerConnect.Rules#cornerShape}）。 */
+        RUN,
         /** 木壁柱：同上，再按点在那一面的左半还是右半定靠哪边。 */
         PILASTER_SIDE,
         /** 顶帽：同挂墙的件，两头看左右是不是同一朝向的顶帽。 */
@@ -103,6 +106,7 @@ public final class LinerBlock extends Block {
     }
 
     /** 这个状态的样子，朝向已经算进 y 旋转里（模板一律正面朝南作画）。 */
+    @Override
     public LinerLooks.Look look(BlockState state) {
         LinerLooks.Look base = look.apply(state);
         return state.contains(FACING) ? base.turned(yawOf(state.get(FACING))) : base;
@@ -123,7 +127,7 @@ public final class LinerBlock extends Block {
         BlockState s = getDefaultState();
         Direction toPlayer = ctx.getHorizontalPlayerFacing().getOpposite();
         if (s.contains(FACING)) {
-            boolean onWall = kind == Kind.WALL_PIECE || kind == Kind.PILASTER_SIDE || kind == Kind.CAPPING;
+            boolean onWall = kind == Kind.WALL_PIECE || kind == Kind.RUN || kind == Kind.PILASTER_SIDE || kind == Kind.CAPPING;
             s = s.with(FACING, onWall && ctx.getSide().getAxis().isHorizontal() ? ctx.getSide() : toPlayer);
         }
         if (s.contains(AXIS)) {
@@ -166,6 +170,14 @@ public final class LinerBlock extends Block {
                 String end = LinerConnect.Rules.cappingEnd(same(world, pos.offset(LinerConnect.viewerLeft(f)), f),
                         same(world, pos.offset(LinerConnect.viewerRight(f)), f));
                 return s.with(END, LinerBlocks.CappingEnd.of(end));
+            }
+            case RUN -> {
+                int f = LinerConnect.index(s.get(FACING));
+                String shape = LinerConnect.Rules.cornerShape(f, d -> {
+                    BlockState other = world.getBlockState(pos.offset(LinerConnect.direction(d)));
+                    return other.isOf(this) ? LinerConnect.index(other.get(FACING)) : null;
+                });
+                return s.with(SHAPE, LinerBlocks.CornerShape.of(shape));
             }
             case CARPET -> {
                 return s.with(NORTH, isThis(world, pos.north())).with(EAST, isThis(world, pos.east()))
@@ -212,8 +224,36 @@ public final class LinerBlock extends Block {
         return s;
     }
 
+    /**
+     * 镜像：朝向照游戏自带的做法转；镜像还会把左右对调（转不会）—— 大框左右的接缝、木壁柱靠哪边、顶帽哪一头、
+     * 拐角的左右、地毯的四边都跟着换。看邻居的那几样放下去之后会重算，靠哪边的木壁柱不会，第一版漏了它。
+     */
     @Override
     protected BlockState mirror(BlockState state, BlockMirror mirror) {
-        return state.contains(FACING) ? state.rotate(mirror.getRotation(state.get(FACING))) : state;
+        if (mirror == BlockMirror.NONE) {
+            return state;
+        }
+        BlockState s = state.contains(FACING) ? state.rotate(mirror.getRotation(state.get(FACING))) : state;
+        if (s.contains(LEFT)) {
+            s = s.with(LEFT, state.get(RIGHT)).with(RIGHT, state.get(LEFT));
+        }
+        if (s.contains(SIDE)) {
+            s = s.with(SIDE, state.get(SIDE) == LinerBlocks.PilasterSide.LEFT ? LinerBlocks.PilasterSide.RIGHT
+                    : LinerBlocks.PilasterSide.LEFT);
+        }
+        if (s.contains(END)) {
+            LinerBlocks.CappingEnd end = state.get(END);
+            s = s.with(END, end == LinerBlocks.CappingEnd.LEFT ? LinerBlocks.CappingEnd.RIGHT
+                    : end == LinerBlocks.CappingEnd.RIGHT ? LinerBlocks.CappingEnd.LEFT : end);
+        }
+        if (s.contains(SHAPE)) {
+            s = s.with(SHAPE, state.get(SHAPE).mirrored());
+        }
+        if (s.contains(NORTH)) {
+            for (Direction d : new Direction[]{Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST}) {
+                s = s.with(LinerBlocks.side(mirror.apply(d)), state.get(LinerBlocks.side(d)));
+            }
+        }
+        return s;
     }
 }

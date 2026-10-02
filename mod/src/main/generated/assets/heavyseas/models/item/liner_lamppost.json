@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/lamppost_item",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/lamppost_lower",
+    "g": "heavyseas:block/liner/prop/lamppost_glass_lit",
+    "particle": "heavyseas:block/liner/prop/lamppost_lower",
+    "u": "heavyseas:block/liner/prop/lamppost_upper"
+  }
+}

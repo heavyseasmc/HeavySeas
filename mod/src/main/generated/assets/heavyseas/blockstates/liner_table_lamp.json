@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,lit=false,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 90
+    },
+    "facing=east,lit=false,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit",
+      "y": 90
+    },
+    "facing=north,lit=false,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off"
+    },
+    "facing=north,lit=false,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off"
+    },
+    "facing=north,lit=true,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit"
+    },
+    "facing=north,lit=true,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit"
+    },
+    "facing=south,lit=false,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 180
+    },
+    "facing=south,lit=false,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit",
+      "y": 180
+    },
+    "facing=west,lit=false,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 270
+    },
+    "facing=west,lit=false,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=false": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=true": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit",
+      "y": 270
+    }
+  }
+}

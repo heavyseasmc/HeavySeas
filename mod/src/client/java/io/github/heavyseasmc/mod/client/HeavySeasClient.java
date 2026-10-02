@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
+import io.github.heavyseasmc.mod.world.liner.LinerProps;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
@@ -144,6 +145,8 @@ public final class HeavySeasClient implements ClientModInitializer {
         HudRenderCallback.EVENT.register(GameHud::render);
         // 救生艇方块里只有帆（四角帆的斜边）与星徽（圆牌）的贴图有透明像素：按镂空画，其余照实心
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getCutout(), SkiffBlocks.SAIL, SkiffBlocks.EMBLEM);
+        // 大邮轮的灯与家具（ADR-0063）一律按镂空画：灯柱横担、灯罩流苏、台灯拉链是镂空片；别的件没有透明像素，按镂空画也一样
+        LinerProps.all().values().forEach(b -> BlockRenderLayerMap.INSTANCE.putBlock(b, RenderLayer.getCutout()));
         GameScreenSidebar.register();
         // 别的界面（Minecraft 自带的进度 · 游戏菜单 · 聊天……）打开时也记一行，与 GameScreen 的「界面：打开 X」配对：
         // 回归脚本据此分得开「本模组那一面没弹」与「被别的界面盖住了」—— 此前两次都要截图才看出来

@@ -542,5 +542,13 @@
   "block.heavyseas.liner_cornice": "檐口",
   "block.heavyseas.liner_pilaster": "白漆壁柱",
   "block.heavyseas.liner_pilaster_mahogany": "桃花心木壁柱",
-  "block.heavyseas.liner_capping_mahogany": "桃花心木顶帽"
+  "block.heavyseas.liner_capping_mahogany": "桃花心木顶帽",
+  "block.heavyseas.liner_lamppost": "甲板灯柱",
+  "block.heavyseas.liner_floor_lamp": "黄铜落地灯",
+  "block.heavyseas.liner_table_lamp": "绿罩台灯",
+  "block.heavyseas.liner_grand_table": "大圆桌",
+  "block.heavyseas.liner_sofa_cream": "切斯特菲尔德沙发（米色）",
+  "block.heavyseas.liner_sofa_green": "切斯特菲尔德沙发（绿丝绒）",
+  "block.heavyseas.liner_club_chair_cream": "俱乐部扶手椅（米色）",
+  "block.heavyseas.liner_club_chair_green": "俱乐部扶手椅（绿丝绒）"
 }

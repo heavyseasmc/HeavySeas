@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/floor_lamp_upper_lit",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/floor_lamp_upper",
+    "g": "heavyseas:block/liner/prop/floor_lamp_shade_lit",
+    "particle": "heavyseas:block/liner/prop/floor_lamp_upper"
+  }
+}

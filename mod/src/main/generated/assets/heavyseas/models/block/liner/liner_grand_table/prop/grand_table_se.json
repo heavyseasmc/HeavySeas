@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/grand_table_se",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/grand_table",
+    "particle": "heavyseas:block/liner/prop/grand_table"
+  }
+}

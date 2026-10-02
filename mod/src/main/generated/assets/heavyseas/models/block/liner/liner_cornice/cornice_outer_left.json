@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/cornice_outer_left",
+  "textures": {
+    "particle": "heavyseas:block/liner/cornice",
+    "t": "heavyseas:block/liner/cornice"
+  }
+}
