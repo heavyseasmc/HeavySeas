@@ -553,5 +553,7 @@
   "block.heavyseas.liner_club_chair_green": "俱乐部扶手椅（绿丝绒）",
   "block.heavyseas.liner_ceiling_light": "吸顶灯（花玻璃）",
   "block.heavyseas.liner_brass_chandelier": "黄铜吊灯",
-  "block.heavyseas.liner_crystal_chandelier": "水晶大吊灯"
+  "block.heavyseas.liner_crystal_chandelier": "水晶大吊灯",
+  "block.heavyseas.liner_ceiling_light_pair": "吸顶灯（花玻璃 · 骑两格）",
+  "block.heavyseas.liner_ceiling_light_quad": "吸顶灯（花玻璃 · 骑四格）"
 }

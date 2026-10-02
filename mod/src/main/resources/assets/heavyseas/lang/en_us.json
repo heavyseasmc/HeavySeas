@@ -553,5 +553,7 @@
   "block.heavyseas.liner_club_chair_green": "Club Armchair (Green Velvet)",
   "block.heavyseas.liner_ceiling_light": "Flush Ceiling Light",
   "block.heavyseas.liner_brass_chandelier": "Brass Chandelier",
-  "block.heavyseas.liner_crystal_chandelier": "Crystal Chandelier"
+  "block.heavyseas.liner_crystal_chandelier": "Crystal Chandelier",
+  "block.heavyseas.liner_ceiling_light_pair": "Flush Ceiling Light (Two-Block)",
+  "block.heavyseas.liner_ceiling_light_quad": "Flush Ceiling Light (Four-Block)"
 }

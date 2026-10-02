@@ -61,6 +61,13 @@ public final class LinerProps {
     public static final LinerProp CRYSTAL_CHANDELIER = prop("liner_crystal_chandelier",
             new LinerProp.Spec(LinerProp.Kind.GRAND_CHANDELIER, "crystal_chandelier", "crystal_chandelier", "crystal_chandelier_glow", 15),
             MapColor.GOLD, BlockSoundGroup.GLASS);
+    // 骑缝的吸顶灯（ADR-0068；用户看实拍「客房走廊的灯具不居中」）：同一盏花玻璃吸顶灯，两格 / 2 × 2 一件，灯身落在接缝上
+    public static final LinerProp CEILING_LIGHT_PAIR = prop("liner_ceiling_light_pair",
+            new LinerProp.Spec(LinerProp.Kind.CEILING_PAIR, "ceiling_light_pair", "ceiling_light", "ceiling_light_glass", 15),
+            MapColor.GOLD, BlockSoundGroup.LANTERN);
+    public static final LinerProp CEILING_LIGHT_QUAD = prop("liner_ceiling_light_quad",
+            new LinerProp.Spec(LinerProp.Kind.CEILING_QUAD, "ceiling_light_quad", "ceiling_light", "ceiling_light_glass", 15),
+            MapColor.GOLD, BlockSoundGroup.LANTERN);
 
     private LinerProps() {
     }

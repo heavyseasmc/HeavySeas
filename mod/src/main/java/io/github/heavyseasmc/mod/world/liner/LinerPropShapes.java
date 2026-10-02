@@ -25,6 +25,8 @@ final class LinerPropShapes {
             case CEILING_LAMP -> CEILING_LAMP;
             case CHANDELIER -> part == LinerProp.Part.UPPER ? CHANDELIER_UPPER : CHANDELIER_LOWER;
             case GRAND_CHANDELIER -> part == LinerProp.Part.CROWN ? GRAND_CROWN : cut(GRAND_RING, part);
+            case CEILING_PAIR -> cut(CEILING_PAIR, part);
+            case CEILING_QUAD -> cut(CEILING_QUAD, part);
         };
     }
 
@@ -32,6 +34,9 @@ final class LinerPropShapes {
     //   吸顶花玻璃 —— 铜框 · 两层玻璃盘 · 铜纽，贴着天花只有 5.5 像素厚
     private static final List<double[]> CEILING_LAMP = List.of(box(1.5, 14.5, 1.5, 14.5, 16, 14.5), box(2.5, 13, 2.5, 13.5, 14.5, 13.5),
             box(4.5, 12, 4.5, 11.5, 13, 11.5), box(7, 10.5, 7, 9, 12, 9));
+    //   骑缝的吸顶灯（ADR-0068）：同一盏灯整件挪半格（两格一件挪到 x 16 · 2 × 2 一件挪到 (16, 16)），再按格切
+    private static final List<double[]> CEILING_PAIR = moved(CEILING_LAMP, 8, 0);
+    private static final List<double[]> CEILING_QUAD = moved(CEILING_LAMP, 8, 8);
     // 黄铜小吊灯：上面一格是圆座与链；下面一格是链尾、一圈蜡烛与卷臂（半径 6）、瓶身与坠
     private static final List<double[]> CHANDELIER_UPPER = List.of(box(5, 14, 5, 11, 16, 11), box(6.5, 0, 6.5, 9.5, 14, 9.5));
     private static final List<double[]> CHANDELIER_LOWER = List.of(box(6.5, 12, 6.5, 9.5, 16, 9.5), box(1.5, 7, 1.5, 14.5, 14.5, 14.5),
@@ -60,6 +65,14 @@ final class LinerPropShapes {
 
     private static double[] box(double x0, double y0, double z0, double x1, double y1, double z1) {
         return new double[]{x0, y0, z0, x1, y1, z1};
+    }
+
+    private static List<double[]> moved(List<double[]> boxes, double dx, double dz) {
+        List<double[]> out = new ArrayList<>();
+        for (double[] b : boxes) {
+            out.add(new double[]{b[0] + dx, b[1], b[2] + dz, b[3] + dx, b[4], b[5] + dz});
+        }
+        return List.copyOf(out);
     }
 
     /** 整件的盒子按这一块的格切出来、挪到这一格自己的坐标。 */

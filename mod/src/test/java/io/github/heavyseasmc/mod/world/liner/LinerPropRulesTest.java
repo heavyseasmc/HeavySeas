@@ -100,8 +100,33 @@ final class LinerPropRulesTest {
             assertEquals(at.down(), LinerProp.Rules.offset(at, crown, LinerProp.Part.RING_C, facing));
         }
         for (LinerProp.Kind k : LinerProp.Kind.values()) {
-            assertEquals(k == LinerProp.Kind.CEILING_LAMP || k == LinerProp.Kind.CHANDELIER || k == LinerProp.Kind.GRAND_CHANDELIER,
+            assertEquals(k == LinerProp.Kind.CEILING_LAMP || k == LinerProp.Kind.CHANDELIER || k == LinerProp.Kind.GRAND_CHANDELIER
+                            || k == LinerProp.Kind.CEILING_PAIR || k == LinerProp.Kind.CEILING_QUAD,
                     LinerProp.Rules.hanging(k), k + " 挂不挂在天花下");
+        }
+    }
+
+    @Test
+    void seamLightsSpreadFlatUnderTheCeilingAndLightEveryCell() {
+        // 骑缝的吸顶灯（ADR-0068）：两格 / 2 × 2 一件，都在同一层（每一格都贴天花），整件往人的右手与远处长（同沙发、大桌），每一格都发光
+        BlockPos at = new BlockPos(5, 64, -3);
+        for (Direction facing : HORIZONTAL) {
+            LinerProp.Part a = LinerProp.Rules.anchor(LinerProp.Kind.CEILING_PAIR);
+            assertEquals(LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.SOFA), LinerProp.Part.WEST, facing),
+                    LinerProp.Rules.offset(at, a, LinerProp.Part.WEST, facing), "两格的骑缝灯与沙发同一个长法，朝 " + facing);
+            Set<BlockPos> quad = new java.util.HashSet<>();
+            for (LinerProp.Part p : LinerProp.Rules.parts(LinerProp.Kind.CEILING_QUAD)) {
+                BlockPos q = LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.CEILING_QUAD), p, facing);
+                assertEquals(at.getY(), q.getY(), "2 × 2 的骑缝灯四格都在天花下那一层");
+                quad.add(q);
+            }
+            assertEquals(4, quad.size());
+        }
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.CEILING_PAIR, LinerProp.Kind.CEILING_QUAD)) {
+            assertEquals(true, LinerProp.Rules.isLamp(k), k + " 是灯");
+            for (LinerProp.Part p : LinerProp.Rules.parts(k)) {
+                assertEquals(true, LinerProp.Rules.glows(k, p), k + " · " + p + " 发光");
+            }
         }
     }
 
@@ -198,8 +223,9 @@ final class LinerPropRulesTest {
                 checked++;
             }
         }
-        // 正向对照：每一种、每一块都过了一遍（落地灯 2 · 台灯 1 · 大桌 4 · 沙发 2 · 椅子 1 · 吸顶灯 1 · 小吊灯 2 · 大吊灯 10）
-        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10, checked);
+        // 正向对照：每一种、每一块都过了一遍（落地灯 2 · 台灯 1 · 大桌 4 · 沙发 2 · 椅子 1 · 吸顶灯 1 · 小吊灯 2 · 大吊灯 10
+        //   · 骑缝灯两格 2 · 2 × 2 4）
+        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10 + 2 + 4, checked);
     }
 
     @Test

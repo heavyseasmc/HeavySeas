@@ -1,0 +1,16 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {"particle": "#b"},
+  "elements": [
+    {"from": [0, 14.5, 0], "to": [6.5, 16, 6.5], "faces": {"south": {"uv": [3.25, 6.5, 6.5, 7.25], "texture": "#b"}, "east": {"uv": [0.0, 6.5, 3.25, 7.25], "texture": "#b"}, "up": {"uv": [3.25, 3.25, 6.5, 6.5], "texture": "#b", "cullface": "up"}, "down": {"uv": [9.75, 0.0, 13.0, 3.25], "texture": "#b"}}},
+    {"from": [0, 13, 0], "to": [5.5, 14.5, 5.5], "shade": false, "faces": {"south": {"uv": [11.75, 0.0, 14.5, 0.75], "texture": "#g"}, "east": {"uv": [9.0, 0.0, 11.75, 0.75], "texture": "#g"}, "down": {"uv": [2.75, 0.0, 5.5, 2.75], "texture": "#g"}}},
+    {"from": [0, 12, 0], "to": [3.5, 13, 3.5], "shade": false, "faces": {"south": {"uv": [1.75, 5.5, 3.5, 6.0], "texture": "#g"}, "east": {"uv": [0.0, 5.5, 1.75, 6.0], "texture": "#g"}, "down": {"uv": [7.25, 0.0, 9.0, 1.75], "texture": "#g"}}},
+    {"from": [0, 11, 0], "to": [1, 12, 1], "faces": {"south": {"uv": [11.5, 6.5, 12.0, 7.0], "texture": "#b"}, "east": {"uv": [11.0, 6.5, 11.5, 7.0], "texture": "#b"}, "down": {"uv": [7.0, 6.5, 7.5, 7.0], "texture": "#b"}}},
+    {"from": [0, 10.5, 0], "to": [0.5, 11, 0.5], "faces": {"south": {"uv": [14.25, 6.5, 14.5, 6.75], "texture": "#b"}, "east": {"uv": [14.0, 6.5, 14.25, 6.75], "texture": "#b"}, "down": {"uv": [14.75, 6.5, 15.0, 6.75], "texture": "#b"}}},
+    {"from": [5.5, 12.5, 0], "to": [6, 14.5, 1], "faces": {"east": {"uv": [7.5, 6.5, 8.0, 7.5], "texture": "#b"}, "south": {"uv": [10.5, 6.5, 10.75, 7.5], "texture": "#b"}}},
+    {"from": [0, 12.5, 5.5], "to": [1, 14.5, 6], "faces": {"south": {"uv": [8.0, 6.5, 8.5, 7.5], "texture": "#b"}, "east": {"uv": [10.5, 6.5, 10.75, 7.5], "texture": "#b"}}},
+    {"from": [4, 12.5, 0], "to": [5.5, 13, 1], "faces": {"down": {"uv": [9.5, 6.5, 10.25, 7.0], "texture": "#b"}, "west": {"uv": [12.5, 6.5, 13.0, 6.75], "texture": "#b"}, "south": {"uv": [13.0, 6.5, 13.75, 6.75], "texture": "#b"}}},
+    {"from": [0, 12.5, 4], "to": [1, 13, 5.5], "faces": {"down": {"uv": [9.0, 6.5, 9.5, 7.25], "texture": "#b"}, "north": {"uv": [12.0, 6.5, 12.5, 6.75], "texture": "#b"}, "east": {"uv": [13.0, 6.5, 13.75, 6.75], "texture": "#b"}}}
+  ]
+}

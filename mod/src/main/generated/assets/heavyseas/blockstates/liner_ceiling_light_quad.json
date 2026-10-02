@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "facing=east,lit=false,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_off",
+      "y": 90
+    },
+    "facing=east,lit=false,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_off",
+      "y": 90
+    },
+    "facing=east,lit=false,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_off",
+      "y": 90
+    },
+    "facing=east,lit=false,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_off",
+      "y": 90
+    },
+    "facing=east,lit=true,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_lit",
+      "y": 90
+    },
+    "facing=north,lit=false,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_off"
+    },
+    "facing=north,lit=false,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_off"
+    },
+    "facing=north,lit=false,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_off"
+    },
+    "facing=north,lit=false,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_off"
+    },
+    "facing=north,lit=true,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_lit"
+    },
+    "facing=north,lit=true,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_lit"
+    },
+    "facing=north,lit=true,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_lit"
+    },
+    "facing=north,lit=true,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_lit"
+    },
+    "facing=south,lit=false,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_off",
+      "y": 180
+    },
+    "facing=south,lit=false,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_off",
+      "y": 180
+    },
+    "facing=south,lit=false,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_off",
+      "y": 180
+    },
+    "facing=south,lit=false,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_off",
+      "y": 180
+    },
+    "facing=south,lit=true,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_lit",
+      "y": 180
+    },
+    "facing=west,lit=false,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_off",
+      "y": 270
+    },
+    "facing=west,lit=false,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_off",
+      "y": 270
+    },
+    "facing=west,lit=false,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_off",
+      "y": 270
+    },
+    "facing=west,lit=false,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_off",
+      "y": 270
+    },
+    "facing=west,lit=true,part=ne": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_ne_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,part=nw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_nw_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,part=se": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_se_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,part=sw": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_quad/prop/ceiling_light_quad_sw_lit",
+      "y": 270
+    }
+  }
+}

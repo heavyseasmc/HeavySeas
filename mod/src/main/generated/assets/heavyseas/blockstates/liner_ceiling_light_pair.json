@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,lit=false,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_off",
+      "y": 90
+    },
+    "facing=east,lit=false,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_off",
+      "y": 90
+    },
+    "facing=east,lit=true,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_lit",
+      "y": 90
+    },
+    "facing=north,lit=false,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_off"
+    },
+    "facing=north,lit=false,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_off"
+    },
+    "facing=north,lit=true,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_lit"
+    },
+    "facing=north,lit=true,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_lit"
+    },
+    "facing=south,lit=false,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_off",
+      "y": 180
+    },
+    "facing=south,lit=false,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_off",
+      "y": 180
+    },
+    "facing=south,lit=true,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_lit",
+      "y": 180
+    },
+    "facing=west,lit=false,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_off",
+      "y": 270
+    },
+    "facing=west,lit=false,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_off",
+      "y": 270
+    },
+    "facing=west,lit=true,part=east": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_east_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,part=west": {
+      "model": "heavyseas:block/liner/liner_ceiling_light_pair/prop/ceiling_light_pair_west_lit",
+      "y": 270
+    }
+  }
+}
