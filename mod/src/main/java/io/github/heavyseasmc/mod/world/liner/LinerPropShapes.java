@@ -54,13 +54,14 @@ final class LinerPropShapes {
             box(7, 15, 7, 9, 16, 9), box(1, 2, 7.5, 15, 5, 8.5));
     private static final List<double[]> TABLE_LAMP = List.of(box(3, 0, 5, 13, 2, 11), box(7, 2, 7, 9, 8, 9),
             box(3, 8, 5.5, 13, 12.5, 10.5));
+    //   第三版（ADR-0070）：坐垫冠面 8.5、靠背软包前到 z 11.5、八边形卷包顶到 12.5
     private static final List<double[]> CHAIR = List.of(box(1.5, 0, 1, 14.5, 8.5, 15), box(1.5, 5, 11.5, 14.5, 16, 16),
-            box(0, 2, 0.5, 3.5, 12, 16), box(12.5, 2, 0.5, 16, 12, 16));
+            box(0, 2, 0.5, 3.5, 12.5, 16), box(12.5, 2, 0.5, 16, 12.5, 16));
     // 大桌（整件 32 × 32）：近圆的桌布四层叠出来 + 正中粗柱
     private static final List<double[]> GRAND_TABLE = List.of(box(1, 7, 9, 31, 13, 23), box(3, 7, 6, 29, 13, 26),
             box(6, 7, 3, 26, 13, 29), box(10, 7, 1, 22, 13, 31), box(11.5, 0, 11.5, 20.5, 7, 20.5));
-    // 沙发（整件 32 × 16）：底座与坐垫 · 靠背 · 两头卷边扶手
-    private static final List<double[]> SOFA = List.of(box(1.5, 0, 1.5, 30.5, 8, 14.5), box(2.5, 5, 11, 29.5, 13.5, 15),
+    // 沙发（整件 32 × 16）：底座与坐垫 · 靠背 · 两头卷边扶手（第三版，ADR-0070：坐垫中段前沿 z 1.5、冠面 8.5，靠背软包前到 z 10.5）
+    private static final List<double[]> SOFA = List.of(box(1.5, 0, 1.5, 30.5, 8.5, 14.5), box(2.5, 5, 10.5, 29.5, 13.5, 15),
             box(0, 2, 1, 3.5, 14, 15.5), box(28.5, 2, 1, 32, 14, 15.5));
 
     private static double[] box(double x0, double y0, double z0, double x1, double y1, double z1) {
