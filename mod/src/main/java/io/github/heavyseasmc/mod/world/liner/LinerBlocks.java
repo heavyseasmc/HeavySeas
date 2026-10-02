@@ -220,11 +220,13 @@ public final class LinerBlocks {
 
     // ---------------------------------------------------------------- 构造用的小工具
 
+    /** 大框：画线的那几边用前出 1 像素框条的模板 {@code frame_<哪几边>}（ADR-0069 §1a），四边都接着的正中那一格用整块。 */
     private static LinerBlock frame(String name, String style, MapColor color) {
-        return add(name, solid(color), LinerBlock.Kind.FRAME,
-                s -> look("cube_front", tex("front", "frame_" + style + "_"
-                        + LinerConnect.Rules.frameMask(s.get(UP), s.get(DOWN), s.get(LEFT), s.get(RIGHT)), "back", "wall_white")),
-                FACING, UP, DOWN, LEFT, RIGHT);
+        return add(name, solid(color), LinerBlock.Kind.FRAME, s -> {
+            String mask = LinerConnect.Rules.frameMask(s.get(UP), s.get(DOWN), s.get(LEFT), s.get(RIGHT));
+            return look(mask.equals("c") ? "cube_front" : "frame_" + mask,
+                    tex("front", "frame_" + style + "_" + mask, "back", "wall_white"));
+        }, FACING, UP, DOWN, LEFT, RIGHT);
     }
 
     private static LinerBlock add(String name, AbstractBlock.Settings settings, LinerBlock.Kind kind,

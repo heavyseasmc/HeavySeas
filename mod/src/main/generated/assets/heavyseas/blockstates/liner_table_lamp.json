@@ -1,63 +1,243 @@
 {
   "variants": {
-    "facing=east,lit=false,on_table=false": {
+    "facing=east,lit=false,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
       "y": 90
     },
-    "facing=east,lit=false,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off",
+    "facing=east,lit=false,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
       "y": 90
     },
-    "facing=east,lit=true,on_table=false": {
+    "facing=east,lit=false,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 90
+    },
+    "facing=east,lit=false,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 90
+    },
+    "facing=east,lit=false,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_off",
+      "y": 90
+    },
+    "facing=east,lit=false,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_off",
+      "y": 90
+    },
+    "facing=east,lit=false,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_off",
+      "y": 90
+    },
+    "facing=east,lit=false,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_off",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
       "y": 90
     },
-    "facing=east,lit=true,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit",
+    "facing=east,lit=true,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
       "y": 90
     },
-    "facing=north,lit=false,on_table=false": {
+    "facing=east,lit=true,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_lit",
+      "y": 90
+    },
+    "facing=east,lit=true,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_lit",
+      "y": 90
+    },
+    "facing=north,lit=false,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off"
     },
-    "facing=north,lit=false,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off"
+    "facing=north,lit=false,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off"
     },
-    "facing=north,lit=true,on_table=false": {
+    "facing=north,lit=false,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off"
+    },
+    "facing=north,lit=false,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off"
+    },
+    "facing=north,lit=false,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_off"
+    },
+    "facing=north,lit=false,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_off"
+    },
+    "facing=north,lit=false,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_off"
+    },
+    "facing=north,lit=false,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_off"
+    },
+    "facing=north,lit=true,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit"
     },
-    "facing=north,lit=true,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit"
+    "facing=north,lit=true,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit"
     },
-    "facing=south,lit=false,on_table=false": {
+    "facing=north,lit=true,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit"
+    },
+    "facing=north,lit=true,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit"
+    },
+    "facing=north,lit=true,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_lit"
+    },
+    "facing=north,lit=true,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_lit"
+    },
+    "facing=north,lit=true,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_lit"
+    },
+    "facing=north,lit=true,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_lit"
+    },
+    "facing=south,lit=false,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
       "y": 180
     },
-    "facing=south,lit=false,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off",
+    "facing=south,lit=false,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
       "y": 180
     },
-    "facing=south,lit=true,on_table=false": {
+    "facing=south,lit=false,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 180
+    },
+    "facing=south,lit=false,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 180
+    },
+    "facing=south,lit=false,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_off",
+      "y": 180
+    },
+    "facing=south,lit=false,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_off",
+      "y": 180
+    },
+    "facing=south,lit=false,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_off",
+      "y": 180
+    },
+    "facing=south,lit=false,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_off",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
       "y": 180
     },
-    "facing=south,lit=true,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit",
+    "facing=south,lit=true,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
       "y": 180
     },
-    "facing=west,lit=false,on_table=false": {
+    "facing=south,lit=true,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_lit",
+      "y": 180
+    },
+    "facing=south,lit=true,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_lit",
+      "y": 180
+    },
+    "facing=west,lit=false,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
       "y": 270
     },
-    "facing=west,lit=false,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_off",
+    "facing=west,lit=false,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
       "y": 270
     },
-    "facing=west,lit=true,on_table=false": {
+    "facing=west,lit=false,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 270
+    },
+    "facing=west,lit=false,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_off",
+      "y": 270
+    },
+    "facing=west,lit=false,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_off",
+      "y": 270
+    },
+    "facing=west,lit=false,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_off",
+      "y": 270
+    },
+    "facing=west,lit=false,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_off",
+      "y": 270
+    },
+    "facing=west,lit=false,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_off",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=false,table_corner=ne": {
       "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
       "y": 270
     },
-    "facing=west,lit=true,on_table=true": {
-      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_lit",
+    "facing=west,lit=true,on_table=false,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=false,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=false,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=true,table_corner=ne": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_ne_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=true,table_corner=nw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_nw_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=true,table_corner=se": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_se_lit",
+      "y": 270
+    },
+    "facing=west,lit=true,on_table=true,table_corner=sw": {
+      "model": "heavyseas:block/liner/liner_table_lamp/prop/table_lamp_sunk_sw_lit",
       "y": 270
     }
   }

@@ -1,5 +1,5 @@
 {
-  "parent": "heavyseas:block/liner/liner_frame_gilt_wide/cube_front_frame_gilt_wide_tblr",
+  "parent": "heavyseas:block/liner/liner_frame_gilt_wide/frame_tblr",
   "display": {
     "gui": {
       "rotation": [

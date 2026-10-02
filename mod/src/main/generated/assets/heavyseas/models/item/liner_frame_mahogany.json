@@ -1,5 +1,5 @@
 {
-  "parent": "heavyseas:block/liner/liner_frame_mahogany/cube_front_frame_mahogany_tblr",
+  "parent": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr",
   "display": {
     "gui": {
       "rotation": [

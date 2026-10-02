@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/frame_blr",
+  "textures": {
+    "back": "heavyseas:block/liner/wall_white",
+    "front": "heavyseas:block/liner/frame_mahogany_gilt_blr",
+    "particle": "heavyseas:block/liner/frame_mahogany_gilt_blr"
+  }
+}

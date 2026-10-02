@@ -48,7 +48,7 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  * 顶灯与吊灯（ADR-0066）<b>只能挂在天花下</b>（摆的时候看正上方），整件往下长；吊灯只有灯身那几格发光（15）。
  * 骑缝的吸顶灯（ADR-0068）两格或 2 × 2 一件，灯身落在接缝上，像沙发、大桌那样往人的右手与远处长。
  * 轮廓与碰撞箱都照外形拼几个盒子（{@link LinerPropShapes}），没有一件是整块的。
- * 台灯放在大桌上时整件下沉 3 像素落在桌布上（{@code on_table}，看正下方那一格）。
+ * 台灯放在大桌上时整件下沉 3 像素落在桌布上（{@code on_table}，看正下方那一格），并往桌子正中斜挪 3 像素（{@code table_corner}，ADR-0071）。
  *
  * <p>模型一律<b>正面朝北</b>作画（与游戏自带方块的约定一致，物品栏里才看得到正面），与 {@link LinerBlock} 的「朝南作画」不同：
  * 这里的 y 旋转是 北 0 · 东 90 · 南 180 · 西 270。
@@ -112,6 +112,14 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
     public static final BooleanProperty LIT = Properties.LIT;
     /** 台灯：正下方是大桌（整件下沉 3 像素落在桌布上）。 */
     public static final BooleanProperty ON_TABLE = BooleanProperty.of("on_table");
+    /**
+     * 台灯在大桌上往哪边挪（ADR-0071）：大桌 2 × 2、桌布是圆的，台灯总落在桌子的某一个角格上，摆在格子正中底座就有一角伸出布边
+     * （用户 2026-10-03「桌子上台灯的脚有一部分悬空了」）—— 于是往桌子正中斜挪 3 像素。值是<b>台灯自己模型里</b>的方向
+     * （NW = 往模型的 −x −z），由正下方那块桌子是哪一块、朝哪算出来（{@link Rules#tableCorner}）；不在桌上时不起作用。
+     */
+    public static final EnumProperty<Part> TABLE_CORNER = EnumProperty.of("table_corner", Part.class, Part.NW, Part.NE, Part.SW, Part.SE);
+    /** 台灯在桌上斜挪多少像素（每个方向）：3 —— 底座 10 × 6、整件仍在这一格里，四角都落在 30 像素的圆桌布上（liner_props.py 有判据）。 */
+    static final int TABLE_SHIFT = 3;
     public static final EnumProperty<Part> TALL = EnumProperty.of("part", Part.class, Part.LOWER, Part.UPPER);
     public static final EnumProperty<Part> QUAD = EnumProperty.of("part", Part.class, Part.NW, Part.NE, Part.SW, Part.SE);
     public static final EnumProperty<Part> PAIR = EnumProperty.of("part", Part.class, Part.WEST, Part.EAST);
@@ -156,7 +164,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             s = s.with(LIT, true);
         }
         if (s.contains(ON_TABLE)) {
-            s = s.with(ON_TABLE, false);
+            s = s.with(ON_TABLE, false).with(TABLE_CORNER, Part.NW);
         }
         setDefaultState(s);
     }
@@ -183,7 +191,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             builder.add(LIT);
         }
         if (s.kind() == Kind.TABLE_LAMP) {
-            builder.add(ON_TABLE);
+            builder.add(ON_TABLE, TABLE_CORNER);
         }
     }
 
@@ -213,7 +221,8 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                     ? LinerLooks.look("prop/" + spec.model() + "_lower", tex("b", "prop/" + spec.model() + "_lower"))
                     : LinerLooks.look("prop/" + spec.model() + "_upper_" + st, tex("b", "prop/" + spec.model() + "_upper",
                     "g", "prop/" + spec.glow() + "_" + st));
-            case TABLE_LAMP -> LinerLooks.look("prop/" + spec.model() + (s.get(ON_TABLE) ? "_sunk_" : "_") + st,
+            case TABLE_LAMP -> LinerLooks.look("prop/" + spec.model()
+                            + (s.get(ON_TABLE) ? "_sunk_" + s.get(TABLE_CORNER).asString() + "_" : "_") + st,
                     tex("b", "prop/" + spec.texture(), "g", "prop/" + spec.glow() + "_" + st));
             case GRAND_TABLE -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(QUAD).asString(), tex("b", "prop/" + spec.texture()));
             case SOFA -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(PAIR).asString(), tex("b", "prop/" + spec.texture()));
@@ -299,7 +308,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             }
         }
         if (s.contains(ON_TABLE)) {
-            s = s.with(ON_TABLE, isTable(world.getBlockState(anchorPos.down())));
+            s = onTable(s, world.getBlockState(anchorPos.down()));
         }
         return s;
     }
@@ -330,9 +339,18 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             }
         }
         if (state.contains(ON_TABLE) && direction == Direction.DOWN) {
-            return state.with(ON_TABLE, isTable(neighborState));
+            return onTable(state, neighborState);
         }
         return state;
+    }
+
+    /** 台灯按正下方那一格定：是不是在大桌上、在桌上的话往桌子正中哪边挪。 */
+    private static BlockState onTable(BlockState lamp, BlockState below) {
+        if (!isTable(below)) {
+            return lamp.with(ON_TABLE, false);
+        }
+        return lamp.with(ON_TABLE, true)
+                .with(TABLE_CORNER, Rules.tableCorner(below.get(QUAD), below.get(FACING), lamp.get(FACING)));
     }
 
     /** 整件最上面那一层的每一格（单格的件就是点中的那一格）。 */
@@ -403,6 +421,9 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             return state;
         }
         BlockState s = state.rotate(mirror.getRotation(state.get(FACING)));
+        if (s.contains(TABLE_CORNER)) {
+            s = s.with(TABLE_CORNER, Rules.mirrored(state.get(TABLE_CORNER)));          // 模型里的方向，照镜子同样是左右对调
+        }
         return part == null ? s : s.with(part, Rules.mirrored(state.get(part)));
     }
 
@@ -415,11 +436,15 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
 
     private VoxelShape shapeOf(BlockState s) {
         Part p = part == null ? null : s.get(part);
-        double sink = s.contains(ON_TABLE) && s.get(ON_TABLE) ? 3 : 0;
+        boolean onTable = s.contains(ON_TABLE) && s.get(ON_TABLE);
+        double sink = onTable ? 3 : 0;
+        // 在桌上的台灯往桌子正中斜挪（模型里的方向，转朝向之前挪）
+        double sx = onTable ? TABLE_SHIFT * (s.get(TABLE_CORNER).x == 0 ? -1 : 1) : 0;
+        double sz = onTable ? TABLE_SHIFT * (s.get(TABLE_CORNER).z == 0 ? -1 : 1) : 0;
         VoxelShape shape = VoxelShapes.empty();
         for (double[] b : LinerPropShapes.boxes(spec.kind(), p)) {
-            double[] lo = LinerLooks.rotateY(b[0], b[2], yawOf(s.get(FACING)));
-            double[] hi = LinerLooks.rotateY(b[3], b[5], yawOf(s.get(FACING)));
+            double[] lo = LinerLooks.rotateY(b[0] + sx, b[2] + sz, yawOf(s.get(FACING)));
+            double[] hi = LinerLooks.rotateY(b[3] + sx, b[5] + sz, yawOf(s.get(FACING)));
             double y0 = Math.max(0, b[1] - sink);
             double y1 = Math.max(y0 + 0.5, b[4] - sink);
             shape = VoxelShapes.union(shape, VoxelShapes.cuboid(new Box(
@@ -462,6 +487,16 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                         Part.RING_E, Part.RING_SW, Part.RING_S, Part.RING_SE);
                 default -> EnumSet.noneOf(Part.class);
             };
+        }
+
+        /**
+         * 台灯在大桌上该往哪边挪（{@link #TABLE_CORNER} 的值，台灯自己模型里的方向）：先在桌子的模型里看这一块离桌子正中是哪个方向
+         * （NW 那一块往 +x +z，SE 那一块往 −x −z …），按桌子的朝向转到世界，再按台灯的朝向倒转回台灯的模型里。
+         */
+        public static Part tableCorner(Part tablePart, Direction tableFacing, Direction lampFacing) {
+            int[] w = toWorld(tablePart.x == 0 ? 1 : -1, tablePart.z == 0 ? 1 : -1, LinerConnect.index(tableFacing));
+            int[] m = toWorld(w[0], w[1], (4 - LinerConnect.index(lampFacing)) & 3);
+            return m[0] < 0 ? (m[1] < 0 ? Part.NW : Part.SW) : (m[1] < 0 ? Part.NE : Part.SE);
         }
 
         /** 有开关、会发光的那几种。 */

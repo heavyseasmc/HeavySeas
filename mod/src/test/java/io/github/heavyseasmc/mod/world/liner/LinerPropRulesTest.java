@@ -107,6 +107,35 @@ final class LinerPropRulesTest {
     }
 
     @Test
+    void tableLampLeansTowardTheMiddleOfTheTable() {
+        // 用户 2026-10-03「桌子上台灯的脚有一部分悬空了」（ADR-0071）：台灯在大桌哪一角、桌子与台灯各朝哪边，
+        //   挪的方向（台灯模型里的 table_corner，按台灯朝向转到世界）都得指向桌子正中 —— 从世界里那四块桌子的位置直接算答案，
+        //   不用 tableCorner 自己的算法
+        int checked = 0;
+        for (Direction tableFacing : HORIZONTAL) {
+            BlockPos anchor = BlockPos.ORIGIN;
+            java.util.Map<LinerProp.Part, BlockPos> cells = new java.util.HashMap<>();
+            for (LinerProp.Part p : LinerProp.Rules.parts(LinerProp.Kind.GRAND_TABLE)) {
+                cells.put(p, LinerProp.Rules.offset(anchor, LinerProp.Rules.anchor(LinerProp.Kind.GRAND_TABLE), p, tableFacing));
+            }
+            double cx = cells.values().stream().mapToInt(BlockPos::getX).average().orElseThrow() + 0.5;
+            double cz = cells.values().stream().mapToInt(BlockPos::getZ).average().orElseThrow() + 0.5;
+            for (java.util.Map.Entry<LinerProp.Part, BlockPos> e : cells.entrySet()) {
+                int wantX = (int) Math.signum(cx - (e.getValue().getX() + 0.5));
+                int wantZ = (int) Math.signum(cz - (e.getValue().getZ() + 0.5));
+                for (Direction lampFacing : HORIZONTAL) {
+                    LinerProp.Part c = LinerProp.Rules.tableCorner(e.getKey(), tableFacing, lampFacing);
+                    int[] w = LinerProp.Rules.toWorld(c.x == 0 ? -1 : 1, c.z == 0 ? -1 : 1, LinerConnect.index(lampFacing));
+                    assertArrayEquals(new int[]{wantX, wantZ}, w,
+                            "桌子朝 " + tableFacing + " 的 " + e.getKey() + " 那一块上、台灯朝 " + lampFacing + "：该往桌子正中挪");
+                    checked++;
+                }
+            }
+        }
+        assertEquals(4 * 4 * 4, checked);
+    }
+
+    @Test
     void seamLightsSpreadFlatUnderTheCeilingAndLightEveryCell() {
         // 骑缝的吸顶灯（ADR-0068）：两格 / 2 × 2 一件，都在同一层（每一格都贴天花），整件往人的右手与远处长（同沙发、大桌），每一格都发光
         BlockPos at = new BlockPos(5, 64, -3);

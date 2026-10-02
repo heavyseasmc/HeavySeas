@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/table_lamp_sunk_se_lit",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/table_lamp",
+    "g": "heavyseas:block/liner/prop/table_lamp_shade_lit",
+    "particle": "heavyseas:block/liner/prop/table_lamp"
+  }
+}
