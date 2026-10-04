@@ -1,0 +1,10 @@
+{
+  "parent": "heavyseas:block/liner/template/casing_tall_jamb_left_skirting",
+  "textures": {
+    "c": "heavyseas:block/liner/door_casing",
+    "e": "heavyseas:block/liner/door_casing_tall",
+    "h": "heavyseas:block/liner/door_casing_head",
+    "k": "heavyseas:block/liner/skirting",
+    "particle": "heavyseas:block/liner/door_casing"
+  }
+}

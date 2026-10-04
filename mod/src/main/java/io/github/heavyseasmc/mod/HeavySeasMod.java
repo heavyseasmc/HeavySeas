@@ -38,16 +38,13 @@ import io.github.heavyseasmc.mod.world.PlayerSky;
 import io.github.heavyseasmc.mod.world.CreativeTabs;
 import io.github.heavyseasmc.mod.world.GullEntity;
 import io.github.heavyseasmc.mod.world.Gulls;
-import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
 import io.github.heavyseasmc.mod.world.liner.LinerBlocks;
 import io.github.heavyseasmc.mod.world.liner.LinerGlass;
 import io.github.heavyseasmc.mod.world.liner.LinerDoors;
 import io.github.heavyseasmc.mod.world.liner.LinerHull;
 import io.github.heavyseasmc.mod.world.liner.LinerProps;
+import io.github.heavyseasmc.mod.world.liner.LinerShip;
 import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
-import io.github.heavyseasmc.mod.world.LobbyBoatBlockEntity;
-import io.github.heavyseasmc.mod.world.LobbyBoatEntity;
-import io.github.heavyseasmc.mod.world.LobbyBoat;
 import io.github.heavyseasmc.mod.world.SceneItems;
 import io.github.heavyseasmc.mod.world.Seats;
 import io.github.heavyseasmc.mod.world.PlayerBodies;
@@ -89,7 +86,6 @@ public final class HeavySeasMod implements ModInitializer {
         SceneDataLoader.register();
         // 只用来挂模型的物品（布景 · 补给箱）：要在场景数据校验它们之前注册好。
         SceneItems.register();
-        LobbyBoatBlock.register();
         SkiffBlocks.register();
         LinerBlocks.register();                        // 大邮轮那一族装饰方块（ADR-0062）
         LinerProps.register();                         // 大邮轮的灯与家具（ADR-0063）
@@ -97,8 +93,6 @@ public final class HeavySeasMod implements ModInitializer {
         LinerHull.register();                          // 北辰号的船壳板与舷窗（ADR-0069 §2 ① · ④）
         LinerDoors.register();                         // 北辰号的门（ADR-0069 §2 ⑤）
         io.github.heavyseasmc.mod.world.liner.LinerStairs.register();   // 北辰号大楼梯一族（ADR 草稿 stairs）
-        LobbyBoatEntity.register();
-        ServerChunkEvents.CHUNK_LOAD.register(LobbyBoatBlockEntity::restoreLegacyAnchors);
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。
         SeatEntity.register();
         PlayerBodies.register();
@@ -112,11 +106,14 @@ public final class HeavySeasMod implements ModInitializer {
             server.getWorlds().forEach(Nameplates::clear);
             // 船体是真方块、走廊是强加载票，都进存档：崩在对局中时这里清（ADR-0034 §5.2）。
             MistSea.resetScene(server);
+            // 北辰号（ADR-0080）：世界里不是 jar 里这一版就排上摆放，之后一 tick 一步
+            LinerShip.onServerStarted(server);
         });
         // 调试指令给「下一局」定的东西与指定的天色（ADR-0060）只活一次运行：单人游戏同一个进程里再开一个世界，不能带过去。
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             DebugNext.clear();
             PlayerSky.resetForced();
+            LinerShip.onServerStopped();
         });
         // M4 crash recovery: the match itself is intentionally ephemeral, but escrowed real inventories are not.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
@@ -142,6 +139,11 @@ public final class HeavySeasMod implements ModInitializer {
         // ❗只在指定模式里才作数，其余一律放行 —— 吃掉别人的右键会让人觉得「右键偶尔失灵」。
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) ->
                 DesignationPhase.onUseEntity(player, world, entity));
+        // 北辰号演习艇（ADR-0083）：右键艇的任何一格 = 入座报名；坐在艇里再右键 = 阵容面板
+        net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, world, hand, hit) ->
+                hand == net.minecraft.util.Hand.MAIN_HAND
+                        ? io.github.heavyseasmc.mod.world.liner.DrillSkiff.useBlock(player, world, hit.getBlockPos())
+                        : net.minecraft.util.ActionResult.PASS);
         CommandRegistrationCallback.EVENT.register(
                 (dispatcher, registryAccess, environment) -> SeasCommand.register(dispatcher));
 
@@ -156,7 +158,7 @@ public final class HeavySeasMod implements ModInitializer {
         PayloadTypeRegistry.playC2S().register(StartVoyageC2S.ID, StartVoyageC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(StartVoyageC2S.ID,
                 (payload, context) -> context.player().server.execute(
-                        () -> LobbyBoat.launch(context.player(), payload)));
+                        () -> io.github.heavyseasmc.mod.world.liner.DrillSkiff.launch(context.player(), payload)));
         PayloadTypeRegistry.playC2S().register(ProvisionActionC2S.ID, ProvisionActionC2S.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(ProvisionActionC2S.ID,
                 (payload, context) -> context.player().server.execute(
@@ -217,5 +219,6 @@ public final class HeavySeasMod implements ModInitializer {
         // 排程：替身的一步、航海结算后的停顿（ADR-0019）。
         ServerTickEvents.END_SERVER_TICK.register(GameFlow::tick);
         ServerTickEvents.END_SERVER_TICK.register(Gulls::tick);
+        ServerTickEvents.END_SERVER_TICK.register(LinerShip::tick);
     }
 }

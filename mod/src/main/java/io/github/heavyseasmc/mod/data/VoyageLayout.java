@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod.data;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
@@ -35,9 +36,10 @@ import java.util.Set;
  * @param arrival   岸从哪个方向来、布景从多远滑到多远、要不要强加载走廊
  * @param fog       用哪份雾表（{@code data/<ns>/fog/<name>.json}，ADR-0034 §5.1.4）
  * @param backdrops 靠岸时滑到船前的布景（§5.3）；可以为空（非官方地图不要岸）
+ * @param liner     北辰号摆在哪（ADR-0081）：只有默认布局可以写；空 = 这张地图没有北辰号
  */
 public record VoyageLayout(Identifier id, Identifier dimension, Boat boat, Optional<Hull> hull, Arrival arrival,
-                           Identifier fog, List<Backdrop> backdrops) {
+                           Identifier fog, List<Backdrop> backdrops, Optional<Liner> liner) {
 
     public VoyageLayout {
         Objects.requireNonNull(id, "id");
@@ -47,6 +49,20 @@ public record VoyageLayout(Identifier id, Identifier dimension, Boat boat, Optio
         Objects.requireNonNull(arrival, "arrival");
         Objects.requireNonNull(fog, "fog");
         backdrops = List.copyOf(backdrops);
+        Objects.requireNonNull(liner, "liner");
+    }
+
+    /**
+     * 北辰号的位置（ADR-0081，用户 2026-10-03 定乙：位置写进地图的数据，摆还是模组摆）。维度就是这份布局的维度
+     * （ADR-0054 D12：北辰号与对局同一个维度）；船自己的东西（段 · 艇 · 落脚点）在 jar 里的清单上，都相对这个原点。
+     *
+     * @param origin 船体那一块的西北下角（结构的 (0, 0, 0) 落在这一格）
+     */
+    public record Liner(BlockPos origin) {
+
+        public Liner {
+            Objects.requireNonNull(origin, "origin");
+        }
     }
 
     /**

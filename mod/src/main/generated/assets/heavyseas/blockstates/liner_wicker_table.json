@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_wicker_table/prop/wicker_table",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_wicker_table/prop/wicker_table"
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_wicker_table/prop/wicker_table",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_wicker_table/prop/wicker_table",
+      "y": 270
+    }
+  }
+}

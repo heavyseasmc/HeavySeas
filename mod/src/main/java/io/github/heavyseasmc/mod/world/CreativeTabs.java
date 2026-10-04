@@ -65,7 +65,6 @@ public final class CreativeTabs {
                 .icon(() -> new ItemStack(GullEntity.SPAWN_EGG))
                 .displayName(Text.translatable("itemGroup.heavyseas.objects"))
                 .entries((context, entries) -> {
-                    entries.add(LobbyBoatBlock.ITEM);
                     entries.add(GullEntity.SPAWN_EGG);
                 })
                 .build());

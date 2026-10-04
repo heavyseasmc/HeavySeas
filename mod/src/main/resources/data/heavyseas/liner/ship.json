@@ -1,0 +1,168 @@
+{
+ "size": [
+  336,
+  85,
+  35
+ ],
+ "waterline": 12,
+ "segments": [
+  {
+   "structure": "heavyseas:liner/seg_000",
+   "x0": 0,
+   "x1": 40,
+   "sha1": "c8361ac9182c529520b13f3c0d96d5cdc63f31ac"
+  },
+  {
+   "structure": "heavyseas:liner/seg_040",
+   "x0": 40,
+   "x1": 80,
+   "sha1": "890f33ba0d2bca5d8a541665a09d26f403b185a7"
+  },
+  {
+   "structure": "heavyseas:liner/seg_080",
+   "x0": 80,
+   "x1": 120,
+   "sha1": "9842aab9c13e373fe3b62cfb958600acb1057435"
+  },
+  {
+   "structure": "heavyseas:liner/seg_120",
+   "x0": 120,
+   "x1": 160,
+   "sha1": "3a1cf718e428a9a6b5a94d07fe470adc29aee738"
+  },
+  {
+   "structure": "heavyseas:liner/seg_160",
+   "x0": 160,
+   "x1": 186,
+   "sha1": "4507f5c6b207cba5ba7ab0a7ed1ce3adf0bb3196"
+  },
+  {
+   "structure": "heavyseas:liner/seg_186",
+   "x0": 186,
+   "x1": 226,
+   "sha1": "15b4e2222c64a67291d3e5c1c07c457a3bce387d"
+  },
+  {
+   "structure": "heavyseas:liner/seg_226",
+   "x0": 226,
+   "x1": 266,
+   "sha1": "4a57c3060b631e046eb31e49c9095c5955ce65ed"
+  },
+  {
+   "structure": "heavyseas:liner/seg_266",
+   "x0": 266,
+   "x1": 306,
+   "sha1": "f9096efa245772e04d802095bafdaaac8acade1d"
+  },
+  {
+   "structure": "heavyseas:liner/seg_306",
+   "x0": 306,
+   "x1": 336,
+   "sha1": "3be35780e9c6573e1ccfd219653199bcc591e392"
+  }
+ ],
+ "skiffs": [
+  {
+   "no": 1,
+   "side": "stbd",
+   "drill": true,
+   "rotation": "clockwise_90",
+   "pos": [
+    250,
+    49,
+    29
+   ]
+  },
+  {
+   "no": 3,
+   "side": "stbd",
+   "drill": false,
+   "rotation": "clockwise_90",
+   "pos": [
+    223,
+    49,
+    29
+   ]
+  },
+  {
+   "no": 2,
+   "side": "port",
+   "drill": false,
+   "rotation": "clockwise_90",
+   "pos": [
+    250,
+    49,
+    -5
+   ]
+  },
+  {
+   "no": 4,
+   "side": "port",
+   "drill": false,
+   "rotation": "clockwise_90",
+   "pos": [
+    223,
+    49,
+    -5
+   ]
+  },
+  {
+   "no": 5,
+   "side": "stbd",
+   "drill": false,
+   "rotation": "clockwise_90",
+   "pos": [
+    125,
+    49,
+    29
+   ]
+  },
+  {
+   "no": 7,
+   "side": "stbd",
+   "drill": false,
+   "rotation": "clockwise_90",
+   "pos": [
+    98,
+    49,
+    29
+   ]
+  },
+  {
+   "no": 6,
+   "side": "port",
+   "drill": false,
+   "rotation": "clockwise_90",
+   "pos": [
+    125,
+    49,
+    -5
+   ]
+  },
+  {
+   "no": 8,
+   "side": "port",
+   "drill": false,
+   "rotation": "clockwise_90",
+   "pos": [
+    98,
+    49,
+    -5
+   ]
+  }
+ ],
+ "arrival": [
+  221.5,
+  40,
+  17.5
+ ],
+ "arrival_yaw": 90.0,
+ "mirror": [
+  222,
+  40,
+  17
+ ],
+ "mirror_facing": "west",
+ "blocks": 209212,
+ "air": 117794
+}

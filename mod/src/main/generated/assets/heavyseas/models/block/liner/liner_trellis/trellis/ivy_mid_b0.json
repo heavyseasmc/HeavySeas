@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/trellis/ivy_mid_b0",
+  "textures": {
+    "particle": "heavyseas:block/liner/ivy",
+    "v": "heavyseas:block/liner/ivy"
+  }
+}

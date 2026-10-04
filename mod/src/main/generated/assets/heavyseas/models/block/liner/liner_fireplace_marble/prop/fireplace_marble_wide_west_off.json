@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/fireplace_marble_wide_west_off",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/fireplace_marble",
+    "g": "heavyseas:block/liner/prop/fireplace_marble_glow_off",
+    "k": "heavyseas:block/liner/prop/fireplace_marble_detail",
+    "particle": "heavyseas:block/liner/prop/fireplace_marble"
+  }
+}

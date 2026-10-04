@@ -112,19 +112,11 @@ final class DecorModels extends FabricModelProvider {
         for (BlockState state : block.getStateManager().getStates()) {
             looks.put(state, lookOf.apply(state));
         }
-        Map<String, Identifier> models = uploadModels(generator, family, templateDir, textureDir, name, looks.values());
-        JsonObject variants = new JsonObject();
-        looks.forEach((state, look) -> {
-            JsonObject variant = new JsonObject();
-            variant.addProperty("model", models.get(modelKey(look)).toString());
-            if (look.x() != 0) {
-                variant.addProperty("x", look.x());
-            }
-            if (look.y() != 0) {
-                variant.addProperty("y", look.y());
-            }
-            variants.add(variantKey(state), variant);
-        });
+        // 多部件（格架上的常春藤，ADR-0080 §7）：底层按 baseProperties 分、每一层按它自己的属性分，写 multipart
+        List<LinerLooks.Layer> layers = block instanceof LinerLooks.Styled st ? st.layers() : List.of();
+        Map<String, Identifier> models = layers.isEmpty()
+                ? uploadModels(generator, family, templateDir, textureDir, name, looks.values())
+                : multipart(generator, family, templateDir, textureDir, name, block, looks, (LinerLooks.Styled) block, layers);
         // 物品（创造物品栏里那一格、手里拿着的样子）= 摆出来看得见的那一版的模型
         Identifier itemParent = models.get(modelKey(lookOf.apply(display)));
         if (itemLook != null) {
@@ -146,8 +138,117 @@ final class DecorModels extends FabricModelProvider {
         } else {
             generator.registerParentedItemModel(block, itemParent);
         }
+        if (!layers.isEmpty()) {
+            return;                                                // 方块状态文件在 multipart() 里写了
+        }
+        JsonObject variants = new JsonObject();
+        looks.forEach((state, look) -> variants.add(variantKey(state), apply(models.get(modelKey(look)), look)));
         JsonObject root = new JsonObject();
         root.add("variants", variants);
+        writeBlockState(generator, block, root);
+    }
+
+    /** 方块状态文件里的一项：模型 + x / y 旋转（0 不写）。 */
+    private static JsonObject apply(Identifier model, Look look) {
+        JsonObject variant = new JsonObject();
+        variant.addProperty("model", model.toString());
+        if (look.x() != 0) {
+            variant.addProperty("x", look.x());
+        }
+        if (look.y() != 0) {
+            variant.addProperty("y", look.y());
+        }
+        return variant;
+    }
+
+    /**
+     * 多部件的方块状态文件：底层一项一项按 baseProperties 的取值组合写 when，每一层按它自己那几个属性写（这一层不画的组合不写）。
+     * 同一组 when 出了两种模型 = 那一层其实还看别的属性 —— 抛（不然游戏里同一组 when 只认先写的那一项，另一种悄悄丢了）。
+     */
+    private static Map<String, Identifier> multipart(BlockStateModelGenerator generator, String family, String templateDir, String textureDir,
+                                                     String name, Block block, Map<BlockState, Look> baseLooks, LinerLooks.Styled styled,
+                                                     List<LinerLooks.Layer> layers) {
+        List<Look> all = new ArrayList<>(baseLooks.values());
+        List<Map<String, Look>> parts = new ArrayList<>();
+        parts.add(group(name, baseLooks, styled.baseProperties()));
+        for (LinerLooks.Layer layer : layers) {
+            Map<BlockState, Look> looks = new LinkedHashMap<>();
+            for (BlockState state : block.getStateManager().getStates()) {
+                LinerLooks.Look l = layer.look().apply(state);
+                if (l != null) {
+                    looks.put(state, liner(l));
+                }
+            }
+            all.addAll(looks.values());
+            parts.add(group(name, looks, layer.properties()));
+        }
+        Map<String, Identifier> models = uploadModels(generator, family, templateDir, textureDir, name, all);
+        // 底层对叠层那几个属性写全取值（「none|mid|tip」，恒真）：方块状态文件自己说清每个属性有哪几个值。
+        //   不写的话「没有常春藤」(ivy = none) 不出现在任何一项的 when 里，按方块状态文件认合法状态的两道判据（checkLinerShip · liner_build）
+        //   就把每一格没藤的格架判成「没有这一项」（ADR-0085 §4：接进整船时实跑撞上）
+        Map<String, String> domain = new LinkedHashMap<>();
+        for (Property<?> p : block.getStateManager().getProperties()) {
+            if (!styled.baseProperties().contains(p)) {
+                domain.put(p.getName(), String.join("|", p.getValues().stream().map(v -> valueName(p, v)).toList()));
+            }
+        }
+        JsonArray entries = new JsonArray();
+        boolean[] base = {true};
+        for (Map<String, Look> part : parts) {
+            boolean isBase = base[0];
+            base[0] = false;
+            part.forEach((when, look) -> {
+                JsonObject entry = new JsonObject();
+                JsonObject cond = new JsonObject();
+                for (String kv : when.split(",")) {
+                    String[] p = kv.split("=", 2);
+                    cond.addProperty(p[0], p[1]);
+                }
+                if (isBase) {
+                    domain.forEach(cond::addProperty);
+                }
+                entry.add("when", cond);
+                entry.add("apply", apply(models.get(modelKey(look)), look));
+                entries.add(entry);
+            });
+        }
+        JsonObject root = new JsonObject();
+        root.add("multipart", entries);
+        writeBlockState(generator, block, root);
+        return models;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static String valueName(Property p, Object v) {
+        return p.name((Comparable) v);
+    }
+
+    /** 按 properties 那几个属性的取值分组：键 = 「名=值」按名字排序、逗号隔开；同一组出了两种样子就抛。 */
+    private static Map<String, Look> group(String name, Map<BlockState, Look> looks, List<Property<?>> properties) {
+        if (properties.isEmpty()) {
+            throw new IllegalStateException(name + "：有叠层，却没给底层看哪几个属性（baseProperties）");
+        }
+        List<Property<?>> sorted = new ArrayList<>(properties);
+        sorted.sort(Comparator.comparing(Property::getName));
+        Map<String, Look> out = new LinkedHashMap<>();
+        looks.forEach((state, look) -> {
+            StringBuilder key = new StringBuilder();
+            for (Property<?> p : sorted) {
+                if (!key.isEmpty()) {
+                    key.append(',');
+                }
+                key.append(p.getName()).append('=').append(valueName(state, p));
+            }
+            Look prev = out.putIfAbsent(key.toString(), look);
+            if (prev != null && !modelKey(prev).equals(modelKey(look)) || prev != null && prev.y() != look.y()) {
+                throw new IllegalStateException(name + "：多部件的一层在 " + key + " 上出了两种样子（" + modelKey(prev) + " · " + modelKey(look)
+                        + "）—— 这一层还看别的属性，没写进它的属性表");
+            }
+        });
+        return out;
+    }
+
+    private static void writeBlockState(BlockStateModelGenerator generator, Block block, JsonObject root) {
         generator.blockStateCollector.accept(new BlockStateSupplier() {
             @Override
             public Block getBlock() {

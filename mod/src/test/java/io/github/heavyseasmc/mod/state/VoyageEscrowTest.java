@@ -60,6 +60,31 @@ final class VoyageEscrowTest {
         component.end();
         assertFalse(component.belongsToActiveVoyage(seated));
         assertTrue(component.hasVoyageEscrow(previous));
+        // 散局之后回北辰号的是刚才那一局的人（入座的与观众），不是存档里早就有托管的人（ADR-0083）
+        assertEquals(Set.of(seated, spectator), component.endedVoyagePlayers());
+    }
+
+    /** 过魔镜的托管（ADR-0083）：记着从哪面镜子过来，重启之后照样认得出它是过魔镜的、镜子在哪。 */
+    @Test
+    void mirrorCrossingSurvivesWorldComponentNbt() {
+        UUID crossed = UUID.randomUUID();
+        UUID legacy = UUID.randomUUID();
+        GameComponent original = new GameComponent(null);
+        original.putVoyageEscrow(new GameComponent.VoyageEscrow(crossed, "minecraft:overworld", 10.5, 64, -3.5, 90f, 0f,
+                new NbtList(), java.util.Optional.empty(),
+                java.util.Optional.of(new GameComponent.MirrorAt("minecraft:overworld", new net.minecraft.util.math.BlockPos(11, 64, -3)))));
+        original.putVoyageEscrow(new GameComponent.VoyageEscrow(legacy, "minecraft:overworld", 0, 70, 0, 0, 0, new NbtList()));
+
+        NbtCompound saved = new NbtCompound();
+        original.writeToNbt(saved, null);
+        GameComponent loaded = new GameComponent(null);
+        loaded.readFromNbt(saved, null);
+
+        GameComponent.VoyageEscrow back = loaded.voyageEscrow(crossed).orElseThrow();
+        assertTrue(back.viaMirror());
+        assertEquals(new net.minecraft.util.math.BlockPos(11, 64, -3), back.mirror().orElseThrow().pos());
+        assertEquals("minecraft:overworld", back.mirror().orElseThrow().dimension());
+        assertFalse(loaded.voyageEscrow(legacy).orElseThrow().viaMirror(), "开局时托管的老路不该被认成过魔镜的");
     }
 
     @Test

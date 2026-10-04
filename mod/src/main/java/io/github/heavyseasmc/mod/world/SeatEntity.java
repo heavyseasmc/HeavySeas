@@ -144,9 +144,10 @@ public final class SeatEntity extends Entity {
         return super.updatePassengerForDismount(passenger);
     }
 
+    /** 大厅座位（北辰号演习艇上的，ADR-0083）起身落在哪：艇里侧的艇甲板上。 */
     public Optional<Vec3d> lobbyLanding(LivingEntity passenger) {
-        return lobby() ? LobbyBoatLanding.find(getWorld(), passenger.getType(), lobbyAnchor(),
-                Direction.fromRotation(getYaw())) : Optional.empty();
+        return lobby() && getWorld() instanceof net.minecraft.server.world.ServerWorld world
+                ? io.github.heavyseasmc.mod.world.liner.DrillSkiff.landing(world, lobbyAnchor()) : Optional.empty();
     }
 
     /**

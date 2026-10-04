@@ -1,0 +1,16 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#c"},
+  "elements": [
+    {"from": [9.0, 0, 0], "to": [11.0, 7.0, 2.0], "faces": {"south": {"texture": "#c", "uv": [8, 9, 10, 16]}, "west": {"texture": "#c", "uv": [12, 9, 14, 16]}, "east": {"texture": "#c", "uv": [14, 9, 16, 16]}, "up": {"texture": "#h", "uv": [9.0, 12, 11.0, 13]}}},
+    {"from": [11.0, 5, 0], "to": [16, 7.0, 2.0], "faces": {"south": {"texture": "#h", "uv": [11.0, 8, 16, 10]}, "down": {"texture": "#h", "uv": [11.0, 14, 16, 15]}, "up": {"texture": "#h", "uv": [11.0, 12, 16, 13]}}},
+    {"from": [11.0, 0, 0], "to": [14.5, 5, 0.75], "faces": {"south": {"texture": "#h", "uv": [11.0, 2, 14.5, 7]}}},
+    {"from": [14.5, 1.5, 0], "to": [16, 5, 0.75], "faces": {"south": {"texture": "#h", "uv": [14.5, 2, 16, 5.5]}}},
+    {"from": [14.5, 0, 0], "to": [16, 1.5, 1.5], "faces": {"south": {"texture": "#h", "uv": [14.5, 0, 16, 1.5]}, "west": {"texture": "#c", "uv": [14, 14.5, 15.5, 16]}, "up": {"texture": "#h", "uv": [14.5, 15, 16, 16]}}},
+    {"from": [9.0, 7.0, 0], "to": [16, 10.0, 1.0], "faces": {"south": {"texture": "#e", "uv": [0, 10, 16, 12]}, "west": {"texture": "#e", "uv": [0, 10, 1.0, 12]}}},
+    {"from": [8.0, 10.0, 0], "to": [16, 11.0, 2.5], "faces": {"south": {"texture": "#e", "uv": [0, 6, 16, 8]}, "down": {"texture": "#e", "uv": [0, 8, 16, 10]}, "west": {"texture": "#e", "uv": [0, 10, 2.5, 12]}}},
+    {"from": [7.5, 11.0, 0], "to": [16, 12.0, 4.5], "faces": {"south": {"texture": "#e", "uv": [0, 15, 16, 16]}, "down": {"texture": "#e", "uv": [0, 4, 16, 6]}, "west": {"texture": "#e", "uv": [0, 10, 4.5, 12]}}},
+    {"from": [7.0, 12.0, 0], "to": [16, 14.0, 5.5], "faces": {"south": {"texture": "#e", "uv": [0, 2, 16, 4]}, "down": {"texture": "#e", "uv": [0, 4, 16, 6]}, "west": {"texture": "#e", "uv": [0, 10, 5.5, 12]}}},
+    {"from": [7.5, 14.0, 0], "to": [16, 15.0, 5.0], "faces": {"south": {"texture": "#e", "uv": [0, 0, 16, 2]}, "up": {"texture": "#e", "uv": [0, 12, 16, 14]}, "west": {"texture": "#e", "uv": [0, 10, 5.0, 12]}}}
+  ]
+}

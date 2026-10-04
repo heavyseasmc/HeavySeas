@@ -8,6 +8,7 @@ import io.github.heavyseasmc.mod.data.VoyageLayout;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.world.liner.LinerShip;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.RegistryKey;
@@ -17,8 +18,10 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.TeleportTarget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,8 +96,14 @@ public final class MistSea {
         }
         prepareScene(sea, component, layout);
         List<ServerPlayerEntity> crossed = new ArrayList<>();
+        // 过魔镜时就托管过的人（ADR-0083：穿越即托管，ADR-0054 D12 第 3 条）：开局不再托管一次，散局回北辰号
+        List<ServerPlayerEntity> boarded = new ArrayList<>();
         try {
             for (ServerPlayerEntity player : humans) {
+                if (mirrorEscrow(player).isPresent()) {
+                    boarded.add(player);
+                    continue;
+                }
                 escrow(component, player);
                 crossed.add(player);
             }
@@ -102,7 +111,7 @@ public final class MistSea {
                 checkpoint(server, "进入雾海前的物品托管");
             }
             Vec3d bow = layout.boat().bow();
-            for (ServerPlayerEntity player : crossed) {
+            for (ServerPlayerEntity player : humans) {
                 player.stopRiding();
                 player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
             }
@@ -123,6 +132,9 @@ public final class MistSea {
             }
             for (ServerPlayerEntity player : crossed) {
                 restore(component, player);
+            }
+            for (ServerPlayerEntity player : boarded) {
+                mirrorEscrow(player).ifPresent(escrow -> toLiner(player, escrow));
             }
             cleanupScene(sea, component);
             throw failure;
@@ -178,32 +190,136 @@ public final class MistSea {
      */
 
     private static void escrow(GameComponent component, ServerPlayerEntity player) {
+        requireNoEscrow(player);
+        Vec3d returnPoint = player.getPos();
+        put(component, player, returnPoint, player.getYaw(), player.getPitch(), Optional.empty());
+    }
+
+    /**
+     * 过魔镜托管（ADR-0083）：背包与身体记下、背包清空；回程从这面镜子出来（{@code back} 是镜子前那一格、{@code yaw} 背对镜子）。
+     *
+     * @throws IllegalStateException 已有一份未恢复的托管
+     */
+    public static void escrowAtMirror(ServerWorld liner, ServerPlayerEntity player, GameComponent.MirrorAt mirror, Vec3d back, float yaw) {
+        requireNoEscrow(player);
+        put(GameComponents.of(liner), player, back, yaw, 0f, Optional.of(mirror));
+        checkpoint(player.server, "过魔镜时的物品托管");
+    }
+
+    private static void requireNoEscrow(ServerPlayerEntity player) {
         for (ServerWorld world : player.server.getWorlds()) {
             if (GameComponents.of(world).hasVoyageEscrow(player.getUuid())) {
                 throw new IllegalStateException(player.getGameProfile().getName() + " 已有一份未恢复的雾海托管");
             }
         }
-        Vec3d returnPoint = player.getPos();
-        if (player.getVehicle() instanceof SeatEntity seat && seat.ours() && seat.lobby()) {
-            returnPoint = seat.lobbyLanding(player).orElseThrow(
-                    () -> new IllegalStateException("大厅游轮附近没有安全的返回地面，无法开航"));
-        }
+    }
+
+    private static void put(GameComponent component, ServerPlayerEntity player, Vec3d back, float yaw, float pitch,
+                            Optional<GameComponent.MirrorAt> mirror) {
         NbtList inventory = player.getInventory().writeNbt(new NbtList());
         component.putVoyageEscrow(new GameComponent.VoyageEscrow(player.getUuid(),
                 player.getWorld().getRegistryKey().getValue().toString(),
-                returnPoint.x, returnPoint.y, returnPoint.z, player.getYaw(), player.getPitch(), inventory,
-                Optional.of(PlayerBodies.capture(player))));
+                back.x, back.y, back.z, yaw, pitch, inventory, Optional.of(PlayerBodies.capture(player)), mirror));
         player.getInventory().clear();
         player.getInventory().markDirty();
         player.playerScreenHandler.sendContentUpdates();
     }
 
-    /** Normal end: online players return immediately; offline records remain until their next login. */
+    /** 这个人有没有一份过魔镜的托管（在北辰号上，或在这一局里）。 */
+    public static Optional<GameComponent.VoyageEscrow> mirrorEscrow(ServerPlayerEntity player) {
+        for (ServerWorld world : player.server.getWorlds()) {
+            Optional<GameComponent.VoyageEscrow> escrow = GameComponents.of(world).voyageEscrow(player.getUuid());
+            if (escrow.isPresent()) {
+                return escrow.filter(GameComponent.VoyageEscrow::viaMirror);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 送回北辰号的落脚点（大楼梯平台、船上那面镜子前）：冒险模式、满血满饱（船上不受伤，{@link PlayerBodies}）。
+     * 北辰号不在（清单读不出来、地图数据里没有）时没有船可回 —— 直接把托管还了送回家，不让人卡在海上。
+     */
+    public static void toLiner(ServerPlayerEntity player, GameComponent.VoyageEscrow escrow) {
+        Optional<LinerShip.Manifest> manifest = LinerShip.manifest();
+        ServerWorld liner = manifest.map(m -> player.server.getWorld(m.dimension())).orElse(null);
+        if (liner == null) {
+            LOGGER.warn("北辰号不在（{}）：{} 的托管直接还了、送回家", LinerShip.unavailableReason().orElse("?"),
+                    player.getGameProfile().getName());
+            goHome(player);
+            return;
+        }
+        Vec3d at = manifest.get().arrival();
+        player.stopRiding();
+        player.teleport(liner, at.x, at.y, at.z, manifest.get().arrivalYaw(), 0f);
+        PlayerBodies.aboard(player, escrow.body());
+    }
+
+    /** 回程的去向（{@link #goHome}）：镜子前 · 自己的重生点 · 世界出生点；后两种是那面镜子不在了。 */
+    public enum Home {
+        MIRROR, RESPAWN, WORLD_SPAWN, NO_ESCROW
+    }
+
+    /**
+     * 从船上那面镜子回家（ADR-0065 §1 第 5 条 · 样张页第 8、9 步）：背包与身体还回来；那面镜子还在，回到镜子前（托管时记的那一格、背对镜子），
+     * 不在了送自己的重生点（床或重生锚），没有才送世界出生点。查镜子之前先把那一格所在的区块载进来 —— 没载入的区块什么都查不到，
+     * 会把「查不到」当成「不在了」。
+     */
+    public static Home goHome(ServerPlayerEntity player) {
+        for (ServerWorld world : player.server.getWorlds()) {
+            GameComponent component = GameComponents.of(world);
+            Optional<GameComponent.VoyageEscrow> found = component.voyageEscrow(player.getUuid());
+            if (found.isEmpty()) {
+                continue;
+            }
+            GameComponent.VoyageEscrow escrow = found.get();
+            Home home = Home.MIRROR;
+            TeleportTarget elsewhere = null;
+            if (escrow.viaMirror()) {
+                GameComponent.MirrorAt at = escrow.mirror().orElseThrow();
+                Identifier dim = Identifier.tryParse(at.dimension());
+                ServerWorld there = dim == null ? null : player.server.getWorld(RegistryKey.of(RegistryKeys.WORLD, dim));
+                boolean standing = there != null && there.getChunk(at.pos()) != null
+                        && there.getBlockState(at.pos()).isOf(io.github.heavyseasmc.mod.world.liner.LinerProps.MIRROR);
+                if (!standing) {
+                    elsewhere = player.getRespawnTarget(true, TeleportTarget.NO_OP);
+                    home = elsewhere.missingRespawnBlock() || player.getSpawnPointPosition() == null ? Home.WORLD_SPAWN : Home.RESPAWN;
+                }
+            }
+            TeleportTarget redirect = elsewhere;
+            if (restore(component, player, redirect)) {
+                checkpoint(player.server, "从魔镜回家的物品恢复");
+                return home;
+            }
+            throw new IllegalStateException("回家失败：" + player.getGameProfile().getName() + " 的托管没能还回来（日志里有原因），托管照旧留着");
+        }
+        TeleportTarget target = player.getRespawnTarget(true, TeleportTarget.NO_OP);
+        player.stopRiding();
+        player.teleportTo(target);
+        return Home.NO_ESCROW;
+    }
+
+    /**
+     * Normal end: online players return immediately; offline records remain until their next login.
+     * 过魔镜托管的（ADR-0083）：刚才在这一局里的人回北辰号的落脚点、托管照旧留着（从船上那面镜子回家时才还）；
+     * 开局时托管的老路（{@code /seas start}）照旧当场还、送回原处。
+     */
     public static void restoreAll(ServerWorld sea, GameComponent component) {
         int restored = 0;
+        Set<UUID> voyage = component.endedVoyagePlayers();
         for (UUID id : new ArrayList<>(component.voyageEscrowPlayers())) {
             ServerPlayerEntity player = sea.getServer().getPlayerManager().getPlayer(id);
-            if (player != null && restore(component, player)) {
+            if (player == null) {
+                continue;
+            }
+            GameComponent.VoyageEscrow escrow = component.voyageEscrow(id).orElse(null);
+            if (escrow != null && escrow.viaMirror()) {
+                if (voyage.contains(id)) {
+                    toLiner(player, escrow);
+                }
+                continue;
+            }
+            if (restore(component, player)) {
                 restored++;
             }
         }
@@ -244,6 +360,13 @@ public final class MistSea {
                     player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
                 }
                 GameComponents.sync(sea);
+            } else if (component.voyageEscrow(player.getUuid()).map(GameComponent.VoyageEscrow::viaMirror).orElse(false)) {
+                // 过了魔镜、不在对局里：人该在北辰号上。不在船上（崩在对局里、存档里还停在对局那条艇边）就送回落脚点；在船上就不动
+                GameComponent.VoyageEscrow escrow = component.voyageEscrow(player.getUuid()).orElseThrow();
+                if (!onLiner(player)) {
+                    toLiner(player, escrow);
+                    LOGGER.info("雾海恢复：{} 过了魔镜、不在对局里，送回北辰号", player.getGameProfile().getName());
+                }
             } else if (restore(component, player)) {
                 checkpoint(player.server, "雾海异常中断恢复");
                 player.sendMessage(Text.translatable("heavyseas.mist_sea.recovered"), true);
@@ -253,7 +376,18 @@ public final class MistSea {
         }
     }
 
+    /** 人在北辰号那一块里（船体外扩一圈，含舷外的艇）。 */
+    static boolean onLiner(ServerPlayerEntity player) {
+        return LinerShip.manifest().map(m -> player.getWorld().getRegistryKey().equals(m.dimension())
+                && Box.from(m.hullBox()).expand(8).contains(player.getPos())).orElse(false);
+    }
+
     private static boolean restore(GameComponent component, ServerPlayerEntity player) {
+        return restore(component, player, null);
+    }
+
+    /** @param elsewhere 不回托管里记的那个位置、改送这里（回程时家里那面镜子不在了）；{@code null} = 照托管里记的 */
+    private static boolean restore(GameComponent component, ServerPlayerEntity player, TeleportTarget elsewhere) {
         GameComponent.VoyageEscrow escrow = component.removeVoyageEscrow(player.getUuid()).orElse(null);
         if (escrow == null) {
             return false;
@@ -270,7 +404,11 @@ public final class MistSea {
             player.getInventory().markDirty();
             player.playerScreenHandler.sendContentUpdates();
             player.removeStatusEffect(StatusEffects.BLINDNESS);
-            player.teleport(destination, escrow.x(), escrow.y(), escrow.z(), escrow.yaw(), escrow.pitch());
+            if (elsewhere != null) {
+                player.teleportTo(elsewhere);
+            } else {
+                player.teleport(destination, escrow.x(), escrow.y(), escrow.z(), escrow.yaw(), escrow.pitch());
+            }
             escrow.body().ifPresent(body -> PlayerBodies.restore(player, body));
             return true;
         } catch (RuntimeException failure) {
@@ -295,7 +433,7 @@ public final class MistSea {
                 entry.rain(), entry.thunder(), entry.time(), entry.start(), entry.end());
     }
 
-    private static void checkpoint(MinecraftServer server, String reason) {
+    static void checkpoint(MinecraftServer server, String reason) {
         if (!server.save(false, true, false)) {
             LOGGER.warn("雾海存档检查点未报告成功：{}", reason);
         } else {

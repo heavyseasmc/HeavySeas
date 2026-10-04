@@ -150,6 +150,11 @@ public final class SceneDataLoader implements SimpleSynchronousResourceReloadLis
             Identifier layoutId = VoyageLayoutLoader.layoutIdOf(entry.getKey());
             try (Reader reader = entry.getValue().getReader()) {
                 VoyageLayout layout = VoyageLayoutLoader.parse(entry.getKey().toString(), reader, layoutId);
+                if (layout.liner().isPresent() && !layout.id().equals(DEFAULT)) {
+                    // 用户 2026-10-03 定：只有默认布局摆北辰号（大厅用的就是它）。别的布局写了不当场拒绝，就是「写了被静默忽略」
+                    throw new IllegalStateException("%s 的 liner：只有默认布局 %s 可以写北辰号的位置 —— 换地图就换默认那一份；别的布局删掉 liner"
+                            .formatted(entry.getKey(), DEFAULT));
+                }
                 if (!fogTables.containsKey(layout.fog())) {
                     throw new IllegalStateException("%s 的 fog：雾表 %s 不存在（data/%s/fog/%s.json）—— 读到的雾表是 %s"
                             .formatted(entry.getKey(), layout.fog(), layout.fog().getNamespace(),

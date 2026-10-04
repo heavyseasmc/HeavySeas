@@ -19,8 +19,6 @@ import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import io.github.heavyseasmc.mod.world.SeatEntity;
 import io.github.heavyseasmc.mod.world.GullEntity;
-import io.github.heavyseasmc.mod.world.LobbyBoatBlock;
-import io.github.heavyseasmc.mod.world.LobbyBoatEntity;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -156,6 +154,8 @@ public final class HeavySeasClient implements ClientModInitializer {
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getTranslucent(), LinerHull.PORTHOLE_BLACK, LinerHull.PORTHOLE_WHITE,
                 LinerHull.PORTHOLE_INNER, LinerHull.PORTHOLE_INNER_PLAIN, LinerDoors.DOUBLE);
         BlockRenderLayerMap.INSTANCE.putBlock(LinerDoors.CABIN, RenderLayer.getCutout());
+        // 夜里亮着灯的舱室，从船外看舷窗与大窗是暖的（ADR-0082）：建网格时按屋里那一侧的光换上亮着的玻璃
+        GlassGlow.register();
         GameScreenSidebar.register();
         // 别的界面（Minecraft 自带的进度 · 游戏菜单 · 聊天……）打开时也记一行，与 GameScreen 的「界面：打开 X」配对：
         // 回归脚本据此分得开「本模组那一面没弹」与「被别的界面盖住了」—— 此前两次都要截图才看出来
@@ -169,8 +169,6 @@ public final class HeavySeasClient implements ClientModInitializer {
 
         // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
         EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);
-        EntityRendererRegistry.register(LobbyBoatEntity.TYPE, EmptyEntityRenderer::new);
-        BlockEntityRendererRegistry.register(LobbyBoatBlock.TYPE, LobbyBoatRenderer::new);
         // 海鸥：自绘模型（ADR-0034 §5.4），模型层要先登记，渲染器构造时按层取部件。
         EntityModelLayerRegistry.registerModelLayer(GullModel.LAYER, GullModel::getTexturedModelData);
         EntityRendererRegistry.register(GullEntity.TYPE, GullRenderer::new);

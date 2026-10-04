@@ -19,7 +19,8 @@ import java.util.Map;
  * 大邮轮的灯与家具（ADR-0063）：ADR-0061 §5 第二轮定稿的六件 —— 甲板灯柱 · 黄铜落地灯 · 绿罩台灯 · 2 × 2 大桌 ·
  * 两格切斯特菲尔德沙发 · 俱乐部扶手椅（后两件各有米色与绿丝绒两种布）；ADR-0066 加了挂在天花下的三种灯
  * （吸顶花玻璃 · 两格高的黄铜小吊灯 · 3 × 3 加吊杆共 10 格的水晶大吊灯）；客房与阅览室的家具（黄铜床 · 衣柜 · 盥洗台 ·
- * 书柜 · 写字台 · 写字椅）与壁灯（ADR 草稿 furniture）。
+ * 书柜 · 写字台 · 写字椅）与壁灯（ADR 草稿 furniture）；A 甲板新家具（ADR 草稿 furnish）：壁炉两种 · 炉上件两种 · 棕榈两种 ·
+ * 藤编扶手椅 / 小圆桌 / 长椅 · 吧台。
  *
  * <p>通用件，不带船名；只在创造模式里拿（挖不动、不掉东西、没有配方，与大邮轮那一族的装饰方块相同），进「灯与家具」页。
  * 判据 {@code checkLinerBlocks} 与装饰方块共用一段（登记写法 {@code prop("liner_…")}）。
@@ -79,6 +80,11 @@ public final class LinerProps {
     public static final LinerProp WASHSTAND = prop("liner_washstand",
             new LinerProp.Spec(LinerProp.Kind.WASHSTAND, "washstand", "washstand", null, 0),
             MapColor.OFF_WHITE, BlockSoundGroup.WOOD);
+    // 魔镜（ADR-0083 · ADR-0065 §1 第 4 条落地立镜）：玩家自己世界里那面与北辰号大楼梯平台上那面是同一种方块。
+    //   样子是用户 2026-10-04 挑的那一版：银箔框、弧顶小冠饰、镜面「轻」的旧银；同日放大到两格宽三格高、嵌进墙里（摆法 C，liner_props.py 的 mirror_mod_set）
+    public static final LinerProp MIRROR = prop("liner_mirror",
+            new LinerProp.Spec(LinerProp.Kind.MIRROR, "mirror", "mirror", null, 0),
+            MapColor.LIGHT_GRAY, BlockSoundGroup.WOOD);
     public static final LinerProp BOOKCASE = prop("liner_bookcase",
             new LinerProp.Spec(LinerProp.Kind.BOOKCASE, "bookcase", "bookcase", null, 0),
             MapColor.BROWN, BlockSoundGroup.WOOD);
@@ -92,6 +98,56 @@ public final class LinerProps {
     public static final LinerProp WALL_SCONCE = prop("liner_wall_sconce",
             new LinerProp.Spec(LinerProp.Kind.SCONCE, "wall_sconce", "wall_sconce", "wall_sconce_shade", 12),
             MapColor.GOLD, BlockSoundGroup.LANTERN);
+    // A 甲板新家具（ADR 草稿 furnish；用户 2026-10-04「全按倾向」）：休息室白大理石壁炉 + 描金框镜 · 吸烟室桃花心木壁炉 + 桃花心木框油画；
+    //   炉火亮度 13（落地灯 14 与壁灯 12 之间），只有正中下面那一格发光
+    public static final LinerProp FIREPLACE_MARBLE = prop("liner_fireplace_marble",
+            new LinerProp.Spec(LinerProp.Kind.FIREPLACE, "fireplace_marble", "fireplace_marble", "fireplace_marble_glow", 13),
+            MapColor.OFF_WHITE, BlockSoundGroup.STONE);
+    public static final LinerProp FIREPLACE_MAHOGANY = prop("liner_fireplace_mahogany",
+            new LinerProp.Spec(LinerProp.Kind.FIREPLACE, "fireplace_mahogany", "fireplace_mahogany", "fireplace_mahogany_glow", 13),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp OVERMANTEL_MIRROR = prop("liner_overmantel_mirror",
+            new LinerProp.Spec(LinerProp.Kind.OVERMANTEL, "overmantel_mirror", "overmantel_mirror", null, 0),
+            MapColor.GOLD, BlockSoundGroup.GLASS);
+    public static final LinerProp OVERMANTEL_PICTURE = prop("liner_overmantel_picture",
+            new LinerProp.Spec(LinerProp.Kind.OVERMANTEL, "overmantel_picture", "overmantel_picture", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    //   棕榈：两格高的藤编花篮（咖啡座）· 三格高的大棵木桶（休息室灯井下）
+    public static final LinerProp PALM = prop("liner_palm",
+            new LinerProp.Spec(LinerProp.Kind.PALM, "palm", "palm", null, 0),
+            MapColor.DARK_GREEN, BlockSoundGroup.AZALEA_LEAVES);
+    public static final LinerProp PALM_TALL = prop("liner_palm_tall",
+            new LinerProp.Spec(LinerProp.Kind.PALM_TALL, "palm_tall", "palm_tall", null, 0),
+            MapColor.DARK_GREEN, BlockSoundGroup.AZALEA_LEAVES);
+    //   藤编三件：白漆藤配深绿丝绒坐垫（大面斜纹、桌面与搁板篮纹）
+    public static final LinerProp WICKER_CHAIR = prop("liner_wicker_chair",
+            new LinerProp.Spec(LinerProp.Kind.WICKER_CHAIR, "wicker_chair", "wicker_chair", null, 0),
+            MapColor.OFF_WHITE, BlockSoundGroup.WOOD);
+    public static final LinerProp WICKER_TABLE = prop("liner_wicker_table",
+            new LinerProp.Spec(LinerProp.Kind.WICKER_TABLE, "wicker_table", "wicker_table", null, 0),
+            MapColor.OFF_WHITE, BlockSoundGroup.WOOD);
+    public static final LinerProp WICKER_SETTEE = prop("liner_wicker_settee",
+            new LinerProp.Spec(LinerProp.Kind.WICKER_SETTEE, "wicker_settee", "wicker_settee", null, 0),
+            MapColor.OFF_WHITE, BlockSoundGroup.WOOD);
+    //   吧台：带台后酒架那一版（4 长 × 2 高）
+    public static final LinerProp BAR_COUNTER = prop("liner_bar_counter",
+            new LinerProp.Spec(LinerProp.Kind.BAR_COUNTER, "bar_counter", "bar_counter", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    // 艇甲板设备（ADR-0080 §7 · ADR 草稿 deckgear；用户 2026-10-04「全按倾向」）：四分圆摇臂式吊艇架（白臂黑座）· 喇叭口通风筒高 / 矮。
+    //   模板与贴图由 liner_props_deck.py 经 liner_props.py --write 写（#b 白漆 · #k 铁与吊索 / 喇叭与口）
+    public static final LinerProp DAVIT = prop("liner_davit",
+            new LinerProp.Spec(LinerProp.Kind.DAVIT, "davit", "davit", null, 0),
+            MapColor.WHITE, BlockSoundGroup.METAL);
+    public static final LinerProp VENTILATOR = prop("liner_ventilator",
+            new LinerProp.Spec(LinerProp.Kind.VENTILATOR, "ventilator", "ventilator", null, 0),
+            MapColor.WHITE, BlockSoundGroup.METAL);
+    public static final LinerProp VENTILATOR_SHORT = prop("liner_ventilator_short",
+            new LinerProp.Spec(LinerProp.Kind.VENTILATOR_SHORT, "ventilator_short", "ventilator_short", null, 0),
+            MapColor.WHITE, BlockSoundGroup.METAL);
+    // 开局的钟（ADR-0084 第三轮；用户 2026-10-04 定门形钟架）：演习艇艏柱那一头里侧，坐在艇里的人右键敲钟开阵容面板（DrillSkiff.ringBell）
+    public static final LinerProp DRILL_BELL = prop("liner_drill_bell",
+            new LinerProp.Spec(LinerProp.Kind.DRILL_BELL, "drill_bell", "drill_bell", null, 0),
+            MapColor.GOLD, BlockSoundGroup.METAL);
 
     private LinerProps() {
     }

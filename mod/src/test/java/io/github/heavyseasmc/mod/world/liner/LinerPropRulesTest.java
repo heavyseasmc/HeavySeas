@@ -23,6 +23,98 @@ final class LinerPropRulesTest {
     private static final Set<LinerProp.Part> BED = EnumSet.of(LinerProp.Part.FOOT, LinerProp.Part.HEAD);
     private static final Set<LinerProp.Part> SHELF = EnumSet.of(LinerProp.Part.WEST, LinerProp.Part.EAST,
             LinerProp.Part.UPPER_WEST, LinerProp.Part.UPPER_EAST);
+    // A 甲板新家具（ADR 草稿 furnish）：壁炉 · 炉上件 3 宽 × 2 高 · 吧台 4 长 × 2 高 · 大棵棕榈三格高
+    private static final Set<LinerProp.Part> WIDE = LinerProp.Rules.parts(LinerProp.Kind.FIREPLACE);
+    private static final Set<LinerProp.Part> BAR = LinerProp.Rules.parts(LinerProp.Kind.BAR_COUNTER);
+    private static final Set<LinerProp.Part> TALL3 = LinerProp.Rules.parts(LinerProp.Kind.PALM_TALL);
+    // 魔镜放大到 3 宽 × 3 高（2026-10-04，摆法 C）
+    private static final Set<LinerProp.Part> WIDE3 = LinerProp.Rules.parts(LinerProp.Kind.MIRROR);
+
+    @Test
+    void mirrorIsThreeByThreeCentredOnTheClickedCellAndEveryCellFindsTheCentre() {
+        // 点中的是下面一层正中（左右对称的件，镜子立在人面前），往人的左右手各一格、往上两层。人站在西边、面朝东摆 → 镜面朝西
+        BlockPos at = new BlockPos(222, 40, 17);
+        Direction facing = Direction.WEST;
+        assertEquals(LinerProp.Part.WIDE_MID, LinerProp.Rules.anchor(LinerProp.Kind.MIRROR));
+        assertEquals(9, WIDE3.size());
+        Set<BlockPos> cells = new HashSet<>();
+        for (LinerProp.Part p : WIDE3) {
+            BlockPos q = LinerProp.Rules.offset(at, LinerProp.Part.WIDE_MID, p, facing);
+            cells.add(q);
+            // 右键点中哪一格，交给 MagicMirror 的都是正中那一格（LinerProp.onUse 的换算）
+            assertEquals(at, LinerProp.Rules.offset(q, p, LinerProp.Part.WIDE_MID, facing), p + " 换算回正中");
+        }
+        Set<BlockPos> want = new HashSet<>();
+        for (int dy = 0; dy < 3; dy++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                want.add(at.add(0, dy, dz));
+            }
+        }
+        assertEquals(want, cells);
+        // 镜面朝西时模型的西（x 0）在 z + 1 —— liner_build.mirror_cells 与 checkLinerShip ⑧ 照这一条摆、照这一条认
+        assertEquals(at.south(), LinerProp.Rules.offset(at, LinerProp.Part.WIDE_MID, LinerProp.Part.WIDE_WEST, facing));
+        assertEquals(at.up(2).north(), LinerProp.Rules.offset(at, LinerProp.Part.WIDE_MID, LinerProp.Part.WIDE_TOP_EAST, facing));
+        for (Direction f : HORIZONTAL) {
+            assertEquals(WIDE3, reachable(LinerProp.Part.WIDE_MID, f, WIDE3), "魔镜朝 " + f + " 断成了几截");
+        }
+        assertEquals(false, LinerProp.Rules.isLamp(LinerProp.Kind.MIRROR));
+    }
+
+    @Test
+    void aDeckPiecesGrowToThePlacersRightAndUpAndOnlyTheHearthGlows() {
+        // 人站在南边、面朝北（对着墙）摆：正面朝着人（朝南），背贴北边那面墙；点中的是下面一层人左手那一块，往人的右手（东）与上面长
+        BlockPos at = new BlockPos(7, 40, -12);
+        Direction facing = Direction.SOUTH;
+        assertEquals(6, WIDE.size());
+        assertEquals(8, BAR.size());
+        assertEquals(EnumSet.of(LinerProp.Part.LOWER, LinerProp.Part.UPPER, LinerProp.Part.TOP), TALL3);
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.FIREPLACE, LinerProp.Kind.OVERMANTEL)) {
+            Set<BlockPos> cells = new HashSet<>();
+            for (LinerProp.Part p : LinerProp.Rules.parts(k)) {
+                cells.add(LinerProp.Rules.offset(at, LinerProp.Rules.anchor(k), p, facing));
+            }
+            assertEquals(Set.of(at, at.east(), at.east(2), at.up(), at.east().up(), at.east(2).up()), cells, k + " 往人的右手与上面长");
+        }
+        Set<BlockPos> bar = new HashSet<>();
+        for (LinerProp.Part p : BAR) {
+            bar.add(LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.BAR_COUNTER), p, facing));
+        }
+        assertEquals(8, bar.size());
+        assertEquals(true, bar.contains(at.east(3)) && bar.contains(at.east(3).up()) && !bar.contains(at.west()), "吧台往人的右手长四格");
+        assertEquals(at.up(2), LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.PALM_TALL), LinerProp.Part.TOP, facing));
+        assertEquals(TALL, LinerProp.Rules.parts(LinerProp.Kind.PALM));
+        assertEquals(PAIR, LinerProp.Rules.parts(LinerProp.Kind.WICKER_SETTEE));
+        // 长椅同沙发
+        assertEquals(LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.SOFA), LinerProp.Part.WEST, facing),
+                LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.WICKER_SETTEE), LinerProp.Part.WEST, facing));
+        // 炉火是开关（默认亮），只有正中下面那一格发光；别的新件都不是灯
+        assertEquals(true, LinerProp.Rules.isLamp(LinerProp.Kind.FIREPLACE));
+        for (LinerProp.Part p : WIDE) {
+            assertEquals(p == LinerProp.Part.WIDE_MID, LinerProp.Rules.glows(LinerProp.Kind.FIREPLACE, p), "炉火 · " + p);
+        }
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.OVERMANTEL, LinerProp.Kind.PALM, LinerProp.Kind.PALM_TALL, LinerProp.Kind.WICKER_CHAIR,
+                LinerProp.Kind.WICKER_TABLE, LinerProp.Kind.WICKER_SETTEE, LinerProp.Kind.BAR_COUNTER)) {
+            assertEquals(false, LinerProp.Rules.isLamp(k), k + " 不是灯");
+            assertEquals(false, LinerProp.Rules.hanging(k), k + " 不挂天花");
+        }
+    }
+
+    @Test
+    void palmsCollideOnlyWithThePot() {
+        // 棕榈：碰撞只算盆（下面那一格的盆），上面几格一个碰撞盒子都没有；轮廓照旧有（点得中）。别的件碰撞箱就是轮廓（null）
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.PALM, LinerProp.Kind.PALM_TALL)) {
+            for (LinerProp.Part p : LinerProp.Rules.parts(k)) {
+                List<double[]> c = LinerPropShapes.collision(k, p);
+                assertEquals(p == LinerProp.Part.LOWER, !c.isEmpty(), k + " · " + p);
+                assertEquals(false, LinerPropShapes.boxes(k, p).isEmpty(), k + " · " + p + " 的轮廓");
+                for (double[] b : c) {
+                    assertEquals(true, b[4] <= 8, k + " 的碰撞高过盆沿：" + java.util.Arrays.toString(b));
+                }
+            }
+        }
+        assertNull(LinerPropShapes.collision(LinerProp.Kind.FIREPLACE, LinerProp.Part.WIDE_MID));
+        assertNull(LinerPropShapes.collision(LinerProp.Kind.SOFA, LinerProp.Part.WEST));
+    }
 
     @Test
     void furnitureGrowsTheWayTheModelsAreDrawn() {
@@ -87,7 +179,7 @@ final class LinerPropRulesTest {
 
     @Test
     void everyPartFindsEachPartnerExactlyWhereOffsetPutsIt() {
-        for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR, TALL, BED, SHELF)) {
+        for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR, TALL, BED, SHELF, WIDE, BAR, TALL3, WIDE3)) {
             for (Direction facing : HORIZONTAL) {
                 for (LinerProp.Part here : parts) {
                     int partners = 0;
@@ -99,8 +191,16 @@ final class LinerPropRulesTest {
                                     here + " 朝 " + facing + " 时，" + d + " 那一格的搭档 " + p);
                         }
                     }
-                    // 两格的件一个搭档；2 × 2 的大桌、竖着 2 × 2 的书柜每一块挨着两块（斜对角那一块不挨着，靠一格传一格）
-                    assertEquals(parts == QUAD || parts == SHELF ? 2 : 1, partners, here + " 朝 " + facing);
+                    // 两格的件一个搭档；2 × 2 的大桌、竖着 2 × 2 的书柜每一块挨着两块（斜对角那一块不挨着，靠一格传一格）；
+                    //   3 宽 × 2 高、4 长 × 2 高、三格高的件：在模型里挨着几块就是几个搭档（中间那几块三个 / 两个）
+                    int touching = 0;
+                    for (LinerProp.Part q : parts) {
+                        touching += Math.abs(q.x - here.x) + Math.abs(q.y - here.y) + Math.abs(q.z - here.z) == 1 ? 1 : 0;
+                    }
+                    assertEquals(touching, partners, here + " 朝 " + facing);
+                    if (parts == QUAD || parts == SHELF || parts == PAIR || parts == TALL || parts == BED) {
+                        assertEquals(parts == QUAD || parts == SHELF ? 2 : 1, partners, here + " 朝 " + facing);
+                    }
                 }
             }
         }
@@ -288,8 +388,95 @@ final class LinerPropRulesTest {
             }
         }
         // 正向对照：每一种、每一块都过了一遍（落地灯 2 · 台灯 1 · 大桌 4 · 沙发 2 · 椅子 1 · 吸顶灯 1 · 小吊灯 2 · 大吊灯 10
-        //   · 骑缝灯两格 2 · 2 × 2 4 · 床 2 · 衣柜 2 · 盥洗台 2 · 书柜 4 · 写字台 2 · 写字椅 1 · 壁灯 1）
-        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10 + 2 + 4 + 2 + 2 + 2 + 4 + 2 + 1 + 1, checked);
+        //   · 骑缝灯两格 2 · 2 × 2 4 · 床 2 · 衣柜 2 · 盥洗台 2 · 魔镜 9（2026-10-04 放大前 2）· 书柜 4 · 写字台 2 · 写字椅 1 · 壁灯 1
+        //   · A 甲板新家具：壁炉 6 · 炉上件 6 · 棕榈 2 · 大棵棕榈 3 · 藤椅 1 · 藤编小圆桌 1 · 藤编长椅 2 · 吧台 8
+        //   · 艇甲板设备：吊艇架 10 · 高通风筒 3 · 矮通风筒 2 · 开局的钟 12）
+        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10 + 2 + 4 + 2 + 2 + 2 + 9 + 4 + 2 + 1 + 1 + 6 + 6 + 2 + 3 + 1 + 1 + 2 + 8 + 10 + 3 + 2 + 12, checked);
+    }
+
+    /** 从 from 那一块起，经「搭档在哪一格」（六个面上的邻居）一格传一格走得到的块 —— 拆一格整件没，靠的就是这条链。 */
+    private static Set<LinerProp.Part> reachable(LinerProp.Part from, Direction facing, Set<LinerProp.Part> parts) {
+        Set<LinerProp.Part> seen = EnumSet.of(from);
+        java.util.ArrayDeque<LinerProp.Part> todo = new java.util.ArrayDeque<>(seen);
+        while (!todo.isEmpty()) {
+            LinerProp.Part here = todo.pop();
+            for (Direction d : Direction.values()) {
+                LinerProp.Part p = LinerProp.Rules.partnerAt(here, d, facing, parts);
+                if (p != null && seen.add(p)) {
+                    todo.push(p);
+                }
+            }
+        }
+        return seen;
+    }
+
+    @Test
+    void deckGearIsOneChainAndTheDavitArmReachesOutboard() {
+        // 艇甲板设备（ADR 草稿 deckgear）：吊艇架 10 格、高通风筒 3 格、矮通风筒 2 格。拆一格整件没是一格传一格（搭档不在了自己变空气，
+        //   只看六个面）—— 所以从锚点出发、经搭档一格格走，必须每一块都走得到，哪个朝向都一样
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.DAVIT, LinerProp.Kind.VENTILATOR, LinerProp.Kind.VENTILATOR_SHORT,
+                LinerProp.Kind.DRILL_BELL)) {
+            Set<LinerProp.Part> parts = LinerProp.Rules.parts(k);
+            for (Direction facing : HORIZONTAL) {
+                assertEquals(parts, reachable(LinerProp.Rules.anchor(k), facing, parts), k + " 朝 " + facing + " 断成了几截");
+                for (LinerProp.Part here : parts) {
+                    for (Direction d : Direction.values()) {
+                        LinerProp.Part p = LinerProp.Rules.partnerAt(here, d, facing, parts);
+                        if (p != null) {
+                            assertEquals(BlockPos.ORIGIN.offset(d), LinerProp.Rules.offset(BlockPos.ORIGIN, here, p, facing), k + " " + here + " " + d);
+                        }
+                    }
+                }
+            }
+        }
+        assertEquals(10, LinerProp.Rules.parts(LinerProp.Kind.DAVIT).size());
+        assertEquals(EnumSet.of(LinerProp.Part.LOWER, LinerProp.Part.UPPER, LinerProp.Part.TOP), LinerProp.Rules.parts(LinerProp.Kind.VENTILATOR));
+        assertEquals(TALL, LinerProp.Rules.parts(LinerProp.Kind.VENTILATOR_SHORT));
+        assertEquals(12, LinerProp.Rules.parts(LinerProp.Kind.DRILL_BELL).size());
+        // 开局的钟（门形钟架，2 宽 × 6 高）：点中的是下面一层人左手那一块，往人的右手与上面长（同书柜）—— 面朝北的人：东边那一格是锚点，另一列在西
+        BlockPos bell = new BlockPos(7, 48, 30);
+        Set<BlockPos> bellCells = new HashSet<>();
+        for (LinerProp.Part q : LinerProp.Rules.parts(LinerProp.Kind.DRILL_BELL)) {
+            bellCells.add(LinerProp.Rules.offset(bell, LinerProp.Rules.anchor(LinerProp.Kind.DRILL_BELL), q, Direction.SOUTH));
+        }
+        Set<BlockPos> wantBell = new HashSet<>();
+        for (int y = 0; y < 6; y++) {
+            wantBell.add(bell.up(y));
+            wantBell.add(bell.east().up(y));
+        }
+        assertEquals(wantBell, bellCells);
+        // 正向对照：第一轮样张那 6 格（臂只放在 (0,3,−1) · (0,5,−2) · (0,6,−2)，与扇板那一格只在棱上挨着）必须走不通 —— 判据认得出断处
+        Set<LinerProp.Part> first = EnumSet.of(LinerProp.Part.BASE, LinerProp.Part.BASE_IN, LinerProp.Part.QUADRANT, LinerProp.Part.ARM_C,
+                LinerProp.Part.ARM_F, LinerProp.Part.ARM_HEAD);
+        assertEquals(EnumSet.of(LinerProp.Part.BASE, LinerProp.Part.BASE_IN, LinerProp.Part.QUADRANT),
+                reachable(LinerProp.Part.BASE, Direction.NORTH, first));
+        // 吊艇架往哪长：点中的是铁座靠舷外那一格；正面朝北（舷外在北）时，往舷内（南）一格是 base_in，臂头在上 6 格、往舷外（北）2 格
+        BlockPos at = new BlockPos(100, 48, 2);
+        assertEquals(LinerProp.Part.BASE, LinerProp.Rules.anchor(LinerProp.Kind.DAVIT));
+        assertEquals(at.south(), LinerProp.Rules.offset(at, LinerProp.Part.BASE, LinerProp.Part.BASE_IN, Direction.NORTH));
+        assertEquals(at.add(0, 6, -2), LinerProp.Rules.offset(at, LinerProp.Part.BASE, LinerProp.Part.ARM_HEAD, Direction.NORTH));
+        // 右舷那一架正面朝南：臂头往南（舷外）2 格
+        assertEquals(at.add(0, 6, 2), LinerProp.Rules.offset(at, LinerProp.Part.BASE, LinerProp.Part.ARM_HEAD, Direction.SOUTH));
+        // 照镜子：各块都在 x 0 那一列，块不换、相对位置照样对得上；艇换到另一只手
+        for (Direction facing : HORIZONTAL) {
+            Direction mirroredFacing = facing.getAxis() == Direction.Axis.X ? facing.getOpposite() : facing;
+            for (LinerProp.Kind k : List.of(LinerProp.Kind.DAVIT, LinerProp.Kind.VENTILATOR, LinerProp.Kind.DRILL_BELL)) {
+                for (LinerProp.Part a : LinerProp.Rules.parts(k)) {
+                    for (LinerProp.Part b : LinerProp.Rules.parts(k)) {
+                        BlockPos d = LinerProp.Rules.offset(BlockPos.ORIGIN, a, b, facing);
+                        assertEquals(new BlockPos(-d.getX(), d.getY(), d.getZ()), LinerProp.Rules.offset(BlockPos.ORIGIN,
+                                LinerProp.Rules.mirrored(a), LinerProp.Rules.mirrored(b), mirroredFacing), k + " " + a + " → " + b + " 朝 " + facing);
+                    }
+                }
+            }
+        }
+        assertEquals(LinerProp.BoatSide.LEFT, LinerProp.Rules.mirrored(LinerProp.BoatSide.RIGHT));
+        assertEquals(LinerProp.BoatSide.RIGHT, LinerProp.Rules.mirrored(LinerProp.BoatSide.LEFT));
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.DAVIT, LinerProp.Kind.VENTILATOR, LinerProp.Kind.VENTILATOR_SHORT,
+                LinerProp.Kind.DRILL_BELL)) {
+            assertEquals(false, LinerProp.Rules.isLamp(k), k + " 不是灯");
+            assertEquals(false, LinerProp.Rules.hanging(k), k + " 不挂天花");
+        }
     }
 
     @Test
@@ -300,7 +487,7 @@ final class LinerPropRulesTest {
         // 整件照镜子（世界里 x 取反）之后，每一块换成 mirrored 的那一块、朝向照镜子转 —— 各块之间的相对位置必须还对得上
         for (Direction facing : HORIZONTAL) {
             Direction mirroredFacing = facing.getAxis() == Direction.Axis.X ? facing.getOpposite() : facing;
-            for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR, BED, SHELF, TALL)) {
+            for (Set<LinerProp.Part> parts : List.of(QUAD, PAIR, BED, SHELF, TALL, WIDE, BAR, TALL3, WIDE3)) {
                 for (LinerProp.Part a : parts) {
                     for (LinerProp.Part b : parts) {
                         BlockPos d = LinerProp.Rules.offset(BlockPos.ORIGIN, a, b, facing);

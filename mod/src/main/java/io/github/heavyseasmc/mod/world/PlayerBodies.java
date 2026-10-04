@@ -37,13 +37,35 @@ public final class PlayerBodies {
         });
     }
 
+    /** 对局里的人，与过了魔镜在北辰号上的人（ADR-0083，用户 2026-10-03 定：船上冒险模式、不受伤）。 */
     private static boolean protectedBody(ServerPlayerEntity player) {
         for (ServerWorld world : player.server.getWorlds()) {
-            if (GameComponents.of(world).belongsToActiveVoyage(player.getUuid())) {
+            GameComponent component = GameComponents.of(world);
+            if (component.belongsToActiveVoyage(player.getUuid())
+                    || component.voyageEscrow(player.getUuid()).map(GameComponent.VoyageEscrow::viaMirror).orElse(false)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * 上了北辰号（过魔镜，或散局回船）：冒险模式（船是大家的大厅，挖不得）、满血满饱；血量上限回到自己的（对局里按角色体型改过）。
+     */
+    public static void aboard(ServerPlayerEntity player, java.util.Optional<GameComponent.BodySnapshot> own) {
+        double max = own.map(GameComponent.BodySnapshot::maxHealth).orElse(20d);
+        player.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH).setBaseValue(max);
+        player.setHealth(player.getMaxHealth());
+        player.setAbsorptionAmount(0);
+        player.getHungerManager().setFoodLevel(20);
+        player.getHungerManager().setSaturationLevel(5);
+        player.setAir(player.getMaxAir());
+        player.setFireTicks(0);
+        player.fallDistance = 0;
+        player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.BLINDNESS);
+        if (player.interactionManager.getGameMode() != GameMode.ADVENTURE) {
+            player.changeGameMode(GameMode.ADVENTURE);
+        }
     }
 
     public static GameComponent.BodySnapshot capture(ServerPlayerEntity player) {
@@ -71,6 +93,9 @@ public final class PlayerBodies {
     }
 
     public static void tick(MinecraftServer server) {
+        if (server.getTicks() % 20 == 0) {
+            keepAboard(server);
+        }
         for (ServerWorld world : server.getWorlds()) {
             GameComponent component = GameComponents.of(world);
             if (component.session().isEmpty()) {
@@ -110,6 +135,26 @@ public final class PlayerBodies {
                 }
             }
             Seats.refresh(world, component);
+        }
+    }
+
+    /** 船上的人（过了魔镜、不在对局里）一秒核一次：冒险模式、不饿（用户定：船上冒险模式）。 */
+    private static void keepAboard(MinecraftServer server) {
+        for (ServerWorld world : server.getWorlds()) {
+            GameComponent component = GameComponents.of(world);
+            for (java.util.UUID id : component.voyageEscrowPlayers()) {
+                if (component.belongsToActiveVoyage(id) || !component.voyageEscrow(id).map(GameComponent.VoyageEscrow::viaMirror).orElse(false)) {
+                    continue;
+                }
+                ServerPlayerEntity player = server.getPlayerManager().getPlayer(id);
+                if (player == null || player.isSpectator()) {
+                    continue;
+                }
+                if (player.interactionManager.getGameMode() != GameMode.ADVENTURE) {
+                    player.changeGameMode(GameMode.ADVENTURE);
+                }
+                player.getHungerManager().setFoodLevel(20);
+            }
         }
     }
 

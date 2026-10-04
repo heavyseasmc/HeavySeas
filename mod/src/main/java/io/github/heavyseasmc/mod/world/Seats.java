@@ -228,12 +228,12 @@ public final class Seats {
             return;
         }
         if (seat.lobby()) {
-            if (world.getBlockState(seat.lobbyAnchor()).isOf(LobbyBoatBlock.BLOCK)) {
+            if (io.github.heavyseasmc.mod.world.liner.DrillSkiff.isAnchor(world, seat.lobbyAnchor())) {
                 return;
             }
             seat.removeAllPassengers();
             seat.discard();
-            LOGGER.info("大厅座位：锚点救生艇已不在，清掉孤儿");
+            LOGGER.info("大厅座位：不是北辰号演习艇的（主世界那条大厅游轮已拿掉，或北辰号挪了位置），清掉孤儿");
             return;
         }
         if (GameComponents.of(world).seatIds().contains(seat.getUuid())) {

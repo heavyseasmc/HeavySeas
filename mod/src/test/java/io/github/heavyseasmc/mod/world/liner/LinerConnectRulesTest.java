@@ -215,6 +215,61 @@ final class LinerConnectRulesTest {
         assertEquals("skirting", LinerConnect.Rules.pilasterBase(true, false, true));
     }
 
+    // ---------------------------------------------------------------- A 甲板新贴附件（ADR-0080 §7）：格架 · 拱 · 宽门套
+    // 同一组用例在 liner_build.py --self-test 的「规则抄本对照」里逐条再跑一遍
+
+    @Test
+    void trellisInTheCornerAlsoCoversTheSideWall() {
+        // 西墙前朝东的那一格，正前方是北墙前朝南的格架：北墙在它的右手（面朝东看，右手是北）
+        assertEquals("inner_right", LinerConnect.Rules.trellisCorner(E, S));
+        // 东墙前朝西，正前方是北墙前朝南的格架：北墙在它的左手
+        assertEquals("inner_left", LinerConnect.Rules.trellisCorner(W, S));
+        assertEquals("none", LinerConnect.Rules.trellisCorner(E, E), "前面是同朝向的格架：不是屋角");
+        assertEquals("none", LinerConnect.Rules.trellisCorner(E, null), "前面不是格架");
+        assertEquals("none", LinerConnect.Rules.trellisCorner(E, W), "前面那一格背对着（对面墙）：不是屋角");
+    }
+
+    @Test
+    void trellisJoinsTheCornerPieceThatCoversItsWall() {
+        assertTrue(LinerConnect.Rules.trellisJoins(S, S, "none", true), "同朝向：接着");
+        assertFalse(LinerConnect.Rules.trellisJoins(S, null, "none", true), "不是格架：画框条");
+        // 北墙前朝南的那一排，左手边是屋角那一格（朝东、内角补在右手 = 北墙）：接着，不画框条
+        assertTrue(LinerConnect.Rules.trellisJoins(S, E, "inner_right", true));
+        assertFalse(LinerConnect.Rules.trellisJoins(S, E, "inner_left", true), "内角补在南墙上，不是我这面墙");
+        assertFalse(LinerConnect.Rules.trellisJoins(S, E, "none", true), "朝向不同又不是内角");
+        assertFalse(LinerConnect.Rules.trellisJoins(S, E, "inner_right", false), "上下两边只认同一朝向");
+    }
+
+    @Test
+    void ivyGrowsFromBelowAndPicksItsLayoutByPosition() {
+        assertEquals("none", LinerConnect.Rules.ivyState(false, true));
+        assertEquals("mid", LinerConnect.Rules.ivyState(true, true));
+        assertEquals("tip", LinerConnect.Rules.ivyState(true, false));
+        // 与 liner_decor.py / liner_build.py 的 ivy_hash 同一个算法：几组数（含负坐标与世界边上的坐标）逐个对上
+        assertEquals(0, LinerConnect.Rules.ivyHash(0, 0, 0));
+        assertEquals(455915198, LinerConnect.Rules.ivyHash(1, 2, 3));
+        assertEquals(973241535, LinerConnect.Rules.ivyHash(-5, 41, 17));
+        assertEquals(1806853136, LinerConnect.Rules.ivyHash(100000, 64, -2000));
+        assertEquals(1766124306, LinerConnect.Rules.ivyHash(-30000000, 319, 29999999));
+        assertEquals("b", LinerConnect.Rules.ivyLayout(100000, -2000));
+        assertEquals(2, LinerConnect.Rules.ivyVariant(1, 2, 3));
+    }
+
+    @Test
+    void archPartAndRowFollowTheNeighbours() {
+        assertEquals("l", LinerConnect.Rules.archPart(false, true));
+        assertEquals("c", LinerConnect.Rules.archPart(true, true));
+        assertEquals("r", LinerConnect.Rules.archPart(true, false));
+        assertEquals("l", LinerConnect.Rules.archPart(false, false), "孤零零一格：当左边那一块");
+        assertEquals("lower", LinerConnect.Rules.archRow(true));
+        assertEquals("upper", LinerConnect.Rules.archRow(false));
+    }
+
+    @Test
+    void theTallCasingIsCrossedLikeTheOtherCasing() {
+        assertEquals("casing", LinerConnect.Rules.lineKind("liner_door_casing_tall", null));
+    }
+
     @Test
     void aRunThatCarriesOnPastAPerpendicularPieceStaysStraight() {
         // 北墙前一排朝南的件，正前方恰好摆着一个朝东的件 —— 但西边紧挨着的仍是同朝向的那条线：照直，不拐（楼梯也这么判）

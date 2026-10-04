@@ -767,6 +767,45 @@ tasks.named('check') {
     dependsOn checkSceneAssets
 }
 
+// 结构文件（gzip 的 NBT）读成 Groovy 的 Map / List。救生艇与北辰号两道判据共用这一份（一个实现，ADR-0080 提出来的）。
+def readStructureNbt = { File f ->
+    def input = new DataInputStream(new BufferedInputStream(new java.util.zip.GZIPInputStream(new FileInputStream(f))))
+    def readTag
+    readTag = { int type ->
+        switch (type) {
+            case 1: return input.readByte()
+            case 2: return input.readShort()
+            case 3: return input.readInt()
+            case 4: return input.readLong()
+            case 5: return input.readFloat()
+            case 6: return input.readDouble()
+            case 7: def b = new byte[input.readInt()]; input.readFully(b); return b
+            case 8: return input.readUTF()
+            case 9: def t = input.readByte() as int; def n = input.readInt(); return (0..<n).collect { readTag(t) }
+            case 10:
+                def map = [:]
+                while (true) {
+                    def t = input.readByte() as int
+                    if (t == 0) { return map }
+                    // ❗名字必须先单独读出来：写成 map[input.readUTF()] = readTag(t) 时 Groovy 先算右边，
+                    //   先读了值再读名字，整个流就错位了（实测：读到一半撞上「标签 0」）
+                    def key = input.readUTF()
+                    map[key] = readTag(t)
+                }
+            case 11: return (0..<input.readInt()).collect { input.readInt() }
+            case 12: return (0..<input.readInt()).collect { input.readLong() }
+            default: throw new GradleException("${f.name}：不认识的 NBT 标签 ${type}")
+        }
+    }
+    try {
+        if (input.readByte() != 10) { throw new GradleException("${f.name}：根标签不是 Compound") }
+        input.readUTF()
+        return readTag(10)
+    } finally {
+        input.close()
+    }
+}
+
 // 自制装饰方块（救生艇 ADR-0056 · ADR-0057 · 大邮轮 ADR-0062）：每一族四份来源要互相对得上 ——
 //   方块登记源码 · 批量生成的方块状态与模型（src/main/generated）·
 //   decor_textures.py / liner_decor.py 写进来的模板与贴图（src/main/resources）· 雾海那条艇的结构（boat_hull.nbt，只有救生艇）。
@@ -798,6 +837,27 @@ def checkDecorBlocks = { Task task, Map fam ->
         def usedModels = [] as Set
         bsFiles.each { File f ->
             def json = slurper.parse(f, 'UTF-8') as Map
+            if (json.multipart != null) {
+                // 多部件（格架上的常春藤，ADR-0080 §7）：同一组属性（when 里出现的那几个属性）算一层；每一层的项数 = 那几个属性
+                //   各自出现过的取值个数之积 —— 与 variants 的「全组合」同一个道理，漏一项游戏里那几格就少一层（不报错）
+                def layers = [:].withDefault { [] }
+                (json.multipart as List).each { part ->
+                    def when = (part.when ?: [:]) as Map
+                    layers[when.keySet().collect { it.toString() }.sort().join(',')] << when
+                    def applies = part.apply instanceof List ? part.apply : [part.apply]
+                    applies.each { usedModels << it.model.toString() }
+                }
+                layers.each { String props, List whens ->
+                    def vals = [:].withDefault { [] as Set }
+                    whens.each { Map w -> w.each { k, v -> vals[k.toString()] << v.toString() } }
+                    def product = vals.values().inject(1L) { acc, vs -> acc * vs.size() }
+                    if (whens.size() != product) {
+                        problems << "${rel(f)}：多部件模型按 ${props} 分的那一层 ${whens.size()} 项，不是各属性取值个数之积 ${product}（漏了哪一种组合，那几格就少画一层）"
+                    }
+                }
+                checkedVariants += (json.multipart as List).size()
+                return
+            }
             variants[(f.name - '.json').toString()] = (json.variants as Map).keySet().collect { it.toString() } as Set
             (json.variants as Map).each { k, v -> usedModels << v.model.toString() }
             // ADR-0062：变体数 = 各属性取值个数之积。判据只取文件自己的键：哪一个属性出现过哪几个值，乘起来就该是变体数
@@ -885,11 +945,12 @@ def checkDecorBlocks = { Task task, Map fam ->
             def png = new File(task.ext.resourcesDir, "textures/${ref.substring('heavyseas:'.length())}.png")
             if (!png.isFile()) { problems << "贴图 ${ref} 不存在（要 ${rel(png)}）"; return }
             def size = pngSize(png)
-            // 灯与家具（ADR-0061 §4 · ADR-0063）一件一张专用大图：prop/ 下的贴图许 16 / 32 / 64 的正方形；别的照旧 16 宽
+            // 灯与家具（ADR-0061 §4 · ADR-0063）一件一张专用大图：prop/ 下的贴图许 16 / 32 / 64 / 128 的正方形；别的照旧 16 宽
+            //   （128：魔镜放大到 2 × 3 之后 64 那一张放不下全部的面，2026-10-04 实跑 liner_props 的装箱报错）
             def prop = ref.startsWith("heavyseas:block/${fam.dir}/prop/".toString())
             prop = prop || ref.startsWith("heavyseas:block/${fam.dir}/stairs/".toString())   // 大楼梯一族：栏杆、起步柱同灯与家具，一件一张专用图
             if (size == null) { problems << "${rel(png)}：不是 PNG" }
-            else if (prop && !(size[0] in [16, 32, 64] && size[1] == size[0])) { problems << "${rel(png)}：${size[0]}×${size[1]}，灯与家具的贴图应为 16 / 32 / 64 的正方形" }
+            else if (prop && !(size[0] in [16, 32, 64, 128] && size[1] == size[0])) { problems << "${rel(png)}：${size[0]}×${size[1]}，灯与家具的贴图应为 16 / 32 / 64 / 128 的正方形" }
             else if (!prop && (size[0] != 16 || size[1] % 16 != 0)) { problems << "${rel(png)}：${size[0]}×${size[1]}，应为 16 宽、高是 16 的倍数" }
         }
         // 没人用的贴图与模板：生成器改了名 / 删了件，旧文件还躺在 jar 里（也说明两边的清单不一致）。
@@ -900,11 +961,23 @@ def checkDecorBlocks = { Task task, Map fam ->
         def idOf = { File f, String top, String ext -> task.ext.resourcesDir.toPath().relativize(f.toPath()).toString()
                 .replace(File.separator, '/').replaceFirst("^${top}/", '') - ext }
         def scanned = 0
+        // 亮着的玻璃（ADR-0082）：没有模型引用，客户端 GlassGlow 建网格时按屋里的光换上 —— 平常那一张有模型在用、
+        //   而且 GlassGlow 源码里写着这一族的换法，才算有人用（只认「…/glass_lit」与「…/window_glass_lit_<压边>」两种名字）
+        def glowSource = task.ext.has('glowSource') ? task.ext.glowSource : null
+        def glowText = glowSource?.isFile() ? glowSource.getText('UTF-8') : ''
+        def unlitOf = { String id ->
+            if (id.endsWith('/hull/glass_lit') && glowText.contains('block/liner/hull/glass_lit')) { return id - '_lit' }
+            def m = (id =~ /^(.*\/glass\/window_glass_)lit_([a-z]+)$/)
+            if (m.find() && glowText.contains('"lit_"')) { return m.group(1) + m.group(2) }
+            return null
+        }
         if (texDir.isDirectory()) {
             texDir.eachFileRecurse(groovy.io.FileType.FILES) { File f ->
                 if (!f.name.endsWith('.png')) { return }
                 scanned++
                 def id = idOf(f, 'textures', '.png')
+                def unlit = unlitOf(id)
+                if (unlit != null && usedTextures.contains("heavyseas:${unlit}".toString())) { return }
                 if (!usedTextures.contains("heavyseas:${id}".toString())) { problems << "${rel(f)}：没有任何模型用到" }
             }
         }
@@ -921,44 +994,7 @@ def checkDecorBlocks = { Task task, Map fam ->
         def ours = []
         if (fam.hull) {
             // 4) 船体结构：里面每个 heavyseas 方块的状态，都要在它的方块状态文件里有那一项（属性按名字排序拼成键）
-            def readNbt = { File f ->
-                def input = new DataInputStream(new BufferedInputStream(new java.util.zip.GZIPInputStream(new FileInputStream(f))))
-                def readTag
-                readTag = { int type ->
-                    switch (type) {
-                        case 1: return input.readByte()
-                        case 2: return input.readShort()
-                        case 3: return input.readInt()
-                        case 4: return input.readLong()
-                        case 5: return input.readFloat()
-                        case 6: return input.readDouble()
-                        case 7: def b = new byte[input.readInt()]; input.readFully(b); return b
-                        case 8: return input.readUTF()
-                        case 9: def t = input.readByte() as int; def n = input.readInt(); return (0..<n).collect { readTag(t) }
-                        case 10:
-                            def map = [:]
-                            while (true) {
-                                def t = input.readByte() as int
-                                if (t == 0) { return map }
-                                // ❗名字必须先单独读出来：写成 map[input.readUTF()] = readTag(t) 时 Groovy 先算右边，
-                                //   先读了值再读名字，整个流就错位了（实测：读到一半撞上「标签 0」）
-                                def key = input.readUTF()
-                                map[key] = readTag(t)
-                            }
-                        case 11: return (0..<input.readInt()).collect { input.readInt() }
-                        case 12: return (0..<input.readInt()).collect { input.readLong() }
-                        default: throw new GradleException("${f.name}：不认识的 NBT 标签 ${type}")
-                    }
-                }
-                try {
-                    if (input.readByte() != 10) { throw new GradleException("${f.name}：根标签不是 Compound") }
-                    input.readUTF()
-                    return readTag(10)
-                } finally {
-                    input.close()
-                }
-            }
-            def hull = readNbt(task.ext.hullFile)
+            def hull = readStructureNbt(task.ext.hullFile)
             def palette = hull.palette as List
             ours = palette.findAll { it.Name.toString().startsWith('heavyseas:') }
             if (ours.isEmpty()) {
@@ -1052,6 +1088,8 @@ def checkLinerBlocks = tasks.register('checkLinerBlocks') {
                         file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerHull.java'),
                         file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerDoors.java')]
     ext.extraSources += [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerStairs.java')]   // 大楼梯一族（登记写法 add("liner_…")）
+    ext.glowSource = file('src/client/java/io/github/heavyseasmc/mod/client/GlassGlow.java')              // 亮着的玻璃谁在用（ADR-0082）
+    inputs.file(ext.glowSource).optional()
     inputs.dir(ext.resourcesDir).optional()
     inputs.dir(ext.generatedDir).optional()
     inputs.file(ext.blocksSource).optional()
@@ -1067,6 +1105,255 @@ def checkLinerBlocks = tasks.register('checkLinerBlocks') {
 tasks.named('check') {
     dependsOn checkSkiffBlocks
     dependsOn checkLinerBlocks
+}
+
+// 北辰号整船进模组（ADR-0080）：清单 data/heavyseas/liner/ship.json 写船自己（段 · 艇 · 落脚点，位置相对船体），
+// 摆在哪写在官方地图的默认航程布局里（voyage/default.json 的 liner.origin，维度就是那份布局的维度；ADR-0081）。
+// 生成器（docs/tools/scene/liner_ship.py write-mod）写得对不对，游戏里不报错 —— 船只是摆歪、泡水、露在对局的视野里，
+// 或者桅杆被维度顶削掉一截。所以对着与清单正交的几份来源核对：
+//   ① 结构文件：清单里每一段都在、校验和对得上、段首尾相接铺满全长；目录里没有清单之外的段
+//   ② 每段的调色板只有本模组方块与写明的空气，每个状态都在它的方块状态文件里（生成物 blockstates）
+//   ③ 装得下：船底到船顶（含舷外的艇）在维度类型的高度范围里
+//   ④ 水线那一道正好在平坦生成的水面上一格；黑板从那一道上面起，那一格要是一列钢板的下格（LinerHull.Rules.PHASE）
+//   ⑤ 离对局足够远：同一维度的每份航程布局，船头到整船（含艇）的水平距离超过最大视距
+//   ⑦ 位置只有一个来源：只有默认布局写 liner；清单里不再写原点与维度
+//   ⑧ 船上那面魔镜（ADR-0083）：清单写的那一格在结构里真是魔镜，落脚点是镜面前那一格、站得下、背对镜子
+// 地图作者换的那一份不经过构建：起服时 LinerShip 核 ③ ④ ⑤ 同样几条（不对就不摆）。
+def checkLinerShip = tasks.register('checkLinerShip') {
+    group = 'verification'
+    description = '北辰号整船（ADR-0080）：清单与结构文件对得上 · 只有本模组方块与写明的空气 · 维度装得下 · 水线在水面上一格且落在钢板横缝上 · 离每份航程布局的船头超过最大视距'
+    ext.dataDir = file('src/main/resources/data/heavyseas')
+    ext.generatedDir = file('src/main/generated/assets/heavyseas')
+    ext.hullSource = file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerHull.java')
+    inputs.dir(ext.dataDir)
+    inputs.dir(ext.generatedDir).optional()
+    inputs.file(ext.hullSource).optional()
+    doLast { Task task ->
+        def slurper = new groovy.json.JsonSlurper()
+        def problems = []
+        File data = task.ext.dataDir
+        def manifestFile = new File(data, 'liner/ship.json')
+        if (!manifestFile.isFile()) {
+            throw new GradleException("没在查：${manifestFile} 不在 —— 重跑 python docs/tools/scene/liner_ship.py write-mod")
+        }
+        def m = slurper.parse(manifestFile, 'UTF-8') as Map
+        // ⑦ 位置只有一个来源（ADR-0081）：默认布局的 liner.origin；清单里不写，别的布局不写
+        def defaultFile = new File(data, 'voyage/default.json')
+        if (!defaultFile.isFile()) { throw new GradleException("没在查：默认航程布局 ${defaultFile} 不在") }
+        def defaultLayout = slurper.parse(defaultFile, 'UTF-8') as Map
+        if (!(defaultLayout.liner instanceof Map) || !(defaultLayout.liner.origin instanceof List)) {
+            throw new GradleException("没在查：默认航程布局 voyage/default.json 没写 liner.origin —— 官方地图要有北辰号（ADR-0081）")
+        }
+        def origin = (defaultLayout.liner.origin as List).collect { it as int }
+        ['origin', 'dimension'].each { k ->
+            if (m.containsKey(k)) { problems << "清单里还写着 ${k}：位置写在默认航程布局的 liner 里，两处都写就有两个来源（重跑 liner_ship.py write-mod）" }
+        }
+        def size = m.size as List
+        def segs = m.segments as List
+        if (!segs) {
+            throw new GradleException("没在查：清单里一段都没有")
+        }
+
+        // ① 结构文件
+        def structDir = new File(data, 'structure/liner')
+        def listed = [] as Set
+        int expectX = 0
+        def sha1 = { File f -> java.security.MessageDigest.getInstance('SHA-1').digest(f.bytes).encodeHex().toString() }
+        def nbts = [:]
+        segs.each { seg ->
+            def id = seg.structure.toString()
+            if (!id.startsWith('heavyseas:liner/')) { problems << "段 ${id} 不在 heavyseas:liner/ 下"; return }
+            def f = new File(structDir, id.substring('heavyseas:liner/'.length()) + '.nbt')
+            listed << f.name
+            if (seg.x0 != expectX) { problems << "段 ${id} 从 x ${seg.x0} 起，上一段到 ${expectX} 为止（段要首尾相接）" }
+            expectX = seg.x1 as int
+            if (!f.isFile()) { problems << "清单里的 ${id} 没有结构文件 ${f.name}"; return }
+            if (sha1(f) != seg.sha1) { problems << "${f.name} 的校验和对不上清单（文件被改过、或清单没跟着重写）"; return }
+            nbts[id] = readStructureNbt(f)
+        }
+        if (expectX != size[0]) { problems << "段铺到 x ${expectX}，船长 ${size[0]}" }
+        (structDir.listFiles({ File f -> f.name.endsWith('.nbt') } as FileFilter) ?: []).each { File f ->
+            if (!listed.contains(f.name)) { problems << "structure/liner/${f.name}：清单里没有这一段（生成器改了段、旧文件还在）" }
+        }
+
+        // ② 调色板
+        def bsDir = new File(task.ext.generatedDir, 'blockstates')
+        def variants = [:]
+        (bsDir.listFiles({ File f -> f.name.endsWith('.json') } as FileFilter) ?: []).each { File f ->
+            def json = slurper.parse(f, 'UTF-8') as Map
+            if (json.multipart != null) {
+                // 多部件（格架，ADR-0080 §7）：合法的状态 = when 里出现过的每个属性各取一值的全组合（属性按名字排序拼成键，同 variants）
+                def vals = [:].withDefault { [] as Set }
+                // 「a|b|c」是「或」：底层对叠层那几个属性写了全取值（DecorModels），拆开才认得出 ivy = none 这类只在「不画那一层」时出现的值
+                (json.multipart as List).each { part -> ((part.when ?: [:]) as Map).each { k, v -> v.toString().split('\\|').each { vals[k.toString()] << it } } }
+                def keys = ['']
+                vals.keySet().sort().each { String k -> keys = keys.collectMany { String pre -> vals[k].sort().collect { String v -> (pre ? pre + ',' : '') + k + '=' + v } } }
+                variants[(f.name - '.json').toString()] = keys as Set
+                return
+            }
+            variants[(f.name - '.json').toString()] = (json.variants as Map ?: [:]).keySet().collect { it.toString() } as Set
+        }
+        if (variants.isEmpty()) {
+            throw new GradleException("没在查：${bsDir} 下一个方块状态文件都没有 —— 判据坏了，或者没跑 ./gradlew :mod:runDatagen")
+        }
+        long blocks = 0, air = 0
+        int states = 0
+        nbts.each { id, nbt ->
+            def pal = nbt.palette as List
+            def segSize = nbt.size as List
+            def seg = segs.find { it.structure == id }
+            if (segSize[0] != (seg.x1 - seg.x0) || segSize[2] != size[2] || segSize[1] > size[1]) {
+                problems << "${id}：结构尺寸 ${segSize}，清单里这一段是 ${seg.x1 - seg.x0} × ≤${size[1]} × ${size[2]}"
+            }
+            def isAir = pal.collect { it.Name.toString() == 'minecraft:air' }
+            (nbt.blocks as List).each { b -> if (isAir[b.state as int]) { air++ } else { blocks++ } }
+            pal.each { st ->
+                def name = st.Name.toString()
+                if (name == 'minecraft:air') { return }
+                states++
+                if (!name.startsWith('heavyseas:')) { problems << "${id}：${name} 不是本模组的方块（一律自制）"; return }
+                def shortName = name.substring('heavyseas:'.length())
+                def props = (st.Properties ?: [:]) as Map
+                def key = props.keySet().collect { it.toString() }.sort().collect { "${it}=${props[it]}" }.join(',')
+                if (!variants.containsKey(shortName)) { problems << "${id}：${name} 没有方块状态文件" }
+                else if (!variants[shortName].contains(key)) { problems << "${id}：${name}[${key}] 在方块状态文件里没有这一项" }
+            }
+        }
+        // 有一段没读（文件缺 · 校验和不对）时格数必然对不上：那一段已经点过名，这里不再陪着红
+        if (nbts.size() == segs.size() && (blocks != (m.blocks as long) || air != (m.air as long))) {
+            problems << "结构里本模组方块 ${blocks} 格 · 空气 ${air} 格，清单写的是 ${m.blocks} · ${m.air}"
+        }
+
+        // 舷外的艇：按艇的结构尺寸与转向算它占哪一块（只会算 clockwise_90 —— 生成器改了转向要先改这里）
+        def skiffNbt = readStructureNbt(new File(data, 'structure/boat_hull.nbt'))
+        def ks = skiffNbt.size as List
+        int minX = origin[0], minY = origin[1], minZ = origin[2]
+        int maxX = origin[0] + size[0] - 1, maxY = origin[1] + size[1] - 1, maxZ = origin[2] + size[2] - 1
+        def skiffBoxes = []
+        (m.skiffs as List).each { k ->
+            if (k.rotation != 'clockwise_90') { problems << "艇 ${k.no} 的转向 ${k.rotation}：判据只会算 clockwise_90"; return }
+            def p = [0, 1, 2].collect { (k.pos[it] as int) + origin[it] }      // 清单里相对船体
+            def b = [no: k.no, x: (p[0] - (ks[2] - 1))..(p[0]), y: (p[1])..(p[1] + ks[1] - 1), z: (p[2])..(p[2] + ks[0] - 1)]
+            skiffBoxes << b
+            minX = Math.min(minX, b.x.from); maxX = Math.max(maxX, b.x.to)
+            minY = Math.min(minY, b.y.from); maxY = Math.max(maxY, b.y.to)
+            minZ = Math.min(minZ, b.z.from); maxZ = Math.max(maxZ, b.z.to)
+        }
+        // ⑥ 落脚点：人站的那两格都不在任何一条艇里 —— 艇是摆的时候才挂上去的，生成器看不见它（第一版就落在 4 号艇正下方，头顶一格是艇底）
+        def arr = m.arrival as List                                         // 清单里相对船体
+        int ax = (Math.floor(arr[0] as double) as int) + origin[0], ay = (Math.floor(arr[1] as double) as int) + origin[1]
+        int az = (Math.floor(arr[2] as double) as int) + origin[2]
+        if (ax < origin[0] || ax >= origin[0] + size[0] || az < origin[2] || az >= origin[2] + size[2]) {
+            problems << "落脚点 (${ax} ${ay} ${az}) 不在船上"
+        }
+        skiffBoxes.each { b ->
+            [ay, ay + 1].each { y ->
+                if (ax in b.x && y in b.y && az in b.z) { problems << "落脚点那一格 (${ax} ${y} ${az}) 在 ${b.no} 号艇里：人站上去会卡在艇里" }
+            }
+        }
+
+        // ⑧ 船上那面魔镜与落脚点（ADR-0083；2026-10-04 放大到 3 × 3、摆法 C）：清单写的那一格（下面一层正中 wide_mid）在结构里真是魔镜，
+        //   整件九格都在、每一格是该在那里的那一块、朝向对得上（模型的西 = 人面对镜面时的右手，照 LinerProp.Rules.toWorld 算）；
+        //   落脚点是镜面正中前那一格、那两格空着、脚下是实的，落脚时面朝镜面朝的方向（背对镜子、面朝光井）。生成器写的是位置，判据回到结构里看那几格是什么
+        def cellAt = { int lx, int ly, int lz ->
+            def seg = segs.find { lx >= (it.x0 as int) && lx < (it.x1 as int) }
+            def nbt = seg == null ? null : nbts[seg.structure.toString()]
+            if (nbt == null) { return null }
+            def b = (nbt.blocks as List).find { (it.pos[0] as int) == lx - (seg.x0 as int) && (it.pos[1] as int) == ly && (it.pos[2] as int) == lz }
+            return b == null ? null : (nbt.palette as List)[b.state as int]
+        }
+        def facingOff = [north: [0, -1], south: [0, 1], west: [-1, 0], east: [1, 0]]
+        def yawOf = [south: 0d, west: 90d, north: 180d, east: 270d]
+        def mpos = (m.mirror as List)?.collect { it as int }
+        def mface = m.mirror_facing?.toString()
+        if (mpos == null || !facingOff.containsKey(mface)) {
+            problems << "清单的 mirror / mirror_facing 缺了或写错（${m.mirror} · ${m.mirror_facing}）"
+        } else if (nbts.size() == segs.size()) {
+            def modelX = [north: [1, 0], east: [0, 1], south: [-1, 0], west: [0, -1]]      // 模型的 +x（东）在世界里朝哪
+            [west: 0, mid: 1, east: 2].each { col, cx ->
+                [0: '', 1: 'upper_', 2: 'top_'].each { dy, row ->
+                    def part = "wide_${row}${col}".toString()
+                    int wx = mpos[0] + modelX[mface][0] * (cx - 1), wz = mpos[2] + modelX[mface][1] * (cx - 1)
+                    def st = cellAt(wx, mpos[1] + (dy as int), wz)
+                    if (st?.Name?.toString() != 'heavyseas:liner_mirror' || st.Properties?.part != part || st.Properties?.facing != mface) {
+                        problems << "清单说魔镜在 (${mpos.join(' ')})（朝 ${mface}），${part} 该在 (${wx} ${mpos[1] + (dy as int)} ${wz})，结构里那一格是 ${st == null ? '空的' : st.Name + (st.Properties ?: '')}"
+                    }
+                }
+            }
+            def front = [mpos[0] + facingOff[mface][0], mpos[1], mpos[2] + facingOff[mface][1]]
+            int lx = (Math.floor(arr[0] as double) as int), ly = (Math.floor(arr[1] as double) as int), lz = (Math.floor(arr[2] as double) as int)
+            if ([lx, ly, lz] != front) {
+                problems << "落脚点 (${lx} ${ly} ${lz}) 不在魔镜的镜面前那一格 (${front.join(' ')})：过了镜子的人该从镜子前走出来"
+            } else if (cellAt(lx, ly, lz) != null && cellAt(lx, ly, lz).Name.toString() != 'minecraft:air'
+                    || cellAt(lx, ly + 1, lz) != null && cellAt(lx, ly + 1, lz).Name.toString() != 'minecraft:air'
+                    || cellAt(lx, ly - 1, lz) == null) {
+                problems << "魔镜前的落脚点 (${lx} ${ly} ${lz}) 站不下人（那两格要空、脚下要实）"
+            }
+            if (Math.abs((m.arrival_yaw as double) - yawOf[mface]) > 0.01) {
+                problems << "落脚时面朝 ${m.arrival_yaw}°，镜面朝 ${mface}（${yawOf[mface]}°）：过了镜子该背对镜子"
+            }
+        }
+
+        // ③ 装得下 · ④ 水线（维度 JSON 与维度类型 JSON 是这两条的事实源）
+        def dimId = defaultLayout.dimension.toString()
+        def dimFile = new File(data, "dimension/${dimId.substring(dimId.indexOf(':') + 1)}.json")
+        if (!dimFile.isFile()) { throw new GradleException("没在查：清单的维度 ${dimId} 没有 ${dimFile}") }
+        def dim = slurper.parse(dimFile, 'UTF-8') as Map
+        def typeId = dim.type.toString()
+        def typeFile = new File(data, "dimension_type/${typeId.substring(typeId.indexOf(':') + 1)}.json")
+        def type = slurper.parse(typeFile, 'UTF-8') as Map
+        int bottom = type.min_y as int
+        int top = bottom + (type.height as int) - 1
+        if (minY < bottom || maxY > top) {
+            problems << "维度 ${dimId} 装不下北辰号：船占 y ${minY}–${maxY}，维度只有 y ${bottom}–${top}（${typeFile.name} 的 height ${type.height}）"
+        }
+        def layers = dim.generator?.settings?.layers as List
+        if (!layers) { throw new GradleException("没在查：${dimFile.name} 不是平坦生成、读不到 layers") }
+        int waterTop = bottom + (layers.sum { it.height as int } as int) - 1
+        if (layers[-1].block != 'minecraft:water') { problems << "${dimFile.name} 最上面那一层是 ${layers[-1].block}，不是水" }
+        int band = (origin[1] as int) + (m.waterline as int)
+        if (band != waterTop + 1) {
+            problems << "水线那一道在 y ${band}，水面在 y ${waterTop}：应当正好在水面上一格（龙骨 y 该是 ${waterTop + 1 - (m.waterline as int)}）"
+        }
+        def phaseMatch = (task.ext.hullSource.getText('UTF-8') =~ /int PHASE = (\d+);/)
+        if (!phaseMatch.find()) { throw new GradleException("没在查：${task.ext.hullSource.name} 里找不到 PHASE") }
+        int phase = phaseMatch.group(1) as int
+        if (Math.floorMod(band + 1 - phase, 2) != 0) {
+            problems << "黑板从 y ${band + 1} 起，那一格不是一列钢板的下格（PHASE ${phase}）：水线会切在一块板的正中"
+        }
+
+        // ⑤ 离对局足够远：最大视距 32 区块；客户端按整块区块画，再加一块
+        int far = 33 * 16
+        def layouts = (new File(data, 'voyage').listFiles({ File f -> f.name.endsWith('.json') } as FileFilter) ?: []) as List
+        if (layouts.isEmpty()) { throw new GradleException("没在查：${data}/voyage 下一份航程布局都没有") }
+        int near = 0
+        layouts.each { File f ->
+            def v = slurper.parse(f, 'UTF-8') as Map
+            if (f.name != 'default.json' && v.containsKey('liner')) {
+                problems << "航程布局 ${f.name} 写了 liner：只有默认布局可以写北辰号的位置（模组读到它会拒绝整个数据包）"
+            }
+            if (v.dimension != dimId) { return }
+            near++
+            double bx = v.boat.bow[0] as double, bz = v.boat.bow[2] as double
+            double dx = Math.max(0d, Math.max(minX - bx, bx - (maxX + 1)))
+            double dz = Math.max(0d, Math.max(minZ - bz, bz - (maxZ + 1)))
+            double dist = Math.sqrt(dx * dx + dz * dz)
+            if (dist <= far) {
+                problems << "航程布局 ${f.name} 的船头离北辰号只有 ${Math.round(dist)} 格，最大视距是 ${far} 格：对局里看得见它"
+            }
+        }
+        if (near == 0) { throw new GradleException("没在查：没有一份航程布局在维度 ${dimId} 里") }
+
+        if (problems) {
+            throw new GradleException((['北辰号整船核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        task.logger.lifecycle("北辰号整船核对通过：${segs.size()} 段 · 本模组方块 ${blocks} 格（${states} 种状态）· 水线下空气 ${air} 格 · 艇 ${(m.skiffs as List).size()} 条 · " +
+                "占 (${minX} ${minY} ${minZ})..(${maxX} ${maxY} ${maxZ})，维度 y ${bottom}–${top} · 水线 y ${band} 在水面 ${waterTop} 上一格 · 离 ${near} 份航程布局的船头都超过 ${far} 格")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkLinerShip
 }
 
 // 生产 jar 里的 mixin 类必须已经翻成中间名（ADR-0034 §5.1.1）。

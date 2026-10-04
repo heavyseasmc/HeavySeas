@@ -25,6 +25,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockBox;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.Component;
 import org.ladysnake.cca.api.v3.component.sync.AutoSyncedComponent;
@@ -152,9 +153,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         if (session == null) {
             return endedFor.contains(player.getUuid());   // 结束那一帧（「没有对局」）也得送到
         }
-        // M4: the finale is a world performance. Same-dimension spectators receive only the
-        // public fields below; their per-player secrets remain empty because they have no seat.
-        return player.getWorld().getRegistryKey().equals(owner.getRegistryKey());
+        // 只发给这一局的人（入座的 + 开局时带进来的观众，ADR-0083）。此前发给同一维度里的每一个人（M4：终局是一场演出）——
+        // 北辰号与对局同在雾海之后，船上闲逛的人会看到对局的 HUD、雾、终局界面弹出来、按键被接管。观众照旧只拿到公开的那几栏。
+        return activeVoyagePlayers.contains(player.getUuid());
     }
 
     /**
@@ -1061,6 +1062,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     private final Set<UUID> activeVoyagePlayers = new java.util.HashSet<>();
+    /** 刚结束那一局的人（入座的与观众）：{@link #end()} 记下，散局时 {@code MistSea.restoreAll} 按它把过了魔镜的人送回北辰号。 */
+    private final Set<UUID> endedVoyagePlayers = new java.util.HashSet<>();
+
+    public Set<UUID> endedVoyagePlayers() {
+        return Set.copyOf(endedVoyagePlayers);
+    }
 
     /**
      * 这一局摆在世界里的那几个座位（船头到船尾）· ADR-0024。
@@ -1267,9 +1274,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         overboardDeadline = 0;
         setWaterBodies(List.of(), 0);
         occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
-        if (owner instanceof ServerWorld serverWorld) {
-            serverWorld.getPlayers().stream().map(ServerPlayerEntity::getUuid).forEach(endedFor::add);
-        }
+        endedFor.addAll(activeVoyagePlayers);             // 结束那一帧只发给这一局的人（同 shouldSyncWith）
+        endedVoyagePlayers.clear();
+        endedVoyagePlayers.addAll(endedFor);              // 散局之后谁回北辰号（MistSea.restoreAll 在 end() 之后读）
         clearDesignation();
         clearProvisionTarget();
         clearActionWindow();
@@ -1357,15 +1364,38 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * Unlike the rule session this record is persisted: it is the recovery contract after a crash/restart.
      */
     public record VoyageEscrow(UUID player, String dimension, double x, double y, double z,
-                               float yaw, float pitch, NbtList inventory, Optional<BodySnapshot> body) {
+                               float yaw, float pitch, NbtList inventory, Optional<BodySnapshot> body,
+                               Optional<MirrorAt> mirror) {
         public VoyageEscrow {
             inventory = inventory.copy();
             Objects.requireNonNull(body, "body");
+            Objects.requireNonNull(mirror, "mirror");
+        }
+
+        public VoyageEscrow(UUID player, String dimension, double x, double y, double z,
+                            float yaw, float pitch, NbtList inventory, Optional<BodySnapshot> body) {
+            this(player, dimension, x, y, z, yaw, pitch, inventory, body, Optional.empty());
         }
 
         public VoyageEscrow(UUID player, String dimension, double x, double y, double z,
                             float yaw, float pitch, NbtList inventory) {
-            this(player, dimension, x, y, z, yaw, pitch, inventory, Optional.empty());
+            this(player, dimension, x, y, z, yaw, pitch, inventory, Optional.empty(), Optional.empty());
+        }
+
+        /** 过魔镜托管的（人在北辰号上或这一局里，回程走镜子）；空 = 开局时托管的老路（{@code /seas start}，散局就还）。 */
+        public boolean viaMirror() {
+            return mirror.isPresent();
+        }
+    }
+
+    /**
+     * 玩家穿过来的那面镜子：维度 + 镜子下面一层正中那一格（镜面正中的正下方）。回程先看它还在不在（先把那一格的区块载进来再查，ADR-0065 样张页第 9 步），
+     * 在就回到镜子前（托管里记的那个位置），不在就送重生点。
+     */
+    public record MirrorAt(String dimension, BlockPos pos) {
+        public MirrorAt {
+            Objects.requireNonNull(dimension, "dimension");
+            pos = pos.toImmutable();
         }
     }
 
@@ -1413,6 +1443,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         voyageEscrows.put(escrow.player(), escrow);
     }
 
+    public Optional<VoyageEscrow> voyageEscrow(UUID player) {
+        return Optional.ofNullable(voyageEscrows.get(player));
+    }
+
     public Optional<VoyageEscrow> removeVoyageEscrow(UUID player) {
         return Optional.ofNullable(voyageEscrows.remove(player));
     }
@@ -1436,7 +1470,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     saved.getFloat("yaw"), saved.getFloat("pitch"),
                     saved.getList("inventory", NbtElement.COMPOUND_TYPE),
                     saved.contains("body", NbtElement.COMPOUND_TYPE)
-                            ? Optional.of(BodySnapshot.read(saved.getCompound("body"))) : Optional.empty());
+                            ? Optional.of(BodySnapshot.read(saved.getCompound("body"))) : Optional.empty(),
+                    saved.contains("mirror", NbtElement.COMPOUND_TYPE)
+                            ? Optional.of(new MirrorAt(saved.getCompound("mirror").getString("dimension"),
+                            BlockPos.fromLong(saved.getCompound("mirror").getLong("pos")))) : Optional.empty());
             voyageEscrows.put(escrow.player(), escrow);
         }
         sceneLeftover = null;
@@ -1484,6 +1521,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             saved.putFloat("pitch", escrow.pitch());
             saved.put("inventory", escrow.inventory().copy());
             escrow.body().ifPresent(body -> saved.put("body", body.write()));
+            escrow.mirror().ifPresent(mirror -> {
+                NbtCompound m = new NbtCompound();
+                m.putString("dimension", mirror.dimension());
+                m.putLong("pos", mirror.pos().asLong());
+                saved.put("mirror", m);
+            });
             escrows.add(saved);
         }
         tag.put(KEY_ESCROWS, escrows);

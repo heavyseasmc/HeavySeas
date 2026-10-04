@@ -225,7 +225,7 @@ public final class LinerConnect {
          */
         public static String lineKind(String block, String base) {
             return switch (block) {
-                case "liner_door_casing" -> "casing";
+                case "liner_door_casing", "liner_door_casing_tall" -> "casing";        // 宽门套与门套同一族：跨过去接着找
                 case "liner_skirting" -> "skirting";
                 case "liner_chair_rail" -> "chair_rail";
                 case "liner_cornice_thin" -> "cornice";
@@ -242,6 +242,92 @@ public final class LinerConnect {
                 return "none";
             }
             return skirtingLeft || skirtingRight ? "skirting" : "plinth";
+        }
+
+        // ---------------------------------------------------------------- A 甲板新贴附件（ADR-0080 §7）：格架 · 拱 · 宽门套
+        // 同一组用例在 liner_build.py --self-test 的「规则抄本对照」里逐条再跑一遍（Python 抄本与这里必须同一个答案）。
+        // 朝向一律用编号（北 0 · 东 1 · 南 2 · 西 3）；站在正面看的人左手 = 朝向 + 1、右手 = 朝向 + 3（viewerLeft / viewerRight）。
+
+        /**
+         * 格架的内角：正前方那一格是朝向与自己垂直的格架 → 这一格在屋角，前面那一格挂的那面墙就在自己的左手或右手，
+         * 在那面墙上补一片（同檐口的内角，{@code liner_decor.py} 的 {@code _trellis_side}）。
+         *
+         * @param frontFacing 正前方那一格格架的朝向；不是格架 = {@code null}
+         * @return {@code none} · {@code inner_left} · {@code inner_right}
+         */
+        public static String trellisCorner(int facing, Integer frontFacing) {
+            if (frontFacing == null || !perpendicular(frontFacing, facing)) {
+                return "none";
+            }
+            int wall = opposite(frontFacing);                  // 前面那一格挂的墙在它的这一边 = 屋角在我的这一边
+            if (wall == ((facing + 3) & 3)) {
+                return "inner_right";
+            }
+            return wall == ((facing + 1) & 3) ? "inner_left" : "none";
+        }
+
+        /**
+         * 格架的这一边接不接着（不接就画框条）：那一格是同一朝向的格架；或者（左右两边）它是内角、补的那一片正好在我这面墙上 ——
+         * 两面墙的格架在屋角接上，屋角前一格不画框条。
+         *
+         * @param otherFacing 那一格格架的朝向；不是格架 = {@code null}
+         * @param otherCorner 那一格的内角（{@code none} · {@code inner_left} · {@code inner_right}）
+         * @param sideways    问的是左右两边（上下两边只认同一朝向）
+         */
+        public static boolean trellisJoins(int facing, Integer otherFacing, String otherCorner, boolean sideways) {
+            if (otherFacing == null) {
+                return false;
+            }
+            if (otherFacing == facing) {
+                return true;
+            }
+            if (!sideways) {
+                return false;
+            }
+            int side = "inner_right".equals(otherCorner) ? (otherFacing + 3) & 3 : "inner_left".equals(otherCorner) ? (otherFacing + 1) & 3 : -1;
+            return side == opposite(facing);
+        }
+
+        /** 常春藤：这一格没藤 = {@code none}；有藤、上面那一格（同朝向的格架）也有 = {@code mid}（茎穿过上边）；否则 = {@code tip}（茎在这一格收住）。 */
+        public static String ivyState(boolean hasIvy, boolean ivyAbove) {
+            return !hasIvy ? "none" : ivyAbove ? "mid" : "tip";
+        }
+
+        /** 常春藤的三种茎的布局（{@code liner_decor.py} 的 IVY_LAYOUTS 的键）：只看这一列。 */
+        public static final String IVY_LAYOUTS = "abc";
+        /** 茎的拐法有几种（IVY_PATHS）。 */
+        public static final int IVY_PATHS = 3;
+
+        /**
+         * 位置 → 非负整数（常春藤按位置挑布局与拐法）。32 位整数运算：乘法自动截断、无符号右移 ——
+         * 与 {@code liner_decor.py} / {@code liner_build.py} 的 {@code ivy_hash} 同一个算法（那边按 32 位掩码算），负坐标照样一致。
+         */
+        public static int ivyHash(int x, int y, int z) {
+            int h = x * 0x27D4EB2D + y * 0x165667B1 + z * 0x1B873593;
+            h ^= h >>> 15;
+            h *= 0x2C1B3C6D;
+            h ^= h >>> 12;
+            return h & 0x7FFFFFFF;
+        }
+
+        /** 这一列茎的布局：只看 x · z（同一列上下两格天然对得上）。 */
+        public static String ivyLayout(int x, int z) {
+            return String.valueOf(IVY_LAYOUTS.charAt(ivyHash(x, 0, z) % IVY_LAYOUTS.length()));
+        }
+
+        /** 这一格茎怎么拐、叶子长在哪：看这一格。 */
+        public static int ivyVariant(int x, int y, int z) {
+            return ivyHash(x, y, z) % IVY_PATHS;
+        }
+
+        /** 拱是一排里的哪一格：左手边不是同一朝向的拱 = {@code l}，右手边不是 = {@code r}，两边都是 = {@code c}。 */
+        public static String archPart(boolean leftIsArch, boolean rightIsArch) {
+            return !leftIsArch ? "l" : !rightIsArch ? "r" : "c";
+        }
+
+        /** 半圆拱占两排：正上方是同一朝向的拱 = 下面那一排（{@code lower}），否则 = 上面那一排（{@code upper}，顶着墙）。 */
+        public static String archRow(boolean archAbove) {
+            return archAbove ? "lower" : "upper";
         }
 
         /**

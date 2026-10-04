@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/bar_counter_bay_4",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/bar_counter",
+    "k": "heavyseas:block/liner/prop/bar_counter_detail",
+    "particle": "heavyseas:block/liner/prop/bar_counter",
+    "w": "heavyseas:block/liner/prop/bar_counter_bottles"
+  }
+}

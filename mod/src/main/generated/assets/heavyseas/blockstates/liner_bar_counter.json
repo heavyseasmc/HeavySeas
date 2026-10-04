@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "facing=east,part=bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_1",
+      "y": 90
+    },
+    "facing=east,part=bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_2",
+      "y": 90
+    },
+    "facing=east,part=bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_3",
+      "y": 90
+    },
+    "facing=east,part=bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_4",
+      "y": 90
+    },
+    "facing=east,part=upper_bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_1",
+      "y": 90
+    },
+    "facing=east,part=upper_bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_2",
+      "y": 90
+    },
+    "facing=east,part=upper_bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_3",
+      "y": 90
+    },
+    "facing=east,part=upper_bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_4",
+      "y": 90
+    },
+    "facing=north,part=bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_1"
+    },
+    "facing=north,part=bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_2"
+    },
+    "facing=north,part=bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_3"
+    },
+    "facing=north,part=bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_4"
+    },
+    "facing=north,part=upper_bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_1"
+    },
+    "facing=north,part=upper_bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_2"
+    },
+    "facing=north,part=upper_bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_3"
+    },
+    "facing=north,part=upper_bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_4"
+    },
+    "facing=south,part=bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_1",
+      "y": 180
+    },
+    "facing=south,part=bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_2",
+      "y": 180
+    },
+    "facing=south,part=bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_3",
+      "y": 180
+    },
+    "facing=south,part=bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_4",
+      "y": 180
+    },
+    "facing=south,part=upper_bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_1",
+      "y": 180
+    },
+    "facing=south,part=upper_bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_2",
+      "y": 180
+    },
+    "facing=south,part=upper_bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_3",
+      "y": 180
+    },
+    "facing=south,part=upper_bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_4",
+      "y": 180
+    },
+    "facing=west,part=bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_1",
+      "y": 270
+    },
+    "facing=west,part=bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_2",
+      "y": 270
+    },
+    "facing=west,part=bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_3",
+      "y": 270
+    },
+    "facing=west,part=bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_bay_4",
+      "y": 270
+    },
+    "facing=west,part=upper_bay_1": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_1",
+      "y": 270
+    },
+    "facing=west,part=upper_bay_2": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_2",
+      "y": 270
+    },
+    "facing=west,part=upper_bay_3": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_3",
+      "y": 270
+    },
+    "facing=west,part=upper_bay_4": {
+      "model": "heavyseas:block/liner/liner_bar_counter/prop/bar_counter_upper_bay_4",
+      "y": 270
+    }
+  }
+}

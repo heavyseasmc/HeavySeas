@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/drill_bell_bell_w4",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/drill_bell",
+    "k": "heavyseas:block/liner/prop/drill_bell_brass",
+    "particle": "heavyseas:block/liner/prop/drill_bell"
+  }
+}

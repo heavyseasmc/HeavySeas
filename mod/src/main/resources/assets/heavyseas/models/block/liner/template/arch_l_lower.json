@@ -1,0 +1,20 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#f"},
+  "elements": [
+    {"from": [0, 8.0, 0.0], "to": [1, 16, 2.0], "faces": {"north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [1, 12.0, 0.0], "to": [2, 16, 2.0], "faces": {"north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [2, 14.0, 0.0], "to": [3, 16, 2.0], "faces": {"north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [3, 15.0, 0.0], "to": [4, 16, 2.0], "faces": {"north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [0, 6, 2.0], "to": [1, 16, 14.0], "faces": {"south": {"texture": "#f"}, "north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [1, 10, 2.0], "to": [2, 16, 14.0], "faces": {"south": {"texture": "#f"}, "north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [2, 12, 2.0], "to": [3, 16, 14.0], "faces": {"south": {"texture": "#f"}, "north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [3, 13, 2.0], "to": [4, 16, 14.0], "faces": {"south": {"texture": "#f"}, "north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [4, 15, 2.0], "to": [5, 16, 14.0], "faces": {"south": {"texture": "#f"}, "north": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [0, 8.0, 14.0], "to": [1, 16, 16.0], "faces": {"south": {"texture": "#f"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [1, 12.0, 14.0], "to": [2, 16, 16.0], "faces": {"south": {"texture": "#f"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [2, 14.0, 14.0], "to": [3, 16, 16.0], "faces": {"south": {"texture": "#f"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [3, 15.0, 14.0], "to": [4, 16, 16.0], "faces": {"south": {"texture": "#f"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}},
+    {"from": [0.0, 0, 0], "to": [1.5, 2.0, 16], "faces": {"south": {"texture": "#f"}, "north": {"texture": "#w"}, "up": {"texture": "#w"}, "down": {"texture": "#w"}, "east": {"texture": "#w"}}}
+  ]
+}

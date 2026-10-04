@@ -1,0 +1,94 @@
+{
+  "variants": {
+    "facing=east,part=c,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_lower",
+      "y": 270
+    },
+    "facing=east,part=c,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_upper",
+      "y": 270
+    },
+    "facing=east,part=l,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_lower",
+      "y": 270
+    },
+    "facing=east,part=l,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_upper",
+      "y": 270
+    },
+    "facing=east,part=r,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_lower",
+      "y": 270
+    },
+    "facing=east,part=r,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_upper",
+      "y": 270
+    },
+    "facing=north,part=c,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_lower",
+      "y": 180
+    },
+    "facing=north,part=c,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_upper",
+      "y": 180
+    },
+    "facing=north,part=l,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_lower",
+      "y": 180
+    },
+    "facing=north,part=l,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_upper",
+      "y": 180
+    },
+    "facing=north,part=r,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_lower",
+      "y": 180
+    },
+    "facing=north,part=r,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_upper",
+      "y": 180
+    },
+    "facing=south,part=c,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_lower"
+    },
+    "facing=south,part=c,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_upper"
+    },
+    "facing=south,part=l,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_lower"
+    },
+    "facing=south,part=l,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_upper"
+    },
+    "facing=south,part=r,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_lower"
+    },
+    "facing=south,part=r,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_upper"
+    },
+    "facing=west,part=c,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_lower",
+      "y": 90
+    },
+    "facing=west,part=c,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_c_upper",
+      "y": 90
+    },
+    "facing=west,part=l,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_lower",
+      "y": 90
+    },
+    "facing=west,part=l,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_l_upper",
+      "y": 90
+    },
+    "facing=west,part=r,row=lower": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_lower",
+      "y": 90
+    },
+    "facing=west,part=r,row=upper": {
+      "model": "heavyseas:block/liner/liner_arch/arch_r_upper",
+      "y": 90
+    }
+  }
+}

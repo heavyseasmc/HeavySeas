@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.heavyseasmc.engine.data.DataFormatException;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
@@ -49,6 +50,7 @@ final class VoyageLayoutLoaderTest {
         assertEquals(40, layout.arrival().slideTo());
         assertTrue(layout.arrival().forceload());
         assertEquals(DEFAULT, layout.fog());
+        assertEquals(new BlockPos(-168, 52, -1017), layout.liner().orElseThrow().origin(), "官方地图的北辰号（ADR-0080 P2 · P3）");
 
         // 几何：船头在 +Z 那一端、座位往 −Z 排、人面朝 +Z、岸在 +Z（与 MistSea 原来的注释一致）。
         // sin(180°) 不是精确的 0，逐分量带容差比。
@@ -151,6 +153,20 @@ final class VoyageLayoutLoaderTest {
     void hullRestoreMustBeKnown() throws IOException {
         assertRejected(shipped().replace("\"restore\": \"water\"", "\"restore\": \"lava\""),
                 "hull.restore", "值 lava 不认识");
+    }
+
+    /** 北辰号的位置（ADR-0081）：可以不写（这张地图没有北辰号）；写了只认 origin 三个整数。 */
+    @Test
+    void linerIsOptionalAndStrict() throws IOException {
+        JsonObject root = JsonParser.parseString(shipped()).getAsJsonObject();
+        root.remove("liner");
+        assertTrue(VoyageLayoutLoader.parse(SOURCE, new StringReader(root.toString()), DEFAULT).liner().isEmpty());
+
+        assertRejected(shipped().replace("\"liner\": { \"origin\": [-168, 52, -1017] }",
+                "\"liner\": { \"origin\": [-168, 52, -1017], \"dimension\": \"minecraft:overworld\" }"),
+                "liner", "有不认识的字段 [dimension]");
+        assertRejected(shipped().replace("[-168, 52, -1017]", "[-168, 52.5, -1017]"), "liner.origin[1]", "应当是整数");
+        assertRejected(shipped().replace("[-168, 52, -1017]", "[-168, 52]"), "liner.origin", "应当是 [x, y, z] 三个数字");
     }
 
     @Test

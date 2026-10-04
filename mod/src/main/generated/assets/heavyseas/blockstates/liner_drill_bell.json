@@ -1,0 +1,184 @@
+{
+  "variants": {
+    "facing=east,part=bell_e0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e0",
+      "y": 90
+    },
+    "facing=east,part=bell_e1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e1",
+      "y": 90
+    },
+    "facing=east,part=bell_e2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e2",
+      "y": 90
+    },
+    "facing=east,part=bell_e3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e3",
+      "y": 90
+    },
+    "facing=east,part=bell_e4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e4",
+      "y": 90
+    },
+    "facing=east,part=bell_e5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e5",
+      "y": 90
+    },
+    "facing=east,part=bell_w0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w0",
+      "y": 90
+    },
+    "facing=east,part=bell_w1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w1",
+      "y": 90
+    },
+    "facing=east,part=bell_w2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w2",
+      "y": 90
+    },
+    "facing=east,part=bell_w3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w3",
+      "y": 90
+    },
+    "facing=east,part=bell_w4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w4",
+      "y": 90
+    },
+    "facing=east,part=bell_w5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w5",
+      "y": 90
+    },
+    "facing=north,part=bell_e0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e0"
+    },
+    "facing=north,part=bell_e1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e1"
+    },
+    "facing=north,part=bell_e2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e2"
+    },
+    "facing=north,part=bell_e3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e3"
+    },
+    "facing=north,part=bell_e4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e4"
+    },
+    "facing=north,part=bell_e5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e5"
+    },
+    "facing=north,part=bell_w0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w0"
+    },
+    "facing=north,part=bell_w1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w1"
+    },
+    "facing=north,part=bell_w2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w2"
+    },
+    "facing=north,part=bell_w3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w3"
+    },
+    "facing=north,part=bell_w4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w4"
+    },
+    "facing=north,part=bell_w5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w5"
+    },
+    "facing=south,part=bell_e0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e0",
+      "y": 180
+    },
+    "facing=south,part=bell_e1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e1",
+      "y": 180
+    },
+    "facing=south,part=bell_e2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e2",
+      "y": 180
+    },
+    "facing=south,part=bell_e3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e3",
+      "y": 180
+    },
+    "facing=south,part=bell_e4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e4",
+      "y": 180
+    },
+    "facing=south,part=bell_e5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e5",
+      "y": 180
+    },
+    "facing=south,part=bell_w0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w0",
+      "y": 180
+    },
+    "facing=south,part=bell_w1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w1",
+      "y": 180
+    },
+    "facing=south,part=bell_w2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w2",
+      "y": 180
+    },
+    "facing=south,part=bell_w3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w3",
+      "y": 180
+    },
+    "facing=south,part=bell_w4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w4",
+      "y": 180
+    },
+    "facing=south,part=bell_w5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w5",
+      "y": 180
+    },
+    "facing=west,part=bell_e0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e0",
+      "y": 270
+    },
+    "facing=west,part=bell_e1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e1",
+      "y": 270
+    },
+    "facing=west,part=bell_e2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e2",
+      "y": 270
+    },
+    "facing=west,part=bell_e3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e3",
+      "y": 270
+    },
+    "facing=west,part=bell_e4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e4",
+      "y": 270
+    },
+    "facing=west,part=bell_e5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_e5",
+      "y": 270
+    },
+    "facing=west,part=bell_w0": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w0",
+      "y": 270
+    },
+    "facing=west,part=bell_w1": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w1",
+      "y": 270
+    },
+    "facing=west,part=bell_w2": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w2",
+      "y": 270
+    },
+    "facing=west,part=bell_w3": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w3",
+      "y": 270
+    },
+    "facing=west,part=bell_w4": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w4",
+      "y": 270
+    },
+    "facing=west,part=bell_w5": {
+      "model": "heavyseas:block/liner/liner_drill_bell/prop/drill_bell_bell_w5",
+      "y": 270
+    }
+  }
+}

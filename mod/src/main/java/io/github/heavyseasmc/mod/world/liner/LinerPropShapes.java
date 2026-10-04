@@ -30,12 +30,84 @@ final class LinerPropShapes {
             case CEILING_QUAD -> cut(CEILING_QUAD, part);
             case BED -> cut(BED, part);
             case WARDROBE -> cut(WARDROBE, part);
+            case MIRROR -> cut(MIRROR, part);
             case WASHSTAND -> cut(WASHSTAND, part);
             case BOOKCASE -> cut(BOOKCASE, part);
             case WRITING_TABLE -> cut(WRITING_TABLE, part);
             case WRITING_CHAIR -> WRITING_CHAIR;
             case SCONCE -> SCONCE;
+            case FIREPLACE -> cut(FIREPLACE, part);
+            case OVERMANTEL -> cut(OVERMANTEL, part);
+            case PALM -> cut(PALM, part);
+            case PALM_TALL -> cut(PALM_TALL, part);
+            case WICKER_CHAIR -> WICKER_CHAIR;
+            case WICKER_TABLE -> WICKER_TABLE;
+            case WICKER_SETTEE -> cut(WICKER_SETTEE, part);
+            case BAR_COUNTER -> cut(BAR_COUNTER, part);
+            case DAVIT -> cut(DAVIT, part);
+            case VENTILATOR -> cut(VENTILATOR, part);
+            case VENTILATOR_SHORT -> cut(VENTILATOR_SHORT, part);
+            case DRILL_BELL -> cut(DRILL_BELL, part);
         };
+    }
+
+    /**
+     * 碰撞箱与轮廓不一样的那几种：→ 这一块的碰撞盒子；{@code null} = 碰撞箱就是轮廓。
+     * 棕榈（ADR 草稿 furnish）：碰撞只算盆 —— 叶子伸出这一格 4–6 像素，轮廓里有一团（点得中、看得见选中框），人从叶子底下穿得过去；
+     * 盆上面那几格一个碰撞盒子都没有。
+     */
+    static List<double[]> collision(LinerProp.Kind kind, LinerProp.Part part) {
+        return switch (kind) {
+            case PALM, PALM_TALL -> part == LinerProp.Part.LOWER ? PALM_POT : List.of();
+            default -> null;
+        };
+    }
+
+    // A 甲板新家具（ADR 草稿 furnish）：整件写（壁炉 · 炉上件 48 × 32、吧台 64 × 32、棕榈竖着 32 / 48），按格切 ——
+    //   壁炉：炉台面 · 炉身（两侧壁柱到横楣，炉口也算进去：火里走不进去）· 壁炉台 · 台上的座钟
+    private static final List<double[]> FIREPLACE = List.of(box(2, 0, 1, 46, 1.5, 10), box(3.5, 0, 8.5, 44.5, 25.5, 16),
+            box(2, 25.5, 6.5, 46, 27.5, 16), box(21, 27.5, 10.5, 27, 32, 13.5));
+    //   炉上件：框（贴墙一层，前出到 12.75）· 冠饰 / 檐口；底框往下伸进壁炉那 4.5 像素不算（只按自己那两排切）
+    private static final List<double[]> OVERMANTEL = List.of(box(4, 0, 12.75, 44, 29, 16), box(13, 29, 13, 35, 32, 16));
+    //   棕榈：盆 · 茎 · 一团叶子（叶子伸出这一格的那几像素轮廓里没有 —— 轮廓只许在这一格里）
+    private static final List<double[]> PALM = List.of(box(3, 0, 3, 13, 8, 13), box(5, 8, 5, 11, 16, 11), box(1, 16, 1, 15, 28, 15));
+    private static final List<double[]> PALM_TALL = List.of(box(3, 0, 3, 13, 8, 13), box(5, 8, 5, 11, 24, 11), box(1, 24, 1, 15, 40, 15));
+    private static final List<double[]> PALM_POT = List.of(box(3, 0, 3, 13, 8, 13));
+    //   藤编扶手椅：座与裙 · 背 · 两侧扶手（座面 7.75）
+    private static final List<double[]> WICKER_CHAIR = List.of(box(2, 0, 2, 14, 7.75, 14.5), box(1.75, 7.75, 12.25, 14.25, 16, 14.75),
+            box(1.5, 7.75, 1.75, 4.25, 11.75, 12.25), box(11.75, 7.75, 1.75, 14.5, 11.75, 12.25));
+    //   藤编小圆桌：桌面 · 四条腿与搁板一块
+    private static final List<double[]> WICKER_TABLE = List.of(box(2.5, 11, 2.5, 13.5, 12.25, 13.5), box(3.5, 0, 3.5, 12.5, 11, 12.5));
+    //   藤编长椅（整件 32 × 16）：同藤椅
+    private static final List<double[]> WICKER_SETTEE = List.of(box(2, 0, 2, 30, 7.75, 14.5), box(1.75, 7.75, 12.25, 30.25, 16, 14.75),
+            box(1.5, 7.75, 1.75, 4.25, 11.75, 12.25), box(27.75, 7.75, 1.75, 30.5, 11.75, 12.25));
+    //   吧台（整件 64 × 32）：台身 · 大理石台面（高 16）· 脚踏杆 · 台后酒架（贴墙一层）
+    private static final List<double[]> BAR_COUNTER = List.of(box(0.5, 0, 4, 63.5, 14.5, 16), box(0, 14.5, 2.5, 64, 16, 16),
+            box(1.5, 2, 1.25, 62.5, 3, 4), box(0, 16, 11.5, 64, 32, 16));
+
+
+    // 艇甲板设备（ADR 草稿 deckgear）：整件写（模型正面朝北 = 舷外，往舷外是 −z），按格切 ——
+    //   吊艇架：铁座与底板（两格长）· 丝杠与轴承 · 立板与扇板 · 斜臂（每 8 像素高一块、跟着 22.5° 往舷外挪，臂扫过的每一格都有一块）·
+    //   臂头与上滑车 · 吊索与下滑车（伸出这一列的那一截切掉）。镜像那一份（艇在左手）由 LinerProp 左右对调
+    private static final List<double[]> DAVIT = davit();
+    //   通风筒：矮座 · 管 · 喇叭身与口圈（口比一格宽、往前探出这一格的部分切掉）
+    private static final List<double[]> VENTILATOR = List.of(box(1, 0, 1, 15, 1.5, 15), box(2, 1.5, 2, 14, 26, 14),
+            box(0, 24, 0, 16, 42.5, 13));
+    private static final List<double[]> VENTILATOR_SHORT = List.of(box(2, 0, 2, 14, 1.5, 14), box(4, 1.5, 4, 12, 11, 12),
+            box(1, 9, 0, 15, 21.75, 11));
+
+    //   开局的钟（门形钟架，整件 32 × 85）：两根柱（连底板）· 横梁 · 钟（钟口到吊环，连钟绳）；钟挂在两列的接缝上
+    private static final List<double[]> DRILL_BELL = List.of(box(1, 0, 6, 6, 82.5, 11), box(26, 0, 6, 31, 82.5, 11),
+            box(0, 82.5, 6.5, 32, 85, 10.5), box(11, 53, 3.5, 21, 82.5, 13.5));
+
+    private static List<double[]> davit() {
+        List<double[]> out = new ArrayList<>(List.of(box(2, 0, 1, 14, 3, 31), box(5.5, 3, 3, 10.5, 7, 30),
+                box(3.5, 3, 9, 12.5, 21, 26), box(5, 96, -27, 11, 113, -21), box(6, 64, -26, 16, 97, -22)));
+        for (int y = 16; y < 112; y += 8) {
+            double zc = 14 - Math.tan(Math.toRadians(22.5)) * (y + 4 - 18);         // 臂的轴线：枢轴 (y 18, z 14) 起，每往上 1 往舷外 tan22.5
+            out.add(box(5.5, y, zc - 3, 10.5, y + 8, zc + 3));
+        }
+        return List.copyOf(out);
     }
 
     // 客房与阅览室的家具（ADR 草稿 furniture）：整件写（床 z 到 32、衣柜 · 盥洗台 · 书柜 y 到 32），按格切 ——
@@ -44,6 +116,11 @@ final class LinerPropShapes {
             box(2.5, 10.75, 23.5, 13.5, 12, 29.5), box(0.25, 0, 30, 15.75, 16, 31.75));
     //   衣柜：柜身（踢脚座到楣板）· 两层檐口
     private static final List<double[]> WARDROBE = List.of(box(0.25, 0, 4, 15.75, 29.25, 16), box(0, 29.25, 3.5, 16, 31.75, 16));
+    //   魔镜（2 宽 × 3 高，嵌进主景那一版，用户 2026-10-04 选 C；整件 48 × 48，框在正中 x 8–40、两侧两列各带半边框）：
+    //   框连背板（贴墙 z 12–16、底边落地）· 弧顶一级级收（照模型里每一排框的宽量的）· 顶上的小冠饰
+    private static final List<double[]> MIRROR = List.of(box(8, 0, 12, 40, 40, 16), box(8.5, 40, 12, 39.5, 42, 16),
+            box(9.5, 42, 12, 38.5, 43, 16), box(11, 43, 12, 37, 44, 16), box(13, 44, 12, 35, 45, 16),
+            box(15.5, 45, 12, 32.5, 45.5, 16), box(19, 45.5, 12.5, 29, 47.75, 15.5));
     //   盥洗台：柜身 · 大理石台面 · 挡水板与搁板 · 龙头 · 镜子
     private static final List<double[]> WASHSTAND = List.of(box(1, 0, 5, 15, 12.5, 16), box(0.5, 12.5, 5.5, 15.5, 14, 16),
             box(0.5, 14, 13.5, 15.5, 19.75, 16), box(4.5, 14, 10.75, 11.5, 17.75, 13.5), box(2.5, 19.75, 14.25, 13.5, 32, 16));

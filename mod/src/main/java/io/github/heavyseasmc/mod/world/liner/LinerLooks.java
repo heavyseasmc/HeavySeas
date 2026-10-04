@@ -52,6 +52,27 @@ public final class LinerLooks {
         default Look itemLook() {
             return null;
         }
+
+        /**
+         * 叠在 {@link #look} 上面的几层（多部件模型，格架上的常春藤）：空 = 一个状态一块模型（方块状态文件写 variants）；
+         * 不空 = 批量生成工具写 multipart —— 底层只按 {@link #baseProperties} 那几个属性分，每一层只按它自己那几个属性分，
+         * 不用把「框条 × 内角 × 藤」的每一种组合各做一块模板。
+         */
+        default List<Layer> layers() {
+            return List.of();
+        }
+
+        /** 有叠层时，底层（{@link #look}）只看这几个属性；别的属性改了底层不许变（批量生成工具核对，变了就抛）。 */
+        default List<net.minecraft.state.property.Property<?>> baseProperties() {
+            return List.of();
+        }
+    }
+
+    /**
+     * 多部件模型的一层：只看 {@code properties} 那几个属性；{@code look} 回答这一层画哪块模板（朝向已经算进 y 旋转），
+     * {@code null} = 这个状态这一层不画。
+     */
+    public record Layer(List<net.minecraft.state.property.Property<?>> properties, java.util.function.Function<BlockState, Look> look) {
     }
 
     static Look look(String template, Map<String, String> textures) {
@@ -125,6 +146,91 @@ public final class LinerLooks {
         return out;
     }
 
+    /**
+     * A 甲板新贴附件（ADR-0080 §7）的轮廓，与 {@code liner_decor.py} 的 {@code adeck_mod_templates()} 同一套尺寸（LinerLooksTest 拿模板文件逐块对照
+     * 宽门套与拱；格架的模板在 {@code trellis/} 子目录里、有斜件，不在那条判据里）：
+     * <ul>
+     *   <li>宽门套 7 宽：压边 x 9–11 前出 2 · 平板 + 窄唇 x 11–16 前出 ≤ 1.5；门楣上一道檐（横板 1 · 承托线 2.5 · 退进的台 4.5 ·
+     *       檐板 5.5 · 冠线 5，第三轮打磨后），上角那一格檐往外挑过压边（承托线从 8、台与冠线从 7.5、檐板从 7 起）。</li>
+     *   <li>半圆拱：全拱 48 宽、拱墩顶 2 + 半椭圆（半宽 24、矢高 22），每一像素列取整 —— 按拱腹最低的中间那一层逐列取盒子（墙面那两层更高，
+     *       包在里面）；拱心石 x 22–26 垂下 2.5；拱墩 1.5 宽 2 高。这里自己算一遍曲线，不读 Python 的结果（判据的两半各算各的）。</li>
+     *   <li>格架：轮廓是贴墙一片 2.5 厚（木条与框条都在里面；常春藤不进轮廓）；内角那一格再加旁边那面墙上的一片。</li>
+     * </ul>
+     */
+    private static Map<String, List<double[]>> withAdeck(Map<String, List<double[]>> base) {
+        Map<String, List<double[]>> out = new java.util.HashMap<>(base);
+        List<double[]> jamb = List.of(box(9, 0, 0, 11, 16, 2), box(11, 0, 0, 16, 16, 1.5));
+        List<double[]> jambUp = List.of(box(9, 6, 0, 11, 16, 2), box(11, 6, 0, 16, 16, 1.5));
+        List<double[]> skirting = List.of(box(8.5, 0, 0, 16, 6, 2.5), box(0, 0, 0, 8.5, 3, 1), box(0, 3, 0, 8.5, 4, 0.5));
+        // 门头（第三轮打磨）：横板 7–10 前出 1 · 承托线 10–11 前出 2.5 · 檐板底下那道台 11–12 前出 4.5 · 檐板 12–14 前出 5.5 · 冠线 14–15 前出 5
+        List<double[]> head = List.of(box(0, 0, 0, 16, 5, 1.5), box(0, 5, 0, 16, 7, 2), box(0, 7, 0, 16, 10, 1),
+                box(0, 10, 0, 16, 11, 2.5), box(0, 11, 0, 16, 12, 4.5), box(0, 12, 0, 16, 14, 5.5), box(0, 14, 0, 16, 15, 5));
+        List<double[]> corner = List.of(box(9, 0, 0, 11, 7, 2), box(11, 5, 0, 16, 7, 2), box(11, 0, 0, 16, 5, 1.5),
+                box(9, 7, 0, 16, 10, 1), box(8, 10, 0, 16, 11, 2.5), box(7.5, 11, 0, 16, 12, 4.5), box(7, 12, 0, 16, 14, 5.5),
+                box(7.5, 14, 0, 16, 15, 5));
+        Map<String, List<double[]>> left = new java.util.LinkedHashMap<>();
+        left.put("jamb_left", jamb);
+        left.put("jamb_left_skirting", concat(jambUp, skirting));
+        left.put("jamb_left_chair_rail", concat(jamb, List.of(box(0, 0, 0, 9, 2, 1))));
+        left.put("corner_left", corner);
+        left.forEach((name, boxes) -> {
+            out.put("casing_tall_" + name, boxes);
+            out.put("casing_tall_" + name.replace("left", "right"), mirrored(boxes));
+        });
+        out.put("casing_tall_head", head);
+        // 半圆拱：拱腹（中间那一层）逐列 → 同高的相邻列并成一个盒子
+        int[] h = new int[48];
+        for (int k = 0; k < 48; k++) {
+            double t = (k + 0.5 - 24) / 24;
+            h[k] = (int) Math.floor(2 + 22 * Math.sqrt(Math.max(0, 1 - t * t)) + 0.5);
+        }
+        double keyBottom = h[24] - 2.5;
+        String[] parts = {"l", "c", "r"};
+        for (int p = 0; p < 3; p++) {
+            for (String row : new String[]{"lower", "upper"}) {
+                int gx0 = 16 * p;
+                int gy0 = row.equals("upper") ? 16 : 0;
+                boolean key = gx0 <= 22 && 26 <= gx0 + 16 && keyBottom >= gy0 && keyBottom < gy0 + 16;
+                List<double[]> boxes = new java.util.ArrayList<>();
+                int runStart = -1;
+                int runH = -1;
+                for (int gk = gx0; gk <= gx0 + 16; gk++) {
+                    int eff = -1;                                          // 这一列在这一排里从哪儿起是实的；-1 = 这一排里全空 / 拱心石那几列
+                    if (gk < gx0 + 16 && !(key && gk >= 22 && gk < 26)) {
+                        int e = Math.max(h[gk], gy0);
+                        eff = e >= gy0 + 16 ? -1 : e;
+                    }
+                    if (eff != runH && runH >= 0) {
+                        boxes.add(box(runStart - gx0, runH - gy0, 0, gk - gx0, 16, 16));
+                    }
+                    if (eff != runH) {
+                        runStart = gk;
+                        runH = eff;
+                    }
+                }
+                if (key) {
+                    boxes.add(box(22 - gx0, keyBottom - gy0, 0, 26 - gx0, 16, 16));
+                }
+                if (row.equals("lower") && p != 1) {
+                    boxes.add(p == 0 ? box(0, 0, 0, 1.5, 2, 16) : box(14.5, 0, 0, 16, 2, 16));
+                }
+                out.put("arch_" + parts[p] + "_" + row, boxes);
+            }
+        }
+        // 格架：16 种框条 × （没有内角 · 屋角那一边画着竖框条时的内角）
+        for (int m = 0; m < 16; m++) {
+            String mask = LinerConnect.Rules.frameMask((m & 1) != 0, (m & 2) != 0, (m & 4) != 0, (m & 8) != 0);
+            out.put("trellis/base_" + mask, List.of(box(0, 0, 0, 16, 16, 2.5)));
+            if (mask.contains("r")) {
+                out.put("trellis/base_" + mask + "_inner_right", List.of(box(0, 0, 0, 16, 16, 2.5), box(13.5, 0, 2.5, 16, 16, 16)));
+            }
+            if (mask.contains("l")) {
+                out.put("trellis/base_" + mask + "_inner_left", List.of(box(0, 0, 0, 16, 16, 2.5), box(0, 0, 2.5, 2.5, 16, 16)));
+            }
+        }
+        return out;
+    }
+
     /** 直段 + 四种拐角（同 {@code liner_decor.py} 的 {@code corner_variants}）：每个盒子按自己的进深 d 转过去。 */
     private static void withCorners(Map<String, List<double[]>> out, String name, List<double[]> straight) {
         List<double[]> innerL = new java.util.ArrayList<>(straight);
@@ -157,7 +263,7 @@ public final class LinerLooks {
     }
 
     /** 每块模板的轮廓（模板坐标，单位像素）：与模型元件大致重合的几个盒子。整块的三种是满格。 */
-    private static final Map<String, List<double[]>> BOXES = withAttach(withFrames(Map.ofEntries(
+    private static final Map<String, List<double[]>> BOXES = withAdeck(withAttach(withFrames(Map.ofEntries(
             Map.entry("cube", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("cube_front", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("floor", List.of(box(0, 0, 0, 16, 16, 16))),
@@ -179,7 +285,7 @@ public final class LinerLooks {
             Map.entry("capping", List.of(box(0, 0, 0, 16, 3, 2))),
             Map.entry("capping_left", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5))),
             Map.entry("capping_right", List.of(box(0, 0, 0, 16, 3, 2), box(11, 0, 0, 16, 16, 1.5))),
-            Map.entry("capping_both", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5), box(11, 0, 0, 16, 16, 1.5))))));
+            Map.entry("capping_both", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5), box(11, 0, 0, 16, 16, 1.5)))))));
 
     private static double[] box(double x0, double y0, double z0, double x1, double y1, double z1) {
         return new double[]{x0, y0, z0, x1, y1, z1};

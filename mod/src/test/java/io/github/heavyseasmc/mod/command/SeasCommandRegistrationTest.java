@@ -14,7 +14,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,7 +59,7 @@ class SeasCommandRegistrationTest {
         var debug = root.getChild("debug");
         assertNotNull(debug);
         for (String child : List.of("weather", "next", "timer", "inspect", "dump", "gulls", "deal", "skiff", "sky",
-                "log", "ui")) {
+                "log", "ui", "liner")) {
             assertNotNull(debug.getChild(child), "debug 下少了 " + child);
         }
         assertNotNull(debug.getChild("weather").getChild("now"), "原来的 dev weather 搬到 weather now");
@@ -71,19 +74,29 @@ class SeasCommandRegistrationTest {
      * 在今天不会出事 —— 但哪天根的门被改松了，漏写的那几条就整个敞开，而且什么都不会报错。
      */
     static List<String> unguarded(CommandNode<ServerCommandSource> node, String path, int[] checked) {
+        return unguarded(node, path, checked, Map.of(), new HashSet<>());
+    }
+
+    /** 比 2 级高的那几个节点（D7：改地图 4 级）：路径 → 要几级。 */
+    static final Map<String, Integer> HIGHER = Map.of("debug liner replace", DebugCommand.MAP);
+
+    static List<String> unguarded(CommandNode<ServerCommandSource> node, String path, int[] checked,
+                                  Map<String, Integer> higher, Set<String> visited) {
         List<String> out = new ArrayList<>();
         checked[0]++;
-        for (int level = 0; level < DebugCommand.GAME; level++) {
+        visited.add(path);
+        int need = higher.getOrDefault(path, DebugCommand.GAME);
+        for (int level = 0; level < need; level++) {
             if (node.canUse(source(level))) {
                 out.add(path + "：" + level + " 级也能用");
             }
         }
-        if (!node.canUse(source(DebugCommand.GAME))) {
-            out.add(path + "：" + DebugCommand.GAME + " 级反而用不了");
+        if (!node.canUse(source(need))) {
+            out.add(path + "：" + need + " 级反而用不了");
         }
         for (CommandNode<ServerCommandSource> child : node.getChildren()) {
             String name = child instanceof ArgumentCommandNode<?, ?> ? "<" + child.getName() + ">" : child.getName();
-            out.addAll(unguarded(child, path + " " + name, checked));
+            out.addAll(unguarded(child, path + " " + name, checked, higher, visited));
         }
         return out;
     }
@@ -92,9 +105,12 @@ class SeasCommandRegistrationTest {
     @DisplayName("debug 子树里每一个节点（字面量与参数）都自己要 2 级")
     void everyDebugNodeGuardsItself() {
         int[] checked = {0};
-        List<String> bad = unguarded(seas().getChild("debug"), "debug", checked);
+        Set<String> visited = new HashSet<>();
+        List<String> bad = unguarded(seas().getChild("debug"), "debug", checked, HIGHER, visited);
         // 正向对照：一个节点都没走到时，「全都挡着」与「没在核」长得一样
         assertTrue(checked[0] >= 40, "只核了 " + checked[0] + " 个节点 —— 没在核，不是都挡着");
+        // 更高一档的那几个路径要真的走到：改了名、挪了位置，这一张表就成了一条放行的空规矩
+        assertTrue(visited.containsAll(HIGHER.keySet()), "要 4 级的节点没走到：" + HIGHER.keySet() + " 不全在 " + visited);
         System.out.println("debug 子树：核了 " + checked[0] + " 个节点");
         assertEquals(List.of(), bad, String.join("\n", bad));
     }
@@ -110,6 +126,17 @@ class SeasCommandRegistrationTest {
         List<String> bad = unguarded(tree.build(), "debug", checked);
         assertEquals(3, checked[0]);
         assertEquals(List.of("debug leak：0 级也能用", "debug leak：1 级也能用"), bad);
+    }
+
+    @Test
+    @DisplayName("红测：要 4 级的节点漏写成 2 级，判据点名它，而且只点它")
+    void judgeNamesAHigherNodeThatIsTooLoose() {
+        LiteralArgumentBuilder<ServerCommandSource> tree = CommandManager.<ServerCommandSource>literal("debug")
+                .requires(s -> s.hasPermissionLevel(2))
+                .then(CommandManager.<ServerCommandSource>literal("tp").requires(s -> s.hasPermissionLevel(2)))
+                .then(CommandManager.<ServerCommandSource>literal("replace").requires(s -> s.hasPermissionLevel(2)));
+        List<String> bad = unguarded(tree.build(), "debug", new int[]{0}, Map.of("debug replace", 4), new HashSet<>());
+        assertEquals(List.of("debug replace：2 级也能用", "debug replace：3 级也能用"), bad);
     }
 
     @Test

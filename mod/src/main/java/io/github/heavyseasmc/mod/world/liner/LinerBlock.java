@@ -27,23 +27,29 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.ARCH_PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.AXIS;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.BASE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CASING_PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CELL;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CORNER;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.DOWN;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.EAST;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.END;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.FACING;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.IVY;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.LAYOUT;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.LEFT;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.NORTH;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.RIGHT;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.ROW;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SHAPE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SIDE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SOUTH;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.TRIM;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.UP;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.V;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.WEST;
 
 /**
@@ -86,7 +92,14 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         /** 甲板：板顺着摆它的人面朝的方向。 */
         DECK,
         /** 地毯：四边接不接地毯、花纹第几格。 */
-        CARPET
+        CARPET,
+        /**
+         * 格架（ADR-0080 §7）：同挂墙的件；框条看上下左右（同大框）· 屋角补旁边那面墙（{@link LinerConnect.Rules#trellisCorner}）·
+         * 常春藤中段 / 藤梢看上面那一格、布局与拐法按位置算。常春藤是叠上去的另一层（{@link #layers}）。
+         */
+        TRELLIS,
+        /** 拱（ADR-0080 §7）：墙那一格本身，正面朝着摆它的人；一排里的哪一格 · 上下哪一排看邻居（{@link LinerConnect.Rules#archPart}）。 */
+        ARCH
     }
 
     private static final ThreadLocal<Property<?>[]> PENDING = new ThreadLocal<>();
@@ -131,6 +144,23 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         return state.contains(FACING) ? base.turned(yawOf(state.get(FACING))) : base;
     }
 
+    /** 格架上的常春藤是叠上去的一层（多部件模型）：只看朝向与藤的三个属性；底层（框条 · 内角）不看藤。 */
+    @Override
+    public java.util.List<LinerLooks.Layer> layers() {
+        if (kind != Kind.TRELLIS) {
+            return java.util.List.of();
+        }
+        return java.util.List.of(new LinerLooks.Layer(java.util.List.of(FACING, IVY, LAYOUT, V), s -> {
+            LinerLooks.Look ivy = LinerBlocks.ivyLook(s);
+            return ivy == null ? null : ivy.turned(yawOf(s.get(FACING)));
+        }));
+    }
+
+    @Override
+    public java.util.List<Property<?>> baseProperties() {
+        return kind == Kind.TRELLIS ? java.util.List.of(FACING, UP, DOWN, LEFT, RIGHT, CORNER) : java.util.List.of();
+    }
+
     /** 朝向 → y 旋转：模板朝南；Minecraft 的 y 旋转从上往下看是顺时针（北 → 东 → 南 → 西）。 */
     static int yawOf(Direction facing) {
         return switch (facing) {
@@ -143,7 +173,8 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
 
     /** 挂在墙上的那几种（宿主前面那一格、正面朝外）。 */
     static boolean onWall(Kind kind) {
-        return kind == Kind.WALL_PIECE || kind == Kind.RUN || kind == Kind.PILASTER_SIDE || kind == Kind.CAPPING || kind == Kind.CASING;
+        return kind == Kind.WALL_PIECE || kind == Kind.RUN || kind == Kind.PILASTER_SIDE || kind == Kind.CAPPING || kind == Kind.CASING
+                || kind == Kind.TRELLIS;
     }
 
     /** 这个状态若是我们的挂墙件，回它的朝向；不是回 {@code null}。 */
@@ -252,10 +283,40 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
                         runBeside(world, pos, f, LinerConnect.viewerLeft(f)), runBeside(world, pos, f, LinerConnect.viewerRight(f)));
                 return s.with(TRIM, LinerBlocks.Trim.of(trim));
             }
+            case TRELLIS -> {
+                // ① 内角看正前方那一格 ② 框条看上下左右（左右那一格是补到我这面墙上的内角也算接着）③ 藤：中段 / 藤梢看上面那一格，布局与拐法按位置
+                Direction f = s.get(FACING);
+                int fi = LinerConnect.index(f);
+                BlockState front = world.getBlockState(pos.offset(f));
+                String corner = LinerConnect.Rules.trellisCorner(fi, front.isOf(this) ? LinerConnect.index(front.get(FACING)) : null);
+                BlockState above = world.getBlockState(pos.up());
+                boolean ivyAbove = above.isOf(this) && above.get(FACING) == f && above.get(IVY) != LinerBlocks.Ivy.NONE;
+                String ivy = LinerConnect.Rules.ivyState(s.get(IVY) != LinerBlocks.Ivy.NONE, ivyAbove);
+                return s.with(CORNER, LinerBlocks.TrellisCorner.of(corner))
+                        .with(UP, trellisJoins(world, pos.up(), fi, false)).with(DOWN, trellisJoins(world, pos.down(), fi, false))
+                        .with(LEFT, trellisJoins(world, pos.offset(LinerConnect.viewerLeft(f)), fi, true))
+                        .with(RIGHT, trellisJoins(world, pos.offset(LinerConnect.viewerRight(f)), fi, true))
+                        .with(IVY, LinerBlocks.Ivy.of(ivy))
+                        .with(LAYOUT, LinerBlocks.IvyLayout.of(LinerConnect.Rules.ivyLayout(pos.getX(), pos.getZ())))
+                        .with(V, LinerConnect.Rules.ivyVariant(pos.getX(), pos.getY(), pos.getZ()));
+            }
+            case ARCH -> {
+                Direction f = s.get(FACING);
+                String part = LinerConnect.Rules.archPart(same(world, pos.offset(LinerConnect.viewerLeft(f)), f),
+                        same(world, pos.offset(LinerConnect.viewerRight(f)), f));
+                return s.with(LinerBlocks.ARCH_PART, LinerBlocks.ArchPart.of(part))
+                        .with(ROW, LinerBlocks.ArchRow.of(LinerConnect.Rules.archRow(same(world, pos.up(), f))));
+            }
             default -> {
                 return s;
             }
         }
+    }
+
+    /** 格架的这一边接不接着（规则在 {@link LinerConnect.Rules#trellisJoins}）：只认同一种方块（格架）。 */
+    private boolean trellisJoins(BlockView world, BlockPos q, int facing, boolean sideways) {
+        BlockState o = world.getBlockState(q);
+        return o.isOf(this) && LinerConnect.Rules.trellisJoins(facing, LinerConnect.index(o.get(FACING)), o.get(CORNER).asString(), sideways);
     }
 
     /** 从 pos 往 side 那一边沿墙找那条线（规则在 {@link LinerConnect.Rules#runBeside}）。 */
@@ -270,7 +331,8 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         }
         Block b = o.getBlock();
         String block = b == LinerBlocks.SKIRTING ? "liner_skirting" : b == LinerBlocks.CHAIR_RAIL ? "liner_chair_rail"
-                : b == LinerBlocks.CORNICE_THIN ? "liner_cornice_thin" : b == LinerBlocks.DOOR_CASING ? "liner_door_casing" : "other";
+                : b == LinerBlocks.CORNICE_THIN ? "liner_cornice_thin" : b == LinerBlocks.DOOR_CASING ? "liner_door_casing"
+                : b == LinerBlocks.DOOR_CASING_TALL ? "liner_door_casing_tall" : "other";
         return LinerConnect.Rules.lineKind(block, o.contains(BASE) ? o.get(BASE).asString() : null);
     }
 
@@ -368,6 +430,12 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         }
         if (s.contains(CASING_PART)) {
             s = s.with(CASING_PART, state.get(CASING_PART).mirrored());
+        }
+        if (s.contains(CORNER)) {
+            s = s.with(CORNER, state.get(CORNER).mirrored());
+        }
+        if (s.contains(ARCH_PART)) {
+            s = s.with(ARCH_PART, state.get(ARCH_PART).mirrored());
         }
         if (s.contains(NORTH)) {
             for (Direction d : new Direction[]{Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST}) {

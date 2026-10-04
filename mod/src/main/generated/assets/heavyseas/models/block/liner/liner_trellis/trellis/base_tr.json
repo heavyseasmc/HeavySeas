@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/trellis/base_tr",
+  "textures": {
+    "particle": "heavyseas:block/liner/trellis",
+    "t": "heavyseas:block/liner/trellis"
+  }
+}

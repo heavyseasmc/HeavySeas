@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.github.heavyseasmc.engine.data.DataFormatException;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
 
@@ -39,7 +40,7 @@ public final class VoyageLayoutLoader {
     /** {@code item_display} 追踪 10 chunk = 160 格，减一个 chunk 的余量。 */
     public static final int SLIDE_FROM_MAX = 144;
 
-    private static final Set<String> TOP_KEYS = Set.of("schema_version", "id", "dimension", "boat", "hull", "arrival", "fog", "backdrops");
+    private static final Set<String> TOP_KEYS = Set.of("schema_version", "id", "dimension", "boat", "hull", "arrival", "fog", "backdrops", "liner");
     private static final Map<String, String> RESERVED = Map.of(
             "structures", "M6 第 4 刀的后手（方案 D，还没做）");
     private static final Set<String> BOAT_KEYS = Set.of("bow", "yaw", "seat_spacing");
@@ -47,6 +48,7 @@ public final class VoyageLayoutLoader {
     private static final Set<String> ARRIVAL_KEYS = Set.of("bearing", "slide_from", "slide_to", "forceload");
     private static final Set<String> BACKDROP_KEYS = Set.of("item", "offset", "yaw", "scale", "view_range", "box");
     private static final Set<String> RESTORE_IDS = Set.of("water", "none");
+    private static final Set<String> LINER_KEYS = Set.of("origin");
     public static final double SCALE_MIN = 0.1;
     public static final double SCALE_MAX = 64.0;
     public static final float VIEW_RANGE_DEFAULT = 4f;
@@ -169,8 +171,16 @@ public final class VoyageLayoutLoader {
                     backdropYaw, (float) scale, viewRange, boxWidth, boxHeight));
         }
 
+        // 北辰号：这里只认语法；「只有默认布局可以写」由 SceneDataLoader 核（它知道哪一份是默认），
+        //   装不装得下 · 水线对不对 · 离对局够不够远要读了船的清单才算得出（LinerShip 起服时核，构建期 checkLinerShip 核 jar 里那份）。
+        Optional<VoyageLayout.Liner> liner = SceneJson.optionalObject(source, "顶层", root, "liner").map(linerJson -> {
+            SceneJson.onlyKeys(source, "liner", linerJson, LINER_KEYS);
+            int[] origin = SceneJson.integers3(source, "liner", linerJson, "origin");
+            return new VoyageLayout.Liner(new BlockPos(origin[0], origin[1], origin[2]));
+        });
+
         return new VoyageLayout(id, dimension, boat, hull,
-                new VoyageLayout.Arrival(bearing, slideFrom, slideTo, forceload), fog, backdrops);
+                new VoyageLayout.Arrival(bearing, slideFrom, slideTo, forceload), fog, backdrops, liner);
     }
 
     /** 资源 id → 布局自称的 id：{@code heavyseas:voyage/default.json} → {@code heavyseas:default}。 */

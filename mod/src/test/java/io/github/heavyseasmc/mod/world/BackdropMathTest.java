@@ -26,7 +26,7 @@ final class BackdropMathTest {
     private static VoyageLayout layout(float yaw, float bearing) {
         return new VoyageLayout(DEFAULT, Identifier.of("heavyseas", "mist_sea"),
                 new VoyageLayout.Boat(new Vec3d(0.5, 65.15, 0.5), yaw, 2.0), Optional.empty(),
-                new VoyageLayout.Arrival(bearing, 88, 40, true), DEFAULT, List.of(LIGHTHOUSE));
+                new VoyageLayout.Arrival(bearing, 88, 40, true), DEFAULT, List.of(LIGHTHOUSE), Optional.empty());
     }
 
     @Test

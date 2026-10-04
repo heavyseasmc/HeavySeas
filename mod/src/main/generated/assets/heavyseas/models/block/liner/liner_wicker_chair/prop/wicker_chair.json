@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/wicker_chair",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/wicker_chair",
+    "particle": "heavyseas:block/liner/prop/wicker_chair"
+  }
+}

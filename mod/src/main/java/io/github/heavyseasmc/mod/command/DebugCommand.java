@@ -20,6 +20,7 @@ import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.world.MistSea;
 import io.github.heavyseasmc.mod.world.PlayerSky;
+import io.github.heavyseasmc.mod.world.liner.LinerShip;
 import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
 
 import com.google.gson.GsonBuilder;
@@ -68,7 +69,7 @@ import java.util.function.Predicate;
  * <ol>
  *   <li><b>只给管理员，生产服也注册</b>（D1 · D2）。整棵子树每一个节点都自己要 {@link #GAME} 级 ——
  *       不只靠根节点那一道：哪天根节点的门被改松了，这里每一层照样挡着（单测逐个节点核）。
- *       权限分档：对局与观感 2 级 · 动到局外玩家 3 级 · 改地图 4 级（D7）；这一批只有 2 级的。</li>
+ *       权限分档：对局与观感 2 级 · 动到局外玩家 3 级 · 改地图 4 级（D7）。4 级的只有 {@code liner replace}（ADR-0080）。</li>
  *   <li><b>改局面只走引擎的合法入口</b>，照常过自检（{@code Invariants}）。世界上的东西（灯油、帆、天色）引擎不知道，
  *       直接改世界。「复活」与「倒带」故意不做（D5）：那几条自检专门抓真 bug，为调试开后门等于把它们一起关掉。</li>
  *   <li><b>用过就留痕</b>（D3，{@link DebugTrace}）：改了局面的，全船右栏一行「（调试）…」、计分面板盖章、日志一行。</li>
@@ -83,6 +84,9 @@ public final class DebugCommand {
 
     /** 2 级：对局与观感（与 Minecraft 自带的 {@code /weather} {@code /time} 同一档）。 */
     static final int GAME = 2;
+
+    /** 4 级：改地图（D7）—— 清掉北辰号重摆。 */
+    static final int MAP = 4;
 
     private static final DateTimeFormatter DUMP_NAME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
 
@@ -145,6 +149,11 @@ public final class DebugCommand {
                                 .executes(SeasCommand.guarded(DebugCommand::skyRain))))
                         .then(lit("reset", GAME).executes(SeasCommand.guarded(DebugCommand::skyReset))))
                 .then(lit("log", GAME).executes(SeasCommand.guarded(DebugCommand::log)))
+                // 北辰号（ADR-0080）：看摆没摆好 · 管理员自己上船 · 清掉重摆（改地图，4 级）
+                .then(lit("liner", GAME)
+                        .then(lit("status", GAME).executes(SeasCommand.guarded(DebugCommand::linerStatus)))
+                        .then(lit("tp", GAME).executes(SeasCommand.guarded(DebugCommand::linerTp)))
+                        .then(lit("replace", MAP).executes(SeasCommand.guarded(DebugCommand::linerReplace))))
                 // 原来的 /seas dev roster（只在开发环境注册）搬到这里，生产服也有（D2）
                 .then(lit("ui", GAME)
                         .then(lit("roster", GAME)
@@ -741,6 +750,85 @@ public final class DebugCommand {
                     e.changed() ? Text.empty() : Text.translatable("heavyseas.debug.read_only"));
             source.sendFeedback(() -> line, false);
         }
+        return 1;
+    }
+
+    // ------------------------------------------------------------------ 北辰号（ADR-0080）
+
+    /** 清单读不出来时报原因、返回 {@code null}。 */
+    private static LinerShip.Manifest linerManifest(CommandContext<ServerCommandSource> context) {
+        LinerShip.Manifest manifest = LinerShip.manifest().orElse(null);
+        if (manifest == null) {
+            context.getSource().sendError(Text.translatable("heavyseas.debug.liner.unavailable",
+                    LinerShip.unavailableReason().orElse("?")));
+        }
+        return manifest;
+    }
+
+    private static ServerWorld linerWorld(CommandContext<ServerCommandSource> context, LinerShip.Manifest manifest) {
+        ServerWorld world = context.getSource().getServer().getWorld(manifest.dimension());
+        if (world == null) {
+            context.getSource().sendError(Text.translatable("heavyseas.debug.liner.unavailable",
+                    manifest.dimension().getValue().toString()));
+        }
+        return world;
+    }
+
+    private static int linerStatus(CommandContext<ServerCommandSource> context) {
+        LinerShip.Manifest m = linerManifest(context);
+        ServerWorld world = m == null ? null : linerWorld(context, m);
+        if (world == null) {
+            return 0;
+        }
+        String placed = LinerShip.placedVersion(context.getSource().getServer());
+        Text where = LinerShip.progress()
+                .<Text>map(p -> Text.translatable("heavyseas.debug.liner.working", p[0], p[1]))
+                .orElseGet(() -> Text.translatable(m.version().equals(placed)
+                        ? "heavyseas.debug.liner.placed" : "heavyseas.debug.liner.not_placed"));
+        Text line = Text.translatable("heavyseas.debug.liner.status", m.version(), placed.isEmpty() ? "-" : placed,
+                m.origin().getX(), m.origin().getY(), m.origin().getZ(), where);
+        context.getSource().sendFeedback(() -> line, false);
+        return 1;
+    }
+
+    /** 管理员自己上船（第一段艇甲板），面朝船头。这一局里的人不许用：离开艇就等于离开了这一局的座位。 */
+    private static int linerTp(CommandContext<ServerCommandSource> context) {
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        if (player == null) {
+            context.getSource().sendError(Text.translatable("heavyseas.debug.player_only"));
+            return 0;
+        }
+        LinerShip.Manifest m = linerManifest(context);
+        ServerWorld world = m == null ? null : linerWorld(context, m);
+        if (world == null) {
+            return 0;
+        }
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        if (sea != null && GameComponents.of(sea).belongsToActiveVoyage(player.getUuid())) {
+            context.getSource().sendError(Text.translatable("heavyseas.debug.liner.in_voyage"));
+            return 0;
+        }
+        player.stopRiding();
+        player.teleport(world, m.arrival().x, m.arrival().y, m.arrival().z, 270f, 0f);
+        context.getSource().sendFeedback(() -> Text.translatable("heavyseas.debug.liner.tp"), false);
+        LOGGER.info("调试：{} 上了北辰号（{}）", player.getGameProfile().getName(), m.arrival());
+        return 1;
+    }
+
+    private static int linerReplace(CommandContext<ServerCommandSource> context) {
+        LinerShip.Manifest m = linerManifest(context);
+        ServerWorld world = m == null ? null : linerWorld(context, m);
+        if (world == null) {
+            return 0;
+        }
+        Optional<Integer> steps = LinerShip.replace(context.getSource().getServer(), m);
+        if (steps.isEmpty()) {
+            int[] p = LinerShip.progress().orElse(new int[]{0, 0});
+            context.getSource().sendError(Text.translatable("heavyseas.debug.liner.busy", p[0], p[1]));
+            return 0;
+        }
+        context.getSource().sendFeedback(() -> Text.translatable("heavyseas.debug.liner.replace", steps.get()), true);
+        LOGGER.info("调试：{} 让北辰号清掉重摆（{} 步）", who(context), steps.get());
         return 1;
     }
 

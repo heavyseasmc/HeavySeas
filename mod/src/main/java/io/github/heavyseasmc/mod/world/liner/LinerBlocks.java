@@ -64,6 +64,99 @@ public final class LinerBlocks {
     public static final EnumProperty<Trim> TRIM = EnumProperty.of("trim", Trim.class);
     /** 壁柱最下一格的柱脚（{@link LinerConnect.Rules#pilasterBase}，看下面与左右自动算）。 */
     public static final EnumProperty<PilasterBase> BASE = EnumProperty.of("base", PilasterBase.class);
+    // ---- A 甲板新贴附件（ADR-0080 §7）：格架 · 拱（宽门套沿用门套的 part / trim）
+    /** 格架的内角（{@link LinerConnect.Rules#trellisCorner}）：屋角那一格在旁边那面墙上补一片。框条照大框用 up / down / left / right。 */
+    public static final EnumProperty<TrellisCorner> CORNER = EnumProperty.of("corner", TrellisCorner.class);
+    /** 格架上的常春藤：没有 · 中段（上面那一格也有）· 藤梢（{@link LinerConnect.Rules#ivyState}；有没有藤是摆的人定的，中段 / 藤梢自动算）。 */
+    public static final EnumProperty<Ivy> IVY = EnumProperty.of("ivy", Ivy.class);
+    /** 这一列茎的布局（{@link LinerConnect.Rules#ivyLayout}，按位置算）。 */
+    public static final EnumProperty<IvyLayout> LAYOUT = EnumProperty.of("layout", IvyLayout.class);
+    /** 这一格茎的拐法与叶子（{@link LinerConnect.Rules#ivyVariant}，按位置算）。 */
+    public static final IntProperty V = IntProperty.of("v", 0, LinerConnect.Rules.IVY_PATHS - 1);
+    /** 拱是一排三格里的哪一格（{@link LinerConnect.Rules#archPart}）。 */
+    public static final EnumProperty<ArchPart> ARCH_PART = EnumProperty.of("part", ArchPart.class);
+    /** 半圆拱的上下两排（{@link LinerConnect.Rules#archRow}）。 */
+    public static final EnumProperty<ArchRow> ROW = EnumProperty.of("row", ArchRow.class);
+
+    /** 格架的内角：没有 · 补在左手那面墙上 · 右手那面（站在正面看）。 */
+    public enum TrellisCorner implements StringIdentifiable {
+        NONE, INNER_LEFT, INNER_RIGHT;
+
+        static TrellisCorner of(String code) {
+            return valueOf(code.toUpperCase(Locale.ROOT));
+        }
+
+        /** 镜像之后左右对调。 */
+        TrellisCorner mirrored() {
+            return this == INNER_LEFT ? INNER_RIGHT : this == INNER_RIGHT ? INNER_LEFT : this;
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** 常春藤：没有 · 中段 · 藤梢。 */
+    public enum Ivy implements StringIdentifiable {
+        NONE, MID, TIP;
+
+        static Ivy of(String code) {
+            return valueOf(code.toUpperCase(Locale.ROOT));
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** 常春藤茎的三种布局：偏左一根 · 两根 · 偏右一根（{@code liner_decor.py} 的 IVY_LAYOUTS）。 */
+    public enum IvyLayout implements StringIdentifiable {
+        A, B, C;
+
+        static IvyLayout of(String code) {
+            return valueOf(code.toUpperCase(Locale.ROOT));
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** 拱的左 · 中 · 右（站在正面看）。 */
+    public enum ArchPart implements StringIdentifiable {
+        L, C, R;
+
+        static ArchPart of(String code) {
+            return valueOf(code.toUpperCase(Locale.ROOT));
+        }
+
+        /** 镜像之后左右对调。 */
+        ArchPart mirrored() {
+            return this == L ? R : this == R ? L : this;
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** 半圆拱的下面那一排 · 上面那一排。 */
+    public enum ArchRow implements StringIdentifiable {
+        LOWER, UPPER;
+
+        static ArchRow of(String code) {
+            return valueOf(code.toUpperCase(Locale.ROOT));
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
 
     /** 护墙这一段：素段 · 框左半 · 框中段 · 框右半 · 单格框（贴图后缀 c / l / m / r / s）。 */
     public enum WainscotPart implements StringIdentifiable {
@@ -271,8 +364,56 @@ public final class LinerBlocks {
                     ? look("capping", tex("c", "capping_mahogany"))
                     : look("capping_" + s.get(END).asString(), tex("c", "capping_mahogany", "p", "pilaster_mahogany")),
             FACING, END);
+    // ---- A 甲板新贴附件（ADR-0080 §7，用户 2026-10-04「全按倾向」：格架 A 菱格 + 常春藤 + 内角 · 拱 C 半圆 + 拱心石 · 宽门套 A 檐式门头）
+    /** 宽门套（高层的大门、双开门）：门套那一族放大到 7 宽，门楣上一道檐；part / trim 与门套同一套规则，两种门套互相跨过去找线。 */
+    public static final LinerBlock DOOR_CASING_TALL = add("liner_door_casing_tall", piece(MapColor.OFF_WHITE), LinerBlock.Kind.CASING,
+            LinerBlocks::casingTallLook, FACING, CASING_PART, TRIM);
+    /** 白漆菱格格架：框条看上下左右（同大框）· 屋角补旁边那面墙（corner）· 常春藤叠在上面（多部件模型，见 {@link LinerBlock#layers}）。 */
+    public static final LinerBlock TRELLIS = add("liner_trellis", piece(MapColor.OFF_WHITE), LinerBlock.Kind.TRELLIS,
+            LinerBlocks::trellisLook, FACING, UP, DOWN, LEFT, RIGHT, CORNER, IVY, LAYOUT, V);
+    /** 半圆拱（墙那一格本身，屋里一面墙面、外面一面外墙白）：一排三格（part）· 上下两排（row），看邻居自动算。 */
+    public static final LinerBlock ARCH = add("liner_arch", piece(MapColor.OFF_WHITE), LinerBlock.Kind.ARCH,
+            s -> look("arch_" + s.get(ARCH_PART).asString() + "_" + s.get(ROW).asString(),
+                    tex("f", "wall", "w", "wall_white", "c", "door_casing")), FACING, ARCH_PART, ROW);
 
     private LinerBlocks() {
+    }
+
+    /** 宽门套：模板 {@code casing_tall_<哪一块>[_<顺带的线>]}。只有两侧顺带踢脚 / 腰线；门楣、上角与别的线（薄檐口）画成不带线的那一块。 */
+    static LinerLooks.Look casingTallLook(BlockState s) {
+        CasingPart part = s.get(CASING_PART);
+        Trim trim = s.get(TRIM);
+        boolean side = part == CasingPart.JAMB_LEFT || part == CasingPart.JAMB_RIGHT;
+        if (!side || trim == Trim.CORNICE) {
+            trim = Trim.NONE;
+        }
+        Map<String, String> t = tex("c", "door_casing", "h", "door_casing_head", "e", "door_casing_tall");
+        switch (trim) {
+            case SKIRTING -> t.put("k", "skirting");
+            case CHAIR_RAIL -> t.put("r", "chair_rail");
+            default -> {
+            }
+        }
+        return look("casing_tall_" + part.asString() + (trim == Trim.NONE ? "" : "_" + trim.asString()), t);
+    }
+
+    /**
+     * 格架本体：模板 {@code trellis/base_<框条>[_<内角>]}（框条照大框 frameMask；内角只在屋角那一边画着竖框条时才有 ——
+     * 属性里存着别的组合（手动 /setblock 才会出现）画成不带内角的那一块）。常春藤是另一层（{@link #ivyLook}）。
+     */
+    static LinerLooks.Look trellisLook(BlockState s) {
+        String mask = LinerConnect.Rules.frameMask(s.get(UP), s.get(DOWN), s.get(LEFT), s.get(RIGHT));
+        TrellisCorner c = s.get(CORNER);
+        boolean ok = c == TrellisCorner.INNER_RIGHT ? mask.contains("r") : c == TrellisCorner.INNER_LEFT && mask.contains("l");
+        return look("trellis/base_" + mask + (ok ? "_" + c.asString() : ""), tex("t", "trellis"));
+    }
+
+    /** 常春藤那一层：模板 {@code trellis/ivy_<mid|tip>_<布局><拐法>}；没有藤 = {@code null}（这一层不画）。 */
+    static LinerLooks.Look ivyLook(BlockState s) {
+        if (s.get(IVY) == Ivy.NONE) {
+            return null;
+        }
+        return look("trellis/ivy_" + s.get(IVY).asString() + "_" + s.get(LAYOUT).asString() + s.get(V), tex("v", "ivy"));
     }
 
     /** 方块与物品一起登记；物品只在创造模式里拿得到（方块挖不动、不掉东西、没有配方）。 */

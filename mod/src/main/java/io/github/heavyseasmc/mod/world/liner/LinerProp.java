@@ -51,6 +51,8 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  * 台灯放在大桌上时整件下沉 3 像素落在桌布上（{@code on_table}，看正下方那一格），并往桌子正中斜挪 3 像素（{@code table_corner}，ADR-0071）。
  * 客房与阅览室的家具（ADR 草稿 furniture）：黄铜床 1 × 2（床头往远处长）· 衣柜与盥洗台一格宽两格高 · 书柜 2 × 2 竖着两格高 ·
  * 写字台两格宽 · 写字椅一格；壁灯一格、背贴墙（朝向从点中的墙定，墙拆了不掉，没有碰撞箱）。
+ * A 甲板新家具（ADR 草稿 furnish）：壁炉与炉上件 3 宽 × 2 高（炉火右键开关、只有正中下面那一格发光）· 棕榈两格高 / 大棵三格高
+ * （碰撞只算盆）· 藤编扶手椅 · 小圆桌一格、长椅两格 · 吧台 4 长 × 2 高（带台后酒架）。
  *
  * <p>模型一律<b>正面朝北</b>作画（与游戏自带方块的约定一致，物品栏里才看得到正面），与 {@link LinerBlock} 的「朝南作画」不同：
  * 这里的 y 旋转是 北 0 · 东 90 · 南 180 · 西 270。
@@ -72,7 +74,32 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         /** 床（1 × 2）：床尾那一格（离摆的人近）与床头那一格（往远处长）。 */
         FOOT(0, 0, 0), HEAD(0, 0, 1),
         /** 书柜（2 × 2，竖着两格高）：下面一层用 {@link #WEST} · {@link #EAST}，上面一层是这两块。 */
-        UPPER_WEST(0, 1, 0), UPPER_EAST(1, 1, 0);
+        UPPER_WEST(0, 1, 0), UPPER_EAST(1, 1, 0),
+        /** 三格高的件（大棵棕榈 · 高通风筒）：下面两格用 {@link #LOWER} · {@link #UPPER}，最上面一格是它。 */
+        TOP(0, 2, 0),
+        /**
+         * 3 宽 × 2 高、背贴墙的件（壁炉 · 炉上件）：下面一层西 · 中 · 东（模型里由西往东），上面一层同样三块。
+         * 不借 {@link #WEST} · {@link #EAST}：那两块是两格宽的件的第 0 · 1 格，镜像时也只对调这两块；3 宽的东在第 2 格、镜像是 0 ↔ 2。
+         */
+        WIDE_WEST(0, 0, 0), WIDE_MID(1, 0, 0), WIDE_EAST(2, 0, 0),
+        WIDE_UPPER_WEST(0, 1, 0), WIDE_UPPER_MID(1, 1, 0), WIDE_UPPER_EAST(2, 1, 0),
+        /** 3 宽 × 3 高的件（魔镜，2026-10-04 放大）：下面两层同 3 宽 × 2 高那一族，最上面一层是这三块；镜像是西 ↔ 东。 */
+        WIDE_TOP_WEST(0, 2, 0), WIDE_TOP_MID(1, 2, 0), WIDE_TOP_EAST(2, 2, 0),
+        /** 吧台（4 长 × 2 高）：下面一层第 1–4 格（模型里由西往东），上面一层（台后酒架）同样四块；镜像是 1 ↔ 4 · 2 ↔ 3。 */
+        BAY_1(0, 0, 0), BAY_2(1, 0, 0), BAY_3(2, 0, 0), BAY_4(3, 0, 0),
+        UPPER_BAY_1(0, 1, 0), UPPER_BAY_2(1, 1, 0), UPPER_BAY_3(2, 1, 0), UPPER_BAY_4(3, 1, 0),
+        /**
+         * 吊艇架（艇甲板设备，ADR 草稿 deckgear）：铁座两格（锚点 {@link #BASE} · 往舷内一格），其余顺着斜臂往上、往舷外一格不落 ——
+         * 每一格都与上一格面贴面挨着，「拆一格整件没」（一格传一格）才传得到头。模型正面朝北 = 舷外，所以往舷外是 −z。
+         */
+        BASE(0, 0, 0), BASE_IN(0, 0, 1), QUADRANT(0, 1, 0), ARM_A(0, 2, 0), ARM_B(0, 3, 0), ARM_C(0, 3, -1),
+        ARM_D(0, 4, -1), ARM_E(0, 5, -1), ARM_F(0, 5, -2), ARM_HEAD(0, 6, -2),
+        /**
+         * 开局的钟（门形钟架，2 宽 × 6 高，ADR-0084 第三轮）：西一列（模型 x 0）与东一列（x 1），由下往上 0–5；钟挂在横梁正中（两列的接缝上）。
+         * 镜像是西 ↔ 东。
+         */
+        BELL_W0(0, 0, 0), BELL_W1(0, 1, 0), BELL_W2(0, 2, 0), BELL_W3(0, 3, 0), BELL_W4(0, 4, 0), BELL_W5(0, 5, 0),
+        BELL_E0(1, 0, 0), BELL_E1(1, 1, 0), BELL_E2(1, 2, 0), BELL_E3(1, 3, 0), BELL_E4(1, 4, 0), BELL_E5(1, 5, 0);
 
         final int x;
         final int y;
@@ -118,6 +145,12 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         WARDROBE,
         /** 盥洗台（一格宽、两格高，连镜子）：背贴墙。 */
         WASHSTAND,
+        /**
+         * 魔镜（ADR-0065 · ADR-0083；2026-10-04 放大到两格宽、三格高，嵌进墙里的那一版）：占 3 宽 × 3 高，框在正中两格、
+         * 两侧那两列各带半边框（主景正中是一格，两格宽的东西只能这样居中）；背贴墙、镜面朝摆它的人。
+         * 点中的那一格是下面一层正中（{@link Part#WIDE_MID}），往人的左右手各长一格、往上长两层。右键穿过去（{@code MagicMirror}）。
+         */
+        MIRROR,
         /** 书柜（2 × 2，竖着两格高）：往人的右手与上面长。 */
         BOOKCASE,
         /** 写字台（两格宽、两个座位）：同沙发，往人的右手长。 */
@@ -128,7 +161,50 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
          * 壁灯（一格，ADR-0069 §4 倾向 A）：贴在墙前那一格、背贴墙，朝向就是离墙的方向；摆的时候点中的那一面墙要是实的，
          * 摆好之后墙拆了灯也不掉（与檐口、腰线这些挂墙件相同）。右键开关；没有碰撞箱（同游戏自带的墙上火把：走廊两格宽，不碰头）。
          */
-        SCONCE
+        SCONCE,
+        /**
+         * 壁炉（3 宽 × 2 高、背贴墙，ADR 草稿 furnish）：往人的右手与上面长；炉火右键开关（默认亮），只有正中下面那一格发光
+         * （炭与火苗都在那一格的模型里）。灭着时模型里没有火苗、只剩冷炭。
+         */
+        FIREPLACE,
+        /** 炉上件（描金框镜 · 桃花心木框油画；3 宽 × 2 高、背贴墙）：挂在壁炉上面两排，底框往下伸进壁炉那两排 4.5 像素、坐在壁炉台上。 */
+        OVERMANTEL,
+        /** 盆栽棕榈（两格高）：碰撞只算盆（叶子伸出这一格、穿得过去）。 */
+        PALM,
+        /** 大棵棕榈（三格高）：同上。 */
+        PALM_TALL,
+        /** 藤编扶手椅（一格）。 */
+        WICKER_CHAIR,
+        /** 藤编小圆桌（一格）。 */
+        WICKER_TABLE,
+        /** 藤编长椅（两格）：同沙发，往人的右手长。 */
+        WICKER_SETTEE,
+        /** 吧台（4 长 × 2 高，带台后酒架、背贴墙）：往人的右手与上面长。 */
+        BAR_COUNTER,
+        /**
+         * 吊艇架（四分圆摇臂式，ADR-0080 §7 甲）：10 格，正面（模型北）朝舷外，臂倒 22.5° 伸出去，臂头在铁座外 2.5 格、上 6.9 格。
+         * 艇在哪一边由 {@link #BOAT_SIDE} 定（右手是画的那一份，左手是镜像那一份）。
+         */
+        DAVIT,
+        /** 喇叭口通风筒（高，三格）：喇叭口朝正面。 */
+        VENTILATOR,
+        /** 喇叭口通风筒（矮，两格）。 */
+        VENTILATOR_SHORT,
+        /**
+         * 开局的钟（门形钟架：两根白漆柱、柚木横梁、黄铜船钟挂在正中；2 宽 × 6 高，ADR-0084 第三轮）：正面（模型北）朝演习艇，
+         * 往人的右手与上面长（同书柜）。右键敲钟：演习艇旁那一口交给 {@link DrillSkiff#ringBell}（坐在艇里 = 开阵容面板）。
+         */
+        DRILL_BELL
+    }
+
+    /** 吊艇架的艇在哪一边：站在吊艇架后面、面朝舷外（模型的正面）看，艇在右手（模型 +x，画的那一份）还是左手（镜像那一份）。 */
+    public enum BoatSide implements StringIdentifiable {
+        LEFT, RIGHT;
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
     }
 
     public static final net.minecraft.state.property.DirectionProperty FACING = Properties.HORIZONTAL_FACING;
@@ -150,6 +226,19 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             Part.RING_NW, Part.RING_N, Part.RING_NE, Part.RING_W, Part.RING_C, Part.RING_E, Part.RING_SW, Part.RING_S, Part.RING_SE);
     public static final EnumProperty<Part> BED_PART = EnumProperty.of("part", Part.class, Part.FOOT, Part.HEAD);
     public static final EnumProperty<Part> SHELF = EnumProperty.of("part", Part.class, Part.WEST, Part.EAST, Part.UPPER_WEST, Part.UPPER_EAST);
+    public static final EnumProperty<Part> TALL3 = EnumProperty.of("part", Part.class, Part.LOWER, Part.UPPER, Part.TOP);
+    public static final EnumProperty<Part> WIDE = EnumProperty.of("part", Part.class, Part.WIDE_WEST, Part.WIDE_MID, Part.WIDE_EAST,
+            Part.WIDE_UPPER_WEST, Part.WIDE_UPPER_MID, Part.WIDE_UPPER_EAST);
+    public static final EnumProperty<Part> WIDE3 = EnumProperty.of("part", Part.class, Part.WIDE_WEST, Part.WIDE_MID, Part.WIDE_EAST,
+            Part.WIDE_UPPER_WEST, Part.WIDE_UPPER_MID, Part.WIDE_UPPER_EAST, Part.WIDE_TOP_WEST, Part.WIDE_TOP_MID, Part.WIDE_TOP_EAST);
+    public static final EnumProperty<Part> BAR = EnumProperty.of("part", Part.class, Part.BAY_1, Part.BAY_2, Part.BAY_3, Part.BAY_4,
+            Part.UPPER_BAY_1, Part.UPPER_BAY_2, Part.UPPER_BAY_3, Part.UPPER_BAY_4);
+    public static final EnumProperty<Part> DAVIT_PART = EnumProperty.of("part", Part.class, Part.BASE, Part.BASE_IN, Part.QUADRANT,
+            Part.ARM_A, Part.ARM_B, Part.ARM_C, Part.ARM_D, Part.ARM_E, Part.ARM_F, Part.ARM_HEAD);
+    /** 吊艇架：艇在哪一边（见 {@link BoatSide}）。结构照镜子时跟着换（{@link #mirror}）。 */
+    public static final EnumProperty<BoatSide> BOAT_SIDE = EnumProperty.of("boat_side", BoatSide.class);
+    public static final EnumProperty<Part> BELL_PART = EnumProperty.of("part", Part.class, Part.BELL_W0, Part.BELL_W1, Part.BELL_W2,
+            Part.BELL_W3, Part.BELL_W4, Part.BELL_W5, Part.BELL_E0, Part.BELL_E1, Part.BELL_E2, Part.BELL_E3, Part.BELL_E4, Part.BELL_E5);
 
     /**
      * 一件道具的说明。
@@ -167,6 +256,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
     private final Spec spec;
     private final EnumProperty<Part> part;
     private final Map<BlockState, VoxelShape> shapes = new ConcurrentHashMap<>();
+    private final Map<BlockState, VoxelShape> collisions = new ConcurrentHashMap<>();
 
     static LinerProp create(AbstractBlock.Settings settings, Spec spec) {
         PENDING.set(spec);
@@ -191,17 +281,26 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         if (s.contains(ON_TABLE)) {
             s = s.with(ON_TABLE, false).with(TABLE_CORNER, Part.NW);
         }
+        if (s.contains(BOAT_SIDE)) {
+            s = s.with(BOAT_SIDE, BoatSide.RIGHT);
+        }
         setDefaultState(s);
     }
 
     private static EnumProperty<Part> partProperty(Kind kind) {
         return switch (kind) {
-            case TALL_LAMP, CHANDELIER, WARDROBE, WASHSTAND -> TALL;
+            case TALL_LAMP, CHANDELIER, WARDROBE, WASHSTAND, PALM, VENTILATOR_SHORT -> TALL;
+            case MIRROR -> WIDE3;
             case GRAND_TABLE, CEILING_QUAD -> QUAD;
-            case SOFA, CEILING_PAIR, WRITING_TABLE -> PAIR;
+            case SOFA, CEILING_PAIR, WRITING_TABLE, WICKER_SETTEE -> PAIR;
             case GRAND_CHANDELIER -> GRAND;
             case BED -> BED_PART;
             case BOOKCASE -> SHELF;
+            case PALM_TALL, VENTILATOR -> TALL3;
+            case FIREPLACE, OVERMANTEL -> WIDE;
+            case BAR_COUNTER -> BAR;
+            case DAVIT -> DAVIT_PART;
+            case DRILL_BELL -> BELL_PART;
             default -> null;
         };
     }
@@ -219,6 +318,9 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         }
         if (s.kind() == Kind.TABLE_LAMP) {
             builder.add(ON_TABLE, TABLE_CORNER);
+        }
+        if (s.kind() == Kind.DAVIT) {
+            builder.add(BOAT_SIDE);
         }
     }
 
@@ -267,6 +369,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                     tex("b", "prop/" + spec.texture(), "g", "prop/" + spec.glow() + "_" + st));
             // 客房与阅览室的家具（ADR 草稿 furniture）：每一块一个模板，贴图整件一张（书柜的书架里面另一张 #k）
             case WARDROBE, WASHSTAND -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(TALL).asString(), tex("b", "prop/" + spec.texture()));
+            case MIRROR -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(WIDE3).asString(), tex("b", "prop/" + spec.texture()));
             case BED -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(BED_PART).asString(), tex("b", "prop/" + spec.texture()));
             case BOOKCASE -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(SHELF).asString(),
                     tex("b", "prop/" + spec.texture(), "k", "prop/" + spec.texture() + "_shelves"));
@@ -274,6 +377,29 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             case WRITING_CHAIR -> LinerLooks.look("prop/" + spec.model(), tex("b", "prop/" + spec.texture()));
             case SCONCE -> LinerLooks.look("prop/" + spec.model() + "_" + st, tex("b", "prop/" + spec.texture(),
                     "g", "prop/" + spec.glow() + "_" + st));
+            // A 甲板新家具（ADR 草稿 furnish）：大件一张主贴图（#b）+ 细节一张（#k）；壁炉的炭与火在发光那一张（#g，亮 / 灭两张），
+            //   灭着那一份的模板里没有火苗（模板名带 _off / _lit）；吧台的酒瓶另一张（#w）
+            case FIREPLACE -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(WIDE).asString() + "_" + st, tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_detail", "g", "prop/" + spec.glow() + "_" + st));
+            case OVERMANTEL -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(WIDE).asString(), tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_detail"));
+            case PALM -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(TALL).asString(), tex("b", "prop/" + spec.texture()));
+            case PALM_TALL -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(TALL3).asString(), tex("b", "prop/" + spec.texture()));
+            case WICKER_CHAIR, WICKER_TABLE -> LinerLooks.look("prop/" + spec.model(), tex("b", "prop/" + spec.texture()));
+            case WICKER_SETTEE -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(PAIR).asString(), tex("b", "prop/" + spec.texture()));
+            case BAR_COUNTER -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(BAR).asString(), tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_detail", "w", "prop/" + spec.texture() + "_bottles"));
+            // 艇甲板设备（ADR 草稿 deckgear）：白漆一张 #b、铁与吊索 / 喇叭与口一张 #k；吊艇架艇在左手时用镜像那一份模板（_m）
+            case DAVIT -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(DAVIT_PART).asString()
+                            + (s.get(BOAT_SIDE) == BoatSide.LEFT ? "_m" : ""),
+                    tex("b", "prop/" + spec.texture(), "k", "prop/" + spec.texture() + "_iron"));
+            case VENTILATOR -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(TALL3).asString(),
+                    tex("b", "prop/" + spec.texture(), "k", "prop/" + spec.texture() + "_mouth"));
+            case VENTILATOR_SHORT -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(TALL).asString(),
+                    tex("b", "prop/" + spec.texture(), "k", "prop/" + spec.texture() + "_mouth"));
+            // 开局的钟：白漆柱与柚木横梁一张 #b、黄铜钟与铁件、钟绳一张 #k
+            case DRILL_BELL -> LinerLooks.look("prop/" + spec.model() + "_" + s.get(BELL_PART).asString(),
+                    tex("b", "prop/" + spec.texture(), "k", "prop/" + spec.texture() + "_brass"));
         };
         return base.turned(yawOf(s.get(FACING)));
     }
@@ -303,9 +429,23 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             // 骑缝灯在物品栏里就是那一盏灯（整件只是挪了半格）
             case CEILING_PAIR, CEILING_QUAD -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
                     "g", "prop/" + spec.glow() + "_lit"));
-            case BED, WARDROBE, WASHSTAND, WRITING_TABLE -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture()));
+            case BED, WARDROBE, WASHSTAND, MIRROR, WRITING_TABLE -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture()));
             case BOOKCASE -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
                     "k", "prop/" + spec.texture() + "_shelves"));
+            // A 甲板新家具：整件缩小（吧台 4 格长，物品是整件再缩一半的那一份）
+            case FIREPLACE -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_detail", "g", "prop/" + spec.glow() + "_lit"));
+            case OVERMANTEL -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_detail"));
+            case PALM, PALM_TALL, WICKER_SETTEE -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture()));
+            case BAR_COUNTER -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_detail", "w", "prop/" + spec.texture() + "_bottles"));
+            case DAVIT -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_iron"));
+            case VENTILATOR, VENTILATOR_SHORT -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_mouth"));
+            case DRILL_BELL -> LinerLooks.look("prop/" + spec.model() + "_item", tex("b", "prop/" + spec.texture(),
+                    "k", "prop/" + spec.texture() + "_brass"));
             default -> null;
         };
     }
@@ -435,9 +575,20 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         return s.getBlock() instanceof LinerProp p && p.spec.kind() == Kind.GRAND_TABLE;
     }
 
-    /** 灯：右键开关（整件一起）。别的件右键没有反应。 */
+    /**
+     * 灯：右键开关（整件一起）。魔镜：右键穿过去（{@link io.github.heavyseasmc.mod.world.MagicMirror}）。
+     * 开局的钟：右键敲钟（{@link DrillSkiff#ringBell}：响一声；演习艇旁那一口、坐在艇里的人敲 = 开阵容面板）。别的件右键没有反应。
+     */
     @Override
     protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
+        if (spec.kind() == Kind.DRILL_BELL) {
+            return DrillSkiff.ringBell(world, pos, player);
+        }
+        if (spec.kind() == Kind.MIRROR) {
+            // 点中哪一格都一样：交给 MagicMirror 的是下面一层正中那一格（镜面正中的正下方）
+            BlockPos centre = Rules.offset(pos, state.get(WIDE3), Part.WIDE_MID, state.get(FACING));
+            return io.github.heavyseasmc.mod.world.MagicMirror.use(world, centre, state.get(FACING), player);
+        }
         if (!state.contains(LIT)) {
             return ActionResult.PASS;
         }
@@ -485,6 +636,9 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         if (s.contains(TABLE_CORNER)) {
             s = s.with(TABLE_CORNER, Rules.mirrored(state.get(TABLE_CORNER)));          // 模型里的方向，照镜子同样是左右对调
         }
+        if (s.contains(BOAT_SIDE)) {
+            s = s.with(BOAT_SIDE, Rules.mirrored(state.get(BOAT_SIDE)));                // 吊艇架：艇换到另一只手（模板换成镜像那一份）
+        }
         return part == null ? s : s.with(part, Rules.mirrored(state.get(part)));
     }
 
@@ -495,21 +649,35 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         return shapes.computeIfAbsent(state, this::shapeOf);
     }
 
-    /** 碰撞箱就是轮廓（Minecraft 默认），只有壁灯没有：同游戏自带的墙上火把，两格宽的走廊里走过去不碰头。 */
+    /**
+     * 碰撞箱就是轮廓（Minecraft 默认），只有壁灯没有：同游戏自带的墙上火把，两格宽的走廊里走过去不碰头。
+     * 棕榈另算（{@link LinerPropShapes#collision}）：碰撞只算盆，叶子点得中（轮廓有）但穿得过去。
+     */
     @Override
     protected VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        return spec.kind() == Kind.SCONCE ? VoxelShapes.empty() : super.getCollisionShape(state, world, pos, context);
+        if (spec.kind() == Kind.SCONCE) {
+            return VoxelShapes.empty();
+        }
+        if (LinerPropShapes.collision(spec.kind(), part == null ? null : state.get(part)) != null) {
+            return collisions.computeIfAbsent(state, s -> shapeOf(s, LinerPropShapes.collision(spec.kind(), part == null ? null : s.get(part))));
+        }
+        return super.getCollisionShape(state, world, pos, context);
     }
 
     private VoxelShape shapeOf(BlockState s) {
-        Part p = part == null ? null : s.get(part);
+        return shapeOf(s, LinerPropShapes.boxes(spec.kind(), part == null ? null : s.get(part)));
+    }
+
+    private VoxelShape shapeOf(BlockState s, List<double[]> boxes) {
         boolean onTable = s.contains(ON_TABLE) && s.get(ON_TABLE);
         double sink = onTable ? 3 : 0;
         // 在桌上的台灯往桌子正中斜挪（模型里的方向，转朝向之前挪）
         double sx = onTable ? TABLE_SHIFT * (s.get(TABLE_CORNER).x == 0 ? -1 : 1) : 0;
         double sz = onTable ? TABLE_SHIFT * (s.get(TABLE_CORNER).z == 0 ? -1 : 1) : 0;
+        boolean flip = s.contains(BOAT_SIDE) && s.get(BOAT_SIDE) == BoatSide.LEFT;      // 吊艇架镜像那一份：盒子也左右对调
         VoxelShape shape = VoxelShapes.empty();
-        for (double[] b : LinerPropShapes.boxes(spec.kind(), p)) {
+        for (double[] b0 : boxes) {
+            double[] b = flip ? new double[]{16 - b0[3], b0[1], b0[2], 16 - b0[0], b0[4], b0[5]} : b0;
             double[] lo = LinerLooks.rotateY(b[0] + sx, b[2] + sz, yawOf(s.get(FACING)));
             double[] hi = LinerLooks.rotateY(b[3] + sx, b[5] + sz, yawOf(s.get(FACING)));
             double y0 = Math.max(0, b[1] - sink);
@@ -535,12 +703,17 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
          */
         public static Part anchor(Kind kind) {
             return switch (kind) {
-                case TALL_LAMP, WARDROBE, WASHSTAND -> Part.LOWER;
+                case TALL_LAMP, WARDROBE, WASHSTAND, PALM, PALM_TALL, VENTILATOR, VENTILATOR_SHORT -> Part.LOWER;
+                case MIRROR -> Part.WIDE_MID;                                       // 左右对称：点中的是正中，镜子立在人面前（不偏向一侧）
+                case DRILL_BELL -> Part.BELL_E0;                                     // 同书柜：点中的是下面一层人左手那一块，往人的右手与上面长
+                case DAVIT -> Part.BASE;                                            // 铁座靠舷外那一格；往舷内一格、往上、往舷外（正面）长
                 case CHANDELIER -> Part.UPPER;
                 case GRAND_CHANDELIER -> Part.CROWN;
                 case GRAND_TABLE, CEILING_QUAD -> Part.NE;
-                case SOFA, CEILING_PAIR, WRITING_TABLE, BOOKCASE -> Part.EAST;      // 书柜：点中的是下面一层人左手那一块
+                case SOFA, CEILING_PAIR, WRITING_TABLE, BOOKCASE, WICKER_SETTEE -> Part.EAST;      // 书柜：点中的是下面一层人左手那一块
                 case BED -> Part.FOOT;
+                case FIREPLACE, OVERMANTEL -> Part.WIDE_EAST;                       // 下面一层人左手那一块，往人的右手（模型的西）与上面长
+                case BAR_COUNTER -> Part.BAY_4;
                 default -> null;
             };
         }
@@ -548,9 +721,20 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
         /** 一件里有哪几块（与方块状态的 part 属性同一份清单；单格的件是空集）。单测按它把每一种、每一块都过一遍。 */
         public static Set<Part> parts(Kind kind) {
             return switch (kind) {
-                case TALL_LAMP, CHANDELIER, WARDROBE, WASHSTAND -> EnumSet.of(Part.LOWER, Part.UPPER);
+                case TALL_LAMP, CHANDELIER, WARDROBE, WASHSTAND, PALM, VENTILATOR_SHORT -> EnumSet.of(Part.LOWER, Part.UPPER);
+                case MIRROR -> EnumSet.of(Part.WIDE_WEST, Part.WIDE_MID, Part.WIDE_EAST, Part.WIDE_UPPER_WEST, Part.WIDE_UPPER_MID,
+                        Part.WIDE_UPPER_EAST, Part.WIDE_TOP_WEST, Part.WIDE_TOP_MID, Part.WIDE_TOP_EAST);
+                case PALM_TALL, VENTILATOR -> EnumSet.of(Part.LOWER, Part.UPPER, Part.TOP);
+                case FIREPLACE, OVERMANTEL -> EnumSet.of(Part.WIDE_WEST, Part.WIDE_MID, Part.WIDE_EAST,
+                        Part.WIDE_UPPER_WEST, Part.WIDE_UPPER_MID, Part.WIDE_UPPER_EAST);
+                case BAR_COUNTER -> EnumSet.of(Part.BAY_1, Part.BAY_2, Part.BAY_3, Part.BAY_4,
+                        Part.UPPER_BAY_1, Part.UPPER_BAY_2, Part.UPPER_BAY_3, Part.UPPER_BAY_4);
+                case DAVIT -> EnumSet.of(Part.BASE, Part.BASE_IN, Part.QUADRANT, Part.ARM_A, Part.ARM_B, Part.ARM_C, Part.ARM_D,
+                        Part.ARM_E, Part.ARM_F, Part.ARM_HEAD);
+                case DRILL_BELL -> EnumSet.of(Part.BELL_W0, Part.BELL_W1, Part.BELL_W2, Part.BELL_W3, Part.BELL_W4, Part.BELL_W5,
+                        Part.BELL_E0, Part.BELL_E1, Part.BELL_E2, Part.BELL_E3, Part.BELL_E4, Part.BELL_E5);
                 case GRAND_TABLE, CEILING_QUAD -> EnumSet.of(Part.NW, Part.NE, Part.SW, Part.SE);
-                case SOFA, CEILING_PAIR, WRITING_TABLE -> EnumSet.of(Part.WEST, Part.EAST);
+                case SOFA, CEILING_PAIR, WRITING_TABLE, WICKER_SETTEE -> EnumSet.of(Part.WEST, Part.EAST);
                 case BED -> EnumSet.of(Part.FOOT, Part.HEAD);
                 case BOOKCASE -> EnumSet.of(Part.WEST, Part.EAST, Part.UPPER_WEST, Part.UPPER_EAST);
                 case GRAND_CHANDELIER -> EnumSet.of(Part.CROWN, Part.RING_NW, Part.RING_N, Part.RING_NE, Part.RING_W, Part.RING_C,
@@ -569,10 +753,10 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
             return m[0] < 0 ? (m[1] < 0 ? Part.NW : Part.SW) : (m[1] < 0 ? Part.NE : Part.SE);
         }
 
-        /** 有开关、会发光的那几种。 */
+        /** 有开关、会发光的那几种（壁炉的炉火也是：右键开关，默认亮）。 */
         public static boolean isLamp(Kind kind) {
             return switch (kind) {
-                case TALL_LAMP, TABLE_LAMP, CEILING_LAMP, CHANDELIER, GRAND_CHANDELIER, CEILING_PAIR, CEILING_QUAD, SCONCE -> true;
+                case TALL_LAMP, TABLE_LAMP, CEILING_LAMP, CHANDELIER, GRAND_CHANDELIER, CEILING_PAIR, CEILING_QUAD, SCONCE, FIREPLACE -> true;
                 default -> false;
             };
         }
@@ -592,6 +776,7 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                 case CHANDELIER -> p == Part.LOWER;
                 case GRAND_CHANDELIER -> p == Part.RING_N || p == Part.RING_W || p == Part.RING_C || p == Part.RING_E
                         || p == Part.RING_S;
+                case FIREPLACE -> p == Part.WIDE_MID;                              // 炭与火苗都在正中下面那一格
                 default -> true;
             };
         }
@@ -651,8 +836,39 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
                 case RING_SE -> Part.RING_SW;
                 case UPPER_WEST -> Part.UPPER_EAST;
                 case UPPER_EAST -> Part.UPPER_WEST;
+                case WIDE_WEST -> Part.WIDE_EAST;
+                case WIDE_EAST -> Part.WIDE_WEST;
+                case WIDE_UPPER_WEST -> Part.WIDE_UPPER_EAST;
+                case WIDE_UPPER_EAST -> Part.WIDE_UPPER_WEST;
+                case WIDE_TOP_WEST -> Part.WIDE_TOP_EAST;
+                case WIDE_TOP_EAST -> Part.WIDE_TOP_WEST;
+                case BAY_1 -> Part.BAY_4;
+                case BAY_2 -> Part.BAY_3;
+                case BAY_3 -> Part.BAY_2;
+                case BAY_4 -> Part.BAY_1;
+                case UPPER_BAY_1 -> Part.UPPER_BAY_4;
+                case UPPER_BAY_2 -> Part.UPPER_BAY_3;
+                case UPPER_BAY_3 -> Part.UPPER_BAY_2;
+                case UPPER_BAY_4 -> Part.UPPER_BAY_1;
+                case BELL_W0 -> Part.BELL_E0;
+                case BELL_W1 -> Part.BELL_E1;
+                case BELL_W2 -> Part.BELL_E2;
+                case BELL_W3 -> Part.BELL_E3;
+                case BELL_W4 -> Part.BELL_E4;
+                case BELL_W5 -> Part.BELL_E5;
+                case BELL_E0 -> Part.BELL_W0;
+                case BELL_E1 -> Part.BELL_W1;
+                case BELL_E2 -> Part.BELL_W2;
+                case BELL_E3 -> Part.BELL_W3;
+                case BELL_E4 -> Part.BELL_W4;
+                case BELL_E5 -> Part.BELL_W5;
                 default -> p;
             };
+        }
+
+        /** 吊艇架照镜子：艇换到另一只手（各块都在 x 0 那一列，块本身不换）。 */
+        public static BoatSide mirrored(BoatSide side) {
+            return side == BoatSide.LEFT ? BoatSide.RIGHT : BoatSide.LEFT;
         }
     }
 }

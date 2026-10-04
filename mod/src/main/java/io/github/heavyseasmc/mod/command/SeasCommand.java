@@ -260,7 +260,9 @@ public final class SeasCommand {
             context.getSource().sendError(Text.translatable("heavyseas.command.already_running"));
             return 0;
         }
-        List<ServerPlayerEntity> humans = new ArrayList<>(lobby.getServer().getPlayerManager().getPlayerList());
+        // 在线的人都拉进来（调试与回归脚本的老路）—— 但过了魔镜、在北辰号上闲逛的人不拉，坐进演习艇的才算（ADR-0083）
+        List<ServerPlayerEntity> humans = new ArrayList<>(lobby.getServer().getPlayerManager().getPlayerList().stream()
+                .filter(p -> MistSea.mirrorEscrow(p).isEmpty() || io.github.heavyseasmc.mod.world.liner.DrillSkiff.seated(p)).toList());
         try {
             MistSea.startVoyage(lobby.getServer(), players, humans, lobbyComponent.pendingDummies(), null, layoutId);
             lobbyComponent.clearPendingDummies();

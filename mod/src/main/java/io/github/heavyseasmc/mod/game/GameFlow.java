@@ -467,7 +467,7 @@ public final class GameFlow {
                 // 普通系统事件都进 HUD 侧栏；崩溃会立刻收起会话，侧栏也随之消失，
                 // 所以最后这一句只能走 action bar。它不写入聊天历史。
                 world.getServer().getPlayerManager().getPlayerList().stream()
-                        .filter(player -> player.getWorld().getRegistryKey().equals(world.getRegistryKey()))
+                        .filter(player -> component.belongsToActiveVoyage(player.getUuid()))   // 北辰号上的人不在这一局里（ADR-0083）
                         .forEach(player -> player.sendMessage(
                                 Text.translatable("heavyseas.game.crashed").formatted(Formatting.RED), true));
                 component.end();

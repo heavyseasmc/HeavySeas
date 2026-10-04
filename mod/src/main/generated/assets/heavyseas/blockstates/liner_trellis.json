@@ -1,0 +1,4066 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr"
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr",
+        "y": 180
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr"
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr",
+        "y": 90
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr",
+        "y": 270
+      },
+      "when": {
+        "corner": "none",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_left",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_left"
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_left",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_left",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_left",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_c",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_t",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_r_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tr_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_l",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tl",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_lr_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tlr_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "true",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_right",
+        "y": 180
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "north",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_right"
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "south",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_right",
+        "y": 90
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "west",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_b",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tb",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_br_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbr_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "true",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_bl",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tbl",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "true",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_blr_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "true",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/base_tblr_inner_right",
+        "y": 270
+      },
+      "when": {
+        "corner": "inner_right",
+        "down": "false",
+        "facing": "east",
+        "ivy": "none|mid|tip",
+        "layout": "a|b|c",
+        "left": "false",
+        "right": "false",
+        "up": "false",
+        "v": "0|1|2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a0",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a1",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a2",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b0",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b1",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b2",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c0",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c1",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c2",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a0",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a1",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a2",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b0",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b1",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b2",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c0",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c1",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c2",
+        "y": 180
+      },
+      "when": {
+        "facing": "north",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a0"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a1"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a2"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b0"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b1"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b2"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c0"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c1"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c2"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a0"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a1"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a2"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b0"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b1"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b2"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c0"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c1"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c2"
+      },
+      "when": {
+        "facing": "south",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a0",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a1",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a2",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b0",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b1",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b2",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c0",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c1",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c2",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a0",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a1",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a2",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b0",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b1",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b2",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c0",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c1",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c2",
+        "y": 90
+      },
+      "when": {
+        "facing": "west",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a0",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a1",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_a2",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b0",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b1",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_b2",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c0",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c1",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_mid_c2",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "mid",
+        "layout": "c",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a0",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a1",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_a2",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "a",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b0",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b1",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_b2",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "b",
+        "v": "2"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c0",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "0"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c1",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "1"
+      }
+    },
+    {
+      "apply": {
+        "model": "heavyseas:block/liner/liner_trellis/trellis/ivy_tip_c2",
+        "y": 270
+      },
+      "when": {
+        "facing": "east",
+        "ivy": "tip",
+        "layout": "c",
+        "v": "2"
+      }
+    }
+  ]
+}

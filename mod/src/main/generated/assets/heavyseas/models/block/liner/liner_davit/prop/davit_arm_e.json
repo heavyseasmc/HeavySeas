@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/davit_arm_e",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/davit",
+    "k": "heavyseas:block/liner/prop/davit_iron",
+    "particle": "heavyseas:block/liner/prop/davit"
+  }
+}
