@@ -141,6 +141,8 @@ public final class Session {
         if (state.turn() != was) {
             // 蹭到的酒与「本回合用过」同寿命：一个大回合。后者在 SurvivorState.endOfTurn 里清。
             sharedRum.clear();
+            thirstSettledToday.clear();
+            coverUsedToday.clear();
         }
         Invariants.requireValid(state, context, "阶段推进后");
     }
@@ -1355,6 +1357,10 @@ public final class Session {
             table.discardProvision(WATER);
         }
         thirstWatersSpent += donors.size();
+        // 这一次口渴的每个来源都有了去向（挡下 / 蹭到 / 喝水 / 挨打），今天不再算第二次。
+        thirstSettledToday.computeIfAbsent(prompt.who(), k -> new LinkedHashSet<>())
+                .addAll(prompt.effective().sources());
+        coverUsedToday.merge(prompt.who(), prompt.covered(), Integer::sum);
         int damage = prompt.remaining() - donors.size() / prompt.waterPerSource();
         if (damage > 0) {
             state = state.withState(prompt.who(), state.stateOf(prompt.who()).hurt(damage));
@@ -1407,9 +1413,22 @@ public final class Session {
     private int thirstAt;
     private int thirstWatersSpent;
 
+    /**
+     * 今天已经结算过的口渴来源，每人一份；换回合时清。
+     *
+     * <p>❗<b>狂风天一天翻两张航海牌</b>，而口渴标记要到一天结束才清（{@code SurvivorState.endOfTurn}）——
+     * 标记不能提前清，「醉者落海」这类条件还要在第二张上读它。于是第一张点过名的人、喝过酒的人，
+     * 在第二张上又渴一次（规则事实表探针 A · B）。规则是「每个来源一天最多一次」（{@link ThirstSource}、
+     * 卡面「当天口渴 1 次」），用户 2026-10-05 裁定照规则修（ADR-0087 §4 第 1 条）。
+     */
+    private final Map<CharacterId, Set<ThirstSource>> thirstSettledToday = new LinkedHashMap<>();
+
+    /** 今天撑开的阳伞已经挡掉几次；阳伞「每天挡 1 次」，两张牌不各挡一次。换回合时清。 */
+    private final Map<CharacterId, Integer> coverUsedToday = new LinkedHashMap<>();
+
     private ThirstPrompt promptFor(CharacterId id) {
         ThirstTally effective = effectiveThirst(id, thirstCard);
-        int covered = coverCharges(id);
+        int covered = Math.max(0, coverCharges(id) - coverUsedToday.getOrDefault(id, 0));
         int waterPerSource = currentWeatherEffect() == WeatherEffect.DOUBLE_WATER ? 2 : 1;
         int shared = sharedWaterCancels(id) / waterPerSource;
         // 遮蔽与蹭到的水都是「不付代价就抵掉」，所以一起作为 ThirstResolver 的 coverCharges。
@@ -1442,6 +1461,9 @@ public final class Session {
         }
         if (currentWeatherEffect() == WeatherEffect.ROWERS_OVERBOARD && card.thirstRowers()) {
             effective = withoutSource(effective, ThirstSource.ROWED);
+        }
+        for (ThirstSource settled : thirstSettledToday.getOrDefault(id, Set.of())) {
+            effective = withoutSource(effective, settled);   // 狂风天第二张：今天算过的不再算
         }
         return effective;
     }
@@ -1958,10 +1980,25 @@ public final class Session {
         return !share.requiresConscious() || state.conditionOf(id) == Condition.CONSCIOUS;
     }
 
-    /** 蹭到的酒给几点体型。不叠加，所以按目录里那张牌的加值算一次。 */
+    /**
+     * 蹭到的酒给几点体型。不叠加，所以按目录里那张牌的加值算一次。
+     *
+     * <p>❗<b>她自己也喝了同一种酒时，蹭到的不再另加</b>（{@code stacking.rum = false}）：先蹭到别人的、
+     * 再自己喝一瓶，原先蹭酒与自己那瓶分两处记、各加一次，打架体型 +6（规则事实表探针 D）。
+     * 用户 2026-10-05 裁定一天最多 +3（ADR-0087 §4 第 2 条）。先自己喝、再有人喝的那一路，
+     * {@link #drinkRum} 本来就跳过她。
+     */
     private int sharedRumBonus(CharacterId id) {
         if (!sharedRum.contains(id)) {
             return 0;
+        }
+        if (state.roster().get(id).ability() instanceof Ability.ShareEffect share) {
+            SurvivorState s = state.stateOf(id);
+            for (String cardId : share.sources()) {
+                if (s.usedThisTurn(cardId) && !Boolean.TRUE.equals(share.stacking().get(cardId))) {
+                    return 0;
+                }
+            }
         }
         int best = 0;
         for (Provision card : table.provisions().all()) {

@@ -148,6 +148,47 @@ public final class LinerProps {
     public static final LinerProp DRILL_BELL = prop("liner_drill_bell",
             new LinerProp.Spec(LinerProp.Kind.DRILL_BELL, "drill_bell", "drill_bell", null, 0),
             MapColor.GOLD, BlockSoundGroup.METAL);
+    // C3 第二轮 · c3-gallery：肖像画框（ADR-0086 §2 第 7–10 条：桃花心木配描金内压条 · 画面 ×2、原色；画心是木刻头像，ADR-0090 §8）。
+    //   画的是谁是方块属性 sitter（八个值）；中、大两档带画框灯（属性 lamp，亮度 12 同壁灯，灯那一排两格都发光）；右键看牌（PortraitView）。
+    //   模板与贴图由 liner_props_gallery.py 经 liner_props.py --write 写（#b 框 · #p 画面 · #g 灯管）
+    public static final LinerProp PORTRAIT_SMALL = prop("liner_portrait_small",
+            new LinerProp.Spec(LinerProp.Kind.PORTRAIT_SMALL, "portrait_small", "portrait_small", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp PORTRAIT_MEDIUM = prop("liner_portrait_medium",
+            new LinerProp.Spec(LinerProp.Kind.PORTRAIT_MEDIUM, "portrait_medium", "portrait_medium", "portrait_medium_glow", 12),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp PORTRAIT_LARGE = prop("liner_portrait_large",
+            new LinerProp.Spec(LinerProp.Kind.PORTRAIT_LARGE, "portrait_large", "portrait_large", "portrait_large_glow", 12),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    // C3 第二轮 · c3-table（ADR-0086 §2 第 3 · 4 · 6 条；用户 2026-10-05「全部按倾向」）：
+    //   斜面海图桌 C′（3 宽 × 2 深，海图一格一张 32 像素/格）· 讲台 C（方座 + 黄铜绿罩阅读灯，1 × 2 高，书常驻摊开）。
+    //   讲台灯亮度 12，同绿罩台灯与壁灯：读书用的那一盏小灯，不是一间屋的主灯（主灯 15 · 落地灯 14 · 炉火 13）
+    public static final LinerProp CHART_TABLE = prop("liner_chart_table",
+            new LinerProp.Spec(LinerProp.Kind.CHART_TABLE, "chart_table", "chart_table", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp LECTERN = prop("liner_lectern",
+            new LinerProp.Spec(LinerProp.Kind.LECTERN, "lectern", "lectern", "lectern_glow", 12),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    // C3 第二轮 · c3-deck（ADR-0086 §2 第 11–15 条，用户 2026-10-05「全部按倾向」）：露天甲板的躺椅 B · C（一种方块两种铺法）、
+    //   前桅瞭望台 A（台面一圈 · 口沿一圈两件）、空心桅杆（竖井 · 门）、望远镜柜 A、小警钟。模板与贴图由 liner_props_opendeck.py 经 liner_props.py --write 写
+    public static final LinerProp DECK_CHAIR = prop("liner_deck_chair",
+            new LinerProp.Spec(LinerProp.Kind.DECK_CHAIR, "deck_chair", "deck_chair", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp LOOKOUT_FLOOR = prop("liner_lookout_floor",
+            new LinerProp.Spec(LinerProp.Kind.LOOKOUT_FLOOR, "lookout_floor", "lookout", null, 0),
+            MapColor.TERRACOTTA_YELLOW, BlockSoundGroup.METAL);
+    public static final LinerProp LOOKOUT_RIM = prop("liner_lookout_rim",
+            new LinerProp.Spec(LinerProp.Kind.LOOKOUT_RIM, "lookout_rim", "lookout", null, 0),
+            MapColor.TERRACOTTA_YELLOW, BlockSoundGroup.METAL);
+    public static final LinerProp HOLLOW_MAST = prop("liner_hollow_mast",
+            new LinerProp.Spec(LinerProp.Kind.HOLLOW_MAST, "hollow_mast", "hollow_mast", null, 0),
+            MapColor.TERRACOTTA_YELLOW, BlockSoundGroup.METAL);
+    public static final LinerProp TELESCOPE_CABINET = prop("liner_telescope_cabinet",
+            new LinerProp.Spec(LinerProp.Kind.TELESCOPE_CABINET, "telescope_cabinet", "telescope_cabinet", null, 0),
+            MapColor.BROWN, BlockSoundGroup.WOOD);
+    public static final LinerProp ALARM_BELL = prop("liner_alarm_bell",
+            new LinerProp.Spec(LinerProp.Kind.ALARM_BELL, "alarm_bell", "alarm_bell", null, 0),
+            MapColor.GOLD, BlockSoundGroup.METAL);
 
     private LinerProps() {
     }

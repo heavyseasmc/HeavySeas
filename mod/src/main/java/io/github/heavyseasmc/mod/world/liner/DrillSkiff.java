@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 
 /**
@@ -246,6 +247,19 @@ public final class DrillSkiff {
     /** 这个人坐在演习艇的座位上（{@code /seas start} 据此判「船上闲逛的人」与「报了名的人」）。 */
     public static boolean seated(ServerPlayerEntity player) {
         return rig(player.server).map(rig -> seatedHere(player, rig)).orElse(false);
+    }
+
+    /**
+     * 演习艇里现在坐了几个人（海图桌的浮字与小铜船读它，ADR-0086 §2 第 5 条）；船没摆好时为空。
+     * 只问在线的人坐在哪，不碰座位实体 —— 区块没加载时也答得出，也不会顺手把座位生出来。
+     */
+    public static OptionalInt seatedCount(MinecraftServer server) {
+        Optional<Rig> found = rig(server);
+        if (found.isEmpty()) {
+            return OptionalInt.empty();
+        }
+        return OptionalInt.of((int) server.getPlayerManager().getPlayerList().stream()
+                .filter(p -> !p.isSpectator() && seatedHere(p, found.get())).count());
     }
 
     private static boolean seatedHere(ServerPlayerEntity player, Rig rig) {

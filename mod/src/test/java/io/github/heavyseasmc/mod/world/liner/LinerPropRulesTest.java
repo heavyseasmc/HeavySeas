@@ -390,8 +390,112 @@ final class LinerPropRulesTest {
         // 正向对照：每一种、每一块都过了一遍（落地灯 2 · 台灯 1 · 大桌 4 · 沙发 2 · 椅子 1 · 吸顶灯 1 · 小吊灯 2 · 大吊灯 10
         //   · 骑缝灯两格 2 · 2 × 2 4 · 床 2 · 衣柜 2 · 盥洗台 2 · 魔镜 9（2026-10-04 放大前 2）· 书柜 4 · 写字台 2 · 写字椅 1 · 壁灯 1
         //   · A 甲板新家具：壁炉 6 · 炉上件 6 · 棕榈 2 · 大棵棕榈 3 · 藤椅 1 · 藤编小圆桌 1 · 藤编长椅 2 · 吧台 8
-        //   · 艇甲板设备：吊艇架 10 · 高通风筒 3 · 矮通风筒 2 · 开局的钟 12）
-        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10 + 2 + 4 + 2 + 2 + 2 + 9 + 4 + 2 + 1 + 1 + 6 + 6 + 2 + 3 + 1 + 1 + 2 + 8 + 10 + 3 + 2 + 12, checked);
+        //   · 艇甲板设备：吊艇架 10 · 高通风筒 3 · 矮通风筒 2 · 开局的钟 12
+        //   · C3 第二轮 · c3-gallery：肖像画框 小 1 · 中 4 · 大 6
+        //   · C3 第二轮 · c3-table：海图桌 6 · 讲台 2
+        //   · C3 第二轮 · c3-deck：甲板躺椅 2 · 瞭望台台面 8 · 口沿 8 · 空心桅杆 3（竖井 · 门下半 · 门上半）· 望远镜柜 1 · 警钟 1）
+        assertEquals(2 + 1 + 4 + 2 + 1 + 1 + 2 + 10 + 2 + 4 + 2 + 2 + 2 + 9 + 4 + 2 + 1 + 1 + 6 + 6 + 2 + 3 + 1 + 1 + 2 + 8 + 10 + 3 + 2 + 12
+                + 1 + 4 + 6
+                + 6 + 2
+                + 2 + 8 + 8 + 3 + 1 + 1, checked);
+    }
+
+    // ---------------------------------------------------------------- C3 第二轮 · c3-gallery：肖像画框（ADR-0086）
+
+    @Test
+    void portraitFramesGrowLikeTheBookcaseAndLightTheWholeLampRow() {
+        // 人站在南边、面朝北（对着墙）摆：画面朝着人，背贴北边那面墙；点中的是下面一层人左手那一块，往人的右手（东）与上面长（同书柜）
+        BlockPos at = new BlockPos(36, 42, 10);
+        Direction facing = Direction.SOUTH;
+        Set<LinerProp.Part> medium = LinerProp.Rules.parts(LinerProp.Kind.PORTRAIT_MEDIUM);
+        Set<LinerProp.Part> large = LinerProp.Rules.parts(LinerProp.Kind.PORTRAIT_LARGE);
+        assertEquals(SHELF, medium, "中框借书柜那四块");
+        assertEquals(6, large.size());
+        assertEquals(true, large.containsAll(SHELF) && large.contains(LinerProp.Part.TOP_WEST) && large.contains(LinerProp.Part.TOP_EAST));
+        assertEquals(Set.of(), LinerProp.Rules.parts(LinerProp.Kind.PORTRAIT_SMALL), "小框一格");
+        Set<BlockPos> cells = new HashSet<>();
+        for (LinerProp.Part p : large) {
+            cells.add(LinerProp.Rules.offset(at, LinerProp.Rules.anchor(LinerProp.Kind.PORTRAIT_LARGE), p, facing));
+        }
+        assertEquals(Set.of(at, at.east(), at.up(), at.east().up(), at.up(2), at.east().up(2)), cells, "大框往人的右手与上面长两层");
+        for (Direction f : HORIZONTAL) {
+            assertEquals(large, reachable(LinerProp.Part.EAST, f, large), "大框朝 " + f + " 断成了几截");
+            assertEquals(medium, reachable(LinerProp.Part.EAST, f, medium), "中框朝 " + f + " 断成了几截");
+        }
+        // 画框灯：灯那一排两格都发光（中框上面一排、大框最上面一排）；小框没有灯；三档都不是「右键开关的灯」（右键是看牌）
+        for (LinerProp.Part p : large) {
+            assertEquals(p == LinerProp.Part.TOP_WEST || p == LinerProp.Part.TOP_EAST, LinerProp.Rules.glows(LinerProp.Kind.PORTRAIT_LARGE, p), "大框 · " + p);
+        }
+        for (LinerProp.Part p : medium) {
+            assertEquals(p == LinerProp.Part.UPPER_WEST || p == LinerProp.Part.UPPER_EAST, LinerProp.Rules.glows(LinerProp.Kind.PORTRAIT_MEDIUM, p), "中框 · " + p);
+        }
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.PORTRAIT_SMALL, LinerProp.Kind.PORTRAIT_MEDIUM, LinerProp.Kind.PORTRAIT_LARGE)) {
+            assertEquals(true, LinerProp.Rules.isPortrait(k));
+            assertEquals(k != LinerProp.Kind.PORTRAIT_SMALL, LinerProp.Rules.hasFrameLamp(k), k + " 带不带画框灯");
+            assertEquals(false, LinerProp.Rules.isLamp(k), k + " 右键是看牌，不是开关");
+            assertEquals(false, LinerProp.Rules.hanging(k));
+        }
+        assertEquals(false, LinerProp.Rules.isPortrait(LinerProp.Kind.BOOKCASE));
+        // 镜像：最上面一排西 ↔ 东，各块之间的相对位置照样对得上
+        assertEquals(LinerProp.Part.TOP_EAST, LinerProp.Rules.mirrored(LinerProp.Part.TOP_WEST));
+        for (Direction f : HORIZONTAL) {
+            Direction mf = f.getAxis() == Direction.Axis.X ? f.getOpposite() : f;
+            for (LinerProp.Part a : large) {
+                for (LinerProp.Part b : large) {
+                    BlockPos d = LinerProp.Rules.offset(BlockPos.ORIGIN, a, b, f);
+                    assertEquals(new BlockPos(-d.getX(), d.getY(), d.getZ()), LinerProp.Rules.offset(BlockPos.ORIGIN,
+                            LinerProp.Rules.mirrored(a), LinerProp.Rules.mirrored(b), mf), a + " → " + b + " 朝 " + f);
+                }
+            }
+        }
+        // 画框灯的盒子：只在灯那一排、都在这一格里；与框本身合起来也不到九成
+        for (LinerProp.Kind k : List.of(LinerProp.Kind.PORTRAIT_MEDIUM, LinerProp.Kind.PORTRAIT_LARGE)) {
+            for (LinerProp.Part p : LinerProp.Rules.parts(k)) {
+                List<double[]> lamp = LinerPropShapes.frameLamp(k, p);
+                assertEquals(LinerProp.Rules.glows(k, p), !lamp.isEmpty(), k + " · " + p + " 的灯盒子");
+                for (double[] b : lamp) {
+                    for (int i = 0; i < 3; i++) {
+                        assertEquals(true, 0 <= b[i] && b[i] < b[i + 3] && b[i + 3] <= 16, k + " · " + p + " 的灯盒子越出这一格");
+                    }
+                }
+                List<double[]> all = new java.util.ArrayList<>(LinerPropShapes.boxes(k, p));
+                all.addAll(lamp);
+                assertEquals(true, filled(all) < 0.9, k + " · " + p);
+            }
+        }
+        assertEquals(List.of(), LinerPropShapes.frameLamp(LinerProp.Kind.PORTRAIT_SMALL, null));
+    }
+
+    @Test
+    void portraitSittersAreTheRosterInSeatOrder() throws java.io.IOException {
+        // 方块属性 sitter 的八个值 = data/roster 的八个角色、照座位号排（画面贴图 prop/portrait_<尺寸>_<值> 与人物牌都按值名找；
+        //   默认值是第一个 —— liner_props_gallery.MOD_ITEM_SITTER 物品栏那一格挂的就是它）
+        io.github.heavyseasmc.engine.data.RosterData roster = io.github.heavyseasmc.engine.data.RosterLoader.load(
+                java.nio.file.Path.of("..", "data", "roster", "default.json"));
+        List<String> want = roster.characters().stream()
+                .sorted(java.util.Comparator.comparingInt(io.github.heavyseasmc.engine.model.Survivor::seat))
+                .map(s -> s.id().value()).toList();
+        List<String> got = java.util.Arrays.stream(LinerProp.Sitter.values()).map(LinerProp.Sitter::asString).toList();
+        assertEquals(8, want.size(), "没在查：roster 里没读到八个角色");
+        assertEquals(want, got);
+        assertEquals(List.of("none", "off", "on"),
+                java.util.Arrays.stream(LinerProp.FrameLamp.values()).map(LinerProp.FrameLamp::asString).toList());
+    }
+
+    @Test
+    void portraitViewDoesNothingUntilTheClientInstallsIt() {
+        // 服务端那一侧（专用服务端从不登记）：开不了、不抛
+        PortraitView.install(null);
+        assertEquals(false, PortraitView.open("captain"));
+        List<String> seen = new java.util.ArrayList<>();
+        try {
+            PortraitView.install(seen::add);
+            assertEquals(true, PortraitView.open("kid"));
+            assertEquals(List.of("kid"), seen);
+        } finally {
+            PortraitView.install(null);
+        }
+        assertEquals(false, PortraitView.open("captain"));
     }
 
     /** 从 from 那一块起，经「搭档在哪一格」（六个面上的邻居）一格传一格走得到的块 —— 拆一格整件没，靠的就是这条链。 */
@@ -477,6 +581,64 @@ final class LinerPropRulesTest {
             assertEquals(false, LinerProp.Rules.isLamp(k), k + " 不是灯");
             assertEquals(false, LinerProp.Rules.hanging(k), k + " 不挂天花");
         }
+    }
+
+    // C3 第二轮 · c3-table（ADR-0086 §2 第 3 · 6 条）：海图桌 3 宽 × 2 深 · 讲台 1 × 2 高
+    @Test
+    void chartTableGrowsLikeTheGrandTableAndTheLecternLampLightsOnlyItsTop() {
+        Set<LinerProp.Part> chart = LinerProp.Rules.parts(LinerProp.Kind.CHART_TABLE);
+        LinerProp.Part a = LinerProp.Rules.anchor(LinerProp.Kind.CHART_TABLE);
+        assertEquals(LinerProp.Part.FRONT_EAST, a);
+        assertEquals(6, chart.size());
+        // 人站在南边、面朝北摆：正面（斜面低的那一头、抽屉）朝着人（朝南）。点中的是前排人左手那一块，往人的右手（东）长两格、往远处（北）长一排
+        BlockPos at = new BlockPos(4, 41, 9);
+        Direction facing = Direction.SOUTH;
+        Set<BlockPos> cells = new HashSet<>();
+        for (LinerProp.Part p : chart) {
+            cells.add(LinerProp.Rules.offset(at, a, p, facing));
+        }
+        assertEquals(Set.of(at, at.east(), at.east(2), at.north(), at.north().east(), at.north().east(2)), cells);
+        assertEquals(at.east(2), LinerProp.Rules.offset(at, a, LinerProp.Part.FRONT_WEST, facing), "前排在离人近的那一排");
+        assertEquals(at.north(), LinerProp.Rules.offset(at, a, LinerProp.Part.BACK_EAST, facing), "后排（斜面高的那一头）在远处");
+        for (Direction f : HORIZONTAL) {
+            // 拆一格整件没（一格传一格）：从锚点经六个面上的搭档走得到每一块；每一块在模型里挨着几块就是几个搭档
+            assertEquals(chart, reachable(a, f, chart), "海图桌朝 " + f + " 断成了几截");
+            for (LinerProp.Part here : chart) {
+                int partners = 0;
+                for (Direction d : Direction.values()) {
+                    LinerProp.Part p = LinerProp.Rules.partnerAt(here, d, f, chart);
+                    if (p != null) {
+                        partners++;
+                        assertEquals(BlockPos.ORIGIN.offset(d), LinerProp.Rules.offset(BlockPos.ORIGIN, here, p, f), here + " " + d);
+                    }
+                }
+                int touching = 0;
+                for (LinerProp.Part q : chart) {
+                    touching += Math.abs(q.x - here.x) + Math.abs(q.y - here.y) + Math.abs(q.z - here.z) == 1 ? 1 : 0;
+                }
+                assertEquals(touching, partners, here + " 朝 " + f);
+            }
+            // 照镜子：西 ↔ 东，相对位置照样对得上（海图每一格的贴图跟着块走，镜子里的海图不反）
+            Direction mirroredFacing = f.getAxis() == Direction.Axis.X ? f.getOpposite() : f;
+            for (LinerProp.Part p : chart) {
+                for (LinerProp.Part q : chart) {
+                    BlockPos d = LinerProp.Rules.offset(BlockPos.ORIGIN, p, q, f);
+                    assertEquals(new BlockPos(-d.getX(), d.getY(), d.getZ()), LinerProp.Rules.offset(BlockPos.ORIGIN,
+                            LinerProp.Rules.mirrored(p), LinerProp.Rules.mirrored(q), mirroredFacing), p + " → " + q + " 朝 " + f);
+                }
+            }
+        }
+        assertEquals(LinerProp.Part.FRONT_MID, LinerProp.Rules.mirrored(LinerProp.Part.FRONT_MID));
+        assertEquals(LinerProp.Part.BACK_WEST, LinerProp.Rules.mirrored(LinerProp.Part.BACK_EAST));
+        // 讲台：两格高、点中下面那一格；是灯（右键开关），亮着只有上面那一格（绿罩阅读灯）发光。海图桌不是灯；两件都不挂天花
+        assertEquals(LinerProp.Part.LOWER, LinerProp.Rules.anchor(LinerProp.Kind.LECTERN));
+        assertEquals(TALL, LinerProp.Rules.parts(LinerProp.Kind.LECTERN));
+        assertEquals(true, LinerProp.Rules.isLamp(LinerProp.Kind.LECTERN));
+        assertEquals(true, LinerProp.Rules.glows(LinerProp.Kind.LECTERN, LinerProp.Part.UPPER));
+        assertEquals(false, LinerProp.Rules.glows(LinerProp.Kind.LECTERN, LinerProp.Part.LOWER));
+        assertEquals(false, LinerProp.Rules.isLamp(LinerProp.Kind.CHART_TABLE));
+        assertEquals(false, LinerProp.Rules.hanging(LinerProp.Kind.CHART_TABLE));
+        assertEquals(false, LinerProp.Rules.hanging(LinerProp.Kind.LECTERN));
     }
 
     @Test

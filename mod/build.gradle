@@ -138,6 +138,18 @@ tasks.named('classes') {
     dependsOn checkBundledData
 }
 
+// 规则书网页版（ADR-0087 §2「网页版同源」）：与游戏里那本是同一份源文件、同一串块，
+// 第三、十二、十三章的名字与数字一样从 data/ 与 lang 展开。不进 jar、不在门禁里，要看时跑一次。
+tasks.register('rulebookHtml', JavaExec) {
+    group = 'documentation'
+    description = '规则书网页版 → build/rulebook/<语言>.html'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'io.github.heavyseasmc.mod.rulebook.RulebookHtml'
+    def out = layout.buildDirectory.dir('rulebook')
+    args out.get().asFile.path
+    outputs.dir out
+}
+
 // 漏一个 lang 键的表现是界面上出现一行 `heavyseas.command.foo` 的原文 ——
 // 游戏照跑，没有任何报错，也没有任何日志。正因为它安静，才必须在构建期拦。
 //
@@ -1306,6 +1318,37 @@ def checkLinerShip = tasks.register('checkLinerShip') {
             }
             if (Math.abs((m.arrival_yaw as double) - yawOf[mface]) > 0.01) {
                 problems << "落脚时面朝 ${m.arrival_yaw}°，镜面朝 ${mface}（${yawOf[mface]}°）：过了镜子该背对镜子"
+            }
+        }
+
+        // ⑨ 平台上的斜面海图桌（C3 第二轮，ADR-0086 §2 第 5 条）：清单写的锚点在结构里真是朝那个方向的 front_east，
+        //   整件六格都在（模型的 +x 在世界里朝哪同魔镜那一条；后排在模型 +z）；浮字与小铜船按它摆，几何那一份（chart_table.json）九档都在
+        def cpos = (m.chart_table as List)?.collect { it as int }
+        def cface = m.chart_table_facing?.toString()
+        if (cpos == null || !facingOff.containsKey(cface)) {
+            problems << "清单的 chart_table / chart_table_facing 缺了或写错（${m.chart_table} · ${m.chart_table_facing}）"
+        } else if (nbts.size() == segs.size()) {
+            def modelX = [north: [1, 0], east: [0, 1], south: [-1, 0], west: [0, -1]]
+            def modelZ = [north: [0, 1], east: [-1, 0], south: [0, -1], west: [1, 0]]          // 模型的 +z（后排）在世界里朝哪
+            int checkedCells = 0
+            [west: 0, mid: 1, east: 2].each { col, cx ->
+                [front: 0, back: 1].each { row, cz ->
+                    def part = "${row}_${col}".toString()
+                    int wx = cpos[0] + modelX[cface][0] * (cx - 2) + modelZ[cface][0] * cz
+                    int wz = cpos[2] + modelX[cface][1] * (cx - 2) + modelZ[cface][1] * cz
+                    def st = cellAt(wx, cpos[1], wz)
+                    checkedCells++
+                    if (st?.Name?.toString() != 'heavyseas:liner_chart_table' || st.Properties?.part != part || st.Properties?.facing != cface) {
+                        problems << "清单说海图桌锚点在 (${cpos.join(' ')})（朝 ${cface}），${part} 该在 (${wx} ${cpos[1]} ${wz})，结构里那一格是 ${st == null ? '空的' : st.Name + (st.Properties ?: '')}"
+                    }
+                }
+            }
+            if (checkedCells != 6) { throw new GradleException("没在查：海图桌只核了 ${checkedCells} 格") }
+            def geo = new File(data, 'liner/chart_table.json')
+            if (!geo.isFile()) {
+                problems << "缺 liner/chart_table.json（小铜船九档的几何，liner_ship.py write-mod 写）"
+            } else if (((slurper.parse(geo, 'UTF-8') as Map).ship as List)?.size() != 9) {
+                problems << "liner/chart_table.json 里小铜船不是 9 档"
             }
         }
 

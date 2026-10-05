@@ -10,55 +10,55 @@
    "structure": "heavyseas:liner/seg_000",
    "x0": 0,
    "x1": 40,
-   "sha1": "c8361ac9182c529520b13f3c0d96d5cdc63f31ac"
+   "sha1": "2203f120747e7a046048b710841cb0e36a8ef76a"
   },
   {
    "structure": "heavyseas:liner/seg_040",
    "x0": 40,
    "x1": 80,
-   "sha1": "890f33ba0d2bca5d8a541665a09d26f403b185a7"
+   "sha1": "50e11b004a7e2bf7ac2e7f5fa4bdccfade952b11"
   },
   {
    "structure": "heavyseas:liner/seg_080",
    "x0": 80,
    "x1": 120,
-   "sha1": "9842aab9c13e373fe3b62cfb958600acb1057435"
+   "sha1": "e35ca161a3b60b758fae08ea07513a4ad0469cfd"
   },
   {
    "structure": "heavyseas:liner/seg_120",
    "x0": 120,
    "x1": 160,
-   "sha1": "3a1cf718e428a9a6b5a94d07fe470adc29aee738"
+   "sha1": "b328cc90b39eb04b6fc2ba88eb2ea5bf4e3f0d72"
   },
   {
    "structure": "heavyseas:liner/seg_160",
    "x0": 160,
    "x1": 186,
-   "sha1": "4507f5c6b207cba5ba7ab0a7ed1ce3adf0bb3196"
+   "sha1": "c3e1e93c3f5d82e6d582edc3efcc46486ea0fe52"
   },
   {
    "structure": "heavyseas:liner/seg_186",
    "x0": 186,
    "x1": 226,
-   "sha1": "15b4e2222c64a67291d3e5c1c07c457a3bce387d"
+   "sha1": "140e74d953d7574b2163ad8261586dc869fccd5b"
   },
   {
    "structure": "heavyseas:liner/seg_226",
    "x0": 226,
    "x1": 266,
-   "sha1": "4a57c3060b631e046eb31e49c9095c5955ce65ed"
+   "sha1": "5d181690473af4db5b1159df5ae909abc3c2a967"
   },
   {
    "structure": "heavyseas:liner/seg_266",
    "x0": 266,
-   "x1": 306,
-   "sha1": "f9096efa245772e04d802095bafdaaac8acade1d"
+   "x1": 308,
+   "sha1": "eff61c7225d04018f45413bc2a46567a860375ec"
   },
   {
-   "structure": "heavyseas:liner/seg_306",
-   "x0": 306,
+   "structure": "heavyseas:liner/seg_308",
+   "x0": 308,
    "x1": 336,
-   "sha1": "3be35780e9c6573e1ccfd219653199bcc591e392"
+   "sha1": "653a2ddc56246dfdac58b5677fe30475a177476b"
   }
  ],
  "skiffs": [
@@ -163,6 +163,12 @@
   17
  ],
  "mirror_facing": "west",
- "blocks": 209212,
+ "chart_table": [
+  212,
+  40,
+  8
+ ],
+ "chart_table_facing": "south",
+ "blocks": 207120,
  "air": 117794
 }

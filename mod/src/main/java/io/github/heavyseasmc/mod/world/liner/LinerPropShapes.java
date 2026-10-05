@@ -48,8 +48,48 @@ final class LinerPropShapes {
             case VENTILATOR -> cut(VENTILATOR, part);
             case VENTILATOR_SHORT -> cut(VENTILATOR_SHORT, part);
             case DRILL_BELL -> cut(DRILL_BELL, part);
+            // C3 第二轮 · c3-gallery：肖像画框（背贴墙；画框灯另算，见 frameLamp）
+            case PORTRAIT_SMALL -> PORTRAIT_SMALL;
+            case PORTRAIT_MEDIUM -> cut(PORTRAIT_MEDIUM, part);
+            case PORTRAIT_LARGE -> cut(PORTRAIT_LARGE, part);
+            // C3 第二轮 · c3-table
+            case CHART_TABLE -> cut(CHART_TABLE, part);
+            case LECTERN -> cut(LECTERN, part);
+            // C3 第二轮 · c3-deck
+            case DECK_CHAIR -> cut(DECK_CHAIR, part);
+            case LOOKOUT_FLOOR -> cut(LOOKOUT_FLOOR, part);
+            case LOOKOUT_RIM -> cut(LOOKOUT_RIM, part);
+            case HOLLOW_MAST -> mast(part, false);
+            case TELESCOPE_CABINET -> TELESCOPE_CABINET;
+            case ALARM_BELL -> ALARM_BELL;
         };
     }
+
+    /** 这一块的盒子，门开着 / 关着不一样的（空心桅杆）按 open 挑；别的件同 {@link #boxes(LinerProp.Kind, LinerProp.Part)}。 */
+    static List<double[]> boxes(LinerProp.Kind kind, LinerProp.Part part, boolean open) {
+        return kind == LinerProp.Kind.HOLLOW_MAST ? mast(part, open) : boxes(kind, part);
+    }
+
+
+    // C3 第二轮 · c3-gallery
+    /** 肖像画框带灯时，这一块多出来的盒子（罩子连灯管 · 臂与底座）；灯够不着的格是空的。 */
+    static List<double[]> frameLamp(LinerProp.Kind kind, LinerProp.Part part) {
+        return switch (kind) {
+            case PORTRAIT_MEDIUM -> cut(LAMP_MEDIUM, part);
+            case PORTRAIT_LARGE -> cut(LAMP_LARGE, part);
+            default -> List.of();
+        };
+    }
+
+    // C3 第二轮 · c3-gallery：肖像画框（liner_props_gallery.py 的乙 · 桃花心木框）—— 框连背板一块（最凸的是铜牌，z 12.25）；
+    //   中框整件 32 × 32、大框 32 × 48，按格切。画框灯：罩子连灯管（最前到 z 5.75）· 臂与底座（贴回框上）
+    private static final List<double[]> PORTRAIT_SMALL = List.of(box(1.5, 1, 12.25, 14.5, 15, 16));
+    private static final List<double[]> PORTRAIT_MEDIUM = List.of(box(3, 1, 12.25, 29, 31, 16));
+    private static final List<double[]> PORTRAIT_LARGE = List.of(box(1, 2, 12.25, 31, 44, 16));
+    private static final List<double[]> LAMP_MEDIUM = List.of(box(10, 29.25, 5.75, 22, 31.75, 8.25),
+            box(14.5, 28.75, 8.25, 17.5, 30.75, 13.25));
+    private static final List<double[]> LAMP_LARGE = List.of(box(9, 44.25, 5.75, 23, 46.75, 8.25),
+            box(14.5, 44, 8.25, 17.5, 46.25, 15));
 
     /**
      * 碰撞箱与轮廓不一样的那几种：→ 这一块的碰撞盒子；{@code null} = 碰撞箱就是轮廓。
@@ -59,9 +99,106 @@ final class LinerPropShapes {
     static List<double[]> collision(LinerProp.Kind kind, LinerProp.Part part) {
         return switch (kind) {
             case PALM, PALM_TALL -> part == LinerProp.Part.LOWER ? PALM_POT : List.of();
+            // C3 第二轮 · c3-deck：口沿那一圈往下伸到台面、高 1.5 格（翻不出去）；警钟只有拉绳垂在人站的那一格里，不挡路（同壁灯）
+            case LOOKOUT_RIM -> cutFlat(LOOKOUT_BARRIER, part);
+            case ALARM_BELL -> List.of();
             default -> null;
         };
     }
+
+    // ================================================================ C3 第二轮 · c3-deck（样子 = liner_props_opendeck.py；整件写、按格切，同下面那几族）
+
+    //   甲板躺椅（整件 16 × 32，z 0 = 脚那一头）：纵梁与板条一层（座那一段顶 5）· 座垫 · 搁脚垫 · 两侧扶手 · 后仰的靠背（两级台阶近似 22.5°）
+    private static final List<double[]> DECK_CHAIR = List.of(box(1.5, 0, 0.5, 14.5, 5, 31.5), box(3.25, 5, 12.75, 12.75, 8, 24.25),
+            box(3.25, 4.5, 1.25, 12.75, 6, 11.75), box(0.75, 5, 17.5, 3, 9.5, 25.5), box(13, 5, 17.5, 15.25, 9.5, 25.5),
+            box(2.75, 5, 22.5, 13.25, 14, 28.5), box(2.75, 14, 26, 13.25, 22, 32));
+
+    /*
+     * 瞭望台（整件 48 × 48，桅杆那一格在正中 16..32；十六边形外壁，同 liner_props_opendeck 的 NEST_*）：一条一条的带子，每 STEP 像素一条拼。
+     *   台面一圈 = 台面板（这一格的格顶下 1.5 像素）；口沿一圈的轮廓 = 卷边口沿那一道（口沿那一层格底起 3.5 像素）；
+     *   口沿一圈的碰撞 = 从外壁里面那一圈（边心距 NEST_INNER）往外到这一圈的外沿，从台面（口沿那一层格底下 16 像素）高到台面上 1.5 格。
+     */
+    static final double NEST_C = 24;
+    static final double NEST_INNER = 21.5;
+    static final double NEST_OUTER = 23;
+    static final double NEST_RIM_OUTER = 23.75;
+    /** 口沿碰撞箱的顶：台面上 1.5 格（24 像素）—— 口沿那一层的格底在台面上 16 像素，所以在这一格里是 y 8。原地起跳够不着 1.5 格（同栅栏）。 */
+    static final double BARRIER_TOP = 24 - 16;
+    static final double STEP = 2;
+    private static final List<double[]> LOOKOUT_FLOOR = band(-1, NEST_OUTER, 14.5, 16);
+    private static final List<double[]> LOOKOUT_RIM = band(NEST_INNER - 0.25, NEST_RIM_OUTER, 0, 3.5);
+    static final List<double[]> LOOKOUT_BARRIER = band(NEST_INNER, 1e9, -16, BARRIER_TOP);
+
+    /**
+     * 十六边形（以桅杆中线为心、边心距 a；十六个面的法向在 0° · 22.5° · …）在离中线 u 处、另一个方向上的半宽；u 超出边心距就是 −1（那一条整条在外面）。
+     * 同 liner_props_opendeck._poly_halfspan，只多了「u 超出边心距」那一条（那边只在 u ≤ 边心距的地方用，没查）。
+     */
+    static double halfSpan(double u, double a) {
+        if (Math.abs(u) > a) {
+            return -1;
+        }
+        double best = 1e9;
+        for (int k = 0; k < 16; k++) {
+            double th = 2 * Math.PI * k / 16;
+            if (Math.sin(th) > 1e-9) {
+                best = Math.min(best, (a - u * Math.cos(th)) / Math.sin(th));
+            }
+        }
+        return best;
+    }
+
+    /**
+     * 两圈十六边形之间的带子（里沿边心距 rIn，≤ 0 = 没有里沿；外沿 rOut，很大 = 一直到这一圈的外沿），y0..y1：顺着 z 每 STEP 像素一条。
+     * 每一条按「这一条里最难的那一点」取：里沿取离中线最远的那一边（半宽最小，带子往里多盖一点、不留缝），外沿取离中线最近的那一边。
+     */
+    private static List<double[]> band(double rIn, double rOut, double y0, double y1) {
+        List<double[]> out = new ArrayList<>();
+        for (double z = 0; z < 48 - 1e-9; z += STEP) {
+            double near = z < NEST_C && z + STEP > NEST_C ? 0 : Math.min(Math.abs(z - NEST_C), Math.abs(z + STEP - NEST_C));
+            double far = Math.max(Math.abs(z - NEST_C), Math.abs(z + STEP - NEST_C));
+            double xo = Math.min(NEST_C, halfSpan(near, rOut));
+            if (xo <= 0) {
+                continue;
+            }
+            double xi = rIn <= 0 ? -1 : halfSpan(far, rIn);
+            if (xi <= 0) {
+                out.add(box(NEST_C - xo, y0, z, NEST_C + xo, y1, z + STEP));
+            } else if (xi < xo) {
+                out.add(box(NEST_C - xo, y0, z, NEST_C - xi, y1, z + STEP));
+                out.add(box(NEST_C + xi, y0, z, NEST_C + xo, y1, z + STEP));
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    //   空心桅杆（一格，模型北面 = 门那一面）：南 · 西 · 东三面壁（1.5）· 横档那一溜（对着门那一壁里面）；竖井北面也是整壁；
+    //   门那两格北面：门洞两边的壁 · 门槛（连门槛帽）/ 门楣 · 门扇（关着：堵在门洞里退后 0.5；开着：贴在西壁里面）
+    private static final List<double[]> MAST_WALLS = List.of(box(0, 0, 14.5, 16, 16, 16), box(0, 0, 1.5, 1.5, 16, 14.5),
+            box(14.5, 0, 1.5, 16, 16, 14.5), box(4, 1.5, 13, 12, 14.5, 14.5));
+
+    static List<double[]> mast(LinerProp.Part part, boolean open) {
+        List<double[]> out = new ArrayList<>(MAST_WALLS);
+        if (part == null || part == LinerProp.Part.SHAFT) {
+            out.add(box(0, 0, 0, 16, 16, 1.5));
+            return List.copyOf(out);
+        }
+        out.add(box(0, 0, 0, 2.5, 16, 1.5));
+        out.add(box(13.5, 0, 0, 16, 16, 1.5));
+        boolean lower = part == LinerProp.Part.DOOR_LOWER;
+        out.add(lower ? box(2.5, 0, 0, 13.5, 2, 1.5) : box(2.5, 15, 0, 13.5, 16, 1.5));
+        if (open) {
+            out.add(lower ? box(1.5, 2.5, 1.5, 2.25, 16, 12.5) : box(1.5, 0, 1.5, 2.25, 14.5, 12.5));
+        } else {
+            out.add(lower ? box(2.5, 2, 0.5, 13.5, 16, 1.25) : box(2.5, 0, 0.5, 13.5, 15, 1.25));
+        }
+        return List.copyOf(out);
+    }
+
+    //   望远镜柜 A（背贴桅杆 z 16）：柜身连顶上托架与那一支望远镜（伸进上面那一格的那一截不算）
+    private static final List<double[]> TELESCOPE_CABINET = List.of(box(2.5, 3.5, 9.25, 13.5, 14.5, 16),
+            box(1.75, 14.5, 10.75, 14.25, 16, 14.25));
+    //   警钟（背贴桅杆）：钟身在上面那一格里，这一格里只有拉绳、绳结与钟口 —— 轮廓放宽一圈，拉绳好点中
+    private static final List<double[]> ALARM_BELL = List.of(box(5, 7.5, 9, 11, 16, 15));
 
     // A 甲板新家具（ADR 草稿 furnish）：整件写（壁炉 · 炉上件 48 × 32、吧台 64 × 32、棕榈竖着 32 / 48），按格切 ——
     //   壁炉：炉台面 · 炉身（两侧壁柱到横楣，炉口也算进去：火里走不进去）· 壁炉台 · 台上的座钟
@@ -99,6 +236,22 @@ final class LinerPropShapes {
     //   开局的钟（门形钟架，整件 32 × 85）：两根柱（连底板）· 横梁 · 钟（钟口到吊环，连钟绳）；钟挂在两列的接缝上
     private static final List<double[]> DRILL_BELL = List.of(box(1, 0, 6, 6, 82.5, 11), box(26, 0, 6, 31, 82.5, 11),
             box(0, 82.5, 6.5, 32, 85, 10.5), box(11, 53, 3.5, 21, 82.5, 13.5));
+
+    // C3 第二轮 · c3-table（ADR-0086）：整件写（海图桌 48 × 32、一层；讲台竖着两格高），按格切 ——
+    //   海图桌：柜身（含踢脚座）· 正面抽屉与拉手 · 背面镶板 · 台板 · 斜板那一层（板底到木框顶、前沿连黄铜挡边）按 z 每 2.5 像素一级台阶
+    //   （liner_props_table 的斜面几何量出来的，每一级取那一段里最低的板底与最高的框顶）· 后排两根撑杆。
+    //   斜面在后排高过一格（到 26 像素），盒子只许在这一格里 —— 切到 16 为止：后排那一格的碰撞到台板顶（11.5）、前排到 16
+    private static final List<double[]> CHART_TABLE = List.of(box(1, 0, 1.5, 47, 10.5, 31), box(1.5, 1.75, 0.5, 46.5, 10.25, 1.5),
+            box(1.5, 2, 31, 46.5, 9.5, 31.5), box(0.5, 10.5, 0.5, 47.5, 11.5, 31.5),
+            box(0.5, 11.5, 0, 47.5, 14.75, 2.5), box(0.5, 12.5, 2.5, 47.5, 15.75, 5), box(0.5, 13.5, 5, 47.5, 16.75, 7.5),
+            box(0.5, 14.5, 7.5, 47.5, 17.75, 10), box(0.5, 15.5, 10, 47.5, 18.75, 12.5),
+            box(7.5, 11.5, 24, 8.25, 21.75, 24.75), box(39.75, 11.5, 24, 40.5, 21.75, 24.75));
+    //   讲台：方座 · 柱身 · 帽檐 · 颈 · 书托与书（斜 22.5°，按 z 三像素一级）· 灯杆与杆头 · 横臂与灯座 · 绿罩
+    private static final List<double[]> LECTERN = List.of(box(2, 0, 2, 14, 2.5, 14), box(4.5, 2.5, 4.5, 11.5, 13.5, 11.5),
+            box(3.5, 13.5, 3.5, 12.5, 14.5, 12.5), box(5.5, 14.5, 5.5, 10.5, 17, 10.5),
+            box(1, 13.5, 0.5, 15, 18.5, 3), box(1, 13.75, 3, 15, 19.75, 6), box(1, 15, 6, 15, 21, 9), box(1, 16, 9, 15, 22.25, 12),
+            box(1, 17.25, 12, 15, 22.5, 14), box(7.25, 19.75, 12.75, 8.75, 27.5, 14.25), box(7, 25.25, 7, 9, 27, 13),
+            box(4.5, 23.75, 6, 11.5, 25.75, 10));
 
     private static List<double[]> davit() {
         List<double[]> out = new ArrayList<>(List.of(box(2, 0, 1, 14, 3, 31), box(5.5, 3, 3, 10.5, 7, 30),
@@ -198,6 +351,21 @@ final class LinerPropShapes {
             double hz = Math.min(b[5], z0 + 16);
             if (hx - lx > 1e-6 && hy - ly > 1e-6 && hz - lz > 1e-6) {
                 out.add(new double[]{lx - x0, ly - y0, lz - z0, hx - x0, hy - y0, hz - z0});
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 只按 x · z 切（C3 第二轮 · c3-deck）：碰撞箱竖着要越出这一格的那几块（瞭望台口沿往下伸到台面）—— 照 {@link #cut} 竖着也切就只剩格里那一截。
+     * 越出这一格的碰撞盒子游戏照样认（方块的碰撞形状许出格，同栅栏的 1.5 格高）。
+     */
+    private static List<double[]> cutFlat(List<double[]> whole, LinerProp.Part part) {
+        List<double[]> out = new ArrayList<>();
+        for (double[] b : whole) {
+            double[] c = cut(List.of(new double[]{b[0], part.y * 16.0, b[2], b[3], part.y * 16.0 + 16, b[5]}), part).stream().findFirst().orElse(null);
+            if (c != null) {
+                out.add(new double[]{c[0], b[1], c[2], c[3], b[4], c[5]});
             }
         }
         return out;

@@ -157,6 +157,12 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 夜里亮着灯的舱室，从船外看舷窗与大窗是暖的（ADR-0082）：建网格时按屋里那一侧的光换上亮着的玻璃
         GlassGlow.register();
         GameScreenSidebar.register();
+        // C3 第二轮 · c3-gallery：肖像画框右键看牌 —— 方块在 main，界面在这里；钩子由客户端塞进去，main 里从不引用客户端类（ADR-0013）。
+        //   方块的 onUse 在客户端那一侧（渲染线程）调它
+        io.github.heavyseasmc.mod.world.liner.PortraitView.install(sitter ->
+                MinecraftClient.getInstance().setScreen(new PortraitScreen(sitter)));
+        // 讲台右键开规则书（ADR-0087 §2）：同一个形状的钩子
+        io.github.heavyseasmc.mod.rulebook.RulebookView.install(() -> RulebookBook.open(MinecraftClient.getInstance()));
         // 别的界面（Minecraft 自带的进度 · 游戏菜单 · 聊天……）打开时也记一行，与 GameScreen 的「界面：打开 X」配对：
         // 回归脚本据此分得开「本模组那一面没弹」与「被别的界面盖住了」—— 此前两次都要截图才看出来
         // （2026-09-25 游戏菜单盖住各面 · 同日 L 打开 Minecraft 自带的进度界面、吞掉 F8）。类名在开发环境是 yarn 名、生产 jar 里是中间名。
@@ -169,6 +175,9 @@ public final class HeavySeasClient implements ClientModInitializer {
 
         // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
         EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);
+        // 甲板躺椅的座位（C3 第二轮 · c3-deck）：同样什么都不画（游戏自带的空渲染器：不画名牌、不画影子）
+        EntityRendererRegistry.register(io.github.heavyseasmc.mod.world.liner.DeckChairSeat.TYPE,
+                net.minecraft.client.render.entity.EmptyEntityRenderer::new);
         // 海鸥：自绘模型（ADR-0034 §5.4），模型层要先登记，渲染器构造时按层取部件。
         EntityModelLayerRegistry.registerModelLayer(GullModel.LAYER, GullModel::getTexturedModelData);
         EntityRendererRegistry.register(GullEntity.TYPE, GullRenderer::new);

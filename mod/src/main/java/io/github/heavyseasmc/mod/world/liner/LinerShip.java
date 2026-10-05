@@ -121,16 +121,18 @@ public final class LinerShip {
      * @param arrival    过了魔镜站在哪（局部坐标；A 甲板大楼梯平台、船上那面镜子前，ADR-0083）；调试指令 {@code tp} 也落这儿
      * @param arrivalYaw 落脚时面朝哪（度，Minecraft 的约定）
      * @param mirror     船上那面镜子下面一层正中那一格（局部坐标；镜子 3 × 3，WIDE_MID）
+     * @param chartTable 平台上那张斜面海图桌的锚点（front_east，局部坐标）与正面朝向：浮字与小铜船按它摆（{@link ChartTable}，ADR-0086 §2 第 5 条）
      */
     public record Ship(Vec3i size, int waterline, List<Segment> segments, List<Skiff> skiffs, Vec3d arrival, float arrivalYaw,
-                       BlockPos mirror, Direction mirrorFacing, byte[] manifestBytes, byte[] skiffBytes) {
+                       BlockPos mirror, Direction mirrorFacing, BlockPos chartTable, Direction chartFacing,
+                       byte[] manifestBytes, byte[] skiffBytes) {
 
         /** 摆到 {@code dimension} 的 {@code origin}：位置换成世界坐标，版本把位置也算进去。 */
         public Manifest at(RegistryKey<World> dimension, BlockPos origin) {
             List<Skiff> world = skiffs.stream().map(k -> new Skiff(k.no(), origin.add(k.pos()), k.rotation(), k.drill())).toList();
             return new Manifest(dimension, origin, size, waterline, segments, world,
                     arrival.add(origin.getX(), origin.getY(), origin.getZ()), arrivalYaw, origin.add(mirror), mirrorFacing,
-                    version(manifestBytes, skiffBytes, dimension, origin));
+                    origin.add(chartTable), chartFacing, version(manifestBytes, skiffBytes, dimension, origin));
         }
     }
 
@@ -139,11 +141,12 @@ public final class LinerShip {
      *
      * @param waterline 水线那一道（{@code liner_hull_waterline}）的局部 y；它下面紧挨的那一格是水面
      * @param mirror    船上那面镜子下面一层正中那一格（世界坐标）
+     * @param chartTable 斜面海图桌的锚点（世界坐标）
      * @param version   清单 · 艇的结构 · 位置的散列（存档里认的就是它）
      */
     public record Manifest(RegistryKey<World> dimension, BlockPos origin, Vec3i size, int waterline,
                            List<Segment> segments, List<Skiff> skiffs, Vec3d arrival, float arrivalYaw,
-                           BlockPos mirror, Direction mirrorFacing, String version) {
+                           BlockPos mirror, Direction mirrorFacing, BlockPos chartTable, Direction chartFacing, String version) {
 
         /** 演习艇（1 号）；清单里没有标演习艇时为空。 */
         public Optional<Skiff> drill() {
@@ -199,9 +202,15 @@ public final class LinerShip {
         if (facing == null || facing.getAxis().isVertical()) {
             throw new IllegalArgumentException("清单 mirror_facing 要是 north / south / east / west，实际 " + string(o, "mirror_facing"));
         }
+        int[] chart = ints(o, "chart_table", 3);
+        Direction chartFacing = Direction.byName(string(o, "chart_table_facing"));
+        if (chartFacing == null || chartFacing.getAxis().isVertical()) {
+            throw new IllegalArgumentException("清单 chart_table_facing 要是 north / south / east / west，实际 " + string(o, "chart_table_facing"));
+        }
         return new Ship(new Vec3i(size[0], size[1], size[2]), integer(o, "waterline"), List.copyOf(segments), List.copyOf(skiffs),
                 new Vec3d(a.get(0).getAsDouble(), a.get(1).getAsDouble(), a.get(2).getAsDouble()), field(o, "arrival_yaw").getAsFloat(),
-                new BlockPos(mirror[0], mirror[1], mirror[2]), facing, manifest, skiff);
+                new BlockPos(mirror[0], mirror[1], mirror[2]), facing, new BlockPos(chart[0], chart[1], chart[2]), chartFacing,
+                manifest, skiff);
     }
 
     static String version(byte[] manifest, byte[] skiff, RegistryKey<World> dimension, BlockPos origin) {

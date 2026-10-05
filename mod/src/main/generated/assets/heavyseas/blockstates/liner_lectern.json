@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,lit=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower",
+      "y": 90
+    },
+    "facing=east,lit=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_off",
+      "y": 90
+    },
+    "facing=east,lit=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower",
+      "y": 90
+    },
+    "facing=east,lit=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_lit",
+      "y": 90
+    },
+    "facing=north,lit=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower"
+    },
+    "facing=north,lit=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_off"
+    },
+    "facing=north,lit=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower"
+    },
+    "facing=north,lit=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_lit"
+    },
+    "facing=south,lit=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower",
+      "y": 180
+    },
+    "facing=south,lit=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_off",
+      "y": 180
+    },
+    "facing=south,lit=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower",
+      "y": 180
+    },
+    "facing=south,lit=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_lit",
+      "y": 180
+    },
+    "facing=west,lit=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower",
+      "y": 270
+    },
+    "facing=west,lit=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_off",
+      "y": 270
+    },
+    "facing=west,lit=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_lower",
+      "y": 270
+    },
+    "facing=west,lit=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_lectern/prop/lectern_upper_lit",
+      "y": 270
+    }
+  }
+}

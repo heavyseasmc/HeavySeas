@@ -18,7 +18,10 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -179,6 +182,93 @@ class WeatherSessionTest {
         assertTrue(session.navigationComplete());
     }
 
+    // ---- 狂风天翻两张航海牌：同一来源一天只算一次，阳伞一天只挡一次（ADR-0087 §4 第 1 条）。
+    //      规则事实表探针 A · B：两张之间口渴标记不清，于是第一张点过名的人、喝过酒的人在第二张上又渴一次。
+
+    @Test
+    void galeNamedThirstCountsOncePerDay() {
+        CharacterId first = firstSeat();
+        NavigationCard named = card("named", 0, new Selector.Only(Set.of(first)), false, false);
+        Session session = galeAfterExtra("named", List.of(named, QUIET), s -> { });
+        assertEquals(1, drainThirst(session, first), "狂风那张点了他的名");
+        finishGaleAndBeginStandard(session);
+        assertEquals(0, drainThirst(session, first), "标准那张没点他；今天的点名已经算过");
+        assertEquals(1, session.state().stateOf(first).damage());
+    }
+
+    @Test
+    void galeRumThirstCountsOncePerDay() {
+        CharacterId first = firstSeat();
+        Session session = galeAfterExtra(null, List.of(QUIET, card("quiet-2", 0, new Selector.Nobody(), false, false)),
+                s -> s.drinkRum(first, deal(s, first, "rum")));
+        assertEquals(1, drainThirst(session, first), "酒的口渴不看牌面");
+        finishGaleAndBeginStandard(session);
+        assertEquals(0, drainThirst(session, first), "酒今天已经渴过一次");
+        assertEquals(1, session.state().stateOf(first).damage());
+    }
+
+    @Test
+    void galeParasolCoversOncePerDay() {
+        // 两张各带一个只在那一张上生效的来源（狂风那张有打架图示、标准那张点他的名），
+        // 这样「同一来源一天一次」碰不到它们，分得出的只有阳伞挡了一次还是两次。
+        CharacterId first = firstSeat();
+        NavigationCard fight = card("fight", 0, new Selector.Nobody(), false, true);
+        NavigationCard named = card("named", 0, new Selector.Only(Set.of(first)), false, false);
+        int[] before = new int[1];
+        Session session = galeAfterExtra("fight", List.of(fight, named), s -> {
+            s.openParasol(first, deal(s, first, "parasol"));
+            CharacterId other = s.state().bySeat().get(1);
+            s.applyFight(Fight.between(first, other));
+            before[0] = s.state().stateOf(first).damage();
+        });
+        drainThirst(session, first);
+        assertEquals(before[0], session.state().stateOf(first).damage(), "打架的口渴被撑开的伞挡下");
+        finishGaleAndBeginStandard(session);
+        drainThirst(session, first);
+        assertEquals(1, session.state().stateOf(first).damage() - before[0], "伞今天已经挡过一次，点名这一次得自己扛");
+    }
+
+    private static CharacterId firstSeat() {
+        return atAction(WeatherEffect.EXTRA_NAVIGATION, List.of(QUIET)).state().bySeat().getFirst();
+    }
+
+    /**
+     * 狂风天：在行动阶段做完 {@code setup}，翻出狂风那张并结算完落海、排好口渴队列。
+     * 两张牌的先后由牌堆洗牌的种子决定，所以逐个种子试，直到狂风那张恰好是 {@code extraId}（{@code null} 表示哪张都行）。
+     */
+    private static Session galeAfterExtra(String extraId, List<NavigationCard> deck, Consumer<Session> setup) {
+        for (long seed = 1; seed < 64; seed++) {
+            Session session = atAction(WeatherEffect.EXTRA_NAVIGATION, deck, seed);
+            setup.accept(session);
+            session.advancePhase();
+            NavigationCard extra = session.takeWeatherNavigationCard();
+            if (extraId == null || extra.id().equals(extraId)) {
+                session.beginNavigate(extra);
+                return session;
+            }
+        }
+        return fail("64 个种子里狂风那张都不是 " + extraId);
+    }
+
+    private static void finishGaleAndBeginStandard(Session session) {
+        assertTrue(session.finishNavigationResolution());
+        session.prepareRowStack();
+        session.beginNavigate(session.takeCardForNavigation(null));
+    }
+
+    /** 这一张牌的口渴全部按「不喝」结算完；返回其中问到 {@code who} 几次。 */
+    private static int drainThirst(Session session, CharacterId who) {
+        int asked = 0;
+        Optional<Session.ThirstPrompt> prompt;
+        while ((prompt = session.thirstPending()).isPresent()) {
+            if (prompt.get().who().equals(who)) {
+                asked++;
+            }
+            session.decideThirst(List.of());
+        }
+        return asked;
+    }
+
     private static Session atNavigation(WeatherEffect effect, List<NavigationCard> deck) {
         Session session = atAction(effect, deck);
         session.advancePhase();
@@ -186,7 +276,11 @@ class WeatherSessionTest {
     }
 
     private static Session atAction(WeatherEffect effect, List<NavigationCard> deck) {
-        Table table = new Table(new NavigationDeck(deck, new Random(1)), PROVISIONS,
+        return atAction(effect, deck, 1);
+    }
+
+    private static Session atAction(WeatherEffect effect, List<NavigationCard> deck, long deckSeed) {
+        Table table = new Table(new NavigationDeck(deck, new Random(deckSeed)), PROVISIONS,
                 new WeatherDeck(List.of(new WeatherCard(effect.id(), effect)), new Random(2)), new Random(3));
         Session session = new Session("weather-test", ROSTER, table);
         assertEquals(effect, session.beginWeather().effect());

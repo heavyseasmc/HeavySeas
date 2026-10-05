@@ -167,7 +167,8 @@ public final class Seats {
      * 实体加载事件是在它<b>真的进世界那一刻</b>触发的：起服、区块重载、玩家走过去，全都算。
      */
     /** 场景投影的标签：船体旧投影 · 布景 · 补给箱。带这些标签的实体会进存档，起服时按组件里的名单认亲，认不出的清掉。 */
-    private static final java.util.Set<String> SCENE_TAGS = java.util.Set.of(HULL_TAG, Backdrop.TAG, Crate.TAG);
+    private static final java.util.Set<String> SCENE_TAGS = java.util.Set.of(HULL_TAG, Backdrop.TAG, Crate.TAG,
+            io.github.heavyseasmc.mod.world.liner.ChartTable.TAG);
 
     private static boolean sceneTagged(Entity entity) {
         for (String tag : SCENE_TAGS) {
@@ -214,6 +215,13 @@ public final class Seats {
             if (!GameComponents.of(world).backdropIds().contains(entity.getUuid())) {
                 entity.discard();
                 LOGGER.info("布景：清掉一件孤儿（存档里留下的）");
+            }
+            return;
+        }
+        if (entity.getCommandTags().contains(io.github.heavyseasmc.mod.world.liner.ChartTable.TAG)) {
+            if (!io.github.heavyseasmc.mod.world.liner.ChartTable.owns(entity.getUuid())) {
+                entity.discard();
+                LOGGER.info("海图桌：清掉一个孤儿（存档里留下的浮字或小铜船）");
             }
             return;
         }

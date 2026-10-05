@@ -19,6 +19,13 @@ public final class SceneItems {
     public static final Item LIGHTHOUSE_BACKDROP = new Item(new Item.Settings());
     public static final Item PIER_BACKDROP = new Item(new Item.Settings());
     public static final Item SUPPLY_CRATE = new Item(new Item.Settings());
+    /**
+     * C3 第二轮 · c3-table：海图桌上的小铜船（ADR-0086 §2 第 5 条：物品展示实体，不是方块状态）。模型与贴图由
+     * {@code liner_props.py --write} 写（models/item/chart_ship.json · textures/item/chart_ship.png）。模型里船头朝 +x、船底正中在 (8, 8, 8)：
+     * 物品展示实体（显示方式 none）把模型的 (8, 8, 8) 放在实体所在的点上，而 1.21.1 的物品展示实体渲染时先绕 y 转半圈 ——
+     * 变换为单位阵时船头朝世界 −x。
+     */
+    public static final Item CHART_SHIP = new Item(new Item.Settings());
 
     private SceneItems() {
     }
@@ -28,6 +35,7 @@ public final class SceneItems {
         register("lighthouse_backdrop", LIGHTHOUSE_BACKDROP);
         register("pier_backdrop", PIER_BACKDROP);
         register("supply_crate", SUPPLY_CRATE);
+        register("chart_ship", CHART_SHIP);                                           // C3 第二轮 · c3-table
     }
 
     private static void register(String name, Item item) {

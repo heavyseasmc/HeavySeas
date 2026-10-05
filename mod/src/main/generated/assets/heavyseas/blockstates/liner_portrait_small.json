@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "facing=east,sitter=captain": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_captain",
+      "y": 90
+    },
+    "facing=east,sitter=collector": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_collector",
+      "y": 90
+    },
+    "facing=east,sitter=doctor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_doctor",
+      "y": 90
+    },
+    "facing=east,sitter=hostess": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_hostess",
+      "y": 90
+    },
+    "facing=east,sitter=jeweler": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_jeweler",
+      "y": 90
+    },
+    "facing=east,sitter=kid": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_kid",
+      "y": 90
+    },
+    "facing=east,sitter=mate": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_mate",
+      "y": 90
+    },
+    "facing=east,sitter=sailor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_sailor",
+      "y": 90
+    },
+    "facing=north,sitter=captain": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_captain"
+    },
+    "facing=north,sitter=collector": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_collector"
+    },
+    "facing=north,sitter=doctor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_doctor"
+    },
+    "facing=north,sitter=hostess": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_hostess"
+    },
+    "facing=north,sitter=jeweler": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_jeweler"
+    },
+    "facing=north,sitter=kid": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_kid"
+    },
+    "facing=north,sitter=mate": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_mate"
+    },
+    "facing=north,sitter=sailor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_sailor"
+    },
+    "facing=south,sitter=captain": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_captain",
+      "y": 180
+    },
+    "facing=south,sitter=collector": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_collector",
+      "y": 180
+    },
+    "facing=south,sitter=doctor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_doctor",
+      "y": 180
+    },
+    "facing=south,sitter=hostess": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_hostess",
+      "y": 180
+    },
+    "facing=south,sitter=jeweler": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_jeweler",
+      "y": 180
+    },
+    "facing=south,sitter=kid": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_kid",
+      "y": 180
+    },
+    "facing=south,sitter=mate": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_mate",
+      "y": 180
+    },
+    "facing=south,sitter=sailor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_sailor",
+      "y": 180
+    },
+    "facing=west,sitter=captain": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_captain",
+      "y": 270
+    },
+    "facing=west,sitter=collector": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_collector",
+      "y": 270
+    },
+    "facing=west,sitter=doctor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_doctor",
+      "y": 270
+    },
+    "facing=west,sitter=hostess": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_hostess",
+      "y": 270
+    },
+    "facing=west,sitter=jeweler": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_jeweler",
+      "y": 270
+    },
+    "facing=west,sitter=kid": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_kid",
+      "y": 270
+    },
+    "facing=west,sitter=mate": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_mate",
+      "y": 270
+    },
+    "facing=west,sitter=sailor": {
+      "model": "heavyseas:block/liner/liner_portrait_small/prop/portrait_small_prop/portrait_small_sailor",
+      "y": 270
+    }
+  }
+}

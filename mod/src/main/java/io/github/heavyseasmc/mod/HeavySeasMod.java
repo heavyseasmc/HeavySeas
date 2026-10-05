@@ -95,6 +95,8 @@ public final class HeavySeasMod implements ModInitializer {
         io.github.heavyseasmc.mod.world.liner.LinerStairs.register();   // 北辰号大楼梯一族（ADR 草稿 stairs）
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。
         SeatEntity.register();
+        // 甲板躺椅的座位（C3 第二轮 · c3-deck）：另一种实体，对局座位与演习艇报名按类型找座位，看不见它
+        io.github.heavyseasmc.mod.world.liner.DeckChairSeat.register();
         PlayerBodies.register();
         GullEntity.register();
         CreativeTabs.register();                       // 物品都登记完之后：本模组自己的三页（ADR-0058 Q6）
@@ -114,6 +116,7 @@ public final class HeavySeasMod implements ModInitializer {
             DebugNext.clear();
             PlayerSky.resetForced();
             LinerShip.onServerStopped();
+            io.github.heavyseasmc.mod.world.liner.ChartTable.forget();
         });
         // M4 crash recovery: the match itself is intentionally ephemeral, but escrowed real inventories are not.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
@@ -207,6 +210,7 @@ public final class HeavySeasMod implements ModInitializer {
 
         // 倒计时的权威在服务端：客户端自己算超时的话，改过的客户端可以永远不超时。
         ServerTickEvents.END_SERVER_TICK.register(Seats::tick);
+        ServerTickEvents.END_SERVER_TICK.register(io.github.heavyseasmc.mod.world.liner.ChartTable::tick);   // 海图桌的浮字与小铜船（ADR-0086 §2 第 5 条）
         ServerTickEvents.END_SERVER_TICK.register(PlayerSky::tick);
         ServerTickEvents.END_SERVER_TICK.register(PlayerBodies::tick);
         ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);

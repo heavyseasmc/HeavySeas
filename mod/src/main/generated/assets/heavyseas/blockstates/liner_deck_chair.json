@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,part=foot,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_foot",
+      "y": 90
+    },
+    "facing=east,part=foot,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_foot",
+      "y": 90
+    },
+    "facing=east,part=head,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_head",
+      "y": 90
+    },
+    "facing=east,part=head,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_head",
+      "y": 90
+    },
+    "facing=north,part=foot,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_foot"
+    },
+    "facing=north,part=foot,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_foot"
+    },
+    "facing=north,part=head,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_head"
+    },
+    "facing=north,part=head,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_head"
+    },
+    "facing=south,part=foot,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_foot",
+      "y": 180
+    },
+    "facing=south,part=foot,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_foot",
+      "y": 180
+    },
+    "facing=south,part=head,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_head",
+      "y": 180
+    },
+    "facing=south,part=head,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_head",
+      "y": 180
+    },
+    "facing=west,part=foot,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_foot",
+      "y": 270
+    },
+    "facing=west,part=foot,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_foot",
+      "y": 270
+    },
+    "facing=west,part=head,rug=false": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_head",
+      "y": 270
+    },
+    "facing=west,part=head,rug=true": {
+      "model": "heavyseas:block/liner/liner_deck_chair/prop/deck_chair_rug_head",
+      "y": 270
+    }
+  }
+}

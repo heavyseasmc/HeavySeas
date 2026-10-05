@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/portrait_large_top_west_lit",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/portrait_large",
+    "g": "heavyseas:block/liner/prop/portrait_large_glow_lit",
+    "p": "heavyseas:block/liner/prop/portrait_large_hostess",
+    "particle": "heavyseas:block/liner/prop/portrait_large"
+  }
+}

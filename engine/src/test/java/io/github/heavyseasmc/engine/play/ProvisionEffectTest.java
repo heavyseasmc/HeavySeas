@@ -633,6 +633,24 @@ class ProvisionEffectTest {
         }
 
         @Test
+        @DisplayName("❗陪酒女先蹭到别人的酒、再自己喝一瓶：一天最多 +3，不叠成 +6（ADR-0087 §4 第 2 条，探针 D）")
+        void hostessSharedThenOwnRumDoesNotStack() {
+            Session shared = deal(List.of(mate(1), kid(2), hostess(3)), "rum", "water", "rum");
+            shared.drinkRum(MATE, "rum");
+            assertEquals(6, fightingSizeOf(shared, HOSTESS), "蹭到大副的酒：3 + 3");
+
+            Session both = deal(List.of(mate(1), kid(2), hostess(3)), "rum", "water", "rum");
+            both.drinkRum(MATE, "rum");
+            both.drinkRum(HOSTESS, "rum");
+            assertEquals(6, fightingSizeOf(both, HOSTESS), "再自己喝一瓶也还是 3 + 3（stacking.rum = false）");
+
+            Session ownFirst = deal(List.of(mate(1), kid(2), hostess(3)), "rum", "water", "rum");
+            ownFirst.drinkRum(HOSTESS, "rum");
+            ownFirst.drinkRum(MATE, "rum");
+            assertEquals(6, fightingSizeOf(ownFirst, HOSTESS), "对照：先自己喝、再有人喝 —— 蹭酒那一步本来就跳过她");
+        }
+
+        @Test
         @DisplayName("每回合最多喝一次；下一回合可以再喝")
         void oncePerTurn() {
             Session s = deal(List.of(mate(1), kid(2)), "rum", "water");
