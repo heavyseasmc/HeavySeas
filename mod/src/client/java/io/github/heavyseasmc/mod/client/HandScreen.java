@@ -477,7 +477,7 @@ public final class HandScreen extends GameScreen {
             return;                           // 还没轮到它入场
         }
         float progress = i < dealtFrom ? 1f : in;
-        float rise = (1f - progress) * GuiLanguage.DEAL_RISE;
+        float rise = (1f - progress) * GuiMetrics.units(GuiLanguage.DEAL_RISE);
         float scale = GuiLanguage.dealScale(progress);
         context.getMatrices().push();
         // 全部走矩阵，布局本身不动 —— 命中判定因此可以只看落位后的矩形。
@@ -489,11 +489,7 @@ public final class HandScreen extends GameScreen {
         if (edge) {
             CardRow.edgeShadow(context, h, guiScale(), sheet().k());
         }
-        if (i != selected) {
-            CardRow.dim(context);
-        }
         CardTexture.drawProvision(context, hand.get(i), 0, 0, w, h);
-        CardRow.undim(context);
         if (i == selected) {
             drawCardFrame(context, w, h);
         }
@@ -503,7 +499,7 @@ public final class HandScreen extends GameScreen {
     /** 叠起来时上面那张说了算，所以先问选中的那张，再从右往左问（{@link CardRow#indexAt}）。 */
     private int indexAt(int mouseX, int mouseY, int left, int top, int step, int w, int h) {
         return CardRow.indexAt(mouseX, mouseY, left, top, step, w, h, view.hand().size(), selected,
-                Math.max(pullLift, GuiLanguage.LIFT_PX));
+                Math.max(pullLift, GuiMetrics.units(GuiLanguage.LIFT_PX)));
     }
 
     /**

@@ -49,8 +49,14 @@ public record CardLayout(List<String> tiers, Map<String, Shape> shapes, Map<Stri
     public record Title(int x, int top, int bottom, int right, Map<String, Integer> size, Set<String> tiers, int minPx) {
     }
 
-    /** 角标：从右上角 ({@code right}, {@code top}) 往左排，每枚 {@code w}×{@code h}。L2 以右上角为锚放大。 */
-    public record Badges(int right, int top, int w, int h, int gap, int digitSize, int iconSize,
+    /**
+     * 角标（ADR-0090）：从右上角 ({@code right}, {@code top}) 往左排，每枚是「图标 · 符号箭头 · 数字」一行，高 {@code h}，
+     * 宽随内容（图标按贴图的宽高比、数字按实际字宽）。不加框。L2 以右上角为锚放大。
+     *
+     * @param iconGap  图标与数字（或符号）之间空多少
+     * @param signSize 符号箭头的高（{@code +3} 的加号画成实心上箭头）
+     */
+    public record Badges(int right, int top, int h, int gap, int digitSize, int iconSize, int iconGap, int signSize,
                          Set<String> iconTiers, Map<String, Double> scale, Set<String> tiers, int minPx) {
 
         public double scaleAt(String tier) {
@@ -111,9 +117,10 @@ public record CardLayout(List<String> tiers, Map<String, Shape> shapes, Map<Stri
                     new Title(t.get("x").getAsInt(), t.get("top").getAsInt(), t.get("bottom").getAsInt(),
                             t.get("right").getAsInt(), ints(t.getAsJsonObject("size")), set(t, "tiers"),
                             t.get("min_px").getAsInt()),
-                    new Badges(b.get("right").getAsInt(), b.get("top").getAsInt(), b.get("w").getAsInt(),
+                    new Badges(b.get("right").getAsInt(), b.get("top").getAsInt(),
                             b.get("h").getAsInt(), b.get("gap").getAsInt(), b.get("digit_size").getAsInt(),
-                            b.get("icon_size").getAsInt(), set(b, "icon_tiers"), doubles(b.getAsJsonObject("scale")),
+                            b.get("icon_size").getAsInt(), b.get("icon_gap").getAsInt(), b.get("sign_size").getAsInt(),
+                            set(b, "icon_tiers"), doubles(b.getAsJsonObject("scale")),
                             set(b, "tiers"), b.get("min_px").getAsInt()),
                     new Footer(f.get("y").getAsInt(), f.get("emblem").getAsInt(), set(f, "tiers"),
                             f.get("min_px").getAsInt())));
@@ -191,14 +198,15 @@ public record CardLayout(List<String> tiers, Map<String, Shape> shapes, Map<Stri
         }
     }
 
-    /** 标题带在这一档、右上角有 {@code badges} 枚角标时的可用宽（母版单位）：牌名让开角标，再空 6 个单位。 */
-    public double titleBox(String kind, String tier, int badges) {
+    /**
+     * 标题带在这一档、右上角那一组角标宽 {@code badgeUnits}（母版单位，已含这一档的放大）时的可用宽：
+     * 牌名让开角标，再空 6 个单位。角标宽随字宽，只有客户端量得出（{@code CardNameFit}），这里不估。
+     */
+    public double titleBox(String kind, String tier, double badgeUnits) {
         Shape s = shapeOf(kind);
-        Badges b = s.badges();
         double right = s.title().right();
-        if (badges > 0 && b.tiers().contains(tier)) {
-            double k = b.scaleAt(tier);
-            right = Math.min(right, b.right() - badges * b.w() * k - (badges - 1) * b.gap() * k - 6);
+        if (badgeUnits > 0 && s.badges().tiers().contains(tier)) {
+            right = Math.min(right, s.badges().right() - badgeUnits - 6);
         }
         return right - s.title().x();
     }
@@ -226,6 +234,11 @@ public record CardLayout(List<String> tiers, Map<String, Shape> shapes, Map<Stri
         }
         if (s.badges().tiers().contains(tier)) {
             out.add(new Requirement("badge", s.badges().digitSize() * s.badges().scaleAt(tier), s.badges().minPx()));
+            // 图标与数字同一个下限：认不出图标，数字就又成了光秃秃的「3」（ADR-0090 的起因）
+            if (s.badges().iconTiers().contains(tier)) {
+                out.add(new Requirement("badge-icon", s.badges().iconSize() * s.badges().scaleAt(tier),
+                        s.badges().minPx()));
+            }
         }
         if (s.footer().tiers().contains(tier)) {
             out.add(new Requirement("footer", s.footer().emblem(), s.footer().minPx()));

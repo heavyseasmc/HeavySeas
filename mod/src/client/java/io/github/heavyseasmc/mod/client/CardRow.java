@@ -15,7 +15,9 @@ import java.util.Map;
  *   <li><b>间距</b>：放得下就照样张的缝并排；放不下才叠，叠多少由张数定 —— 张数少了自己散开，直到不重叠。</li>
  *   <li><b>抽出来</b>：选中那张以牌底中点为轴往左转 {@link #PULL_DEG}°、往上提，像从一叠里抽出来。
  *       进度就是各面原来那条「抬」（{@link GuiLanguage#approach}），不另起一套动效。</li>
- *   <li><b>一叠当一件东西</b>：没选中的压暗一点；叠着时每张左边缘一道细影，分得出是几张。</li>
+ *   <li><b>一叠当一件东西</b>：叠着时每张左边缘一道细影，分得出是几张。<b>没选中的不压暗</b>：
+ *       用户 2026-10-05 推翻了 ADR-0049 的「压暗一点」——「玩家会感觉不可用，形成视觉误导」。
+ *       选中靠抽出来与金框；压暗只留给真按不动的那张（{@link ChoiceCards#OFF}）。</li>
  *   <li><b>张数一变就滑过去</b>：按「哪一张」认，不按下标 —— 中间少了一张，后面的不该先跳一格再滑。</li>
  * </ul>
  *
@@ -33,8 +35,6 @@ final class CardRow {
      * 回到样图 F 的 30，腾地方的是 {@link GuiLanguage} 里「顿」往上弹的幅度（ADR-0050 §3）。
      */
     static final double PULL_LIFT = 30;
-    /** 没选中的压到几成亮。 */
-    static final float DIM = 0.86f;
     /** 叠着时左边缘那道细影多宽（稿子像素）、多深。 */
     static final double EDGE = 2;
     private static final int EDGE_ALPHA = 0x46;
@@ -78,15 +78,6 @@ final class CardRow {
         if (pull > 0f) {
             context.getMatrices().multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-PULL_DEG * Math.min(1f, pull)));
         }
-    }
-
-    /** 没选中的压暗；画完那一张马上 {@link #undim}。 */
-    static void dim(DrawContext context) {
-        context.setShaderColor(DIM, DIM, DIM, 1f);
-    }
-
-    static void undim(DrawContext context) {
-        context.setShaderColor(1f, 1f, 1f, 1f);
     }
 
     /**

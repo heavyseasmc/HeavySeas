@@ -136,40 +136,95 @@ final class CardPainter {
 
     // ---------------------------------------------------------------- 角标
 
-    /** 画角标，返回最左那一枚的左沿（母版单位）—— 牌名据此让开。没有角标时返回标题带右沿。 */
+    /**
+     * 数字的字面中线离行框上沿多远（字号的倍数）：{@link GuiText} 把基线放在行框上沿下 1.005 倍字号处，
+     * 数字高约 0.71 倍字号，字面中线因此在 0.65 倍处。角标一行按这条线对齐图标与箭头。
+     */
+    private static final double DIGIT_MID = 0.65;
+    /** 符号箭头与数字之间的空（母版单位，随档放大）。 */
+    private static final double SIGN_GAP = 1.0;
+
+    /** 一枚角标拆开的样子：图标 · 符号（+1 上箭头、-1 下箭头、0 没有）· 数字，各自多宽（母版单位，已含这一档的放大）。 */
+    private record Piece(String icon, double iconW, int sign, double signW, String digits, double digitsW) {
+
+        double width(CardLayout.Badges b, double k) {
+            double w = digitsW;
+            if (iconW > 0) {
+                w += iconW + b.iconGap() * k;
+            }
+            if (sign != 0) {
+                w += signW + SIGN_GAP * k;
+            }
+            return w;
+        }
+    }
+
+    private static Piece piece(CardLayout.Badges b, CardFace.Badge badge, String tier, float fx, int textScale) {
+        double k = b.scaleAt(tier);
+        String text = badge.text();
+        int sign = text.startsWith("+") ? 1 : text.startsWith("-") ? -1 : 0;
+        String digits = sign == 0 ? text : text.substring(1);
+        double iconW = b.iconTiers().contains(tier) ? b.iconSize() * k * CardTexture.aspect(icon(badge.icon())) : 0;
+        double signW = sign == 0 ? 0 : b.signSize() * k * CardTexture.aspect(signIcon(sign));
+        int guiSize = Math.max(1, Math.round((float) (b.digitSize() * k * fx)));
+        double digitsW = GuiText.drawnWidth(digits, guiSize, true, textScale <= 0, textScale) / fx;
+        return new Piece(badge.icon(), iconW, sign, signW, digits, digitsW);
+    }
+
+    /**
+     * 一组角标排出来多宽（母版单位）。画与量走同一段：牌名让多少（{@link CardNameFit}）就是这里排出来的宽。
+     *
+     * @param fx 母版单位 → 排字坐标的倍率（合成进贴图时是贴图宽 / 母版宽）
+     */
+    static double badgeUnits(CardLayout.Badges b, List<CardFace.Badge> badges, String tier, float fx, int textScale) {
+        if (badges.isEmpty() || !b.tiers().contains(tier)) {
+            return 0;
+        }
+        double k = b.scaleAt(tier);
+        double total = (badges.size() - 1) * b.gap() * k;
+        for (CardFace.Badge badge : badges) {
+            total += piece(b, badge, tier, fx, textScale).width(b, k);
+        }
+        return total;
+    }
+
+    /**
+     * 画角标（ADR-0090）：每枚是「图标 · 符号箭头 · 数字」一行，不加框，右对齐到 {@code right}。
+     * 三档都画图标 —— 只剩数字的「3」与「1」玩家读不出是什么（用户 2026-10-05）。
+     * 返回最左那一枚的左沿（母版单位）—— 牌名据此让开。没有角标时返回标题带右沿。
+     */
     private static float drawBadges(DrawContext context, CardLayout.Badges b, List<CardFace.Badge> badges, String tier,
                                     int x, int y, float fx, float fy, int textScale) {
         if (badges.isEmpty() || !b.tiers().contains(tier)) {
             return Float.MAX_VALUE;
         }
         double k = b.scaleAt(tier);
-        double bw = b.w() * k;
-        double bh = b.h() * k;
-        double gap = b.gap() * k;
-        boolean icons = b.iconTiers().contains(tier);
-        int n = badges.size();
-        double left = b.right() - n * bw - (n - 1) * gap;
-        for (int i = 0; i < n; i++) {
-            CardFace.Badge badge = badges.get(i);
-            double bx = left + i * (bw + gap);
-            int px = x + Math.round((float) (bx * fx));
-            int py = y + Math.round((float) (b.top() * fy));
-            int pw = Math.round((float) (bw * fx));
-            int ph = Math.round((float) (bh * fy));
-            blit(context, icon("badge_box"), px, py, pw, ph);
-            double digit = b.digitSize() * k;
-            double textTop;
-            if (icons) {
-                double is = b.iconSize() * k;
-                blit(context, icon(badge.icon()), px + Math.round((float) ((bw - is) / 2 * fx)),
-                        py + Math.round((float) (2.5 * k * fy)), Math.round((float) (is * fx)), Math.round((float) (is * fy)));
-                textTop = b.top() + bh - digit * 1.25 - 1 * k;       // 图标在上、数字贴底
-            } else {
-                textTop = b.top() + (bh - digit * 1.25) / 2;          // 没有图标：数字居中
+        double left = b.right() - badgeUnits(b, badges, tier, fx, textScale);
+        double mid = b.top() + b.h() * k / 2;
+        double cx = left;
+        for (CardFace.Badge badge : badges) {
+            Piece p = piece(b, badge, tier, fx, textScale);
+            if (p.iconW() > 0) {
+                double ih = b.iconSize() * k;
+                blit(context, icon(p.icon()), x + Math.round((float) (cx * fx)), y + Math.round((float) ((mid - ih / 2) * fy)),
+                        Math.round((float) (p.iconW() * fx)), Math.round((float) (ih * fy)));
+                cx += p.iconW() + b.iconGap() * k;
             }
-            GuiText.draw(context, badge.text(), px, y + Math.round((float) (textTop * fy)), pw,
-                    Math.max(1, Math.round((float) (digit * fy))), true, GuiLanguage.CARD_INK, GuiText.Align.CENTER,
+            if (p.sign() != 0) {
+                double sh = b.signSize() * k;
+                blit(context, signIcon(p.sign()), x + Math.round((float) (cx * fx)),
+                        y + Math.round((float) ((mid - sh / 2) * fy)), Math.round((float) (p.signW() * fx)),
+                        Math.round((float) (sh * fy)));
+                cx += p.signW() + SIGN_GAP * k;
+            }
+            double digit = b.digitSize() * k;
+            int guiSize = Math.max(1, Math.round((float) (digit * fx)));   // 与量宽那一路（piece）同一个字号
+            // 框宽给足（量出来的宽再多一点）：放得下就不会缩字号，与量的那一路字号相同
+            GuiText.draw(context, p.digits(), x + Math.round((float) (cx * fx)),
+                    y + Math.round((float) ((mid - digit * DIGIT_MID) * fy)),
+                    (int) Math.ceil(p.digitsW() * fx) + 2, guiSize, true, GuiLanguage.CARD_INK, GuiText.Align.LEFT,
                     1, false, textScale <= 0, textScale);
+            cx += p.digitsW() + b.gap() * k;
         }
         return (float) left;
     }
@@ -223,18 +278,41 @@ final class CardPainter {
         }
     }
 
-    /** 一枚图示：纸色圆盘 + 线稿。「全员」那一枚自带底盘。 */
+    /** 一枚图示：纸色圆盘 + 木刻小图（「全员」也一样，ADR-0090 起它不再自带底盘）。 */
     private static void drawIconChip(DrawContext context, String ref, int cx, int cy, int d) {
-        if (ref.equals(io.github.heavyseasmc.mod.card.CardFaces.EVERYONE)) {
-            blit(context, icon(ref), cx, cy, d, d);
-            return;
-        }
         blit(context, icon("chip_disc"), cx, cy, d, d);
+        // 按贴图的宽高比放进圆盘：长边占 ICON_IN_DISC —— 海鸥是扁的，压成方的就成了一团（ADR-0090）
         int is = Math.round(d * ICON_IN_DISC);
-        blit(context, icon(ref), cx + (d - is) / 2, cy + (d - is) / 2, is, is);
+        float a = CardTexture.aspect(icon(ref));
+        int iw = a >= 1 ? is : Math.round(is * a);
+        int ih = a >= 1 ? Math.round(is / a) : is;
+        blit(context, icon(ref), cx + (d - iw) / 2, cy + (d - ih) / 2, iw, ih);
     }
 
     // ---------------------------------------------------------------- 取贴图
+
+    /**
+     * 界面上借用卡牌的木刻小图（ADR-0090）：同一个意思，牌上与界面上画同一样东西 —— 计分的「财宝」就是财宝牌上的钱币，
+     * 座位印章的体型就是角标上的秤砣（Codex 复核：计分换成钻石、印章只有「4/4」，都与牌对不上）。
+     * 按贴图的宽高比画，高 {@code h}，返回画了多宽。
+     */
+    static int drawCardIcon(DrawContext context, String name, int x, int y, int h, float alpha) {
+        int w = cardIconWidth(name, h);
+        RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
+        blit(context, icon(name), x, y, w, h);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        return w;
+    }
+
+    /** {@link #drawCardIcon} 画成高 {@code h} 时有多宽。 */
+    static int cardIconWidth(String name, int h) {
+        return Math.max(1, Math.round(h * CardTexture.aspect(icon(name))));
+    }
+
+    /** 符号箭头：{@code +} 画实心上箭头，{@code -} 画实心下箭头（用户 2026-10-05：「➕改成实心上箭头」）。 */
+    private static Identifier signIcon(int sign) {
+        return sign > 0 ? icon("arrow_up") : icon("arrow_down");
+    }
 
     private static Identifier icon(String name) {
         return Identifier.of(HeavySeasMod.MOD_ID, CARDS + "icon/" + name + ".png");

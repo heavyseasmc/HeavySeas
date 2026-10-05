@@ -160,11 +160,7 @@ public final class TableScreen extends GameScreen {
         if (edge && gathered <= 0f) {
             CardRow.edgeShadow(context, pose.h(), guiScale(), sheet().k());
         }
-        if (!hi) {
-            CardRow.dim(context);
-        }
         CardTexture.drawProvision(context, seat.front().get(index), 0, 0, pose.w(), pose.h());
-        CardRow.undim(context);
         if (hi) {
             drawCardFrame(context, pose.w(), pose.h());
         }

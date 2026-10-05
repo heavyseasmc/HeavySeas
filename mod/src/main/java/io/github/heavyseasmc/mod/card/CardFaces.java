@@ -15,16 +15,18 @@ import java.util.List;
  */
 public final class CardFaces {
 
-    /** 角标与口渴排的图标名 —— 与 {@code textures/gui/cards/icon/<名>.png} 一一对应，管线按这张表烘。 */
-    public static final String STRENGTH = "strength";
+    /**
+     * 角标与口渴排的图标名 —— 与 {@code textures/gui/cards/icon/<名>.png} 一一对应，管线按这张表烘。
+     * 角标那四枚（体型秤砣 · 分数钱币 · 生存救生圈 · 海鸥）是木刻，与插画同一套画法（ADR-0090）。
+     */
+    public static final String SIZE = "size";
     public static final String SURVIVAL = "life_ring";
     public static final String POINTS = "treasure";
-    public static final String GULL_PLUS = "gull_plus";
-    public static final String GULL_MINUS = "gull_minus";
+    public static final String GULL = "gull";
     public static final String ROWERS = "oar";
     public static final String FIGHTERS = "fight";
     public static final String EVERYONE = "everyone";
-    // 天候的效果图示（ADR-0040）。海鸥借航海卡上那一枚（gull_plus 就是一只不带符号的海鸥）。
+    // 天候的效果图示（ADR-0040）。海鸥借航海卡角标上那一枚。
     public static final String OVERBOARD = "overboard";
     public static final String THIRST = "thirst";
     public static final String WATER = "water";
@@ -40,14 +42,18 @@ public final class CardFaces {
 
     /**
      * 物资的角标：打架时的体型加值（武器 · 朗姆酒）或上岸的分数。珠宝按套计分，一个数说不清，不印。
+     *
+     * <p>加值写成 {@code +3}：「加」是这个数的一部分 —— 角色卡上的体型 {@code 8} 是本身多大，武器的 {@code +3}
+     * 是在那之上再加多少，两者印成同一个样子就分不开（用户 2026-10-05：「看起来不明确，不知道数字想表达什么」）。
+     * 符号画成实心箭头（{@code CardPainter}），字串里仍是 {@code +}：闸门的指纹与语言无关。
      */
     public static List<CardFace.Badge> provisionBadges(Provision p) {
         int power = p.weaponPower();
         if (power > 0) {
-            return List.of(new CardFace.Badge(STRENGTH, Integer.toString(power)));
+            return List.of(new CardFace.Badge(SIZE, "+" + power));
         }
         if (p.effect() instanceof ProvisionEffect.BuffSize buff) {
-            return List.of(new CardFace.Badge(STRENGTH, Integer.toString(buff.amount())));
+            return List.of(new CardFace.Badge(SIZE, "+" + buff.amount()));
         }
         if (p.effect() instanceof ProvisionEffect.ScoreFlat score) {
             return List.of(new CardFace.Badge(POINTS, Integer.toString(score.points())));
@@ -76,9 +82,9 @@ public final class CardFaces {
 
     // ---------------------------------------------------------------- 角色
 
-    /** 角色的两枚角标：左体力、右生存（L1 / L2 不画图标，靠位置认 —— ADR-0039 §7.3）。 */
+    /** 角色的两枚角标：左体型、右生存分。三档都画图标（ADR-0090 取代 ADR-0039 §7.3「L1 / L2 靠位置认」）。 */
     public static List<CardFace.Badge> characterBadges(int size, int survival) {
-        return List.of(new CardFace.Badge(STRENGTH, Integer.toString(size)),
+        return List.of(new CardFace.Badge(SIZE, Integer.toString(size)),
                 new CardFace.Badge(SURVIVAL, Integer.toString(survival)));
     }
 
@@ -113,7 +119,7 @@ public final class CardFaces {
             case DOUBLE_WATER -> List.of(icon(THIRST), arrow(), icon(WATER), icon(WATER));
             case ALL_THIRST -> List.of(icon(EVERYONE), arrow(), icon(THIRST));
             case IGNORE_THIRST -> List.of(struck(THIRST));
-            case IGNORE_GULLS -> List.of(struck(GULL_PLUS));
+            case IGNORE_GULLS -> List.of(struck(GULL));
             case SKIP_NAVIGATION -> List.of(struck(NAV_CARD));
             case EXTRA_NAVIGATION -> List.of(count("+1"), icon(NAV_CARD));
             case EXTRA_PROVISION -> List.of(count("+1"), icon(CRATE));
@@ -140,12 +146,26 @@ public final class CardFaces {
     // ---------------------------------------------------------------- 航海
 
     public static CardFace nav(NavCardView card) {
-        List<CardFace.Badge> badges = switch (card.gull()) {
-            case 1 -> List.of(new CardFace.Badge(GULL_PLUS, "+1"));
-            case -1 -> List.of(new CardFace.Badge(GULL_MINUS, "-1"));
+        return new CardFace("nav", card.id(), navTitle(card.overboard()), navBadges(card.gull()), roll(card));
+    }
+
+    /** 航海卡的海鸥角标：一只海鸥 + 带符号的数（符号画成上 / 下箭头，所以不必再有一枚划掉的海鸥）。 */
+    static List<CardFace.Badge> navBadges(int gull) {
+        return gull == 0 ? List.of() : List.of(new CardFace.Badge(GULL, (gull > 0 ? "+" : "-") + Math.abs(gull)));
+    }
+
+    /**
+     * 这种牌角上<b>最宽</b>的那一组角标长什么样：牌名据此给角标让位（{@code CardNameFit}）。
+     * 只看形状不看数据 —— 目录没到之前就要选档，而一位数里最宽的是 8。两位数的值（换了数据包）
+     * 画的时候牌名照样让开（{@code CardPainter} 按实际宽度让），只是可能缩一级字。
+     */
+    public static List<CardFace.Badge> widestBadges(String kind) {
+        return switch (kind) {
+            case "provision" -> List.of(new CardFace.Badge(SIZE, "+8"));
+            case "character" -> characterBadges(8, 8);
+            case "nav" -> navBadges(-1);
             default -> List.of();
         };
-        return new CardFace("nav", card.id(), navTitle(card.overboard()), badges, roll(card));
     }
 
     /**

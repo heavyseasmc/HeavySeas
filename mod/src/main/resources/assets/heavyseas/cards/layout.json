@@ -23,11 +23,13 @@
       },
       "rules": {"y": [70, 73], "left": 24, "right": 276, "tiers": ["l0", "l1"]},
       "badges": {
-        "right": 284, "top": 20, "w": 44, "h": 42, "gap": 4,
-        "digit_size": 22,
-        "icon_size": 16,
-        "icon_tiers": ["l0"],
-        "scale": {"l0": 1.0, "l1": 1.0, "l2": 1.6},
+        "_comment": "ADR-0090：图标 · 符号箭头 · 数字一行，不加框，三档都画图标。right 让开 L0 的内框线（x 284）8 个单位；top 让一行的中线与牌名同高（42）。",
+        "right": 276, "top": 28, "h": 28, "gap": 8,
+        "digit_size": 26,
+        "icon_size": 24, "icon_gap": 3,
+        "sign_size": 15,
+        "icon_tiers": ["l0", "l1", "l2"],
+        "scale": {"l0": 1.0, "l1": 1.0, "l2": 1.9},
         "tiers": ["l0", "l1", "l2"],
         "min_px": 10
       },
@@ -46,11 +48,12 @@
       },
       "rules": {"y": [70, 73], "left": 24, "right": 396, "tiers": ["l0", "l1"]},
       "badges": {
-        "right": 404, "top": 20, "w": 44, "h": 42, "gap": 4,
-        "digit_size": 22,
-        "icon_size": 16,
-        "icon_tiers": ["l0"],
-        "scale": {"l0": 1.0, "l1": 1.0, "l2": 1.6},
+        "right": 396, "top": 28, "h": 28, "gap": 8,
+        "digit_size": 26,
+        "icon_size": 24, "icon_gap": 3,
+        "sign_size": 15,
+        "icon_tiers": ["l0", "l1", "l2"],
+        "scale": {"l0": 1.0, "l1": 1.0, "l2": 1.9},
         "tiers": ["l0", "l1", "l2"],
         "min_px": 10
       },
@@ -77,7 +80,7 @@
       "shape": "portrait",
       "roll": {
         "divider": {"y": 272, "left": 40, "right": 260, "tiers": ["l0", "l1"]},
-        "icon": {"x": 139, "y": 280, "size": 22, "tiers": ["l0", "l1"]},
+        "icon": {"x": 135, "y": 275, "size": 30, "tiers": ["l0", "l1"]},
         "band": {
           "l0": {"top": 307, "bottom": 361, "left": 24, "right": 276, "dmax": 54, "gap": 5, "max_rows": 1},
           "l1": {"top": 307, "bottom": 361, "left": 24, "right": 276, "dmax": 54, "gap": 5, "max_rows": 1},

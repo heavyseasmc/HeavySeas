@@ -100,7 +100,7 @@ public abstract class GameScreen extends Screen {
      * 界面尺寸设成 1 时一个单位是一个像素，设成 4 时是四个，同样的单位数在屏幕上差四倍。
      */
     protected Density density() {
-        int physical = (int) Math.round(height * net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaleFactor());
+        int physical = net.minecraft.client.MinecraftClient.getInstance().getWindow().getFramebufferHeight();
         if (physical >= DENSITY_FULL_PX) {
             return Density.FULL;
         }
@@ -520,13 +520,23 @@ public abstract class GameScreen extends Screen {
     /** 这一帧的骨架。每帧现算：窗口与界面尺寸随时会变。 */
     protected SheetLayout sheet() {
         var window = client == null ? net.minecraft.client.MinecraftClient.getInstance().getWindow() : client.getWindow();
-        return SheetLayout.of(window.getFramebufferWidth(), window.getFramebufferHeight(), guiScale());
+        return SheetLayout.of(window.getFramebufferWidth(), window.getFramebufferHeight());
     }
 
     /** 界面尺寸（整数）：物理像素 ÷ 它 = GUI 单位。 */
     protected int guiScale() {
         var window = client == null ? net.minecraft.client.MinecraftClient.getInstance().getWindow() : client.getWindow();
         return Math.max(1, (int) Math.round(window.getScaleFactor()));
+    }
+
+    /** Screen 的统一绘制入口调用：窗口太小时跳过整面，放大后仍是原来的界面和选中项。 */
+    public final boolean renderWindowNotice(DrawContext context) {
+        if (!WindowNotice.required()) {
+            return false;
+        }
+        endFold(context);
+        WindowNotice.render(context);
+        return true;
     }
 
     /** 往下画物理像素（骨架那几件）：矩阵缩到 1 / 界面尺寸。与 {@link #pxEnd} 成对。 */
@@ -600,7 +610,7 @@ public abstract class GameScreen extends Screen {
 
     /** 一排卡里，指针落在第几张上；都不在时 {@code -1}。上边界把「抬」起来的那几像素算进去。 */
     protected static int cardIndexAt(int mouseX, int mouseY, int left, int top, int w, int h, int count) {
-        if (mouseY < top - GuiLanguage.LIFT_PX || mouseY > top + h) {
+        if (mouseY < top - GuiMetrics.units(GuiLanguage.LIFT_PX) || mouseY > top + h) {
             return -1;
         }
         for (int i = 0; i < count; i++) {
@@ -614,12 +624,12 @@ public abstract class GameScreen extends Screen {
 
     /** 只会「抬」的卡，顶上要留多少空：抬起的距离加金框与余量。 */
     protected static int liftRoom() {
-        return (int) Math.ceil(GuiLanguage.LIFT_PX) + BORDER_ROOM;
+        return (int) Math.ceil(GuiMetrics.units(GuiLanguage.LIFT_PX)) + BORDER_ROOM;
     }
 
     /** 只会「抬」的按钮，顶上要留多少空：抬起的距离加 1 像素的框与余量。抬起来的金框不能切进上面那一行字。 */
     protected static int buttonLiftRoom() {
-        return (int) Math.ceil(GuiLanguage.LIFT_PX) + 1 + 2;
+        return (int) Math.ceil(GuiMetrics.units(GuiLanguage.LIFT_PX)) + 1 + 2;
     }
 
     /**
@@ -630,7 +640,7 @@ public abstract class GameScreen extends Screen {
      * 超时那一下弹起时，金框的上边切进了座位轨上「珠宝商」那几个字。
      */
     protected static int snapRoom(int cardHeight) {
-        return (int) Math.ceil(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE
+        return (int) Math.ceil(GuiMetrics.units(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE)
                 + (GuiLanguage.SNAP_PEAK_SCALE - 1f) * cardHeight) + BORDER_ROOM;
     }
 
@@ -642,7 +652,7 @@ public abstract class GameScreen extends Screen {
         // 照样张 .sel（外 3 深金 · 4 金 · 1 深金，样张 CSS 渲出来的那一件）：在卡自己的矩阵里、换到物理像素画，跟着卡一起抬、一起缩放。
         var window = net.minecraft.client.MinecraftClient.getInstance().getWindow();
         int s = Math.max(1, (int) Math.round(window.getScaleFactor()));
-        SheetLayout l = SheetLayout.of(window.getFramebufferWidth(), window.getFramebufferHeight(), s);
+        SheetLayout l = SheetLayout.of(window.getFramebufferWidth(), window.getFramebufferHeight());
         float f = 1f / s;
         context.getMatrices().push();
         context.getMatrices().scale(f, f, 1f);
@@ -976,7 +986,7 @@ public abstract class GameScreen extends Screen {
         for (int i = 0; i < boxes.size(); i++) {
             Box b = boxes.get(i);
             if (mouseX >= b.x() && mouseX < b.x() + b.w()
-                    && mouseY >= b.y() - GuiLanguage.LIFT_PX && mouseY < b.y() + b.h()) {
+                    && mouseY >= b.y() - GuiMetrics.units(GuiLanguage.LIFT_PX) && mouseY < b.y() + b.h()) {
                 return i;
             }
         }

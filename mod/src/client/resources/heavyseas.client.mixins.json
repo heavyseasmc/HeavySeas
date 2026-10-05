@@ -6,6 +6,7 @@
   "client": [
     "BackgroundRendererMixin",
     "ClientWorldPropertiesMixin",
+    "GameScreenRenderMixin",
     "InGameHudMixin",
     "KeyBindingPriorityMixin",
     "NativeImageMixin",

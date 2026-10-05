@@ -18,7 +18,9 @@ import net.minecraft.util.Identifier;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -58,6 +60,10 @@ public final class CardTexture extends AbstractTexture {
 
     /** 已经换成本类载入的标识。只在渲染线程上碰。 */
     private static final Set<Identifier> REGISTERED = new HashSet<>();
+    /** 载入过的贴图的宽高（像素），只在渲染线程上碰。角标图标按它的宽高比画 —— 海鸥是扁的（ADR-0090）。 */
+    private static final Map<Identifier, int[]> SIZES = new HashMap<>();
+    /** 量不到宽高的：同一张只报一次。 */
+    private static final Set<Identifier> NO_SIZE = new HashSet<>();
 
     private final Identifier location;
 
@@ -73,6 +79,7 @@ public final class CardTexture extends AbstractTexture {
         try (InputStream in = resource.getInputStream()) {
             base = NativeImage.read(in);
         }
+        SIZES.put(location, new int[]{base.getWidth(), base.getHeight()});
         int mips = mipLevels(base.getWidth(), base.getHeight(), MIP_LEVELS);
         NativeImage[] levels = MipmapHelper.getMipmapLevelsImages(new NativeImage[]{base}, mips);
         TextureUtil.prepareImage(getGlId(), mips, base.getWidth(), base.getHeight());
@@ -272,6 +279,21 @@ public final class CardTexture extends AbstractTexture {
     /** 别的 GUI 贴图（材质 · 牌面的分层素材）也按这一套载入：多级纹理 + 线性过滤，缩放才平滑。 */
     static Identifier smooth(Identifier id) {
         return ensure(id);
+    }
+
+    /**
+     * 这张贴图的宽 / 高。读不到（缺图 —— 那时画出来的是 Minecraft 的紫黑缺图块，屏幕上看得见）就按方的画，并报一次。
+     */
+    static float aspect(Identifier id) {
+        ensure(id);
+        int[] wh = SIZES.get(id);
+        if (wh == null || wh[1] <= 0) {
+            if (NO_SIZE.add(id)) {
+                org.slf4j.LoggerFactory.getLogger(HeavySeasMod.MOD_ID).warn("贴图量不到宽高：{} —— 按方的画", id);
+            }
+            return 1f;
+        }
+        return wh[0] / (float) wh[1];
     }
 
     private static Identifier ensure(Identifier id) {

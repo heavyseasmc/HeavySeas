@@ -193,11 +193,11 @@ public final class RowScreen extends GameScreen {
             return;                           // 还没轮到它入场
         }
         boolean undecided = fates[i] == Session.RowFate.UNDECIDED;
-        lift[i] = GuiLanguage.approach(lift[i], undecided && i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
+        lift[i] = GuiLanguage.approach(lift[i], undecided && i == focus ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
         float cx = l.cardX(i) + l.w() / 2f;
         float bottom = l.cardsTop() + l.h();
         float scale = GuiLanguage.dealScale(in);
-        float rise = (1f - in) * GuiLanguage.DEAL_RISE;
+        float rise = (1f - in) * GuiMetrics.units(GuiLanguage.DEAL_RISE);
         if (!undecided) {
             if (flyAt[i] <= 0L) {
                 return;                       // 重开这一面之前就定了：它已经不在你面前
@@ -211,7 +211,7 @@ public final class RowScreen extends GameScreen {
             float targetX = keep ? width / 2f : cx;
             float targetBottom = keep ? l.seaY() + textH() : height + l.h();
             cx += (targetX - cx) * p;
-            bottom += (targetBottom - bottom) * p - GuiLanguage.flyArc(p);
+            bottom += (targetBottom - bottom) * p - GuiMetrics.units(GuiLanguage.flyArc(p));
             scale *= 1f - (keep ? 0.75f : 0.3f) * p;
         }
         CardPose pose = cardPose(ins, gathered, cx, bottom, l.w(), l.h(),

@@ -40,7 +40,7 @@ final class ChoiceCards {
     static final double SEP = 46;
     /** 一排两头各让出多少（稿子像素）：与补给箱那一排同一个边距。 */
     static final double SIDE_ROOM = 40;
-    /** 按不动的那张压到几成亮（没选中的是 {@link CardRow#DIM}）。 */
+    /** 按不动的那张压到几成亮。全牌排只有这一处压暗：没选中的不压（用户 2026-10-05，见 {@link CardRow}）。 */
     static final float OFF = 0.5f;
 
     /**
@@ -192,7 +192,7 @@ final class ChoiceCards {
                     double top0, double below) {
         SheetLayout l = screen.sheet();
         int s = screen.guiScale();
-        geo = layout(l, cards.size(), lastSmall, top0, below, GuiLanguage.SNAP_PEAK_RISE * s, GuiLanguage.SNAP_PEAK_SCALE - 1f);
+        geo = layout(l, cards.size(), lastSmall, top0, below, GuiMetrics.pixels(GuiLanguage.SNAP_PEAK_RISE), GuiLanguage.SNAP_PEAK_SCALE - 1f);
         logLayout();
         if (!decided()) {
             keepFocusEnabled();
@@ -237,7 +237,7 @@ final class ChoiceCards {
         float rise = 0f;
         float scale = 1f;
         if (i == snapIndex) {
-            rise = GuiLanguage.snapRise(snapP);
+            rise = GuiMetrics.units(GuiLanguage.snapRise(snapP));
             scale = GuiLanguage.snapScale(snapP);
         }
         context.getMatrices().push();
@@ -249,11 +249,11 @@ final class ChoiceCards {
         boolean off = !enabled.test(i);
         if (off) {
             context.setShaderColor(OFF, OFF, OFF, 1f);
-        } else if (!hi) {
-            CardRow.dim(context);
         }
         CardTexture.drawAction(context, cards.get(i), 0, 0, pose.w(), pose.h());
-        CardRow.undim(context);
+        if (off) {
+            context.setShaderColor(1f, 1f, 1f, 1f);
+        }
         if (hi) {
             GameScreen.drawCardFrame(context, pose.w(), pose.h());
         }

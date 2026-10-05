@@ -97,9 +97,15 @@ public final class GameHud {
         }
         long now = System.currentTimeMillis();
         SidebarReveal.observe(view.notifications(), now);
+        if (WindowNotice.required()) {
+            if (client.currentScreen == null) {
+                WindowNotice.render(context);
+            }
+            return;
+        }
         int scale = guiScale(client);
         HudLayout layout = HudLayout.of(client.getWindow().getFramebufferWidth(),
-                client.getWindow().getFramebufferHeight(), scale);
+                client.getWindow().getFramebufferHeight());
         MatrixStack matrices = context.getMatrices();
         matrices.push();
         matrices.scale(1f / scale, 1f / scale, 1f);          // 往下全是物理像素（HudLayout 的坐标）
@@ -608,7 +614,7 @@ public final class GameHud {
         // ❗**盖在舞台上**，不占版面：舞台一个像素都不动，否则每钉一次整屏就要重排一次（§7.13）。
         // 与主画面展开那一列同一个画法（样张 b-2：天候卡 · 说明签 · 日志）。
         int scale = guiScale(client);
-        HudLayout layout = HudLayout.of(client.getWindow().getFramebufferWidth(), client.getWindow().getFramebufferHeight(), scale);
+        HudLayout layout = HudLayout.of(client.getWindow().getFramebufferWidth(), client.getWindow().getFramebufferHeight());
         MatrixStack matrices = context.getMatrices();
         matrices.push();
         matrices.scale(1f / scale, 1f / scale, 1f);

@@ -70,7 +70,7 @@ class CardFaceGateTest {
             for (String tier : layout.tiers()) {
                 double narrow = layout.narrowest(kind, tier);
                 for (CardLayout.Requirement r : layout.requirements(kind, tier)) {
-                    if (r.slot().equals("badge") && !hasBadges) {
+                    if (r.slot().startsWith("badge") && !hasBadges) {
                         continue;
                     }
                     checked++;
@@ -197,11 +197,21 @@ class CardFaceGateTest {
     @Test
     @DisplayName("红测 ①：L2 角标只放大 1.2 倍 → 必须红在「l2 · badge」，而不是别处")
     void redTestBadgeTooSmall() throws IOException {
-        CardLayout broken = layoutWith("\"scale\": {\"l0\": 1.0, \"l1\": 1.0, \"l2\": 1.6}",
+        CardLayout broken = layoutWith("\"scale\": {\"l0\": 1.0, \"l1\": 1.0, \"l2\": 1.9}",
                 "\"scale\": {\"l0\": 1.0, \"l1\": 1.0, \"l2\": 1.2}");
         List<String> problems = sizeProblems(broken, faces());
         assertTrue(!problems.isEmpty(), "角标缩小了，判据却说都够大");
         assertTrue(problems.stream().allMatch(p -> p.contains("· l2 · badge")),
+                "红了，但红在别处：\n" + String.join("\n", problems));
+    }
+
+    @Test
+    @DisplayName("红测 ①：角标图标缩到 16 → 必须红在「badge-icon」（数字没动，不许红在数字上）")
+    void redTestBadgeIconTooSmall() throws IOException {
+        CardLayout broken = layoutWith("\"icon_size\": 24, \"icon_gap\": 3,", "\"icon_size\": 16, \"icon_gap\": 3,");
+        List<String> problems = sizeProblems(broken, faces());
+        assertTrue(!problems.isEmpty(), "图标缩小了，判据却说都够大");
+        assertTrue(problems.stream().allMatch(p -> p.contains(" · badge-icon：")),
                 "红了，但红在别处：\n" + String.join("\n", problems));
     }
 

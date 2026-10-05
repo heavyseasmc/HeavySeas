@@ -8,9 +8,9 @@ package io.github.heavyseasmc.mod.ui;
  * 就是那个窗口里的 1 个物理像素。这里的常量全部是<b>稿子像素</b>，取自样张页 {@code index.html} 的 B 形制
  * （{@code .plaque} · {@code .rail} · {@code .dock} · {@code .drawer} 那几条 CSS），每一处都注了出处。
  * 换成屏幕上的物理像素只乘一个系数 {@link #k()}：
- * <pre>k = min(界面尺寸 / 3, 窗口宽 / 1280)</pre>
- * 前一半让 HUD 跟着 Minecraft 的界面尺寸走（热栏也是这么走的，两者的比例因此永远与稿子相同）；
- * 后一半只在窗口比稿子窄时起作用 —— 那时整块 HUD 等比缩到放得下，而不是某一件挪开、某一件缩小。
+ * <pre>k = min(窗口宽 / 1280, 窗口高 / 720)</pre>
+ * 用户 2026-10-05 定：只适应窗口，Minecraft 的界面尺寸不参与布局。宽高取较小比例，矮窗口也能放下。
+ * 界面尺寸只在客户端把物理像素换成绘制与鼠标命中的 GUI 坐标时使用。
  * ❗<b>不许给某一件单独加补偿</b>（用户 2026-09-30）：放不下时改的是 k，一处。
  *
  * <h2>锚点</h2>
@@ -31,6 +31,15 @@ public final class HudLayout {
     public static final int DESIGN_W = 1280;
     public static final int DESIGN_H = 720;
     public static final int DESIGN_GUI_SCALE = 3;
+
+    /** 用户 2026-10-05 验过的窗口下限：手牌的 104 宽缩略卡在这里约为 86 物理像素。 */
+    public static final int MIN_WINDOW_W = 1067;
+    public static final int MIN_WINDOW_H = 600;
+
+    /** 宽与高分别检查，两边都达标才支持正常界面。 */
+    public static boolean supportsWindow(int width, int height) {
+        return width >= MIN_WINDOW_W && height >= MIN_WINDOW_H;
+    }
 
     // ---------------------------------------------------------------- 状态牌（.plaque，锚左上）
     /** {@code .plaque { left: 22px; top: 20px; padding: 12px 16px 12px 14px }}。宽高是 Chrome 排出来的整数（量过 PNG）。 */
@@ -171,14 +180,17 @@ public final class HudLayout {
     /**
      * @param framebufferWidth  帧缓冲宽（物理像素）
      * @param framebufferHeight 帧缓冲高（物理像素）
-     * @param guiScale          Minecraft 此刻的界面尺寸（整数，1 起）
      */
-    public static HudLayout of(int framebufferWidth, int framebufferHeight, int guiScale) {
-        if (framebufferWidth <= 0 || framebufferHeight <= 0 || guiScale <= 0) {
-            throw new IllegalArgumentException("窗口 " + framebufferWidth + "×" + framebufferHeight + " · 界面尺寸 " + guiScale);
+    public static HudLayout of(int framebufferWidth, int framebufferHeight) {
+        return new HudLayout(framebufferWidth, framebufferHeight, windowScale(framebufferWidth, framebufferHeight));
+    }
+
+    /** HUD 与整页界面共用：稿子像素按窗口宽高等比换成物理像素。 */
+    static double windowScale(int framebufferWidth, int framebufferHeight) {
+        if (framebufferWidth <= 0 || framebufferHeight <= 0) {
+            throw new IllegalArgumentException("窗口 " + framebufferWidth + "×" + framebufferHeight);
         }
-        double k = Math.min((double) guiScale / DESIGN_GUI_SCALE, (double) framebufferWidth / DESIGN_W);
-        return new HudLayout(framebufferWidth, framebufferHeight, k);
+        return Math.min((double) framebufferWidth / DESIGN_W, (double) framebufferHeight / DESIGN_H);
     }
 
     /** 稿子像素 → 物理像素的系数。 */
@@ -197,6 +209,11 @@ public final class HudLayout {
     /** 一段长度（稿子像素）在屏幕上多少物理像素。 */
     public int len(double design) {
         return (int) Math.round(design * k);
+    }
+
+    /** 旧样张在界面尺寸 3 下记录的 GUI 长度，换成当前窗口的物理像素。 */
+    public double designGuiPixels(double units) {
+        return units * DESIGN_GUI_SCALE * k;
     }
 
     /** 一个物理像素的矩形。 */

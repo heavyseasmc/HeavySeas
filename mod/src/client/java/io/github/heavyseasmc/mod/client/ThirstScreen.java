@@ -105,8 +105,8 @@ public final class ThirstScreen extends GameScreen {
                 continue;
             }
             boolean drinking = i < chosen;
-            lift[i] = GuiLanguage.approach(lift[i], drinking ? GuiLanguage.LIFT_PX : 0f, dt);
-            float rise = (1f - in) * GuiLanguage.DEAL_RISE;
+            lift[i] = GuiLanguage.approach(lift[i], drinking ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
+            float rise = (1f - in) * GuiMetrics.units(GuiLanguage.DEAL_RISE);
             float scale = GuiLanguage.dealScale(in);
             context.getMatrices().push();
             context.getMatrices().translate(l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h() - lift[i] + rise, 0);

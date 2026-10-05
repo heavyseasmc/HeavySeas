@@ -40,7 +40,7 @@ final class GuiText {
     private static final float LINE_RATIO = 1.25f;
     private static final float IDEOGRAPH_ASCENT = 0.88f;
 
-    /** 字号档，GUI 单位（Minecraft 默认字体是 9）。只在这里定义，界面只许引用 —— 与版面常量只在 GameScreen 一处是同一条规矩。 */
+    /** 字号档，按旧稿子的 GUI 单位记录；物理字号只随窗口变，Minecraft 界面尺寸只做坐标换算。 */
     static final int CAPTION = 8;
     /** 与 Minecraft 默认字体等大：1280×720（界面尺寸 3）下是 24 物理像素。再大，240 个单位高的界面里牌就被字挤小了（实拍过）。 */
     static final int BODY = 9;
@@ -73,7 +73,7 @@ final class GuiText {
      * 把一段字画进宽 {@code boxW} 的框里，最多 {@code maxLines} 行。
      *
      * @param x,y     框的左上角，GUI 单位
-     * @param guiSize 想要的字号，GUI 单位（Minecraft 默认字体是 9）；实际取梯子上不大于它的那一级，且不低于地板
+     * @param guiSize 旧稿子里的字号单位；按窗口换成物理字号后取梯子上不大于它的那一级，且不低于地板
      * @return 占掉的高度，GUI 单位
      */
     static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
@@ -102,7 +102,7 @@ final class GuiText {
     /**
      * 同上，但倍率由调用方给。
      *
-     * <p>{@code scaleOverride <= 0} 时用窗口的界面尺寸（界面上的字一律走这条）。
+     * <p>{@code scaleOverride <= 0} 时用窗口的界面尺寸换算坐标，界面字号则只跟窗口；牌面字号已由卡面槽位给定。
      * 给正数是**合成进牌自己的纹理**那一路（{@link CardComposite}）：那时排字的坐标系是<b>贴图自己的像素</b>，
      * 与窗口多大、界面尺寸设成几，一点关系都没有 —— 传窗口的倍率进去，同一张牌在不同窗口下会合成出不同的字号。
      */
@@ -111,7 +111,9 @@ final class GuiText {
         MinecraftClient client = MinecraftClient.getInstance();
         TextRenderer renderer = client.textRenderer;
         int scale = scaleOverride > 0 ? scaleOverride : scale(client);
-        TextFit.Result fit = fit(renderer, text, boxW, guiSize, bold, maxLines, scale);
+        // 牌面及离屏合成的字号已由卡面槽位换算；界面旧字号则按窗口换算一次。
+        int wantedPx = scaleOverride > 0 || ink ? guiSize * scale : (int) Math.round(GuiMetrics.pixels(guiSize));
+        TextFit.Result fit = fit(renderer, text, boxW, wantedPx, bold, maxLines, scale);
         int linePx = linePx(fit.size());
         int baseline = Math.round((linePx - fit.size()) / 2f + fit.size() * IDEOGRAPH_ASCENT);
 
@@ -131,7 +133,7 @@ final class GuiText {
             int py = y * scale + i * linePx + baseline - BASELINE_BELOW_DRAW_Y;
             Text styled = styled(l.text(), bold, fit.size());
             if (shadow) {
-                int off = Math.max(1, scale / 2);                  // 半个 GUI 单位：界面尺寸大了影子也跟着厚
+                int off = Math.max(1, (int) Math.round(GuiMetrics.pixels(0.5)));
                 context.drawText(renderer, styled, px + off, py + off, SHADOW | (color & 0xFF000000), false);
             }
             if (ink) {
@@ -255,15 +257,15 @@ final class GuiText {
     static int height(String text, int boxW, int guiSize, boolean bold, int maxLines) {
         MinecraftClient client = MinecraftClient.getInstance();
         int scale = scale(client);
-        TextFit.Result fit = fit(client.textRenderer, text, boxW, guiSize, bold, maxLines, scale);
+        TextFit.Result fit = fit(client.textRenderer, text, boxW, (int) Math.round(GuiMetrics.pixels(guiSize)), bold, maxLines, scale);
         return ceilDiv(Math.max(1, fit.lines().size()) * linePx(fit.size()), scale);
     }
 
-    private static TextFit.Result fit(TextRenderer renderer, String text, int boxW, int guiSize, boolean bold,
+    private static TextFit.Result fit(TextRenderer renderer, String text, int boxW, int wantedPx, boolean bold,
                                       int maxLines, int scale) {
         // 只许一行的是标签：只能缩。许多行的是段落：先折行，折不下才缩 —— 先缩的话长句会变成一行小字，
         // 同一栏里字号忽大忽小（航海日志实拍过）。
-        return TextFit.fit(text, boxW * scale, maxLines, candidates(bold, guiSize * scale),
+        return TextFit.fit(text, boxW * scale, maxLines, candidates(bold, wantedPx),
                 (s, px) -> renderer.getWidth(styled(s, bold, px)),
                 maxLines > 1 ? TextFit.Policy.WRAP_FIRST : TextFit.Policy.SHRINK_FIRST);
     }
@@ -271,15 +273,28 @@ final class GuiText {
     /** 这个字号的一行有多高，GUI 单位。版面按它排。 */
     static int lineHeight(int guiSize, boolean bold) {
         int scale = scale(MinecraftClient.getInstance());
-        return ceilDiv(linePx(candidates(bold, guiSize * scale)[0]), scale);
+        return ceilDiv(linePx(candidates(bold, (int) Math.round(GuiMetrics.pixels(guiSize)))[0]), scale);
     }
 
     /** 一行字（不折、不截）在想要的字号下有多宽，GUI 单位，向上取整。排按钮宽度这类要先知道宽度的场合用。 */
     static int width(String text, int guiSize, boolean bold) {
         MinecraftClient client = MinecraftClient.getInstance();
         int scale = scale(client);
-        int px = candidates(bold, guiSize * scale)[0];
+        int px = candidates(bold, (int) Math.round(GuiMetrics.pixels(guiSize)))[0];
         return ceilDiv(client.textRenderer.getWidth(styled(text, bold, px)), scale);
+    }
+
+    /**
+     * 照 {@link #draw(DrawContext, String, int, int, int, int, boolean, int, Align, int, boolean, boolean, int)}
+     * 那一路（{@code ink} · {@code scaleOverride} 同义）画一行不缩不截的字有多宽，单位与它的 {@code x} 相同。
+     * 牌面角标按实际字宽排位置用（ADR-0090）：量与画走同一套换算，两边才对得上。
+     */
+    static float drawnWidth(String text, int guiSize, boolean bold, boolean ink, int scaleOverride) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int scale = scaleOverride > 0 ? scaleOverride : scale(client);
+        int wantedPx = scaleOverride > 0 || ink ? guiSize * scale : (int) Math.round(GuiMetrics.pixels(guiSize));
+        int px = candidates(bold, wantedPx)[0];
+        return client.textRenderer.getWidth(styled(text, bold, px)) / (float) scale;
     }
 
     /**

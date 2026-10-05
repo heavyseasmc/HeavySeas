@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -27,7 +26,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class HudLayoutTest {
 
-    private static final HudLayout DESIGN = HudLayout.of(1280, 720, 3);
+    @Test
+    @DisplayName("窗口支持边界：宽高都达标才显示内容，单独拉宽或拉高不能掩盖不足")
+    void minimumWindowRequiresBothDimensions() {
+        assertTrue(HudLayout.supportsWindow(1067, 600));
+        assertTrue(HudLayout.supportsWindow(1280, 720));
+        assertTrue(!HudLayout.supportsWindow(1066, 600));
+        assertTrue(!HudLayout.supportsWindow(1067, 599));
+        assertTrue(!HudLayout.supportsWindow(3840, 480));
+        assertTrue(!HudLayout.supportsWindow(854, 2160));
+        assertTrue(!HudLayout.supportsWindow(0, 0));
+    }
+
+    private static final HudLayout DESIGN = HudLayout.of(1280, 720);
+
+    @Test
+    @DisplayName("旧字号与动效长度按窗口换算，保留设计窗口的物理尺寸")
+    void legacyUnitsFollowWindow() {
+        assertEquals(27.0, HudLayout.of(1280, 720).designGuiPixels(9), 1e-9);
+        assertEquals(22.5, HudLayout.of(1067, 600).designGuiPixels(9), 1e-9);
+        assertEquals(54.0, HudLayout.of(2560, 1440).designGuiPixels(9), 1e-9);
+    }
     private static final int TOLERANCE = 1;
 
     private static void near(int expected, int actual, String what) {
@@ -119,7 +138,7 @@ class HudLayoutTest {
     void closedPiecesNeverOverlap() {
         List<String> problems = new ArrayList<>();
         for (int[] win : WINDOWS) {
-            HudLayout l = HudLayout.of(win[0], win[1], win[2]);
+            HudLayout l = HudLayout.of(win[0], win[1]);
             int ring = l.len(HudLayout.RING);
             Rect plaque = l.plaque().grow(ring);
             Rect ribbon = l.ribbon();
@@ -149,7 +168,7 @@ class HudLayoutTest {
     void drawerLeavesTheRailAlone() {
         List<String> problems = new ArrayList<>();
         for (int[] win : WINDOWS) {
-            HudLayout l = HudLayout.of(win[0], win[1], win[2]);
+            HudLayout l = HudLayout.of(win[0], win[1]);
             int ring = l.len(HudLayout.RING);
             Rect card = l.drawerCard();
             String at = win[0] + "×" + win[1] + "@" + win[2];
@@ -165,7 +184,7 @@ class HudLayoutTest {
     void plaqueContentStaysInsideItsPadding() {
         List<String> problems = new ArrayList<>();
         for (int[] win : WINDOWS) {
-            HudLayout l = HudLayout.of(win[0], win[1], win[2]);
+            HudLayout l = HudLayout.of(win[0], win[1]);
             Rect inner = l.plaqueInner();
             String at = win[0] + "×" + win[1] + "@" + win[2];
             for (int pips = 3; pips <= 6; pips++) {
@@ -188,7 +207,7 @@ class HudLayoutTest {
     void helmBadgeOnlyTouchesTheCorner() {
         List<String> problems = new ArrayList<>();
         for (int[] win : WINDOWS) {
-            HudLayout l = HudLayout.of(win[0], win[1], win[2]);
+            HudLayout l = HudLayout.of(win[0], win[1]);
             for (int seats = 6; seats <= 8; seats++) {
                 Rect rail = l.rail(seats);
                 for (int i = 0; i < seats; i++) {
@@ -211,14 +230,17 @@ class HudLayoutTest {
     }
 
     @Test
-    @DisplayName("缩放系数：跟着界面尺寸走，窗口比稿子窄时整体等比缩")
-    void scaleFollowsGuiScaleAndShrinksToFit() {
-        assertEquals(1.0, HudLayout.of(1280, 720, 3).k(), 1e-9);
-        assertEquals(2.0 / 3, HudLayout.of(854, 480, 2).k(), 1e-9);
-        assertEquals(1.0, HudLayout.of(1536, 864, 3).k(), 1e-9, "1536×864 自动也是界面尺寸 3：物理尺寸与稿子相同");
-        assertEquals(4.0 / 3, HudLayout.of(1920, 1080, 4).k(), 1e-9);
-        assertEquals(1024.0 / 1280, HudLayout.of(1024, 768, 3).k(), 1e-9, "比稿子窄：按宽度整体缩");
-        assertFalse(HudLayout.of(1280, 1024, 4).k() > 1.0, "1280 宽不许超过稿子的 1 倍");
+    @DisplayName("缩放只由窗口决定：按宽高较小比例适配，包括矮窗口与高分辨率")
+    void scaleFollowsWindowAndShrinksToFit() {
+        assertEquals(1.0, HudLayout.of(1280, 720).k(), 1e-9);
+        assertEquals(2.0 / 3, HudLayout.of(854, 480).k(), 1e-9);
+        assertEquals(1.2, HudLayout.of(1536, 864).k(), 1e-9);
+        assertEquals(1.5, HudLayout.of(1920, 1080).k(), 1e-9);
+        assertEquals(0.8, HudLayout.of(1024, 768).k(), 1e-9);
+        assertEquals(1.0, HudLayout.of(1280, 1024).k(), 1e-9);
+        assertEquals(0.5, HudLayout.of(640, 480).k(), 1e-9);
+        assertEquals(2.0 / 3, HudLayout.of(1920, 480).k(), 1e-9, "宽而矮时高度限制缩放");
+        assertEquals(3.0, HudLayout.of(3840, 2160).k(), 1e-9);
     }
 
     // ---------------------------------------------------------------- 小件

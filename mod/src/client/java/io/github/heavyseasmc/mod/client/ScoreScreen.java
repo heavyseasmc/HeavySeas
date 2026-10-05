@@ -56,6 +56,12 @@ public final class ScoreScreen extends GameScreen {
             "heavyseas.score.loved", "heavyseas.score.hated"};
     // 样张 b-5 的四枚：救生圈 · 宝石 · 心 · 碎心（样张 <symbol> 渲出来的那几枚，HudPart.IC_*）
     private static final HudPart[] ITEM_ICONS = {HudPart.IC_BUOY, HudPart.IC_GEM, HudPart.IC_HEART, HudPart.IC_HATE};
+    /**
+     * 前两行改画卡牌上的木刻小图（ADR-0090）：「自己活着」= 角色卡的生存分救生圈，「财宝」= 财宝牌上的钱币 ——
+     * 同一个分数，牌上与计分上画同一样东西。心与碎心没有对应的牌，照旧用界面的线描（{@link #ITEM_ICONS}）。
+     */
+    private static final String[] CARD_ICONS = {io.github.heavyseasmc.mod.card.CardFaces.SURVIVAL,
+            io.github.heavyseasmc.mod.card.CardFaces.POINTS, null, null};
 
     private HudView view = HudView.IDLE;
     private long dealAt;
@@ -187,7 +193,7 @@ public final class ScoreScreen extends GameScreen {
                 continue;
             }
             HudView.Endgame.Entry en = entries.get(i);
-            int y = Math.round(top + i * rowH + (1f - p) * GuiLanguage.DEAL_RISE * guiScale());
+            int y = (int) Math.round(top + i * rowH + (1f - p) * GuiMetrics.pixels(GuiLanguage.DEAL_RISE));
             boolean me = view.seated() && en.who().equals(view.character());
             boolean gone = view.removed().contains(en.who());
             boolean winner = en.total() == best;
@@ -257,10 +263,16 @@ public final class ScoreScreen extends GameScreen {
         for (int i = 0; i < ITEM_LABELS.length; i++) {
             float p = GuiLanguage.deal(now, dealAt, i + 2);
             if (p > 0f) {
-                int yy = Math.round(y + i * itemH + (1f - p) * GuiLanguage.DEAL_RISE * guiScale() / 2f);
+                int yy = (int) Math.round(y + i * itemH + (1f - p) * GuiMetrics.pixels(GuiLanguage.DEAL_RISE) / 2f);
                 int cy = yy + itemH / 2;
                 int color = values[i] == 0 ? GuiLanguage.Hud.alpha(ink, 0.42f) : ink;
-                GuiMaterial.hudIcon(context, ITEM_ICONS[i], tx, cy - icon / 2, icon, icon, color, k);
+                if (CARD_ICONS[i] != null) {
+                    int iw = CardPainter.cardIconWidth(CARD_ICONS[i], icon);
+                    CardPainter.drawCardIcon(context, CARD_ICONS[i], tx + (icon - iw) / 2, cy - icon / 2, icon,
+                            values[i] == 0 ? 0.42f : 1f);
+                } else {
+                    GuiMaterial.hudIcon(context, ITEM_ICONS[i], tx, cy - icon / 2, icon, icon, color, k);
+                }
                 String value = Integer.toString(values[i]);
                 int vw = GuiText.widthPx(value, valuePx, true, 0);
                 GuiText.drawPx(context, Text.translatable(ITEM_LABELS[i]).getString(), tx + icon + l.len(14),
@@ -275,7 +287,7 @@ public final class ScoreScreen extends GameScreen {
             int ruleY = y + 4 * itemH + l.len(10);
             context.fill(tx, ruleY, x + w - padX, ruleY + Math.max(1, l.len(2)), ink);
             // 合计是「你」的数 —— 金墨（样张 .goldink）。「顿」只抬，不放大。
-            int rise = Math.round(GuiLanguage.snapRise(GuiLanguage.snap(now, snapAt)) * guiScale());
+            int rise = (int) Math.round(GuiMetrics.pixels(GuiLanguage.snapRise(GuiLanguage.snap(now, snapAt))));
             int ty = ruleY + l.len(14) + rise;
             String total = Integer.toString(s.total());
             int totalPx = l.len(40);

@@ -131,7 +131,7 @@ public final class RosterScreen extends GameScreen {
         }
 
         for (int i = 0; i < all.size(); i++) {
-            lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiLanguage.LIFT_PX : 0f, dt);
+            lift[i] = GuiLanguage.approach(lift[i], i == focus ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
             if (i < n) {
                 // 勾上 = 头像亮着、圈上一道铜绿（铜绿 = 可选 · 安全）；没勾 = 淡下去（与座位轨上「还没轮到」同一个淡）。
                 // 焦点 = 金圈（金 = 你指着的那个）。原先在名字前加一个「✓」——那个字不在 GUI 字体的子集里，
@@ -142,8 +142,9 @@ public final class RosterScreen extends GameScreen {
                 int y = Math.round(box.y() + m - lift[i]);
                 GuiMaterial.avatar(context, id, box.x() + (cell - d) / 2, y, d,
                         i == focus ? GuiLanguage.gold() : on ? GuiLanguage.verdigris() : 0, on ? 1f : SEAT_FADED);
+                // 名字用正文墨色，状态交给头像外圈（Codex 复核 2026-10-05：深色主题下铜绿字落在深褐底上，比头像还难认）
                 drawLineIn(context, nameOf(id), box.x() + 2, y + d + m + 2, cell - 4,
-                        i == focus ? GuiLanguage.gold() : on ? GuiLanguage.verdigris() : GuiLanguage.muted());
+                        i == focus ? GuiLanguage.gold() : on ? GuiLanguage.ink() : GuiLanguage.muted());
                 continue;
             }
             Text text;

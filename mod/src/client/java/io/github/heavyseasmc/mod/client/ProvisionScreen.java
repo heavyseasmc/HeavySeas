@@ -212,7 +212,7 @@ public final class ProvisionScreen extends GameScreen {
         int n = Math.max(1, data.offer().size());
         SheetLayout sl = sheet();
         int s = guiScale();
-        CardRow.Provision px = CardRow.provision(sl, n, GuiLanguage.SNAP_PEAK_RISE * s, GuiLanguage.SNAP_PEAK_SCALE - 1f,
+        CardRow.Provision px = CardRow.provision(sl, n, GuiMetrics.pixels(GuiLanguage.SNAP_PEAK_RISE), GuiLanguage.SNAP_PEAK_SCALE - 1f,
                 tipLines(sl));
         int w = Math.max(8, Math.round(px.w() / (float) s));
         return new Layout(px, s, w, GuiLanguage.cardHeight(w), n, (float) (CardRow.PULL_LIFT * sl.k() / s));
@@ -381,12 +381,12 @@ public final class ProvisionScreen extends GameScreen {
         CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardTop(i) + l.h(), l.w(), l.h(), depth);
 
         // 入场：从下方抬起 + 轻微放大。全部走矩阵，不碰布局。
-        float rise = (1f - entered) * GuiLanguage.DEAL_RISE;
+        float rise = (1f - entered) * GuiMetrics.units(GuiLanguage.DEAL_RISE);
         float scale = GuiLanguage.dealScale(entered);
         if (i == snapIndex) {
             // 「顿」：带过冲地弹一下再回原位。叠在「抬」之上 —— 服务端挑的要是另一张，
             // 这一下正好连「高亮挪过去了」一起说清楚。
-            rise += GuiLanguage.snapRise(snapP);
+            rise += GuiMetrics.units(GuiLanguage.snapRise(snapP));
             scale *= GuiLanguage.snapScale(snapP);
         }
         float cx = pose.cx();
@@ -402,7 +402,7 @@ public final class ProvisionScreen extends GameScreen {
             float targetScale = spot[2] / Math.max(1f, pose.w());
             float targetBottom = spot[1] + spot[2] * GuiLanguage.CARD_H / GuiLanguage.CARD_W / 2f;
             cx += (spot[0] - cx) * p;
-            bottom += (targetBottom - bottom) * p - (kept ? GuiLanguage.flyArc(p) : 0f);
+            bottom += (targetBottom - bottom) * p - (kept ? GuiMetrics.units(GuiLanguage.flyArc(p)) : 0f);
             scale *= 1f + (targetScale - 1f) * p;
         }
 
@@ -416,14 +416,7 @@ public final class ProvisionScreen extends GameScreen {
         if (l.stacked() && i > 0 && !hi && i - 1 != highlight && gathered <= 0f && !passing) {
             CardRow.edgeShadow(context, pose.h(), l.s(), sheet().k());
         }
-        boolean dimmed = !hi && !passing;
-        if (dimmed) {
-            CardRow.dim(context);
-        }
         CardTexture.drawProvision(context, offer.get(i), 0, 0, pose.w(), pose.h());
-        if (dimmed) {
-            CardRow.undim(context);
-        }
         if (hi && !passing) {
             // 金 = 「你 · 你选的那张」，与手牌那一面同一个用法；朱砂留给倒计时见底那一段。
             // 传走的那一下不带框：它已经不是「你正在选的」，是「你的了」。

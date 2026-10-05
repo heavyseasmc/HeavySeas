@@ -641,13 +641,28 @@ def checkCardTextures = tasks.register('checkCardTextures') {
         // 牌背：终局翻牌的暗牌只用 secret（爱恨卡的背面），三档各一张。另两张没有界面在用，不拦。
         def (bw, bh) = texOf('provision')
         tiers.eachWithIndex { t, i -> checkOne(i == 0 ? 'back/secret.png' : "back/lod${i}/secret.png", bw, bh, false) }
-        // 图标是方的；角标框按版面描述里角标的宽高（44×42）烘成 2 倍，比例取自那里
-        def badge = layout.shapes.portrait.badges
+        // 图标按贴图自己的宽高比画（ADR-0090：海鸥是扁的、秤砣与箭头是瘦的），所以只查短边够不够；
+        // 圆盘、圆圈与斜线是按正方形画的（CardPainter 里给 d×d），这几枚还得是方的。
+        def squareOnly = ['chip_disc', 'chip_ring', 'strike'] as Set
         icons.each {
-            if (it == 'badge_box') {
-                checkOne("icon/${it}.png", (badge.w as int) * 2, (badge.h as int) * 2, false)
-            } else {
+            if (it in squareOnly) {
                 checkOne("icon/${it}.png", 64, 64, false)
+            } else {
+                def f = new File(root, "icon/${it}.png")
+                if (!f.isFile()) {
+                    problems << "缺贴图：icon/${it}.png"
+                    return
+                }
+                def img = javax.imageio.ImageIO.read(f)
+                checked++
+                if (img == null) {
+                    problems << "icon/${it}.png 读不出来"
+                } else if (Math.min(img.width, img.height) < 64) {
+                    problems << "icon/${it}.png 只有 ${img.width}×${img.height}，短边低于 64 —— 缩小时会糊"
+                } else {
+                    sizes << "${img.width}×${img.height}".toString()
+                    bytes += f.length()
+                }
             }
         }
         // 正向对照：一张都没查到时，「全都对」与「没在查」输出一样。
@@ -1385,7 +1400,7 @@ def checkMixinRemapped = tasks.register('checkMixinRemapped') {
                 def yarnTargets = ['applyFog', 'getGlyph', 'getProvidedGlyphs', 'makeGlyphBitmapSubpixel',
                                    'findCrosshairTarget', 'onKeyPressed', 'setKeyPressed', 'KEY_TO_BINDINGS',
                                    'timesPressed', 'getTimeOfDay', 'getLevelProperties', 'getRainGradient',
-                                   'getThunderGradient']
+                                   'getThunderGradient', 'renderWithTooltip']
                 def leftover = yarnTargets.findAll { text.contains(it) }
                 if (text.contains('net/minecraft/client/') || !leftover.isEmpty()) {
                     problems << "${entry.name}：残留 yarn 名（net/minecraft/client/… 或 ${leftover}），生产客户端上找不到目标"

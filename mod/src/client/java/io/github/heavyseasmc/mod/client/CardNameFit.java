@@ -67,10 +67,15 @@ final class CardNameFit {
         return UNITS.computeIfAbsent(lang, CardNameFit::measure).getOrDefault(kind, Map.of());
     }
 
-    /** 这种牌最多几枚角标 —— 牌名要给它们让位。取自拼牌那一处，不在这里另数。 */
-    static int maxBadges(String kind) {
-        return kind.equals("character") ? CardFaces.characterBadges(0, 0).size()
-                : kind.equals("weather") || kind.equals("action") ? 0 : 1;
+    /**
+     * 这种牌角上最宽的那一组角标在这一档排出来多宽（母版单位）—— 牌名要给它让位。
+     * 形状取自拼牌那一处（{@link CardFaces#widestBadges}），宽度由画角标的那一段量（{@link CardPainter#badgeUnits}），
+     * 不在这里另数、另估（ADR-0090：角标宽随字宽）。
+     */
+    static double badgeUnits(CardLayout layout, String kind, String tier) {
+        CardLayout.Shape s = layout.shapeOf(kind);
+        return CardPainter.badgeUnits(s.badges(), CardFaces.widestBadges(kind), tier,
+                s.texW() / (float) s.masterW(), 1);
     }
 
     static void reset() {
@@ -92,7 +97,7 @@ final class CardNameFit {
                     continue;
                 }
                 int got = fit(n.text(), s.title().size().get(tier) * tex,
-                        layout.titleBox(n.kind(), tier, maxBadges(n.kind())) * tex);
+                        layout.titleBox(n.kind(), tier, badgeUnits(layout, n.kind(), tier)) * tex);
                 double units = (got < 0 ? GuiText.BOLD_PX[0] : got) / tex;
                 out.computeIfAbsent(n.kind(), k -> new HashMap<>()).merge(tier, units, Math::min);
             }
@@ -149,7 +154,6 @@ final class CardNameFit {
      */
     private static int report(CardLayout layout, String lang, String key, Named named, Map<String, Double> units) {
         CardLayout.Shape s = layout.shapeOf(named.kind());
-        int badges = maxBadges(named.kind());
         int bad = 0;
         for (String tier : layout.tiers()) {
             if (!s.title().tiers().contains(tier)) {
@@ -160,7 +164,7 @@ final class CardNameFit {
                 continue;                      // 兜底那一档没有下限；牌名只在前两档出现
             }
             double size = s.title().size().get(tier);
-            double box = layout.titleBox(named.kind(), tier, badges);
+            double box = layout.titleBox(named.kind(), tier, badgeUnits(layout, named.kind(), tier));
             double tex = s.texW() / (double) s.masterW();
             int gotTex = fit(named.text(), size * tex, box * tex);
             double composed = gotTex < 0 ? -1 : gotTex * w / s.texW();

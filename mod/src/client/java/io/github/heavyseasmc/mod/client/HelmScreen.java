@@ -150,11 +150,11 @@ public final class HelmScreen extends GameScreen {
                 continue;
             }
             boolean hi = i == highlight;
-            lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
-            float rise = (1f - in) * GuiLanguage.DEAL_RISE;
+            lift[i] = GuiLanguage.approach(lift[i], hi ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
+            float rise = (1f - in) * GuiMetrics.units(GuiLanguage.DEAL_RISE);
             float scale = GuiLanguage.dealScale(in);
             if (i == snapIndex) {
-                rise += GuiLanguage.snapRise(snapP);
+                rise += GuiMetrics.units(GuiLanguage.snapRise(snapP));
                 scale *= GuiLanguage.snapScale(snapP);
             }
             CardPose pose = cardPose(ins, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(),

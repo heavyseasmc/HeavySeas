@@ -152,7 +152,7 @@ public final class PickScreen extends GameScreen {
     /** 画一张：位置与大小在「摊成一排」与「收成一叠」之间按 {@code gathered} 插值。 */
     private void drawOne(DrawContext context, long dt, Layout l, Inspect in, float gathered, ContestView c, int i) {
         boolean hi = i == highlight;
-        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
+        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
         CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(),
                 hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight)));
         context.getMatrices().push();

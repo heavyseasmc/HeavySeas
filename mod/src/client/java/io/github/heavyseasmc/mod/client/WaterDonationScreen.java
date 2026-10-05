@@ -83,7 +83,7 @@ public final class WaterDonationScreen extends GameScreen {
         int cardW = GuiLanguage.cardWidth(cardH);
         int cardY = cardsTopIn(b.stageTop(), bottom, cardH, room);
         int cardX = (width - cardW) / 2;
-        cardLift = GuiLanguage.approach(cardLift, awaiting ? GuiLanguage.LIFT_PX : 0f, dt);
+        cardLift = GuiLanguage.approach(cardLift, awaiting ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
         int drawY = Math.round(cardY - cardLift);
         CardTexture.drawProvision(context, Session.WATER, cardX, drawY, cardW, cardH);
         card = new Box(cardX, cardY, cardW, cardH);

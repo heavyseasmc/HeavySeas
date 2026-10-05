@@ -135,7 +135,7 @@ public final class WeaponScreen extends GameScreen {
     private void drawOne(DrawContext context, long dt, Layout l, Inspect in, float gathered,
                          List<String> weapons, int i) {
         boolean hi = i == highlight;
-        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiLanguage.LIFT_PX : 0f, dt);
+        lift[i] = GuiLanguage.approach(lift[i], hi ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
         CardPose pose = cardPose(in, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(),
                 hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight)));
         context.getMatrices().push();

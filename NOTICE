@@ -81,6 +81,20 @@ Old Standard TT —— 全部拉丁字母与数字
   出处    https://cdn.jsdelivr.net/npm/@fontsource/old-standard-tt@5.3.0/
 
 ================================================================================
+卡牌插画（AI 辅助生成）
+================================================================================
+
+卡面插画、角色头像，以及卡角角标与信息带里的木刻小图，由 OpenAI 的图像生成模型
+（gpt-image 系列）按本项目自写的画面说明生成，再由本项目挑选、抠图、排版。
+画面说明只写本作自己的规则与人物设定，不含任何第三方作品的名称或图像。
+  文件    mod/src/main/resources/assets/heavyseas/textures/gui/cards/art/
+          mod/src/main/resources/assets/heavyseas/textures/gui/portrait/
+          mod/src/main/resources/assets/heavyseas/textures/gui/cards/icon/ 里的木刻小图，
+          母版在 art/icons/*.png
+  权利    按 OpenAI 的服务条款，生成内容的权利归使用者。与本项目其余美术一样，
+          以 CC BY-SA 4.0 授权（见 LICENSE-ASSETS）。
+
+================================================================================
 音效素材
 ================================================================================
 

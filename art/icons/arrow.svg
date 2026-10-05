@@ -1,7 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <title>怒海狂涛 · 图标 · arrow</title>
-  <g fill="none" stroke="#241E1A" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M10 32 L52 32"/>
-    <path d="M38 18 L53 32 L38 46"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="64" height="48">
+  <title>怒海狂涛 · 图标 · arrow（天候图示里的「变成」：实心右箭头，与角标的上下箭头同一种，ADR-0090）</title>
+  <path d="M62 24 L35 46 L35 33 L2 33 L2 15 L35 15 L35 2 Z" fill="#241E1A" stroke="#241E1A" stroke-width="2" stroke-linejoin="round"/>
 </svg>

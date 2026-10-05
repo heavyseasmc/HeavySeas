@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * 对局各面那副骨架对样张 b-3（1280×720）：期望值是 2026-09-30 在样张 PNG 上逐像素量的，不是抄 {@link SheetLayout} 的常量。
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SheetLayoutTest {
 
-    private static final SheetLayout DESIGN = SheetLayout.of(1280, 720, 3);
+    private static final SheetLayout DESIGN = SheetLayout.of(1280, 720);
 
     private static void near(int expected, int actual, String what) {
         assertTrue(Math.abs(expected - actual) <= 1, what + "：样张上是 " + expected + "，版面给的是 " + actual);
@@ -54,7 +55,7 @@ class SheetLayoutTest {
     void bandsStackInsideTheSheet() {
         List<String> problems = new ArrayList<>();
         for (int[] win : WINDOWS) {
-            SheetLayout l = SheetLayout.of(win[0], win[1], win[2]);
+            SheetLayout l = SheetLayout.of(win[0], win[1]);
             String at = win[0] + "×" + win[1] + "@" + win[2];
             Rect sheet = l.sheet();
             int hdBottom = l.phase(0).bottom();
@@ -81,5 +82,16 @@ class SheetLayoutTest {
             }
         }
         assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
+    @Test
+    @DisplayName("整页与 HUD 采用相同窗口比例，小窗口也不会被界面倍率额外缩小")
+    void windowScaleMatchesHud() {
+        for (int[] win : WINDOWS) {
+            assertEquals(HudLayout.of(win[0], win[1]).k(), SheetLayout.of(win[0], win[1]).k(), 1e-9);
+        }
+        assertEquals(0.5, SheetLayout.of(640, 480).k(), 1e-9);
+        assertEquals(1.5, SheetLayout.of(1920, 1080).k(), 1e-9);
+        assertEquals(new Rect(50, 34, 1180, 652), SheetLayout.of(1280, 720).sheet());
     }
 }

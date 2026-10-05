@@ -8,8 +8,8 @@ import io.github.heavyseasmc.mod.ui.HudLayout.Rect;
  *
  * <h2>与 {@link HudLayout} 同一个坐标系</h2>
  * 常量是<b>稿子像素</b>（1280×720、界面尺寸 3 下的物理像素），乘一个系数 k 就是屏幕上的物理像素：
- * <pre>k = min(界面尺寸 / 3, 窗口宽 / 1280, 窗口高 / 720)</pre>
- * 比主画面多一个「窗口高」：这副骨架上下都有东西（上带在顶、倒计时与提示贴底），矮窗口里只缩 k，一处。
+ * <pre>k = min(窗口宽 / 1280, 窗口高 / 720)</pre>
+ * 与主画面共用窗口缩放；Minecraft 的界面尺寸只用于客户端坐标换算，不改变内容的物理尺寸。
  *
  * <h2>锚点</h2>
  * 板四边各离窗口 50 · 34（样张 {@code .sheet { left: 50px; top: 34px }}，1280×720 下正好 1180×652）。
@@ -93,13 +93,8 @@ public final class SheetLayout {
         this.k = k;
     }
 
-    public static SheetLayout of(int framebufferWidth, int framebufferHeight, int guiScale) {
-        if (framebufferWidth <= 0 || framebufferHeight <= 0 || guiScale <= 0) {
-            throw new IllegalArgumentException("窗口 " + framebufferWidth + "×" + framebufferHeight + " · 界面尺寸 " + guiScale);
-        }
-        double k = Math.min(Math.min((double) guiScale / HudLayout.DESIGN_GUI_SCALE,
-                (double) framebufferWidth / DESIGN_W), (double) framebufferHeight / DESIGN_H);
-        return new SheetLayout(framebufferWidth, framebufferHeight, k);
+    public static SheetLayout of(int framebufferWidth, int framebufferHeight) {
+        return new SheetLayout(framebufferWidth, framebufferHeight, HudLayout.windowScale(framebufferWidth, framebufferHeight));
     }
 
     public double k() {

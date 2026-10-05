@@ -37,6 +37,9 @@ final class SeatMarks {
     private static final double SEAL_MIN_W = 34;
     private static final double SEAL_PAD = 5;
     private static final double SEAL_BORDER = 1.5;
+    /** 数字前那枚秤砣（体型，ADR-0090）的高占大字行高的比例，与数字之间的空（设计单位）。 */
+    private static final double SEAL_ICON_OF_LINE = 0.78;
+    private static final double SEAL_ICON_GAP = 1.5;
     private static final double SEAL_BIG_PX = 13;
     private static final double SEAL_SMALL_PX = 11;
     /** 印章中心相对头像中心，以半径为单位（样张 71 的头像上左 +12、上 +16，宽 34、高 20）。 */
@@ -140,7 +143,12 @@ final class SeatMarks {
         int smallLine = GuiText.linePxAt(smallPx, false);
         int edge = len(SEAL_BORDER, k);
         int h = Math.max(len(SEAL_H, k), bigLine + 2 * edge);
-        int w = Math.max(len(SEAL_MIN_W, k), bigW + smallW + 2 * (len(SEAL_PAD, k) + edge));
+        // 数字前印一枚秤砣：分母是体型，与卡角那枚同一个图（Codex 复核：「4/4」读不出分母是什么）
+        String size = io.github.heavyseasmc.mod.card.CardFaces.SIZE;
+        int iconH = Math.max(1, (int) Math.round(bigLine * SEAL_ICON_OF_LINE));
+        int iconW = CardPainter.cardIconWidth(size, iconH);
+        int iconGap = len(SEAL_ICON_GAP, k);
+        int w = Math.max(len(SEAL_MIN_W, k), iconW + iconGap + bigW + smallW + 2 * (len(SEAL_PAD, k) + edge));
         double r = t.w() / 2.0;
         int cx = t.x() + (int) Math.round(r + SEAL_CX * r);
         int x = cx - w / 2;
@@ -154,7 +162,9 @@ final class SeatMarks {
         }
         GuiMaterial.hudPart(context, hurt ? HudPart.SEAL_HURT : HudPart.SEAL, x, y, w, h, k);
         // 两段字共一条基线：大字在印章里竖向居中，小字的行框底对齐大字的行框底
-        int textX = x + (w - bigW - smallW) / 2;
+        int lineX = x + (w - iconW - iconGap - bigW - smallW) / 2;
+        CardPainter.drawCardIcon(context, size, lineX, y + (h - iconH) / 2, iconH, 1f);
+        int textX = lineX + iconW + iconGap;
         int bigTop = y + (h - bigLine) / 2;
         GuiText.drawPx(context, big, textX, bigTop, bigW + 2, bigPx, true, hurt ? CINNABAR : INK, GuiText.Align.LEFT, 0);
         GuiText.drawPx(context, small, textX + bigW, bigTop + bigLine - smallLine, smallW + 2, smallPx, false, MUTED,
