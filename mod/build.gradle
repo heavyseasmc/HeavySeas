@@ -333,7 +333,7 @@ def checkItemCatalog = tasks.register('checkItemCatalog') {
             throw new GradleException((['物品目录核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
         t.logger.lifecycle("物品目录核对通过：两份 lang 共 ${names} 条名字不带括号 · 登记 ${registered.size()} 件 = " +
-                "物品栏 ${listed.size()} 件（${pages.collect { k, v -> "$k $v" }.join(' · ')}）+ 场景用 ${exempt.size()} 件")
+                "物品栏 ${listed.size()} 件（${pages.collect { k, v -> "$k $v" }.join(' · ')}）+ 不进物品栏 ${exempt.size()} 件（场景用 · 骑缝吸顶灯）")
     }
 }
 

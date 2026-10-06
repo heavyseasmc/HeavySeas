@@ -47,11 +47,7 @@ public final class LinerStairs {
                     LinerStairPiece.Kind.NEWEL_LAMP));
     public static final LinerStairPiece WELL_TRIM = add("liner_well_trim",
             LinerStairPiece.create(piece(MapColor.OFF_WHITE, BlockSoundGroup.WOOD), LinerStairPiece.Kind.WELL_TRIM));
-    // 平台正面的木作主景（立框 · 横楣 · 钟面，钟面不写字）：贴在墙前面那一格，照木壁柱 / 顶帽的约定
-    public static final LinerStairPiece FEATURE_POST = add("liner_feature_post",
-            LinerStairPiece.create(piece(MapColor.DARK_RED, BlockSoundGroup.WOOD), LinerStairPiece.Kind.FEATURE_POST));
-    public static final LinerStairPiece FEATURE_LINTEL = add("liner_feature_lintel",
-            LinerStairPiece.create(piece(MapColor.DARK_RED, BlockSoundGroup.WOOD), LinerStairPiece.Kind.FEATURE_LINTEL));
+    // 平台正面的木作主景只剩钟面（不写字）：立框 · 横楣并进了桃花心木壁柱（居中）与顶帽（高）（ADR-0093 B7）
     public static final LinerStairPiece CLOCK = add("liner_clock",
             LinerStairPiece.create(piece(MapColor.DARK_RED, BlockSoundGroup.WOOD), LinerStairPiece.Kind.CLOCK));
 
@@ -84,7 +80,6 @@ public final class LinerStairs {
     public static boolean frontInGui(Block block) {
         return block instanceof LinerStairBlock
                 || block instanceof LinerStairPiece p && (p.kind() == LinerStairPiece.Kind.WELL_TRIM
-                || p.kind() == LinerStairPiece.Kind.FEATURE_POST || p.kind() == LinerStairPiece.Kind.FEATURE_LINTEL
                 || p.kind() == LinerStairPiece.Kind.CLOCK);
     }
 

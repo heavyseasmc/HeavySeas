@@ -45,8 +45,8 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  *   <li><b>斜栏杆</b>（{@link Kind#SLOPE}）：坐在楼梯方块上面那一格，扶手斜 45°；朝向 = 上坡的方向。
  *       哪一段（底 · 中 · 顶 · 单独一格）看斜下方与斜上方是不是同朝向的斜栏杆：底段的扶手往回伸到起步柱，顶段经 22.5° 一折放平。</li>
  *   <li><b>起步柱</b>（{@link Kind#NEWEL} · {@link Kind#NEWEL_LAMP}）：四向接扶手的短截，接法同平台栏杆；带灯的那一种右键开关，亮着时 13。</li>
- *   <li><b>木作主景</b>（{@link Kind#FEATURE_POST} · {@link Kind#FEATURE_LINTEL} · {@link Kind#CLOCK}，平台正面那道墙）：都贴在墙前面那一格；
- *       立框按上下邻居分段（同收口），横楣按左右邻居定哪一头出端面（同顶帽 {@link LinerConnect.Rules#cappingEnd}），钟面是一格的细模。</li>
+ *   <li><b>钟面</b>（{@link Kind#CLOCK}，平台正面那道墙的木作主景正中）：贴在墙前面那一格，一格的细模。主景的立框与横楣
+ *       是桃花心木壁柱（居中）与顶帽（高）的状态（ADR-0093 B7）。</li>
  *   <li><b>收口</b>（{@link Kind#WELL_TRIM}）：照檐口那一套 —— 贴在宿主（楼板侧面）前面那一格、正面朝外，拐角按 {@link LinerConnect.Rules#cornerShape}；
  *       上下叠着两格（上一层楼板 + 下一层的平顶）时分成上 / 下两段（{@link Rules#trimPart}）。</li>
  * </ul>
@@ -58,10 +58,6 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
     /** 摆法。 */
     public enum Kind {
         BALUSTRADE, SLOPE, NEWEL, NEWEL_LAMP, WELL_TRIM,
-        /** 平台正面木作主景的立框（叠几格就几格高，底段台座、顶段柱头，part 同收口）。 */
-        FEATURE_POST,
-        /** 主景的横楣（一段梁，两头不再接同一种横楣的那一头出端面，end 同顶帽）。 */
-        FEATURE_LINTEL,
         /** 主景的钟面（一格，不写字）。 */
         CLOCK
     }
@@ -126,8 +122,6 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
             case SLOPE -> s = s.with(FACING, Direction.NORTH).with(SLOPE_PART, SlopePart.SINGLE);
             case WELL_TRIM -> s = s.with(FACING, Direction.SOUTH).with(LinerBlocks.SHAPE, LinerBlocks.CornerShape.STRAIGHT)
                     .with(TRIM_PART, TrimPart.SINGLE);
-            case FEATURE_POST -> s = s.with(FACING, Direction.SOUTH).with(TRIM_PART, TrimPart.SINGLE);
-            case FEATURE_LINTEL -> s = s.with(FACING, Direction.SOUTH).with(LinerBlocks.END, LinerBlocks.CappingEnd.BOTH);
             case CLOCK -> s = s.with(FACING, Direction.SOUTH);
         }
         setDefaultState(s);
@@ -140,8 +134,6 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
             case NEWEL_LAMP -> builder.add(NORTH, EAST, SOUTH, WEST, LIT);
             case SLOPE -> builder.add(FACING, SLOPE_PART);
             case WELL_TRIM -> builder.add(FACING, LinerBlocks.SHAPE, TRIM_PART);
-            case FEATURE_POST -> builder.add(FACING, TRIM_PART);
-            case FEATURE_LINTEL -> builder.add(FACING, LinerBlocks.END);
             case CLOCK -> builder.add(FACING);
         }
     }
@@ -165,10 +157,6 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
             }
             case WELL_TRIM -> LinerLooks.look("stairs/well_trim_" + s.get(LinerBlocks.SHAPE).asString() + "_" + s.get(TRIM_PART).asString(),
                     tex("p", "stairs/trim", "n", "stairs/nosing"), LinerBlock.yawOf(s.get(FACING)));
-            case FEATURE_POST -> LinerLooks.look("stairs/feature_post_" + s.get(TRIM_PART).asString(), tex("w", "stairs/feature_post"),
-                    LinerBlock.yawOf(s.get(FACING)));
-            case FEATURE_LINTEL -> LinerLooks.look("stairs/feature_lintel_" + s.get(LinerBlocks.END).asString(),
-                    tex("l", "stairs/feature_lintel"), LinerBlock.yawOf(s.get(FACING)));
             case CLOCK -> LinerLooks.look("stairs/clock", tex("b", "stairs/clock"), LinerBlock.yawOf(s.get(FACING)));
         };
     }
@@ -199,7 +187,7 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
             Direction f = below.getBlock() instanceof StairsBlock && below.get(StairsBlock.HALF) == BlockHalf.BOTTOM
                     ? below.get(StairsBlock.FACING) : ctx.getHorizontalPlayerFacing();
             s = s.with(FACING, f);
-        } else if (kind == Kind.WELL_TRIM || kind == Kind.FEATURE_POST || kind == Kind.FEATURE_LINTEL || kind == Kind.CLOCK) {
+        } else if (kind == Kind.WELL_TRIM || kind == Kind.CLOCK) {
             s = s.with(FACING, ctx.getSide().getAxis().isHorizontal() ? ctx.getSide() : ctx.getHorizontalPlayerFacing().getOpposite());
         }
         return connect(s, world, pos);
@@ -233,16 +221,6 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
                 boolean above = sameTrim(world.getBlockState(pos.up()), s.get(FACING));
                 boolean below = sameTrim(world.getBlockState(pos.down()), s.get(FACING));
                 return s.with(LinerBlocks.SHAPE, LinerBlocks.CornerShape.of(shape)).with(TRIM_PART, Rules.trimPart(above, below));
-            }
-            case FEATURE_POST -> {
-                return s.with(TRIM_PART, Rules.trimPart(sameTrim(world.getBlockState(pos.up()), s.get(FACING)),
-                        sameTrim(world.getBlockState(pos.down()), s.get(FACING))));
-            }
-            case FEATURE_LINTEL -> {
-                Direction f = s.get(FACING);
-                String end = LinerConnect.Rules.cappingEnd(sameTrim(world.getBlockState(pos.offset(LinerConnect.viewerLeft(f))), f),
-                        sameTrim(world.getBlockState(pos.offset(LinerConnect.viewerRight(f))), f));
-                return s.with(LinerBlocks.END, LinerBlocks.CappingEnd.of(end));
             }
             default -> {
                 return s;
@@ -322,7 +300,7 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
                     .with(side(rotation.rotate(Direction.EAST)), state.get(EAST))
                     .with(side(rotation.rotate(Direction.SOUTH)), state.get(SOUTH))
                     .with(side(rotation.rotate(Direction.WEST)), state.get(WEST));
-            case SLOPE, WELL_TRIM, FEATURE_POST, FEATURE_LINTEL, CLOCK -> state.with(FACING, rotation.rotate(state.get(FACING)));
+            case SLOPE, WELL_TRIM, CLOCK -> state.with(FACING, rotation.rotate(state.get(FACING)));
         };
     }
 
@@ -343,13 +321,7 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
             case SLOPE -> state.rotate(mirror.getRotation(state.get(FACING)));
             case WELL_TRIM -> state.rotate(mirror.getRotation(state.get(FACING)))
                     .with(LinerBlocks.SHAPE, state.get(LinerBlocks.SHAPE).mirrored());
-            case FEATURE_POST, CLOCK -> state.rotate(mirror.getRotation(state.get(FACING)));
-            case FEATURE_LINTEL -> {                                  // 镜像左右对调：哪一头出端面跟着换（同顶帽）
-                LinerBlocks.CappingEnd end = state.get(LinerBlocks.END);
-                yield state.rotate(mirror.getRotation(state.get(FACING))).with(LinerBlocks.END,
-                        end == LinerBlocks.CappingEnd.LEFT ? LinerBlocks.CappingEnd.RIGHT
-                                : end == LinerBlocks.CappingEnd.RIGHT ? LinerBlocks.CappingEnd.LEFT : end);
-            }
+            case CLOCK -> state.rotate(mirror.getRotation(state.get(FACING)));
         };
     }
 
@@ -410,14 +382,6 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
                     double top = Math.min(24, Rules.railTop(a1, part) + (collision ? 8 : 0));
                     boxes.add(new double[]{6.5, 0, 16 - a1, 9.5, Math.max(1, top), 16 - 4 * q});
                 }
-            }
-            case FEATURE_POST -> {
-                yaw = LinerBlock.yawOf(s.get(FACING));
-                boxes.add(new double[]{4, 0, 0, 12, 16, 4});
-            }
-            case FEATURE_LINTEL -> {
-                yaw = LinerBlock.yawOf(s.get(FACING));
-                boxes.add(new double[]{0, 0, 0, 16, 14.5, 4.5});
             }
             case CLOCK -> {
                 yaw = LinerBlock.yawOf(s.get(FACING));

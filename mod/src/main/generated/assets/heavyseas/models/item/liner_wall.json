@@ -1,5 +1,5 @@
 {
-  "parent": "heavyseas:block/liner/liner_wall/cube_front",
+  "parent": "heavyseas:block/liner/liner_wall/cube",
   "display": {
     "gui": {
       "rotation": [

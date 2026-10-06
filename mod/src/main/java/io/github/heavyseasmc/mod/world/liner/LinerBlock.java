@@ -35,6 +35,7 @@ import java.util.function.Function;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.ARCH_PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.AXIS;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.BASE;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CAPITAL;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CASING_PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CELL;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CORNER;
@@ -52,6 +53,7 @@ import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.ROW;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SHAPE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SIDE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SOUTH;
+import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.TALL;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.TRIM;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.UP;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.V;
@@ -223,7 +225,9 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
             double u = (hit.x - p.getX() - 0.5) * right.getOffsetX() + (hit.z - p.getZ() - 0.5) * right.getOffsetZ() + 0.5;
             double v = hit.y - p.getY();
             if (kind == Kind.PILASTER_SIDE) {
-                s = s.with(SIDE, u < 0.5 ? LinerBlocks.PilasterSide.LEFT : LinerBlocks.PilasterSide.RIGHT);
+                // 点在面的左 / 中 / 右三分之一：左半根 · 居中整根（ADR-0093 B7）· 右半根
+                s = s.with(SIDE, u < 1.0 / 3 ? LinerBlocks.PilasterSide.LEFT
+                        : u < 2.0 / 3 ? LinerBlocks.PilasterSide.CENTER : LinerBlocks.PilasterSide.RIGHT);
             } else {
                 s = s.with(CASING_PART, LinerBlocks.CasingPart.of(LinerConnect.Rules.casingPart(u, v)));
             }
@@ -254,9 +258,10 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
                 return s.with(PART, LinerBlocks.WainscotPart.of(part));
             }
             case CAPPING -> {
+                // 高的与普通的顶帽互不相接（高檐的端面要出在普通顶帽那一头）
                 Direction f = s.get(FACING);
-                String end = LinerConnect.Rules.cappingEnd(same(world, pos.offset(LinerConnect.viewerLeft(f)), f),
-                        same(world, pos.offset(LinerConnect.viewerRight(f)), f));
+                String end = LinerConnect.Rules.cappingEnd(sameCapping(world, pos.offset(LinerConnect.viewerLeft(f)), s),
+                        sameCapping(world, pos.offset(LinerConnect.viewerRight(f)), s));
                 return s.with(END, LinerBlocks.CappingEnd.of(end));
             }
             case RUN -> {
@@ -283,7 +288,15 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
                 String base = LinerConnect.Rules.pilasterBase(bottom,
                         isSkirting(world.getBlockState(pos.offset(LinerConnect.viewerLeft(f))), f),
                         isSkirting(world.getBlockState(pos.offset(LinerConnect.viewerRight(f))), f));
-                return s.with(BASE, LinerBlocks.PilasterBase.of(base));
+                s = s.with(BASE, LinerBlocks.PilasterBase.of(base));
+                if (s.contains(CAPITAL)) {
+                    // 居中整根：上面那一格不是同一根（同一种 · 同朝向 · 也居中）就长柱头（ADR-0093 B7）；左右半根不长
+                    BlockState above = world.getBlockState(pos.up());
+                    boolean center = s.get(SIDE) == LinerBlocks.PilasterSide.CENTER;
+                    boolean top = !(above.isOf(this) && above.get(FACING) == f && above.get(SIDE) == LinerBlocks.PilasterSide.CENTER);
+                    s = s.with(CAPITAL, center && top);
+                }
+                return s;
             }
             case CASING -> {
                 Direction f = s.get(FACING);
@@ -357,6 +370,12 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
     private boolean same(BlockView world, BlockPos pos, Direction facing) {
         BlockState other = world.getBlockState(pos);
         return other.isOf(this) && other.get(FACING) == facing;
+    }
+
+    /** 顶帽接着顶帽：同一种、同朝向、同高矮（ADR-0093 B7：高檐与普通顶帽各是一段，端面出在两种相接的那一头）。 */
+    private boolean sameCapping(BlockView world, BlockPos pos, BlockState s) {
+        BlockState other = world.getBlockState(pos);
+        return other.isOf(this) && other.get(FACING) == s.get(FACING) && other.get(TALL) == s.get(TALL);
     }
 
     /**
@@ -444,8 +463,9 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
             s = s.with(LEFT, state.get(RIGHT)).with(RIGHT, state.get(LEFT));
         }
         if (s.contains(SIDE)) {
-            s = s.with(SIDE, state.get(SIDE) == LinerBlocks.PilasterSide.LEFT ? LinerBlocks.PilasterSide.RIGHT
-                    : LinerBlocks.PilasterSide.LEFT);
+            LinerBlocks.PilasterSide side = state.get(SIDE);
+            s = s.with(SIDE, side == LinerBlocks.PilasterSide.LEFT ? LinerBlocks.PilasterSide.RIGHT
+                    : side == LinerBlocks.PilasterSide.RIGHT ? LinerBlocks.PilasterSide.LEFT : side);      // 居中的照镜子还是居中
         }
         if (s.contains(END)) {
             LinerBlocks.CappingEnd end = state.get(END);

@@ -51,6 +51,10 @@ public final class LinerBlocks {
      * 背面、两个侧面与顶底画外墙白（就是改之前的样子）；不打开就四个侧面都画饰面。手放默认不打开，生成器按背后那一格在不在屋里打开。
      */
     public static final BooleanProperty EXTERIOR = BooleanProperty.of("exterior");
+    /** 居中整根的壁柱是不是这一根最上面那一格（长柱头）：看上面那一格是不是同一根（ADR-0093 B7；左右半根照旧不长，B4 再说）。 */
+    public static final BooleanProperty CAPITAL = BooleanProperty.of("capital");
+    /** 顶帽是高的那一种（整套檐部：楣板 · 珠线 · 横带 · 挑檐，原「主景横楣」，ADR-0093 B7）；手放默认普通顶帽。 */
+    public static final BooleanProperty TALL = BooleanProperty.of("tall");
     /** 地毯：四边接不接地毯。 */
     public static final BooleanProperty NORTH = Properties.NORTH;
     public static final BooleanProperty EAST = Properties.EAST;
@@ -190,7 +194,8 @@ public final class LinerBlocks {
 
     /** 木壁柱靠这一格的左边还是右边（站在正面看）。 */
     public enum PilasterSide implements StringIdentifiable {
-        LEFT, RIGHT;
+        /** 贴着格子左 / 右边的半根（护墙板接缝那种）· 居中整根（台座 · 柱身 · 柱头，原「主景立框」，ADR-0093 B7）。 */
+        LEFT, RIGHT, CENTER;
 
         @Override
         public String asString() {
@@ -357,14 +362,20 @@ public final class LinerBlocks {
     public static final LinerBlock PILASTER = add("liner_pilaster", piece(MapColor.OFF_WHITE), LinerBlock.Kind.WALL_PIECE,
             s -> look("pilaster" + s.get(BASE).suffix(), baseTex(s.get(BASE), "pilaster", "pilaster_base")), FACING, BASE);
     public static final LinerBlock PILASTER_MAHOGANY = add("liner_pilaster_mahogany", piece(MapColor.DARK_RED), LinerBlock.Kind.PILASTER_SIDE,
-            s -> look((s.get(SIDE) == PilasterSide.LEFT ? "pilaster_left" : "pilaster_right") + s.get(BASE).suffix(),
+            s -> s.get(SIDE) == PilasterSide.CENTER
+                    // 居中整根：就是原来的主景立框那四段（底段台座 · 中段 · 顶段柱头 · 单独一格两头都有），模板与贴图照用
+                    ? look("stairs/feature_post_" + columnPart(s.get(BASE) != PilasterBase.NONE, s.get(CAPITAL)), tex("w", "stairs/feature_post"))
+                    : look((s.get(SIDE) == PilasterSide.LEFT ? "pilaster_left" : "pilaster_right") + s.get(BASE).suffix(),
                     baseTex(s.get(BASE), "pilaster_mahogany", "pilaster_base_mahogany")),
-            FACING, SIDE, BASE);
+            FACING, SIDE, BASE, CAPITAL);
     public static final LinerBlock CAPPING_MAHOGANY = add("liner_capping_mahogany", piece(MapColor.DARK_RED), LinerBlock.Kind.CAPPING,
-            s -> s.get(END) == CappingEnd.NONE
+            s -> s.get(TALL)
+                    // 高的那一种：原来的主景横楣（哪一头出端面同顶帽的 end），模板与贴图照用
+                    ? look("stairs/feature_lintel_" + s.get(END).asString(), tex("l", "stairs/feature_lintel"))
+                    : s.get(END) == CappingEnd.NONE
                     ? look("capping", tex("c", "capping_mahogany"))
                     : look("capping_" + s.get(END).asString(), tex("c", "capping_mahogany", "p", "pilaster_mahogany")),
-            FACING, END);
+            FACING, END, TALL);
     // ---- A 甲板新贴附件（ADR-0080 §7，用户 2026-10-04「全按倾向」：格架 A 菱格 + 常春藤 + 内角 · 拱 C 半圆 + 拱心石 · 宽门套 A 檐式门头）
     /** 宽门套（高层的大门、双开门）：门套那一族放大到 7 宽，门楣上一道檐；part / trim 与门套同一套规则，两种门套互相跨过去找线。 */
     public static final LinerBlock DOOR_CASING_TALL = add("liner_door_casing_tall", piece(MapColor.OFF_WHITE), LinerBlock.Kind.CASING,
@@ -463,6 +474,11 @@ public final class LinerBlocks {
         return look("casing_" + part.asString() + (trim == Trim.NONE ? "" : "_" + trim.asString()), t);
     }
 
+    /** 居中整根壁柱这一格是哪一段（原主景立框的 part）：最下一格（有柱脚）· 最上一格（长柱头）。 */
+    static String columnPart(boolean bottom, boolean top) {
+        return bottom ? (top ? "single" : "bottom") : (top ? "top" : "middle");
+    }
+
     /** 壁柱的贴图：柱身；有柱脚加柱脚那一张；两边有踢脚再加踢脚条那一张。 */
     private static Map<String, String> baseTex(PilasterBase base, String shaft, String plinth) {
         return switch (base) {
@@ -519,11 +535,12 @@ public final class LinerBlocks {
         if (state.contains(FACING)) {
             state = state.with(FACING, Direction.SOUTH);
         }
-        // 连接一律默认「不接」：布尔属性默认取 true，大框默认就成了四边都接着的正中那一格（一条线都没有）——
-        //   物品栏里那一格、/setblock 不带属性时，要的是一块完整的单格框 / 一小块带边的地毯（第一次生成就看到物品图标是白板）
-        for (BooleanProperty joint : new BooleanProperty[]{UP, DOWN, LEFT, RIGHT, NORTH, EAST, SOUTH, WEST}) {
-            if (state.contains(joint)) {
-                state = state.with(joint, false);
+        // 布尔属性一律默认 false：游戏给布尔属性的默认值是 true —— 大框默认就成了四边都接着的正中那一格（一条线都没有，
+        //   第一次生成就看到物品图标是白板）；B9 的 exterior 没进当时那份「连接」名单，手放的墙默认成了背面外墙白（2026-10-07，
+        //   与用户定的「手放默认四面饰面」相反，物品模型指着外墙白那一块）。不再列名单：这一族的布尔属性全部默认 false
+        for (Property<?> p : state.getProperties()) {
+            if (p instanceof BooleanProperty b) {
+                state = state.with(b, false);
             }
         }
         block.defaultTo(state);

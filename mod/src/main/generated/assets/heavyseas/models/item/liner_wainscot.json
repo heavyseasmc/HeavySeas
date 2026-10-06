@@ -1,5 +1,5 @@
 {
-  "parent": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wall_white_wall_white_wall_white",
+  "parent": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wainscot_c_wainscot_c_wall",
   "display": {
     "gui": {
       "rotation": [

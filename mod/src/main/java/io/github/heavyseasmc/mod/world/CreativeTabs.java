@@ -45,8 +45,7 @@ public final class CreativeTabs {
             new Page("p2_trim", List.of(
                     "liner_cornice", "liner_cornice_thin", "liner_chair_rail", "liner_pilaster", "liner_door_casing",
                     "liner_door_casing_tall", "liner_trellis",
-                    "liner_skirting", "liner_pilaster_mahogany", "liner_capping_mahogany", "liner_feature_post",
-                    "liner_feature_lintel")),
+                    "liner_skirting", "liner_pilaster_mahogany", "liner_capping_mahogany")),
             new Page("p3_openings", List.of(
                     "liner_door_cabin", "liner_door_double",
                     "liner_window_1x1", "liner_window_1x2", "liner_window_1x3", "liner_window_2x1", "liner_window_2x2",
@@ -57,7 +56,7 @@ public final class CreativeTabs {
                     "liner_stair_mahogany", "liner_stair_carpet", "liner_well_trim",
                     "liner_balustrade", "liner_balustrade_slope", "liner_newel_post", "liner_newel_lamp")),
             new Page("p5_lights", List.of(
-                    "liner_ceiling_light", "liner_ceiling_light_pair", "liner_ceiling_light_quad", "liner_brass_chandelier",
+                    "liner_ceiling_light", "liner_brass_chandelier",
                     "liner_crystal_chandelier", "liner_wall_sconce", "liner_floor_lamp", "liner_table_lamp", "liner_lamppost")),
             new Page("p6_furniture", List.of(
                     "liner_sofa_cream", "liner_sofa_green", "liner_club_chair_cream", "liner_club_chair_green",
@@ -83,9 +82,14 @@ public final class CreativeTabs {
                     "skiff_yard", "skiff_sail")));
     // ---- 页表结束
 
-    /** 场景用的物品（布景板、补给箱、海图上的小铜船）：指令与对局摆它们，不进物品栏。 */
+    /**
+     * 不进物品栏的：场景用的物品（布景板、补给箱、海图上的小铜船，指令与对局摆它们）；骑缝的两格 / 四格吸顶灯
+     * （ADR-0093 B6，用户 2026-10-07 定：物品栏只留一种吸顶灯，偏半格时由装修锤把它换成占两格 / 四格的那一件 ——
+     * 亮度对称、每一块都点得中；船上照用这两件，/give 照样拿得到）。
+     */
     static final Set<String> NOT_IN_TABS = Set.of(
-            "coast_backdrop", "lighthouse_backdrop", "pier_backdrop", "supply_crate", "chart_ship");
+            "coast_backdrop", "lighthouse_backdrop", "pier_backdrop", "supply_crate", "chart_ship",
+            "liner_ceiling_light_pair", "liner_ceiling_light_quad");
 
     private CreativeTabs() {
     }

@@ -16,19 +16,19 @@
    "structure": "heavyseas:liner/seg_040",
    "x0": 40,
    "x1": 80,
-   "sha1": "2608627f3c2e33122526f55c7bb23c978486fe2b"
+   "sha1": "9ac63d730e036d8bd0239c9387bbf43a31254bde"
   },
   {
    "structure": "heavyseas:liner/seg_080",
    "x0": 80,
    "x1": 120,
-   "sha1": "55e6c8fa92d2818a46d53a5bcfc49319d1b4dd5d"
+   "sha1": "b04d441a86e3018e131834b7645c8715dd1f9b91"
   },
   {
    "structure": "heavyseas:liner/seg_120",
    "x0": 120,
    "x1": 160,
-   "sha1": "ba2427f287fbb41856ba9b5931ece6fa7102dd41"
+   "sha1": "84bab185fc317b86a814fb8bab907d29c0f42762"
   },
   {
    "structure": "heavyseas:liner/seg_160",
@@ -40,7 +40,7 @@
    "structure": "heavyseas:liner/seg_186",
    "x0": 186,
    "x1": 226,
-   "sha1": "b993250d67b92b6fc0a326d315e9c7e10bd88fb5"
+   "sha1": "5a2964b2314f1bf057440d15cb97ea3a9e6d47a4"
   },
   {
    "structure": "heavyseas:liner/seg_226",

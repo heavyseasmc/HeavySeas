@@ -92,6 +92,21 @@ public final class LinerLooks {
         return map;
     }
 
+    /**
+     * 居中整根的桃花心木壁柱与高檐顶帽（ADR-0093 B7）用的是原「主景立框」「主景横楣」的模板（{@code stairs/} 下）：
+     * 轮廓照它们原来的（{@code LinerStairPiece} 里那两块，一字不改）。
+     */
+    private static Map<String, List<double[]>> withFeature(Map<String, List<double[]>> base) {
+        Map<String, List<double[]>> out = new java.util.HashMap<>(base);
+        for (String part : new String[]{"single", "bottom", "middle", "top"}) {
+            out.put("stairs/feature_post_" + part, List.of(box(4, 0, 0, 12, 16, 4)));
+        }
+        for (String end : new String[]{"none", "left", "right", "both"}) {
+            out.put("stairs/feature_lintel_" + end, List.of(box(0, 0, 0, 16, 14.5, 4.5)));
+        }
+        return out;
+    }
+
     /** 大框的 15 块模板（{@code frame_<哪几边>}，ADR-0069 §1a）：轮廓都是整块 —— 前出的 1 像素框条不进轮廓。 */
     private static Map<String, List<double[]>> withFrames(Map<String, List<double[]>> base) {
         Map<String, List<double[]>> out = new java.util.HashMap<>(base);
@@ -262,7 +277,7 @@ public final class LinerLooks {
     }
 
     /** 每块模板的轮廓（模板坐标，单位像素）：与模型元件大致重合的几个盒子。整块的三种是满格。 */
-    private static final Map<String, List<double[]>> BOXES = withAdeck(withAttach(withFrames(Map.ofEntries(
+    private static final Map<String, List<double[]>> BOXES = withFeature(withAdeck(withAttach(withFrames(Map.ofEntries(
             Map.entry("cube", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("cube_front", List.of(box(0, 0, 0, 16, 16, 16))),
             Map.entry("floor", List.of(box(0, 0, 0, 16, 16, 16))),
@@ -284,7 +299,7 @@ public final class LinerLooks {
             Map.entry("capping", List.of(box(0, 0, 0, 16, 3, 2))),
             Map.entry("capping_left", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5))),
             Map.entry("capping_right", List.of(box(0, 0, 0, 16, 3, 2), box(11, 0, 0, 16, 16, 1.5))),
-            Map.entry("capping_both", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5), box(11, 0, 0, 16, 16, 1.5)))))));
+            Map.entry("capping_both", List.of(box(0, 0, 0, 16, 3, 2), box(0, 0, 0, 5, 16, 1.5), box(11, 0, 0, 16, 16, 1.5))))))));
 
     private static double[] box(double x0, double y0, double z0, double x1, double y1, double z1) {
         return new double[]{x0, y0, z0, x1, y1, z1};
