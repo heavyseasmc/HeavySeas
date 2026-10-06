@@ -1,5 +1,9 @@
 package io.github.heavyseasmc.mod.world.liner;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.github.heavyseasmc.mod.world.SeatEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -10,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,6 +48,101 @@ final class DeckPiecesTest {
         // 警钟没有碰撞（只有拉绳垂在人站的那一格里），轮廓在格里、点得中
         assertEquals(List.of(), LinerPropShapes.collision(LinerProp.Kind.ALARM_BELL, null));
         assertFalse(LinerPropShapes.boxes(LinerProp.Kind.ALARM_BELL, null).isEmpty());
+    }
+
+    @Test
+    void theAlarmBellOutlineCoversTheWholeBell() throws Exception {
+        // C3 第三轮打磨（ADR-0086 §5.3 实测「只有钟口那一小截点得中」）：钟身挂在上面那一格（瞭望台口沿那一圈），准星一格一格找方块、
+        //   每一格只问那一格自己的轮廓 —— 所以这一格的轮廓（boxes：拉绳 · 绳结 · 钟舌 · 唇的下沿）与伸上去的那一截（overhang，由口沿那一格
+        //   并进它自己的轮廓）拼起来，要罩住模板 alarm_bell.json（生成器写的、游戏画的同一份）里每一个元件；伸上去的那一截只许在那一格里
+        List<double[]> own = LinerPropShapes.boxes(LinerProp.Kind.ALARM_BELL, null);
+        List<double[]> above = LinerPropShapes.overhang(LinerProp.Kind.ALARM_BELL);
+        assertFalse(above.isEmpty(), "警钟没有伸上去的那一截：钟身点不中");
+        List<double[]> both = new java.util.ArrayList<>(own);
+        for (double[] b : above) {
+            for (int i = 0; i < 3; i++) {
+                assertTrue(0 <= b[i] && b[i] < b[i + 3] && b[i + 3] <= 16, "伸上去的那一截越出了上面那一格：" + java.util.Arrays.toString(b));
+            }
+            both.add(new double[]{b[0], b[1] + 16, b[2], b[3], b[4] + 16, b[5]});
+        }
+        Map<String, List<double[]>> pts = elementPoints("/assets/heavyseas/models/block/liner/template/prop/alarm_bell.json");
+        assertTrue(pts.size() >= 20, "正向对照：模板里的元件只读到 " + pts.size() + " 块");
+        assertEquals(List.of(), uncovered(both, pts), "警钟的轮廓罩不住这几块元件");
+        // 正向对照：只有这一格的轮廓（第二轮就是这样）必须罩不住钟身 —— 判据分得开「点得中整口钟」与「只点得中钟口」
+        assertFalse(uncovered(own, pts).isEmpty(), "只用这一格的轮廓也罩得住：判据没在量");
+        for (LinerProp.Kind k : LinerProp.Kind.values()) {
+            if (k != LinerProp.Kind.ALARM_BELL) {
+                assertEquals(List.of(), LinerPropShapes.overhang(k), k + " 也伸进了上面那一格");
+            }
+        }
+    }
+
+    /** 模板里每个元件取 27 个点（三个方向各取近两端与正中，离边 1 %），照元件的转动转过去：{元件序号 · 起点: 点}。 */
+    private static Map<String, List<double[]>> elementPoints(String resource) throws Exception {
+        JsonObject m;
+        try (InputStream in = DeckPiecesTest.class.getResourceAsStream(resource)) {
+            assertNotNull(in, resource + " 不在");
+            m = JsonParser.parseString(new String(in.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
+        }
+        Map<String, List<double[]>> out = new java.util.LinkedHashMap<>();
+        int i = 0;
+        for (JsonElement e : m.getAsJsonArray("elements")) {
+            JsonObject el = e.getAsJsonObject();
+            double[] f = vec(el.getAsJsonArray("from"));
+            double[] t = vec(el.getAsJsonArray("to"));
+            JsonObject rot = el.has("rotation") ? el.getAsJsonObject("rotation") : null;
+            List<double[]> ps = new java.util.ArrayList<>();
+            for (double a : new double[]{0.01, 0.5, 0.99}) {
+                for (double b : new double[]{0.01, 0.5, 0.99}) {
+                    for (double c : new double[]{0.01, 0.5, 0.99}) {
+                        double[] q = {f[0] + (t[0] - f[0]) * a, f[1] + (t[1] - f[1]) * b, f[2] + (t[2] - f[2]) * c};
+                        ps.add(rot == null ? q : rotate(q, rot));
+                    }
+                }
+            }
+            out.put(i++ + " · " + java.util.Arrays.toString(f), ps);
+        }
+        return out;
+    }
+
+    private static double[] vec(JsonArray a) {
+        return new double[]{a.get(0).getAsDouble(), a.get(1).getAsDouble(), a.get(2).getAsDouble()};
+    }
+
+    /** 元件的转动（与 docs 的 liner_decor._rot_el 同一个公式：绕 origin、按 axis 转 angle 度）。 */
+    private static double[] rotate(double[] p, JsonObject rot) {
+        double[] o = vec(rot.getAsJsonArray("origin"));
+        double r = Math.toRadians(rot.get("angle").getAsDouble());
+        double c = Math.cos(r);
+        double s = Math.sin(r);
+        double x = p[0] - o[0];
+        double y = p[1] - o[1];
+        double z = p[2] - o[2];
+        double[] q = switch (rot.get("axis").getAsString()) {
+            case "x" -> new double[]{x, y * c - z * s, y * s + z * c};
+            case "y" -> new double[]{x * c + z * s, y, -x * s + z * c};
+            default -> new double[]{x * c - y * s, x * s + y * c, z};
+        };
+        return new double[]{q[0] + o[0], q[1] + o[1], q[2] + o[2]};
+    }
+
+    /** 有点落在所有盒子外面的那几块元件。 */
+    private static List<String> uncovered(List<double[]> boxes, Map<String, List<double[]>> pts) {
+        List<String> out = new java.util.ArrayList<>();
+        for (Map.Entry<String, List<double[]>> e : pts.entrySet()) {
+            for (double[] q : e.getValue()) {
+                boolean in = false;
+                for (double[] b : boxes) {
+                    in |= b[0] - 1e-6 <= q[0] && q[0] <= b[3] + 1e-6 && b[1] - 1e-6 <= q[1] && q[1] <= b[4] + 1e-6
+                            && b[2] - 1e-6 <= q[2] && q[2] <= b[5] + 1e-6;
+                }
+                if (!in) {
+                    out.add(e.getKey());
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     @Test

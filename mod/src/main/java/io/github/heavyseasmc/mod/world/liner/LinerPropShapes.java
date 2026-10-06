@@ -172,7 +172,8 @@ final class LinerPropShapes {
     }
 
     //   空心桅杆（一格，模型北面 = 门那一面）：南 · 西 · 东三面壁（1.5）· 横档那一溜（对着门那一壁里面）；竖井北面也是整壁；
-    //   门那两格北面：门洞两边的壁 · 门槛（连门槛帽）/ 门楣 · 门扇（关着：堵在门洞里退后 0.5；开着：贴在西壁里面）
+    //   门那两格北面：门洞两边的壁 · 门槛（连门槛帽）/ 门楣 · 门扇（关着：堵在门洞里退后 1、0.5 厚 —— C3 第三轮打磨，同 liner_props_opendeck 的
+    //   DOOR_SHUT_Z；开着：贴在西壁里面）
     private static final List<double[]> MAST_WALLS = List.of(box(0, 0, 14.5, 16, 16, 16), box(0, 0, 1.5, 1.5, 16, 14.5),
             box(14.5, 0, 1.5, 16, 16, 14.5), box(4, 1.5, 13, 12, 14.5, 14.5));
 
@@ -189,7 +190,7 @@ final class LinerPropShapes {
         if (open) {
             out.add(lower ? box(1.5, 2.5, 1.5, 2.25, 16, 12.5) : box(1.5, 0, 1.5, 2.25, 14.5, 12.5));
         } else {
-            out.add(lower ? box(2.5, 2, 0.5, 13.5, 16, 1.25) : box(2.5, 0, 0.5, 13.5, 15, 1.25));
+            out.add(lower ? box(2.5, 2, 1, 13.5, 16, 1.5) : box(2.5, 0, 1, 13.5, 15, 1.5));
         }
         return List.copyOf(out);
     }
@@ -197,8 +198,20 @@ final class LinerPropShapes {
     //   望远镜柜 A（背贴桅杆 z 16）：柜身连顶上托架与那一支望远镜（伸进上面那一格的那一截不算）
     private static final List<double[]> TELESCOPE_CABINET = List.of(box(2.5, 3.5, 9.25, 13.5, 14.5, 16),
             box(1.75, 14.5, 10.75, 14.25, 16, 14.25));
-    //   警钟（背贴桅杆）：钟身在上面那一格里，这一格里只有拉绳、绳结与钟口 —— 轮廓放宽一圈，拉绳好点中
-    private static final List<double[]> ALARM_BELL = List.of(box(5, 7.5, 9, 11, 16, 15));
+    //   警钟（背贴桅杆）：钟身在上面那一格里，这一格里只有拉绳、绳结、钟舌与唇的下沿 —— 轮廓放宽一圈（罩满口宽 7），拉绳好点中
+    private static final List<double[]> ALARM_BELL = List.of(box(4.5, 7.5, 8.5, 11.5, 16, 15.5));
+    //   警钟伸进上面那一格的那一截（上面那一格自己的坐标）：钟身连钟冠与吊环（钟顶在那一格的 y 8、吊环到 9.5）· 背板、螺栓、挑臂与斜撑
+    private static final List<double[]> ALARM_BELL_ABOVE = List.of(box(4.5, 0, 8.5, 11.5, 9.5, 15.5), box(6.5, 6, 11, 9.5, 12, 16));
+
+    /**
+     * 这一件伸进正上方那一格的那一截（那一格自己的坐标 0–16）：只有警钟。C3 第三轮打磨（ADR-0086 §5.3 实测「只有钟口那一小截点得中」）：
+     * 钟身挂在人站的那一格的上面一格，那一格是瞭望台口沿那一圈；Minecraft 找准星点中的方块是一格一格往前走、每一格只问那一格自己的轮廓
+     * （1.21.1 {@code BlockView.raycast}），这一格的轮廓往上伸也没用 —— 视线一直在上面那一格里走、从不进这一格。所以由上面那一格（口沿）把这一截
+     * 并进它自己的轮廓、点中了就把右键转给警钟（{@link LinerProp#getOutlineShape} · {@code onUse}）。别的件是空的。
+     */
+    static List<double[]> overhang(LinerProp.Kind kind) {
+        return kind == LinerProp.Kind.ALARM_BELL ? ALARM_BELL_ABOVE : List.of();
+    }
 
     // A 甲板新家具（ADR 草稿 furnish）：整件写（壁炉 · 炉上件 48 × 32、吧台 64 × 32、棕榈竖着 32 / 48），按格切 ——
     //   壁炉：炉台面 · 炉身（两侧壁柱到横楣，炉口也算进去：火里走不进去）· 壁炉台 · 台上的座钟

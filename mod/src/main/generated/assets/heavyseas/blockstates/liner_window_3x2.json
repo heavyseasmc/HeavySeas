@@ -1,0 +1,94 @@
+{
+  "variants": {
+    "col=0,facing=east,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_bl",
+      "y": 270
+    },
+    "col=0,facing=east,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tl",
+      "y": 270
+    },
+    "col=0,facing=north,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_bl",
+      "y": 180
+    },
+    "col=0,facing=north,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tl",
+      "y": 180
+    },
+    "col=0,facing=south,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_bl"
+    },
+    "col=0,facing=south,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tl"
+    },
+    "col=0,facing=west,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_bl",
+      "y": 90
+    },
+    "col=0,facing=west,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tl",
+      "y": 90
+    },
+    "col=1,facing=east,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_b",
+      "y": 270
+    },
+    "col=1,facing=east,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_t",
+      "y": 270
+    },
+    "col=1,facing=north,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_b",
+      "y": 180
+    },
+    "col=1,facing=north,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_t",
+      "y": 180
+    },
+    "col=1,facing=south,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_b"
+    },
+    "col=1,facing=south,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_t"
+    },
+    "col=1,facing=west,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_b",
+      "y": 90
+    },
+    "col=1,facing=west,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_t",
+      "y": 90
+    },
+    "col=2,facing=east,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_br",
+      "y": 270
+    },
+    "col=2,facing=east,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tr",
+      "y": 270
+    },
+    "col=2,facing=north,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_br",
+      "y": 180
+    },
+    "col=2,facing=north,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tr",
+      "y": 180
+    },
+    "col=2,facing=south,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_br"
+    },
+    "col=2,facing=south,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tr"
+    },
+    "col=2,facing=west,row=0": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_br",
+      "y": 90
+    },
+    "col=2,facing=west,row=1": {
+      "model": "heavyseas:block/liner/liner_window_3x2/glass/window_tr",
+      "y": 90
+    }
+  }
+}

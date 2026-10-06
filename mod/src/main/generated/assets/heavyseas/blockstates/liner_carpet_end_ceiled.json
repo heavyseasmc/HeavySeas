@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_carpet_end_ceiled/floor_ceiled_carpet_border_nes"
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_carpet_end_ceiled/floor_ceiled_carpet_border_new"
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_carpet_end_ceiled/floor_ceiled_carpet_border_esw"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_carpet_end_ceiled/floor_ceiled_carpet_border_nsw"
+    }
+  }
+}

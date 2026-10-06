@@ -316,16 +316,27 @@ public final class LinerBlocks {
             s -> look("cube_front", tex("front", "mahogany", "back", "wall_white")), FACING);
     public static final LinerBlock TEAK_DECK = add("liner_teak_deck", solid(MapColor.OAK_TAN), LinerBlock.Kind.DECK,
             s -> look("floor", tex("top", "teak_deck", "side", "teak_side"), s.get(AXIS) == Direction.Axis.X ? 90 : 0), AXIS);
+    // 地毯（ADR-0091，用户 2026-10-06 定「现在的花纹 + 单独的毯边」）：满铺只走花纹、不再自己收边；边是下面几件，由摆的人挑 ——
+    //   贴图就是旧地毯外圈那几张、模型不转，船上照旧铺出来逐像素相同
     public static final LinerBlock CARPET = add("liner_carpet", solid(MapColor.RED).sounds(BlockSoundGroup.WOOL), LinerBlock.Kind.CARPET,
-            s -> look("floor", tex("top", carpetTexture(s), "side", "mahogany")), NORTH, EAST, SOUTH, WEST, CELL);
+            s -> look("floor", tex("top", cellTexture(s), "side", "mahogany")), CELL);
+    public static final LinerBlock CARPET_EDGE = carpetPiece("liner_carpet_edge", "edge", false);
+    public static final LinerBlock CARPET_CORNER = carpetPiece("liner_carpet_corner", "corner", false);
+    public static final LinerBlock CARPET_RUNNER = carpetPiece("liner_carpet_runner", "runner", false);
+    public static final LinerBlock CARPET_END = carpetPiece("liner_carpet_end", "end", false);
+    public static final LinerBlock CARPET_MAT = carpetPiece("liner_carpet_mat", "mat", false);
     // 地板的「底面白平顶」版（ADR-0067 §7，用户定的倾向）：4 格的层没有自己的平顶，天花就是上一层地板的底面 ——
-    //   顶面、侧面照旧，只把底面画成平顶。地毯两版互相接（毯边只画在不挨着地毯的那几边，不管是哪一版）
+    //   顶面、侧面照旧，只把底面画成平顶。地毯的每一件都有这一版
     public static final LinerBlock TEAK_DECK_CEILED = add("liner_teak_deck_ceiled", solid(MapColor.OAK_TAN), LinerBlock.Kind.DECK,
             s -> look("floor_ceiled", tex("top", "teak_deck", "side", "teak_side", "bottom", "ceiling"),
                     s.get(AXIS) == Direction.Axis.X ? 90 : 0), AXIS);
     public static final LinerBlock CARPET_CEILED = add("liner_carpet_ceiled", solid(MapColor.RED).sounds(BlockSoundGroup.WOOL),
-            LinerBlock.Kind.CARPET, s -> look("floor_ceiled", tex("top", carpetTexture(s), "side", "mahogany", "bottom", "ceiling")),
-            NORTH, EAST, SOUTH, WEST, CELL);
+            LinerBlock.Kind.CARPET, s -> look("floor_ceiled", tex("top", cellTexture(s), "side", "mahogany", "bottom", "ceiling")), CELL);
+    public static final LinerBlock CARPET_EDGE_CEILED = carpetPiece("liner_carpet_edge_ceiled", "edge", true);
+    public static final LinerBlock CARPET_CORNER_CEILED = carpetPiece("liner_carpet_corner_ceiled", "corner", true);
+    public static final LinerBlock CARPET_RUNNER_CEILED = carpetPiece("liner_carpet_runner_ceiled", "runner", true);
+    public static final LinerBlock CARPET_END_CEILED = carpetPiece("liner_carpet_end_ceiled", "end", true);
+    public static final LinerBlock CARPET_MAT_CEILED = carpetPiece("liner_carpet_mat_ceiled", "mat", true);
 
     // ---------------------------------------------------------------- 结构层：大框（自动拼）· 护墙 · 腰线 · 檐口 · 壁柱 · 顶帽
 
@@ -430,14 +441,26 @@ public final class LinerBlocks {
         return Collections.unmodifiableMap(BLOCKS);
     }
 
-    /** 地毯这一格的那一张：四边都接着走花纹（第几格），否则画不接的那几边的毯边。 */
-    static String carpetTexture(BlockState s) {
-        String mask = LinerConnect.Rules.carpetMask(s.get(NORTH), s.get(EAST), s.get(SOUTH), s.get(WEST));
-        if (!mask.isEmpty()) {
-            return "carpet_border_" + mask;
-        }
+    /** 满铺地毯这一格的花纹：两格一个周期，第几格按位置算。 */
+    static String cellTexture(BlockState s) {
         int cell = s.get(CELL);
         return "carpet_cell_" + cell % LinerConnect.CARPET_PERIOD + cell / LinerConnect.CARPET_PERIOD;
+    }
+
+    /**
+     * 毯边件（ADR-0091）：piece 见 {@link LinerConnect.Rules#carpetBorders}，朝向只挑贴图（{@link LinerBlock.Kind#CARPET_BORDER}）；
+     * 单块小方毯四边都画，不要朝向。ceiled = 底面白平顶那一版。
+     */
+    private static LinerBlock carpetPiece(String name, String piece, boolean ceiled) {
+        Function<String, LinerLooks.Look> top = mask -> ceiled
+                ? look("floor_ceiled", tex("top", "carpet_border_" + mask, "side", "mahogany", "bottom", "ceiling"))
+                : look("floor", tex("top", "carpet_border_" + mask, "side", "mahogany"));
+        AbstractBlock.Settings settings = solid(MapColor.RED).sounds(BlockSoundGroup.WOOL);
+        if (piece.equals("mat")) {
+            return add(name, settings, LinerBlock.Kind.PLAIN, s -> top.apply(LinerConnect.Rules.carpetBorders(piece, 0)));
+        }
+        return add(name, settings, piece.equals("corner") ? LinerBlock.Kind.CARPET_CORNER : LinerBlock.Kind.CARPET_BORDER,
+                s -> top.apply(LinerConnect.Rules.carpetBorders(piece, LinerConnect.index(s.get(FACING)))), FACING);
     }
 
     /**
@@ -464,17 +487,6 @@ public final class LinerBlocks {
             case NONE -> tex("p", shaft);
             case PLINTH -> tex("p", shaft, "b", plinth);
             case SKIRTING -> tex("p", shaft, "b", plinth, "k", "skirting");
-        };
-    }
-
-    /** 地毯四边那几个属性按方向取（结构旋转时用）。 */
-    static BooleanProperty side(Direction d) {
-        return switch (d) {
-            case NORTH -> NORTH;
-            case EAST -> EAST;
-            case SOUTH -> SOUTH;
-            case WEST -> WEST;
-            default -> throw new IllegalArgumentException(d.toString());
         };
     }
 

@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=east,row=0": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_blr",
+      "y": 270
+    },
+    "facing=east,row=1": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_tlr",
+      "y": 270
+    },
+    "facing=north,row=0": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_blr",
+      "y": 180
+    },
+    "facing=north,row=1": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_tlr",
+      "y": 180
+    },
+    "facing=south,row=0": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_blr"
+    },
+    "facing=south,row=1": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_tlr"
+    },
+    "facing=west,row=0": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_blr",
+      "y": 90
+    },
+    "facing=west,row=1": {
+      "model": "heavyseas:block/liner/liner_window_1x2/glass/window_tlr",
+      "y": 90
+    }
+  }
+}

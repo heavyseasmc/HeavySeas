@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr",
+      "y": 90
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.world.liner.LinerGlass;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
@@ -15,6 +16,7 @@ import net.minecraft.client.render.model.BakedQuad;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.util.ModelIdentifier;
 import net.minecraft.client.util.SpriteIdentifier;
+import net.minecraft.registry.Registries;
 import net.minecraft.screen.PlayerScreenHandler;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.Identifier;
@@ -84,8 +86,8 @@ public final class GlassGlow extends ForwardingBakedModel {
         }
         return switch (id.id().getPath()) {
             case "liner_porthole_black", "liner_porthole_white" -> Kind.PORTHOLE;
-            case "liner_window" -> Kind.WINDOW;
-            default -> null;
+            // 整扇窗（ADR-0091）九种尺寸，按方块认：liner_window_<宽>x<高>
+            default -> Registries.BLOCK.get(id.id()) instanceof LinerGlass.Window ? Kind.WINDOW : null;
         };
     }
 

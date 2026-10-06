@@ -1,5 +1,5 @@
 {
-  "parent": "heavyseas:block/liner/liner_window/glass/window_tblr",
+  "parent": "heavyseas:block/liner/liner_carpet_edge/floor_carpet_border_s",
   "display": {
     "gui": {
       "rotation": [

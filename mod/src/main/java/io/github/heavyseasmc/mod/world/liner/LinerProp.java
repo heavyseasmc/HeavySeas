@@ -24,6 +24,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
@@ -376,6 +377,8 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
     private final EnumProperty<Part> part;
     private final Map<BlockState, VoxelShape> shapes = new ConcurrentHashMap<>();
     private final Map<BlockState, VoxelShape> collisions = new ConcurrentHashMap<>();
+    /** 这一件伸进正上方那一格的那一截（{@link LinerPropShapes#overhang}，按这一件的方块状态转好朝向；只有警钟有）。 */
+    private final Map<BlockState, VoxelShape> overhangs = new ConcurrentHashMap<>();
 
     static LinerProp create(AbstractBlock.Settings settings, Spec spec) {
         PENDING.set(spec);
@@ -813,6 +816,15 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
      */
     @Override
     protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
+        // C3 第三轮打磨：瞭望台口沿这一格里点中的是底下警钟伸上来的钟身（overhangBelow）→ 这一下右键交给警钟自己（同一条路：只响、不开局）
+        if (spec.kind() == Kind.LOOKOUT_RIM) {
+            BlockPos down = pos.down();
+            VoxelShape bell = overhangBelow(world, pos);
+            if (bell != null && inside(bell, hit.getPos().subtract(pos.getX(), pos.getY(), pos.getZ()))) {
+                BlockState below = world.getBlockState(down);
+                return ((LinerProp) below.getBlock()).onUse(below, world, down, player, hit.withBlockPos(down));
+            }
+        }
         // C3 第二轮 · c3-deck：躺椅坐 · 空心桅杆的门开关 · 警钟只响（走哪条由 Rules.use 定；单测守住「只有开航钟走 DrillSkiff」）
         switch (Rules.use(spec.kind())) {
             case SIT -> {
@@ -929,7 +941,35 @@ public final class LinerProp extends Block implements LinerLooks.Styled {
 
     @Override
     protected VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        return shapes.computeIfAbsent(state, this::shapeOf);
+        VoxelShape own = shapes.computeIfAbsent(state, this::shapeOf);
+        // C3 第三轮打磨：瞭望台口沿底下挂着警钟时，钟身那一截并进口沿这一格的轮廓（点得中整口钟；为什么不能由警钟自己伸上来见
+        //   LinerPropShapes#overhang）。只给口沿：它的碰撞箱另写（LOOKOUT_BARRIER），并进来的只是轮廓、不挡人
+        if (spec.kind() == Kind.LOOKOUT_RIM) {
+            VoxelShape bell = overhangBelow(world, pos);
+            if (bell != null) {
+                return VoxelShapes.union(own, bell);
+            }
+        }
+        return own;
+    }
+
+    /** 正下方那一格伸进这一格的那一截轮廓（{@link LinerPropShapes#overhang}：警钟的钟身）；正下方不是有这一截的件就是 null。 */
+    private static VoxelShape overhangBelow(BlockView world, BlockPos pos) {
+        BlockState below = world.getBlockState(pos.down());
+        if (!(below.getBlock() instanceof LinerProp p) || LinerPropShapes.overhang(p.spec.kind()).isEmpty()) {
+            return null;
+        }
+        return p.overhangs.computeIfAbsent(below, s -> p.shapeOf(s, LinerPropShapes.overhang(p.spec.kind())));
+    }
+
+    /** 点中的那一点（这一格的坐标，0–1）落没落在这块轮廓里（边上留 1/256 格的余量：点中的点正落在面上）。 */
+    private static boolean inside(VoxelShape shape, Vec3d p) {
+        for (Box b : shape.getBoundingBoxes()) {
+            if (b.expand(1.0 / 256).contains(p)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

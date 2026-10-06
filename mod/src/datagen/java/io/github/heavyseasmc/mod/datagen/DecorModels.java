@@ -64,9 +64,10 @@ final class DecorModels extends FabricModelProvider {
         LinerProps.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
                 name, block, s -> liner(block, s), block.getDefaultState(), false,
                 block.itemLook() == null ? null : liner(block.itemLook())));
-        // 玻璃一批（ADR-0074）：模板正面朝南，与大邮轮那一族的墙面件相同
+        // 玻璃一批（ADR-0074）：模板正面朝南，与大邮轮那一族的墙面件相同；整扇窗（ADR-0091）的物品是整扇缩小
         LinerGlass.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
-                name, block, s -> liner((LinerLooks.Styled) block, s), block.getDefaultState(), true, null));
+                name, block, s -> liner((LinerLooks.Styled) block, s), block.getDefaultState(), true,
+                ((LinerLooks.Styled) block).itemLook() == null ? null : liner(((LinerLooks.Styled) block).itemLook())));
         // 船壳板与舷窗（ADR-0069 §2）：舷窗正面朝南作画，物品栏里转半圈看正面；门（⑤）的物品是一整扇门缩小
         LinerHull.all().forEach((name, block) -> family(generator, "liner", LinerLooks.TEMPLATE_DIR, LinerLooks.TEXTURE_DIR,
                 name, block, s -> liner((LinerLooks.Styled) block, s), block.getDefaultState(), true, null));

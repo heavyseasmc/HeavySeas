@@ -1123,9 +1123,10 @@ def checkLinerBlocks = tasks.register('checkLinerBlocks') {
     inputs.files(ext.extraSources).optional()
     doLast { Task t ->
         // 大框五款走 frame("liner_frame_…") 登记，灯与家具走 prop("liner_…")（LinerProps），船壳与舷窗走 hull("liner_…")（LinerHull），
-        //   门走 door("liner_…")（LinerDoors），其余走 add("liner_…")
+        //   门走 door("liner_…")（LinerDoors），整扇窗走 window("liner_window_<宽>x<高>", …)、毯边件走 carpetPiece("liner_carpet_…", …)
+        //   （ADR-0091；名字里有数字），其余走 add("liner_…")
         checkDecorBlocks(t, [label: '大邮轮', prefix: 'liner_', dir: 'liner', blocksClass: 'LinerBlocks / LinerProps',
-                             registerPattern: /(?:add|frame|prop|glass|hull|door)\("(liner_[a-z_]+)"/, hull: false, scanTabs: false])
+                             registerPattern: /(?:add|frame|prop|glass|hull|door|window|carpetPiece)\("(liner_[a-z0-9_]+)"/, hull: false, scanTabs: false])
     }
 }
 

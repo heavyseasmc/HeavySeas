@@ -149,7 +149,8 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 大邮轮的灯与家具（ADR-0063）一律按镂空画：灯柱横担、灯罩流苏、台灯拉链是镂空片；别的件没有透明像素，按镂空画也一样
         LinerProps.all().values().forEach(b -> BlockRenderLayerMap.INSTANCE.putBlock(b, RenderLayer.getCutout()));
         // 玻璃一批（ADR-0074）：窗与穹顶玻璃是半透明的（窗 20 %、穹顶 65 %），框与肋的像素是实的 —— 同一层画
-        BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getTranslucent(), LinerGlass.WINDOW, LinerGlass.DOME_GLASS);
+        LinerGlass.windows().forEach(w -> BlockRenderLayerMap.INSTANCE.putBlock(w, RenderLayer.getTranslucent()));
+        BlockRenderLayerMap.INSTANCE.putBlock(LinerGlass.DOME_GLASS, RenderLayer.getTranslucent());
         // 舷窗与双开门有半透明的玻璃（ADR-0069 §2；要改成镂空：这一行换 getCutout()，并按 liner_hull.py 的 GLASS_MODE 重出玻璃贴图）
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getTranslucent(), LinerHull.PORTHOLE_BLACK, LinerHull.PORTHOLE_WHITE,
                 LinerHull.PORTHOLE_INNER, LinerHull.PORTHOLE_INNER_PLAIN, LinerDoors.DOUBLE);

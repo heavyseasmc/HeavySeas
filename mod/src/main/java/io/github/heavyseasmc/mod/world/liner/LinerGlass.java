@@ -9,14 +9,18 @@ import net.minecraft.block.MapColor;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.block.TransparentBlock;
 import net.minecraft.block.piston.PistonBehavior;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.sound.BlockSoundGroup;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.EnumProperty;
+import net.minecraft.state.property.IntProperty;
 import net.minecraft.util.BlockMirror;
 import net.minecraft.util.BlockRotation;
 import net.minecraft.util.Identifier;
@@ -27,30 +31,30 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
-import net.minecraft.world.WorldAccess;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldEvents;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.DOWN;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.FACING;
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.LEFT;
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.RIGHT;
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.UP;
 import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
 
 /**
  * 大邮轮的玻璃一批（ADR-0069 §5 已定：窗 W1 白漆细框 · 穹顶 D1 乳白磨砂 + 白漆主肋；做法见 ADR-0074）：
- * 无缝窗 · 穹顶玻璃 · 穹顶的肋。模板与贴图由 {@code docs/tools/scene/liner_glass.py --write} 画好入库（{@code glass/} 子目录）。
+ * 整扇窗 · 穹顶玻璃 · 穹顶的肋。模板与贴图由 {@code docs/tools/scene/liner_glass.py --write} 画好入库（{@code glass/} 子目录）。
  *
  * <ul>
- *   <li><b>无缝窗</b>：一格厚墙里的一块窗板，正面（屋里那一面）朝着摆它的人；上下左右接同一朝向的窗 —— 与大框同一条规则
- *       （{@link LinerConnect.Rules#frameMask}），框只出现在一组窗的外沿；同一朝向的窗之间不画相接的那一面。</li>
+ *   <li><b>整扇窗</b>（ADR-0091 起；之前是接邻居的「无缝窗」）：一件就是一扇宽 × 高格的完整窗，嵌在一格厚的墙里，
+ *       正面（屋里那一面）朝着摆它的人；框只在整扇外沿（与大框同一条规则 {@link LinerConnect.Rules#frameMask}）。</li>
  *   <li><b>穹顶玻璃</b>：整块，同种之间不画面（与游戏自带的玻璃同一个做法：继承 {@link TransparentBlock}）。</li>
  *   <li><b>穹顶的肋</b>：挂在穹顶玻璃下面那一格；{@link RibShape} 不看邻居，由生成器按穹顶的形状写好，玩家摆的时候按面朝方向给 X / Z。</li>
  * </ul>
@@ -125,7 +129,18 @@ public final class LinerGlass {
 
     private static final Map<String, Block> BLOCKS = new LinkedHashMap<>();
 
-    public static final Window WINDOW = glass("liner_window", new Window(settings(MapColor.OFF_WHITE)));
+    private static final List<Window> WINDOWS = new ArrayList<>();
+    // 整扇窗（ADR-0091，用户 2026-10-06 定「整扇定尺寸窗」）：宽 × 高（站在屋里看）1–3 × 1–3 九种 ——
+    //   船上用到其中六种；九种一起，十六种 mask 的模板与玻璃每一张都有尺寸在用
+    public static final Window WINDOW_1X1 = window("liner_window_1x1", 1, 1);
+    public static final Window WINDOW_1X2 = window("liner_window_1x2", 1, 2);
+    public static final Window WINDOW_1X3 = window("liner_window_1x3", 1, 3);
+    public static final Window WINDOW_2X1 = window("liner_window_2x1", 2, 1);
+    public static final Window WINDOW_2X2 = window("liner_window_2x2", 2, 2);
+    public static final Window WINDOW_2X3 = window("liner_window_2x3", 2, 3);
+    public static final Window WINDOW_3X1 = window("liner_window_3x1", 3, 1);
+    public static final Window WINDOW_3X2 = window("liner_window_3x2", 3, 2);
+    public static final Window WINDOW_3X3 = window("liner_window_3x3", 3, 3);
     public static final DomeGlass DOME_GLASS = glass("liner_dome_glass", new DomeGlass(settings(MapColor.WHITE)));
     public static final DomeRib DOME_RIB = glass("liner_dome_rib", new DomeRib(settings(MapColor.OFF_WHITE).sounds(BlockSoundGroup.WOOD)));
 
@@ -144,6 +159,21 @@ public final class LinerGlass {
     /** 全部玻璃一批，按登记顺序（批量生成工具、物品栏、客户端的半透明渲染层与判据用）。 */
     public static Map<String, Block> all() {
         return Collections.unmodifiableMap(BLOCKS);
+    }
+
+    /** 全部整扇窗，从小到大（客户端的半透明渲染层与判据用）。 */
+    public static List<Window> windows() {
+        return Collections.unmodifiableList(WINDOWS);
+    }
+
+    /** 名字照写全（构建期 checkLinerBlocks 从源码里读登记的名字）。 */
+    private static Window window(String name, int width, int height) {
+        if (!name.equals("liner_window_" + width + "x" + height)) {
+            throw new IllegalArgumentException(name + " 与尺寸 " + width + " × " + height + " 对不上");
+        }
+        Window w = glass(name, Window.create(settings(MapColor.OFF_WHITE), width, height));
+        WINDOWS.add(w);
+        return w;
     }
 
     private static <T extends Block> T glass(String name, T block) {
@@ -174,57 +204,170 @@ public final class LinerGlass {
         return shape.simplify();
     }
 
-    // ---------------------------------------------------------------- 无缝窗
+    // ---------------------------------------------------------------- 整扇窗
 
-    /** 无缝窗：朝向 + 上下左右接不接同一朝向的窗（左右按站在正面看的人算，与大框相同）。模板正面朝南。 */
+    /**
+     * 整扇窗（ADR-0091）：朝向（正面朝屋里、朝着摆它的人）+ 这一格在整扇里的第几列（站在正面看从左往右；宽 1 没有这个属性）·
+     * 第几排（从下往上；高 1 没有）。每一格的样子就是旧的「接邻居」窗拼成同样大小时那一格（框只在整扇外沿：
+     * {@link LinerConnect.Rules#frameMask}），模板正面朝南。
+     *
+     * <p>放下：点中的那一格是左下角，往右、往上摆满整扇；有一格摆不下就不放。拆：拆一格整扇一起拆（{@link #onBreak}）。
+     * 不靠邻居更新连锁拆：北辰号一 tick 摆一段，有 6 组窗跨在段与段之间，先摆的那一段会把还没摆的半扇当成断了、整扇拆掉；
+     * 这一族挖不动、炸不掉、推不动，拆只有创造模式里的玩家这一种。
+     */
     public static final class Window extends Block implements LinerLooks.Styled {
 
+        private static final IntProperty[] COLS = {null, null, IntProperty.of("col", 0, 1), IntProperty.of("col", 0, 2)};
+        private static final IntProperty[] ROWS = {null, null, IntProperty.of("row", 0, 1), IntProperty.of("row", 0, 2)};
+        /** 属性只能在构造时传进来：{@code appendProperties} 在 {@code Block} 的构造器里就被调用（同 {@link LinerBlock}）。 */
+        private static final ThreadLocal<int[]> PENDING = new ThreadLocal<>();
+
+        private final int width;
+        private final int height;
+        private final IntProperty col;
+        private final IntProperty row;
         private final Map<BlockState, VoxelShape> shapes = new java.util.concurrent.ConcurrentHashMap<>();
 
-        Window(AbstractBlock.Settings settings) {
+        static Window create(AbstractBlock.Settings settings, int width, int height) {
+            PENDING.set(new int[]{width, height});
+            try {
+                return new Window(settings, width, height);
+            } finally {
+                PENDING.remove();
+            }
+        }
+
+        private Window(AbstractBlock.Settings settings, int width, int height) {
             super(settings);
-            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH)
-                    .with(UP, false).with(DOWN, false).with(LEFT, false).with(RIGHT, false));
+            this.width = width;
+            this.height = height;
+            this.col = COLS[width];
+            this.row = ROWS[height];
+            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH));
         }
 
         @Override
         protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-            builder.add(FACING, UP, DOWN, LEFT, RIGHT);
+            int[] size = PENDING.get();
+            builder.add(FACING);
+            if (size[0] > 1) {
+                builder.add(COLS[size[0]]);
+            }
+            if (size[1] > 1) {
+                builder.add(ROWS[size[1]]);
+            }
+        }
+
+        public int width() {
+            return width;
+        }
+
+        public int height() {
+            return height;
+        }
+
+        public int col(BlockState s) {
+            return col == null ? 0 : s.get(col);
+        }
+
+        public int row(BlockState s) {
+            return row == null ? 0 : s.get(row);
+        }
+
+        /** 同一扇里 (c, r) 那一格的状态。 */
+        public BlockState cell(BlockState s, int c, int r) {
+            BlockState out = s;
+            if (col != null) {
+                out = out.with(col, c);
+            }
+            if (row != null) {
+                out = out.with(row, r);
+            }
+            return out;
+        }
+
+        /** 整扇里 (c, r) 那一格画哪几边的框：上 · 下 · 左 · 右是整扇外沿的那几边（与旧窗拼成同样大小时相同）。 */
+        public static String mask(int c, int r, int width, int height) {
+            return LinerConnect.Rules.frameMask(r < height - 1, r > 0, c > 0, c < width - 1);
+        }
+
+        /** 左下角 origin 起，往右第 c 列、往上第 r 排那一格（左右按站在正面看的人算）。 */
+        static BlockPos at(BlockPos origin, Direction facing, int c, int r) {
+            return origin.offset(LinerConnect.viewerRight(facing), c).up(r);
         }
 
         @Override
         public LinerLooks.Look look(BlockState s) {
-            String mask = LinerConnect.Rules.frameMask(s.get(UP), s.get(DOWN), s.get(LEFT), s.get(RIGHT));
-            // 反光每扇只画在左上那一格（这一格上面、左边都不接窗）：一扇窗一到两段斜纹，不论多大
-            // 玻璃每种 mask 一张：画框那几边一圈压边，左上那一格（上、左都画框）带反光 —— 一扇窗一到两段，不论多大
+            String mask = mask(col(s), row(s), width, height);
+            // 玻璃每种 mask 一张：画框那几边一圈压边，左上那一格（上、左都画框）带反光 —— 一扇窗一到两段斜纹，不论多大
             return LinerLooks.look("glass/window_" + mask, tex("frame", "glass/window_frame", "glass", "glass/window_glass_" + mask))
                     .turned(LinerBlock.yawOf(s.get(FACING)));
         }
 
+        /** 物品是整扇缩小（{@code liner_glass.py} 出 {@code glass/window_item_<宽>x<高>}，每种 mask 的玻璃各一个变量 {@code glass_<mask>}）。 */
+        @Override
+        public LinerLooks.Look itemLook() {
+            Map<String, String> t = new LinkedHashMap<>();
+            t.put("frame", "glass/window_frame");
+            for (int c = 0; c < width; c++) {
+                for (int r = 0; r < height; r++) {
+                    String m = mask(c, r, width, height);
+                    t.put("glass_" + m, "glass/window_glass_" + m);
+                }
+            }
+            return LinerLooks.look("glass/window_item_" + width + "x" + height, t);
+        }
+
         @Override
         public BlockState getPlacementState(ItemPlacementContext ctx) {
-            return connect(getDefaultState().with(FACING, ctx.getHorizontalPlayerFacing().getOpposite()), ctx.getWorld(), ctx.getBlockPos());
+            Direction facing = ctx.getHorizontalPlayerFacing().getOpposite();
+            World world = ctx.getWorld();
+            for (int c = 0; c < width; c++) {
+                for (int r = 0; r < height; r++) {
+                    BlockPos p = at(ctx.getBlockPos(), facing, c, r);
+                    if ((c > 0 || r > 0) && (world.isOutOfHeightLimit(p) || !world.getWorldBorder().contains(p)
+                            || !world.getBlockState(p).canReplace(ctx))) {
+                        return null;
+                    }
+                }
+            }
+            return getDefaultState().with(FACING, facing);
         }
 
+        /** 点中的那一格放的是左下角；其余几格在这里摆满（同游戏自带的门放上半扇）。 */
         @Override
-        protected BlockState getStateForNeighborUpdate(BlockState state, Direction direction, BlockState neighborState,
-                                                       WorldAccess world, BlockPos pos, BlockPos neighborPos) {
-            return connect(state, world, pos);
+        public void onPlaced(World world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
+            Direction f = state.get(FACING);
+            for (int c = 0; c < width; c++) {
+                for (int r = 0; r < height; r++) {
+                    if (c > 0 || r > 0) {
+                        world.setBlockState(at(pos, f, c, r), cell(state, c, r), Block.NOTIFY_ALL);
+                    }
+                }
+            }
         }
 
-        BlockState connect(BlockState s, BlockView world, BlockPos pos) {
-            Direction f = s.get(FACING);
-            return s.with(UP, same(world, pos.up(), f)).with(DOWN, same(world, pos.down(), f))
-                    .with(LEFT, same(world, pos.offset(LinerConnect.viewerLeft(f)), f))
-                    .with(RIGHT, same(world, pos.offset(LinerConnect.viewerRight(f)), f));
+        /** 拆一格整扇一起拆：只拆认得出是同一扇的那几格（同一种、同一朝向、列 · 排对得上）。 */
+        @Override
+        public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
+            if (!world.isClient) {
+                Direction f = state.get(FACING);
+                BlockPos origin = at(pos, f, -col(state), -row(state));
+                for (int c = 0; c < width; c++) {
+                    for (int r = 0; r < height; r++) {
+                        BlockPos p = at(origin, f, c, r);
+                        BlockState o = world.getBlockState(p);
+                        if (!p.equals(pos) && o.isOf(this) && o.get(FACING) == f && col(o) == c && row(o) == r) {
+                            world.setBlockState(p, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL | Block.SKIP_DROPS);
+                            world.syncWorldEvent(player, WorldEvents.BLOCK_BROKEN, p, Block.getRawIdFromState(o));
+                        }
+                    }
+                }
+            }
+            return super.onBreak(world, pos, state, player);
         }
 
-        private boolean same(BlockView world, BlockPos pos, Direction facing) {
-            BlockState other = world.getBlockState(pos);
-            return other.isOf(this) && other.get(FACING) == facing;
-        }
-
-        /** 同一朝向的窗挨着：相接那一面（框条的端面）不画 —— 框条接着往下一格走。 */
+        /** 同一朝向的窗挨着：相接那一面（框条的端面）不画 —— 只有整扇里面那几边写了这种面（模板里的 cullface）。 */
         @Override
         protected boolean isSideInvisible(BlockState state, BlockState stateFrom, Direction direction) {
             return stateFrom.isOf(this) && stateFrom.get(FACING) == state.get(FACING) || super.isSideInvisible(state, stateFrom, direction);
@@ -251,18 +394,20 @@ public final class LinerGlass {
             return true;
         }
 
+        /** 转：列 · 排按站在正面看的人算，跟着朝向一起转，不用换。 */
         @Override
         protected BlockState rotate(BlockState state, BlockRotation rotation) {
             return state.with(FACING, rotation.rotate(state.get(FACING)));
         }
 
-        /** 镜像：朝向照游戏自带的做法转，左右对调（放下之后邻居一更新会重算，这里先换对）。 */
+        /** 镜像：朝向照游戏自带的做法转；左右对调，所以列从另一头数。 */
         @Override
         protected BlockState mirror(BlockState state, BlockMirror mirror) {
             if (mirror == BlockMirror.NONE) {
                 return state;
             }
-            return state.rotate(mirror.getRotation(state.get(FACING))).with(LEFT, state.get(RIGHT)).with(RIGHT, state.get(LEFT));
+            BlockState s = state.rotate(mirror.getRotation(state.get(FACING)));
+            return col == null ? s : s.with(col, width - 1 - state.get(col));
         }
     }
 

@@ -34,23 +34,19 @@ import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CASING_PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CELL;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.CORNER;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.DOWN;
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.EAST;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.END;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.FACING;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.IVY;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.LAYOUT;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.LEFT;
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.NORTH;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.PART;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.RIGHT;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.ROW;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SHAPE;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SIDE;
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.SOUTH;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.TRIM;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.UP;
 import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.V;
-import static io.github.heavyseasmc.mod.world.liner.LinerBlocks.WEST;
 
 /**
  * 大邮轮的一件装饰方块（ADR-0062）。一个类管全部：每种方块有自己的一组属性、一种摆法（{@link Kind}），
@@ -91,8 +87,15 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         CASING,
         /** 甲板：板顺着摆它的人面朝的方向。 */
         DECK,
-        /** 地毯：四边接不接地毯、花纹第几格。 */
+        /** 满铺地毯：花纹第几格按位置算，不画毯边（ADR-0091：毯边是单独的几件，不再看邻居）。 */
         CARPET,
+        /**
+         * 毯边件（ADR-0091）：毯边 · 一格宽的长条 · 长条端头，边朝着摆它的人（{@link LinerConnect.Rules#carpetBorders}）。
+         * 朝向只用来挑贴图、模型不转：毯边贴图的绒毛不是旋转对称的，转了就与旧地毯那一张不再逐像素相同。
+         */
+        CARPET_BORDER,
+        /** 毯边转角（ADR-0091）：同上；两条边落在摆它的人那一侧的斜对角（{@link LinerConnect.Rules#carpetCorner}）。 */
+        CARPET_CORNER,
         /**
          * 格架（ADR-0080 §7）：同挂墙的件；框条看上下左右（同大框）· 屋角补旁边那面墙（{@link LinerConnect.Rules#trellisCorner}）·
          * 常春藤中段 / 藤梢看上面那一格、布局与拐法按位置算。常春藤是叠上去的另一层（{@link #layers}）。
@@ -137,11 +140,15 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         return kind;
     }
 
-    /** 这个状态的样子，朝向已经算进 y 旋转里（模板一律正面朝南作画）。 */
+    /** 这个状态的样子，朝向已经算进 y 旋转里（模板一律正面朝南作画）；毯边件的朝向只挑贴图、不转模型。 */
     @Override
     public LinerLooks.Look look(BlockState state) {
         LinerLooks.Look base = look.apply(state);
-        return state.contains(FACING) ? base.turned(yawOf(state.get(FACING))) : base;
+        return state.contains(FACING) && !carpetPiece(kind) ? base.turned(yawOf(state.get(FACING))) : base;
+    }
+
+    static boolean carpetPiece(Kind kind) {
+        return kind == Kind.CARPET_BORDER || kind == Kind.CARPET_CORNER;
     }
 
     /** 格架上的常春藤是叠上去的一层（多部件模型）：只看朝向与藤的三个属性；底层（框条 · 内角）不看藤。 */
@@ -202,6 +209,10 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
                     }
                 }
             }
+            if (kind == Kind.CARPET_CORNER) {
+                double yaw = Math.toRadians(ctx.getPlayerYaw());
+                facing = LinerConnect.direction(LinerConnect.Rules.carpetCorner(-Math.sin(yaw), Math.cos(yaw)));
+            }
             s = s.with(FACING, facing);
         }
         if (s.contains(AXIS)) {
@@ -260,10 +271,8 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
                 return s.with(SHAPE, LinerBlocks.CornerShape.of(shape));
             }
             case CARPET -> {
-                // 两版地毯（底面木色 · 底面白平顶）互相接：毯边只画在不挨着地毯的那几边
-                return s.with(NORTH, isCarpet(world, pos.north())).with(EAST, isCarpet(world, pos.east()))
-                        .with(SOUTH, isCarpet(world, pos.south())).with(WEST, isCarpet(world, pos.west()))
-                        .with(CELL, LinerConnect.Rules.cell(pos.getX(), pos.getZ(), LinerConnect.CARPET_PERIOD));
+                // 满铺只看位置（花纹两格一个周期）；毯边是单独的几件（ADR-0091），不看邻居
+                return s.with(CELL, LinerConnect.Rules.cell(pos.getX(), pos.getZ(), LinerConnect.CARPET_PERIOD));
             }
             case WALL_PIECE, PILASTER_SIDE -> {
                 if (!s.contains(BASE)) {
@@ -340,10 +349,6 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         return state.isOf(LinerBlocks.SKIRTING) && state.get(FACING) == facing;
     }
 
-    private static boolean isCarpet(BlockView world, BlockPos pos) {
-        return world.getBlockState(pos).getBlock() instanceof LinerBlock b && b.kind == Kind.CARPET;
-    }
-
     /** 那一格是同一种方块、同一朝向。 */
     private boolean same(BlockView world, BlockPos pos, Direction facing) {
         BlockState other = world.getBlockState(pos);
@@ -385,27 +390,17 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
     }
 
     /**
-     * 结构整体旋转时转朝向与地毯的四边；左右、两头、花纹第几格不在这里换 —— 放下之后邻居一更新就按位置重算
+     * 结构整体旋转时转朝向（毯边件的边跟着朝向走，一起转对）；左右、两头、花纹第几格不在这里换 —— 放下之后邻居一更新就按位置重算
      * （「放下以后连不连」留给游戏内实测，ADR-0062 §3 步骤 5）。
      */
     @Override
     protected BlockState rotate(BlockState state, BlockRotation rotation) {
-        BlockState s = state;
-        if (s.contains(FACING)) {
-            s = s.with(FACING, rotation.rotate(s.get(FACING)));
-        }
-        if (s.contains(NORTH)) {
-            s = s.with(LinerBlocks.side(rotation.rotate(Direction.NORTH)), state.get(NORTH))
-                    .with(LinerBlocks.side(rotation.rotate(Direction.EAST)), state.get(EAST))
-                    .with(LinerBlocks.side(rotation.rotate(Direction.SOUTH)), state.get(SOUTH))
-                    .with(LinerBlocks.side(rotation.rotate(Direction.WEST)), state.get(WEST));
-        }
-        return s;
+        return state.contains(FACING) ? state.with(FACING, rotation.rotate(state.get(FACING))) : state;
     }
 
     /**
      * 镜像：朝向照游戏自带的做法转；镜像还会把左右对调（转不会）—— 大框左右的接缝、木壁柱靠哪边、顶帽哪一头、
-     * 拐角的左右、地毯的四边都跟着换。看邻居的那几样放下去之后会重算，靠哪边的木壁柱不会，第一版漏了它。
+     * 拐角的左右、毯边转角朝哪都跟着换。看邻居的那几样放下去之后会重算，靠哪边的木壁柱不会，第一版漏了它。
      */
     @Override
     protected BlockState mirror(BlockState state, BlockMirror mirror) {
@@ -437,10 +432,8 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
         if (s.contains(ARCH_PART)) {
             s = s.with(ARCH_PART, state.get(ARCH_PART).mirrored());
         }
-        if (s.contains(NORTH)) {
-            for (Direction d : new Direction[]{Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST}) {
-                s = s.with(LinerBlocks.side(mirror.apply(d)), state.get(LinerBlocks.side(d)));
-            }
+        if (kind == Kind.CARPET_CORNER) {
+            s = s.with(FACING, LinerConnect.direction(LinerConnect.Rules.carpetCornerAfterMirror(LinerConnect.index(s.get(FACING)))));
         }
         return s;
     }

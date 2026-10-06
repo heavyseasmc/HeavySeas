@@ -60,4 +60,26 @@ final class LinerGlassRulesTest {
         }
         assertTrue(seen.size() == 34, "34 种都查到了");
     }
+
+    /** 整扇窗（ADR-0091）：每一格画哪几边的框只看它在整扇里的位置 —— 框只在整扇外沿，单格四边都画。 */
+    @Test
+    void wholeWindowFramesOnlyItsOuterEdge() {
+        assertEquals("tblr", LinerGlass.Window.mask(0, 0, 1, 1), "1 × 1：四边都画");
+        assertEquals("bl", LinerGlass.Window.mask(0, 0, 3, 3), "左下角");
+        assertEquals("c", LinerGlass.Window.mask(1, 1, 3, 3), "3 × 3 正中：一条框都没有");
+        assertEquals("tr", LinerGlass.Window.mask(1, 2, 2, 3), "2 × 3 右上角");
+        for (int w = 1; w <= 3; w++) {
+            for (int h = 1; h <= 3; h++) {
+                for (int c = 0; c < w; c++) {
+                    for (int r = 0; r < h; r++) {
+                        String m = LinerGlass.Window.mask(c, r, w, h);
+                        assertEquals(r == h - 1, m.contains("t"), w + "×" + h + " (" + c + "," + r + ") 上框");
+                        assertEquals(r == 0, m.contains("b"), w + "×" + h + " (" + c + "," + r + ") 下框");
+                        assertEquals(c == 0, m.contains("l"), w + "×" + h + " (" + c + "," + r + ") 左框");
+                        assertEquals(c == w - 1, m.contains("r"), w + "×" + h + " (" + c + "," + r + ") 右框");
+                    }
+                }
+            }
+        }
+    }
 }
