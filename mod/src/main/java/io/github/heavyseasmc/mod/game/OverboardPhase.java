@@ -9,7 +9,8 @@ import net.minecraft.text.Text;
 
 /** Each fall has its own authoritative intervention deadline. */
 public final class OverboardPhase {
-    public static final long CHOOSE_MILLIS = 12_000L;
+    /** 12 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    public static final long CHOOSE_MILLIS = 20_000L;
 
     private OverboardPhase() {
     }

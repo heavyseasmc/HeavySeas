@@ -389,12 +389,71 @@ public final class ActionPhase {
     public static void autoPass(ServerWorld world, GameComponent component, CharacterId dummy) {
         Session session = component.requireSession();
         if (!component.dummyAutoplay() || session.state().phase() != Phase.ACTION || session.rower().isPresent()
+                || session.contest().isPresent() || component.designating().isPresent()
                 || !session.nextActor().map(dummy::equals).orElse(false)) {
             return;
         }
+        if (component.dummyRandom()) {
+            StandInPlay.takeTurn(world, component, dummy);   // 演示局：随机做一件事（用户 2026-10-07）
+            return;
+        }
+        passForStandIn(world, component, dummy);
+    }
+
+    /** 替身「什么也不做」：自动推进的默认，也是随机行动里那一格与被拒之后的退路。 */
+    static void passForStandIn(ServerWorld world, GameComponent component, CharacterId dummy) {
         GameFlow.broadcast(world, Text.translatable("heavyseas.command.passed", GameFlow.characterName(dummy)));
         LOGGER.info("行动（替身自动）：{} 什么也不做", dummy.value());
         GameFlow.finishAction(world, component, dummy);
+    }
+
+    /**
+     * 替身划船（{@link StandInPlay}）：抽 2 张、随机留 1 张，一次走完。播报与收尾与真人那条路相同（{@link #finishRow}）。
+     *
+     * @return 划了没有（风平浪静没有航海阶段时引擎会拒，那时返回前什么都没动）
+     */
+    static boolean rowForStandIn(ServerWorld world, GameComponent component, CharacterId who, java.util.Random rng) {
+        Session session = component.requireSession();
+        List<NavigationCard> drawn = session.row(who, (cards, state, rower) -> rng.nextInt(cards.size()));
+        GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
+        LOGGER.info("划船（替身随机）：{} 抽了 {} 张，随机留一张", who.value(), drawn.size());
+        finishRow(world, component, who);
+        return true;
+    }
+
+    /**
+     * 替身打一张特殊行动牌（{@link StandInPlay}）。与界面那条路同一套处理器（{@link #useUntargeted}）；
+     * 医疗箱治第一个受了伤、还活着的人（模拟器同一条），不进挑目标那一面。
+     *
+     * @return 前提满足、真的打出去了吗（没人受伤 · 伞已撑开 · 绝境没有尸体，都返回 {@code false} 且什么都没动）
+     */
+    static boolean playForStandIn(ServerWorld world, GameComponent component, CharacterId actor, String cardId) {
+        Session session = component.requireSession();
+        var g = session.state();
+        ProvisionEffect effect = session.provisions().get(cardId).effect();
+        if (effect instanceof ProvisionEffect.Heal) {
+            Optional<CharacterId> target = g.bySeat().stream()
+                    .filter(id -> !g.isRemoved(id) && g.conditionOf(id) != Condition.DEAD && g.stateOf(id).damage() > 0)
+                    .findFirst();
+            if (target.isEmpty()) {
+                return false;
+            }
+            session.useMedicalKit(actor, target.get(), cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.healed",
+                    GameFlow.characterName(actor), GameFlow.characterName(target.get())));
+            LOGGER.info("特殊物资（替身随机）：{} 用 {} 治了 {}", actor.value(), cardId, target.get().value());
+            GameFlow.finishAction(world, component, actor);
+            return true;
+        }
+        if (effect instanceof ProvisionEffect.PreventThirst && g.stateOf(actor).isOpen(cardId)) {
+            return false;                     // 已经撑开了，再撑一次只是白花一个行动
+        }
+        if (effect instanceof ProvisionEffect.HealAll heal && heal.requiresCorpse()
+                && g.onBoatBySeat().stream().noneMatch(id -> g.conditionOf(id) == Condition.DEAD)) {
+            return false;
+        }
+        useUntargeted(world, component, actor, cardId, effect);
+        return true;
     }
 
     /**

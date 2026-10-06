@@ -121,6 +121,10 @@ public final class RosterScreen extends GameScreen {
         List<Box> all = new ArrayList<>(chips);
         all.addAll(tail);
         boxes = all;
+        // 停在头像上看这个人的本事（用户 2026-10-07：「全靠脑子记记不住」）—— 挑阵容时最要紧
+        for (int i = 0; i < n; i++) {
+            addDetail(chips.get(i), characterDetail(config.characters().get(i)));
+        }
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
         if (mouseActuallyMoved(mouseX, mouseY)) {

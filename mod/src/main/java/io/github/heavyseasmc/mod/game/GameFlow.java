@@ -274,7 +274,9 @@ public final class GameFlow {
             if (who.isDummy() && component.dummyAutoplay()) {
                 CharacterId dummy = actor.get();
                 // ❗排到下一 tick，不当场做：当场做的话，全是替身的一局会在这一次调用里递归打完（ADR-0019 §1）。
-                schedule(component, 0L, "替身 " + dummy.value() + " 什么也不做",
+                //   随机行动开着时再停一拍（StandInPlay.beat）：替身一个接一个当场动完，真人跟不上。
+                schedule(component, component.dummyRandom() ? StandInPlay.beat(component) : 0L,
+                        "替身 " + dummy.value() + (component.dummyRandom() ? " 随机行动" : " 什么也不做"),
                         () -> ActionPhase.autoPass(world, component, dummy));
             }
             return;

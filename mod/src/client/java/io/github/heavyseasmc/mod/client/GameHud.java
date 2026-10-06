@@ -65,6 +65,8 @@ public final class GameHud {
     private static final double HEAD_SPACING = 4;
     /** 展开时日志最多几条（样张 b-2 是四条），每条最多折两行。 */
     private static final int LOG_ENTRIES = 4;
+    /** 钉住（L）时一屏最多几条：放得下就多给，放不下照旧从最旧的往回减；再早的靠滚轮翻（用户 2026-10-07）。 */
+    private static final int PINNED_LOG_ENTRIES = 12;
     private static final int LOG_LINES_PER_ENTRY = 2;
     /** 效果说明签最多几行。 */
     private static final int TIP_LINES = 3;
@@ -441,16 +443,68 @@ public final class GameHud {
                     box, textPx, false, GuiLanguage.Hud.ENAMEL_LINE, TIP_LINES, l.len(HudLayout.TIP_LINE));
             y += HudLayout.DRAWER_GAP - HudLayout.TIP_OVERLAP + h;
         }
-        drawLog(context, l, view, now, y, scale, maxEntries);
+        // 钉住时多一块「只有你看得到」的爱恨（用户 2026-10-07：「爱恨提示不能只在手牌页面，L 菜单也放一个」）。
+        // 只在钉住时给：自己滑出来那一下是播报，不是摊开自己的底牌。
+        if (SidebarReveal.pinned() && view.seated() && !view.love().isEmpty()) {
+            y += drawSecret(context, l, view, y) + HudLayout.DRAWER_GAP;
+        }
+        drawLog(context, l, view, now, y, scale, SidebarReveal.pinned() ? PINNED_LOG_ENTRIES : maxEntries);
+    }
+
+    /**
+     * 「只有你看得到」的爱与恨（与手牌一面右上那一块同一个画法，样张 .secret）：眼睛 + 小标题；爱（朱砂的心）· 恨（碎心）各一行，
+     * 头像 38 + 名字。
+     *
+     * @return 这一块占了多高（稿子像素），调用方往下排日志
+     */
+    private static double drawSecret(DrawContext context, HudLayout l, HudView view, double aboveBottom) {
+        double k = l.k();
+        double headDesign = 13 * 1.75;
+        double rowDesign = 44;
+        double hDesign = 12 + headDesign + 8 + 2 * rowDesign + 14;
+        Rect box = l.drawerBlock(aboveBottom, 0, hDesign);
+        int ink = GuiLanguage.Hud.ENAMEL_LINE;
+        GuiMaterial.hudPart(context, HudPart.ENAMEL, box.x(), box.y(), box.w(), box.h(), k);
+        int tx = box.x() + l.len(16);
+        int y = box.y() + l.len(12);
+        int headH = l.len(headDesign);
+        int icon = l.len(24);
+        GuiMaterial.hudIcon(context, HudPart.IC_EYE, tx, y + (headH - icon) / 2, icon, icon,
+                GuiLanguage.Hud.alpha(ink, 0.8f), k);
+        int headPx = l.len(13);
+        GuiText.drawPx(context, Text.translatable("heavyseas.hand.secret").getString(), tx + icon + l.len(8),
+                y + (headH - GuiText.linePxAt(headPx, false)) / 2, box.w() - icon - l.len(40), headPx, false,
+                GuiLanguage.Hud.alpha(ink, 0.8f), GuiText.Align.LEFT, l.len(3));
+        y += headH + l.len(8);
+        String[] who = {view.love(), view.hate()};
+        HudPart[] mark = {HudPart.IC_HEART, HudPart.IC_HATE};
+        int[] color = {GuiLanguage.Hud.LOG_CINNABAR, ink};
+        int rowH = l.len(rowDesign);
+        int tok = l.len(38);
+        int namePx = l.len(17);
+        for (int i = 0; i < 2; i++) {
+            int cy = y + rowH / 2;
+            GuiMaterial.hudIcon(context, mark[i], tx, cy - icon / 2, icon, icon, color[i], k);
+            int tokX = tx + icon + l.len(10);
+            GuiMaterial.portrait(context, who[i], tokX, cy - tok / 2, tok, 1f);
+            GuiMaterial.hudPart(context, HudPart.TOK38_PLAIN, tokX, cy - tok / 2, tok, tok, k);
+            GuiText.drawPx(context, Text.translatable("heavyseas.character." + who[i]).getString(), tokX + tok + l.len(10),
+                    cy - GuiText.linePxAt(namePx, false) / 2, box.right() - (tokX + tok + l.len(10)) - l.len(12), namePx,
+                    false, ink, GuiText.Align.LEFT, 0);
+            y += rowH;
+        }
+        return hDesign;
     }
 
     /** 航海日志（样张 b-2 的 .log）：栏头「航海日志 · 第几天」+ 图钉 + 日志键，下面最新的几条，最底下一道自动收回的短横。 */
     private static void drawLog(DrawContext context, HudLayout l, HudView view, long now, double aboveBottom, int scale,
                                 int maxEntries) {
-        List<Text> notes = view.notifications();
+        // 这一局客户端自己记下的那一本（往回翻要它：投影只留最新八条）；还没记下任何一条时退回投影
+        List<Text> notes = SidebarReveal.history().isEmpty() ? view.notifications() : SidebarReveal.history();
         if (notes.isEmpty()) {
             return;
         }
+        int skip = Math.min(SidebarReveal.scroll(), notes.size() - 1);
         double k = l.k();
         int textPx = l.len(HudLayout.LOG_TEXT);
         int labelPx = l.len(HudLayout.LOG_HEAD_TEXT);
@@ -462,7 +516,7 @@ public final class GameHud {
         // 最新的在最上；最近一批标「刚刚」、不压淡，更早的标类别、压淡（样张 .log .old）
         int batch = Math.max(1, SidebarReveal.lastBatch());
         List<Entry> entries = new ArrayList<>();
-        for (int i = notes.size() - 1; i >= 0 && entries.size() < maxEntries; i--) {
+        for (int i = notes.size() - 1 - skip; i >= 0 && entries.size() < maxEntries; i--) {
             Text note = notes.get(i);
             int age = notes.size() - 1 - i;
             boolean fresh = age < batch;
@@ -521,6 +575,19 @@ public final class GameHud {
             GuiText.paragraphPx(context, e.note().getString(), log.x() + textX0, y, textBox, textPx, false, color,
                     LOG_LINES_PER_ENTRY, lineStep);
             y += e.lines() * lineStep;
+        }
+        // 钉住而且一屏放不下这一局的全部：右边一道细的滚动条（最新在上，往回翻 = 滑块往下走），看得出还有、翻到了哪儿
+        if (SidebarReveal.pinned() && notes.size() > entries.size()) {
+            int trackTop = headTop + headH + l.len(HudLayout.LOG_HEAD_GAP);
+            int trackH = Math.max(1, y - trackTop);
+            int barW = Math.max(1, l.len(3));
+            int barX = log.right() - l.len(7);
+            context.fill(barX, trackTop, barX + barW, trackTop + trackH, GuiLanguage.Hud.alpha(line, 0.15f));
+            int hidden = notes.size() - entries.size();
+            int thumbH = Math.max(l.len(12), trackH * entries.size() / notes.size());
+            int thumbTop = trackTop + (int) ((long) (trackH - thumbH) * Math.min(skip, hidden) / hidden);
+            context.fill(barX, thumbTop, barX + barW, Math.min(trackTop + trackH, thumbTop + thumbH),
+                    GuiLanguage.Hud.alpha(line, 0.6f));
         }
         if (autoclose) {
             int barW = Math.round(l.len(HudLayout.DRAWER_W - 2 * HudLayout.LOG_PAD_X) * SidebarReveal.remaining(now));
@@ -620,6 +687,21 @@ public final class GameHud {
         matrices.scale(1f / scale, 1f / scale, 1f);
         drawDrawer(context, layout, view, now, scale, LOG_ENTRIES);
         matrices.pop();
+    }
+
+    /**
+     * 主画面（没开界面）里的滚轮：对局中、航海日志钉住（L）时翻日志，吃掉这一下（{@code MouseScrollMixin}）。
+     * 对局中背包托管清空（{@code MistSea}），快捷栏换格本来就没有意义；没钉住时照 Minecraft 的默认。
+     *
+     * @return 这一下用掉了没有
+     */
+    public static boolean scrollLog(double vertical) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.currentScreen != null || vertical == 0 || !SidebarReveal.pinned() || !voyageHud()) {
+            return false;
+        }
+        SidebarReveal.scroll(vertical);
+        return true;
     }
 
     /** GameScreen 与实际绘制共用这一份几何；两边各算一遍仍会得到完全相同的边界。 */

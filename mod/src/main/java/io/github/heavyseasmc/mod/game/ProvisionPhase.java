@@ -37,6 +37,14 @@ public final class ProvisionPhase {
     /** 决策 ⑨：倒计时按剩余牌数缩放，N 张 = N×2 秒。 */
     public static final long MILLIS_PER_CARD = 2000L;
 
+    /** 但不少于 20 秒：只剩两三张时只有四五秒，读不完牌（用户 2026-10-07：决策窗口一律至少 20 秒）。 */
+    public static final long MIN_MILLIS = 20_000L;
+
+    /** 这一手 {@code cards} 张的窗口多长。服务端定时限、客户端画倒计时都用它 —— 两边各算一遍就会分家。 */
+    public static long windowMillis(int cards) {
+        return Math.max(MIN_MILLIS, Math.max(1, cards) * MILLIS_PER_CARD);
+    }
+
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
     private ProvisionPhase() {
@@ -207,7 +215,7 @@ public final class ProvisionPhase {
     }
 
     private static void armDeadline(GameComponent component, int cards) {
-        component.setProvisionDeadline(System.currentTimeMillis() + cards * MILLIS_PER_CARD);
+        component.setProvisionDeadline(System.currentTimeMillis() + windowMillis(cards));
         component.setProvisionHighlight(0);
     }
 

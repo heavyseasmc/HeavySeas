@@ -266,6 +266,37 @@ public final class Rulebook {
         return out;
     }
 
+    /**
+     * 书里写在 {@code @指令 id} 底下的那几行，换成纯文字：列表项前面换成「· 」，{@code **} 去掉，空行跳过。
+     * 到下一个 {@code @} 指令或 {@code #} 标题为止。
+     *
+     * <p>对局界面里头像上的说明签用它（用户 2026-10-07：「鼠标移动到角色头像上是浮窗气泡显示角色介绍，全靠脑子记记不住」）——
+     * 说明与书同一个文字源头，不在 lang 里另抄一份：两份迟早分家，而分家之后两边都「看着没错」。
+     *
+     * @return 找不到这个 id 时是空表（调用方自己决定没有说明时怎么办）
+     */
+    public static List<String> notesUnder(String source, String directive, String id) {
+        List<String> out = new ArrayList<>();
+        boolean in = false;
+        for (String raw : source.split("\n")) {
+            String line = raw.strip();
+            Matcher d = DIRECTIVE.matcher(line);
+            if (d.matches() || line.startsWith("#")) {
+                if (in) {
+                    break;
+                }
+                in = d.matches() && d.group(1).equals(directive) && d.group(2) != null && d.group(2).strip().equals(id);
+                continue;
+            }
+            if (!in || line.isEmpty()) {
+                continue;
+            }
+            String text = line.startsWith("- ") ? "· " + line.substring(2).strip() : line;
+            out.add(text.replace("**", ""));
+        }
+        return out;
+    }
+
     /** 整本书里出现过的 {@code @指令 id}（单测核对「每张牌、每个人都写到了」用）。 */
     public static List<String> directiveIds(String source, String directive) {
         List<String> ids = new ArrayList<>();

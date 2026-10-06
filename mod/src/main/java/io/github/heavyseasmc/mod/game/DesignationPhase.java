@@ -36,8 +36,8 @@ import java.util.Optional;
  */
 public final class DesignationPhase {
 
-    /** 举着拳头找人的时间。到点算 Pass（ADR-0025 §7.6 说明了与决策 ⑦ 的出入）。 */
-    public static final long WINDOW_MILLIS = 15_000L;
+    /** 举着拳头找人的时间。到点算 Pass（ADR-0025 §7.6 说明了与决策 ⑦ 的出入）。15 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    public static final long WINDOW_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -89,7 +89,9 @@ public final class DesignationPhase {
         if (me.isEmpty() || !me.get().equals(who.get())) {
             return ActionResult.PASS;         // 举着拳头的不是他：这一下与我们无关
         }
-        Optional<CharacterId> picked = component.seatOf(target.getUuid());
+        // 真人按玩家认；替身按它坐着的那具人形认（StandInBodies，用户 2026-10-07：「抢夺也不能抢人」—— 替身原先没有身体，点不到）
+        Optional<CharacterId> picked = component.seatOf(target.getUuid())
+                .or(() -> io.github.heavyseasmc.mod.world.StandInBodies.characterOf(world, target));
         if (picked.isEmpty()) {
             // 点到了船外的东西（路过的牛、旁观者）。吃掉这一下并说一句 ——
             // 不说的话，玩家会以为自己点中了，然后干等 15 秒。

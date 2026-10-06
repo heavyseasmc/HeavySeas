@@ -46,8 +46,8 @@ import java.util.Optional;
  */
 public final class ThirstPhase {
 
-    /** 每个人的决定时限。与舵手挑牌同一个数：都是「看一眼就能答」的决定。 */
-    public static final long CHOOSE_MILLIS = 12_000L;
+    /** 每个人的决定时限。与舵手挑牌同一个数：都是「看一眼就能答」的决定。12 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    public static final long CHOOSE_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 

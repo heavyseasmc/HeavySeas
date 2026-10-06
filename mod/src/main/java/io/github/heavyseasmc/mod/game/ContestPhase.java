@@ -42,23 +42,23 @@ import java.util.Optional;
  */
 public final class ContestPhase {
 
-    /** 被指定的人表态：同意还是战斗。超时 = 同意。 */
-    public static final long CONSENT_MILLIS = 12_000L;
+    /** 被指定的人表态：同意还是战斗。超时 = 同意。12 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    public static final long CONSENT_MILLIS = 20_000L;
 
-    /** 站队段。 */
-    public static final long STANCE_MILLIS = 15_000L;
+    /** 站队段。15 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    public static final long STANCE_MILLIS = 20_000L;
 
     /** 有人加入之后剩下的时间。 */
     public static final long STANCE_BUMP_MILLIS = 8_000L;
 
-    /** 挂武器段。 */
-    public static final long WEAPON_MILLIS = 10_000L;
+    /** 挂武器段。10 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    public static final long WEAPON_MILLIS = 20_000L;
 
     /** 有人押下之后剩下的时间。 */
     public static final long WEAPON_BUMP_MILLIS = 6_000L;
 
-    /** 抢夺方挑牌。超时 = 手牌随机一张（手上没有就取面前第一张）。 */
-    public static final long PICK_MILLIS = 12_000L;
+    /** 抢夺方挑牌。超时 = 手牌随机一张（手上没有就取面前第一张）。12 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    public static final long PICK_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -405,17 +405,31 @@ public final class ContestPhase {
                              Text who, boolean human) {
         if (!human) {
             component.clearContest();
-            GameFlow.schedule(component, 0L, "这一场：没人要等，按默认往下走",
-                    () -> advanceWithoutHumans(world, component));
+            // 随机行动开着时这一步也停一拍（慢档 1.5 秒）：表态、挑牌一步一步看得见（用户 2026-10-07「demo 玩家不要出牌太快」）
+            GameFlow.schedule(component, randomStandIns(component) ? StandInPlay.step(component) : 0L,
+                    "这一场：没人要等，按默认往下走", () -> advanceWithoutHumans(world, component));
             return;
         }
         component.openContestWindow(millis);
         GameFlow.broadcast(world, who == null
                 ? Text.translatable(key, millis / 1000)
                 : Text.translatable(key, who, millis / 1000));
-        LOGGER.info("这一场：{} 开窗口 {} 秒", component.requireSession().contest().orElseThrow().stage(),
-                millis / 1000);
+        Contest.Stage stage = component.requireSession().contest().orElseThrow().stage();
+        LOGGER.info("这一场：{} 开窗口 {} 秒", stage, millis / 1000);
         GameComponents.sync(world);
+        if (randomStandIns(component)) {
+            // 真人在等这一段：替身在窗口里陆续站出来 / 押下，看得见有人动（StandInPlay）
+            switch (stage) {
+                case STANCES -> StandInPlay.joinStances(world, component, true);
+                case WEAPONS -> StandInPlay.commitWeapons(world, component, true);
+                default -> { }
+            }
+        }
+    }
+
+    /** 替身随机行动开着（{@code /seas dummy random on}）：这一场里替身的那几下随机做，不再一律同意 / 不加入 / 不押。 */
+    private static boolean randomStandIns(GameComponent component) {
+        return component.dummyAutoplay() && component.dummyRandom();
     }
 
     /** 全是替身的那一段：按默认答案往下走一步。 */
@@ -424,10 +438,22 @@ public final class ContestPhase {
         if (contest.isEmpty()) {
             return;                               // 这一步排下来之前已经收场了
         }
+        boolean random = randomStandIns(component);
         switch (contest.get().stage()) {
-            case CONSENT -> consent(world, component, false);       // 替身一律同意（ADR-0023 §7.8）
-            case STANCES -> closeStances(world, component);         // 替身不加入
-            case WEAPONS -> resolve(world, component);              // 替身不押武器
+            // 替身一律同意（ADR-0023 §7.8）；随机开着时一半一半
+            case CONSENT -> consent(world, component, random && StandInPlay.consent(component.gameRandom()));
+            case STANCES -> {
+                if (random) {
+                    StandInPlay.joinStances(world, component, false);
+                }
+                closeStances(world, component);                     // 关着时替身不加入
+            }
+            case WEAPONS -> {
+                if (random) {
+                    StandInPlay.commitWeapons(world, component, false);
+                }
+                resolve(world, component);                          // 关着时替身不押武器
+            }
             case PICK -> autoPick(world, component, contest.get());
         }
     }
@@ -435,6 +461,13 @@ public final class ContestPhase {
     /** 默认的挑牌：手上有就随机一张，手上没有就取面前第一张。 */
     private static void autoPick(ServerWorld world, GameComponent component, Contest contest) {
         Session session = component.requireSession();
+        if (randomStandIns(component)) {
+            String front = StandInPlay.pickFront(session, contest, component.gameRandom());
+            if (front != null) {
+                pickFromFront(world, component, front);
+                return;
+            }
+        }
         List<String> hand = session.state().stateOf(contest.target()).hand();
         if (hand.isEmpty()) {
             pickFromFront(world, component, session.state().stateOf(contest.target()).front().get(0));

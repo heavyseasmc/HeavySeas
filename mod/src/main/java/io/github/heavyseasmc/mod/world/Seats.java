@@ -54,6 +54,12 @@ public final class Seats {
     /** 座位比脚下的地面略高一点：贴地放的话，骑上去的人会有半个身子陷进方块里。 */
     private static final double LIFT = 0.35;
 
+    /**
+     * 演示局里每个真人上一次被摆到第几位（玩家 → 下标）。演示局不钉人（用户 2026-10-07：「demo 局不要把玩家钉在座位上」）：
+     * 起身走开就随他去，只在<b>该坐的位置变了</b>（开局 · 换座位 · 从海里回来 · 重连）时再摆一次。收摊时清空。
+     */
+    private static final java.util.Map<UUID, Integer> PLACED = new java.util.concurrent.ConcurrentHashMap<>();
+
     private Seats() {
     }
 
@@ -105,41 +111,56 @@ public final class Seats {
      *
      * <p>每次投影更新都会走到这里（{@link GameComponents#sync}），所以它必须**便宜且幂等**：
      * 已经坐对了的人一个字节都不动。
+     *
+     * <p>真人局里每个 tick 都把起身的人按回座位（位次就是游戏内容，谁站起来走开都会让船上读不出谁在哪）。
+     * <b>演示局</b>（名单里有替身的局）不钉：只有一个真人，走到替身跟前右键、绕着船看才是测试要做的事
+     * （用户 2026-10-07）。那里只在该坐的位置变了时摆一次，见 {@link #PLACED}。
      */
     public static void refresh(ServerWorld world, GameComponent component) {
         if (component.session().isEmpty() || component.seatIds().isEmpty()) {
             return;
         }
+        boolean demo = component.occupants().values().stream().anyMatch(GameComponent.Occupant::isDummy);
         List<CharacterId> order = component.requireSession().state().bySeat();
         for (int i = 0; i < order.size() && i < component.seatIds().size(); i++) {
             var state = component.requireSession().state();
-            if (state.isRemoved(order.get(i)) || state.isOffline(order.get(i)) || component.bodyInWater(order.get(i))) {
-                continue;
-            }
             Optional<GameComponent.Occupant> who = component.occupantOf(order.get(i));
             if (who.isEmpty() || who.get().isDummy()) {
-                continue;                     // 替身不需要身体（ADR-0024 §7.6）：那个座位就空着
+                continue;                     // 替身没有玩家可摆
             }
-            ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(who.get().player());
+            UUID uuid = who.get().player();
+            if (state.isRemoved(order.get(i)) || state.isOffline(order.get(i)) || component.bodyInWater(order.get(i))) {
+                PLACED.remove(uuid);          // 回来时（重连 · 从海里回来）要再摆一次
+                continue;
+            }
+            ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(uuid);
             SeatEntity seat = seatAt(world, component, i);
             if (player == null || seat == null) {
                 continue;                     // 人不在线 / 座位没了：下一次刷新再说，不在这里补救
             }
             if (player.getVehicle() == seat) {
+                PLACED.put(uuid, i);
                 continue;                     // 已经坐对了 —— 这是绝大多数帧走到的分支
+            }
+            if (demo && Integer.valueOf(i).equals(PLACED.get(uuid))) {
+                continue;                     // 演示局：摆过这一位，他自己起身走开了 —— 不按回去
             }
             player.stopRiding();
             player.teleport(world, seat.getX(), seat.getY(), seat.getZ(), seat.getYaw(), 0f);
             if (player.startRiding(seat, true)) {
-                LOGGER.info("座位：{} 坐上第 {} 位（{}）", player.getGameProfile().getName(),
-                        i + 1, order.get(i).value());
+                PLACED.put(uuid, i);
+                LOGGER.info("座位：{} 坐上第 {} 位（{}）{}", player.getGameProfile().getName(),
+                        i + 1, order.get(i).value(), demo ? " · 演示局，起身不按回" : "");
             }
         }
+        StandInBodies.refresh(world, component);  // 替身的人形照同一份名单摆（用户 2026-10-07「座位上坐一个人形」）
     }
 
-    /** 收摊：把这一局摆下的座位全部清掉，坐着的人自然落地；补给箱实物一起收。 */
+    /** 收摊：把这一局摆下的座位全部清掉，坐着的人自然落地；补给箱实物与替身的人形一起收。 */
     public static void clear(ServerWorld world, GameComponent component) {
         Crate.clear(world, component);
+        PLACED.clear();
+        StandInBodies.clear(world);
         int gone = 0;
         for (UUID id : component.seatIds()) {
             Entity entity = world.getEntity(id);
@@ -256,7 +277,7 @@ public final class Seats {
     private record LoadedEntity(RegistryKey<World> world, UUID entity) {
     }
 
-    private static SeatEntity seatAt(ServerWorld world, GameComponent component, int index) {
+    static SeatEntity seatAt(ServerWorld world, GameComponent component, int index) {
         List<UUID> ids = component.seatIds();
         if (index < 0 || index >= ids.size()) {
             return null;

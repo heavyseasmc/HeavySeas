@@ -40,8 +40,8 @@ import java.util.Optional;
  */
 public final class NavigationPhase {
 
-    /** 舵手挑牌的时限（用户 2026-09-15 定）。 */
-    public static final long PICK_MILLIS = 12_000L;
+    /** 舵手挑牌的时限（用户 2026-09-15 定 12 秒；2026-10-07 改 20 秒：决策窗口一律至少 20 秒）。 */
+    public static final long PICK_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -93,8 +93,10 @@ public final class NavigationPhase {
         GameFlow.broadcast(world, Text.translatable("heavyseas.game.helmsman_picks",
                 GameFlow.characterName(helm), stack));
         if (who.isDummy() && component.dummyAutoplay()) {
-            LOGGER.info("舵手（替身自动）：{} 从划船堆 {} 张里挑第 1 张", helm.value(), stack);
-            resolve(world, component, 0);
+            // 随机行动开着时随机挑（StandInPlay，用户 2026-10-07），关着时挑第 1 张（回归脚本按这个写）
+            int pick = component.dummyRandom() && stack > 1 ? component.gameRandom().nextInt(stack) : 0;
+            LOGGER.info("舵手（替身自动）：{} 从划船堆 {} 张里挑第 {} 张", helm.value(), stack, pick + 1);
+            resolve(world, component, pick);
             return;
         }
         component.setHelmDeadline(System.currentTimeMillis() + PICK_MILLIS);

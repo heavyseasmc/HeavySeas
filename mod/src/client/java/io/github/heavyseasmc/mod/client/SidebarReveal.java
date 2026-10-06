@@ -32,6 +32,18 @@ final class SidebarReveal {
     private static long shownAt = 0L;
     private static boolean pinned;
 
+    /**
+     * 这一局客户端自己记下的全部播报（旧的在前）。服务端的投影只留最新八条，往回翻要靠这一本
+     * （用户 2026-10-07：「航海日志不能滚动」）。每次新到几条就把投影末尾那几条接上来（{@link NotificationArrivals}）。
+     */
+    private static final java.util.ArrayList<Text> history = new java.util.ArrayList<>();
+    /** 一局最多记多少条：够翻一整局，又不至于让一局打很久时无限长。 */
+    private static final int HISTORY_MAX = 400;
+    /** 往回翻了几条（0 = 看的是最新的）。只在钉住时作数，取消钉住就回到最新。 */
+    private static int scroll;
+    /** 滚轮的零头：触控板一次只给零点几格，攒满一格再翻。 */
+    private static double scrollRest;
+
     private SidebarReveal() {
     }
 
@@ -44,15 +56,52 @@ final class SidebarReveal {
      */
     static void observe(List<Text> notes, long now) {
         List<String> current = notes.stream().map(Text::getString).toList();
+        int n = 0;
         if (last != null) {
-            int n = NotificationArrivals.count(last, current);
+            n = NotificationArrivals.count(last, current);
             if (n > 0) {
                 shownAt = now;
                 arrived += n;
                 lastBatch = n;
             }
         }
+        // 记账与「新到了几条」分开：❗上面那一段的行为一个字不改（forget 之后开局那一批照样算新到的，见 forget 的注释）
+        if (history.isEmpty()) {
+            history.addAll(notes);            // 第一次见到 / 新一局：投影里有的整批记下
+        } else if (n > 0) {
+            history.addAll(notes.subList(Math.max(0, notes.size() - n), notes.size()));
+            while (history.size() > HISTORY_MAX) {
+                history.remove(0);
+            }
+            if (scroll > 0) {
+                scroll += n;                  // 正在往回翻：新来的接在上面，翻到的那几条别跟着动
+            }
+        }
         last = current;
+    }
+
+    /** 这一局记下的全部播报（旧的在前）。还没见过任何播报时是空的 —— 调用方退回投影里的那几条。 */
+    static List<Text> history() {
+        return history;
+    }
+
+    /** 往回翻了几条。 */
+    static int scroll() {
+        return pinned ? scroll : 0;
+    }
+
+    /**
+     * 滚轮翻日志：往上滚（正数）翻到更早的，往下滚回到新的。只在钉住时调（{@code GameScreen#mouseScrolled} 与主画面的滚轮）。
+     * 最多翻到只剩最早那一条在最上面；具体一屏放几条由画的那一侧决定，这里只管不越过两头。
+     */
+    static void scroll(double amount) {
+        scrollRest += amount;
+        int steps = (int) scrollRest;
+        if (steps == 0) {
+            return;
+        }
+        scrollRest -= steps;
+        scroll = Math.max(0, Math.min(Math.max(0, history.size() - 1), scroll + steps));
     }
 
     /** 这一局一共新到过几条。 */
@@ -91,6 +140,9 @@ final class SidebarReveal {
         arrived = 0;
         lastBatch = 0;
         shownAt = 0L;
+        history.clear();
+        scroll = 0;
+        scrollRest = 0;
     }
 
     static boolean pinned() {
@@ -100,6 +152,8 @@ final class SidebarReveal {
     /** 钉住 / 取消钉住。钉住时它一直在，不再自己收回去。 */
     static void togglePin() {
         pinned = !pinned;
+        scroll = 0;                           // 再钉上时从最新的看起
+        scrollRest = 0;
     }
 
     /**

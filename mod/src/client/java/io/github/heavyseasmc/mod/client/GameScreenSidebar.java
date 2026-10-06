@@ -48,7 +48,8 @@ final class GameScreenSidebar {
                 }
                 GameHud.renderSidebar(context, client);
                 gameScreen.renderDetails(context, mouseX, mouseY);
-                OverboardCue.drawFlash(context);            // 有人落海那一瞬：最上面一层（ADR-0048）
+                ActionBarEcho.draw(context, gameScreen);    // 动作栏那一句：被纸板盖住的拒绝理由（2026-10-07）
+                OverboardCue.drawFlash(context);           // 有人落海那一瞬：最上面一层（ADR-0048）
             });
         });
     }

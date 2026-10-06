@@ -170,21 +170,29 @@ public final class PlayerBodies {
         Vec3d side = new Vec3d(forward.z, 0, -forward.x);
         for (CharacterId id : swimmers) {
             var occupant = component.occupantOf(id);
-            if (occupant.isEmpty() || occupant.get().isDummy() || state.isOffline(id)) {
+            if (occupant.isEmpty() || state.isOffline(id)) {
                 continue;
             }
-            ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(occupant.get().player());
-            if (player != null) {
-                int index = state.bySeat().indexOf(id);
-                for (int distance = 7; distance <= 15; distance += 2) {
-                    Vec3d point = layout.seatAt(index).add(side.multiply(index % 2 == 0 ? distance : -distance));
-                    BlockPos top = world.getTopPosition(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
-                            BlockPos.ofFloored(point));
-                    if (world.getFluidState(top.down()).isIn(FluidTags.WATER)) {
+            ServerPlayerEntity player = occupant.get().isDummy() ? null
+                    : world.getServer().getPlayerManager().getPlayer(occupant.get().player());
+            if (player == null && !occupant.get().isDummy()) {
+                continue;
+            }
+            int index = state.bySeat().indexOf(id);
+            for (int distance = 7; distance <= 15; distance += 2) {
+                Vec3d point = layout.seatAt(index).add(side.multiply(index % 2 == 0 ? distance : -distance));
+                BlockPos top = world.getTopPosition(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
+                        BlockPos.ofFloored(point));
+                if (world.getFluidState(top.down()).isIn(FluidTags.WATER)) {
+                    if (player == null) {
+                        // 替身的人形也下水（用户 2026-10-07「座位上坐一个人形」）：不然落海这一幕只有真人在水里
+                        StandInBodies.toWater(world, id, new Vec3d(point.x, top.getY() + 0.5, point.z),
+                                layout.ridersFacing());
+                    } else {
                         player.stopRiding();
                         player.teleport(world, point.x, top.getY() + 0.5, point.z, layout.ridersFacing(), 0);
-                        break;
                     }
+                    break;
                 }
             }
         }

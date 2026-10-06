@@ -98,6 +98,8 @@ public final class HeavySeasMod implements ModInitializer {
         // 甲板躺椅的座位（C3 第二轮 · c3-deck）：另一种实体，对局座位与演习艇报名按类型找座位，看不见它
         io.github.heavyseasmc.mod.world.liner.DeckChairSeat.register();
         PlayerBodies.register();
+        // 替身的人形（用户 2026-10-07「座位上坐一个人形」）：右键它就是指定它；不存档
+        io.github.heavyseasmc.mod.world.StandInEntity.register();
         GullEntity.register();
         CreativeTabs.register();                       // 物品都登记完之后：本模组自己的九页（ADR-0058 Q6 · ADR-0093 B8）
         // ❗孤儿座位：加载事件只登记，tick 末尾才清。加载回调仍在实体管理器的遍历里，

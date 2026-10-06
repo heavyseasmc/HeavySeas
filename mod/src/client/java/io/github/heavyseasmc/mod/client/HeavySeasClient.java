@@ -183,6 +183,8 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 海鸥：自绘模型（ADR-0034 §5.4），模型层要先登记，渲染器构造时按层取部件。
         EntityModelLayerRegistry.registerModelLayer(GullModel.LAYER, GullModel::getTexturedModelData);
         EntityRendererRegistry.register(GullEntity.TYPE, GullRenderer::new);
+        // 替身的人形：玩家模型 + Minecraft 自带的默认皮肤（用户 2026-10-07「座位上坐一个人形」）
+        EntityRendererRegistry.register(io.github.heavyseasmc.mod.world.StandInEntity.TYPE, StandInRenderer::new);
 
         handKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R,

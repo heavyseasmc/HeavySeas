@@ -133,7 +133,15 @@ public final class SeasCommand {
                                 .then(CommandManager.literal("on")
                                         .executes(guarded(context -> dummyAuto(context, true))))
                                 .then(CommandManager.literal("off")
-                                        .executes(guarded(context -> dummyAuto(context, false))))))
+                                        .executes(guarded(context -> dummyAuto(context, false)))))
+                        .then(CommandManager.literal("random")
+                                .executes(guarded(context -> dummyRandom(context, null, false)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyRandom(context, true, false)))
+                                        .then(CommandManager.literal("fast")
+                                                .executes(guarded(context -> dummyRandom(context, true, true)))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyRandom(context, false, false))))))
                 .then(CommandManager.literal("status").executes(guarded(SeasCommand::status)))
                 .then(CommandManager.literal("pass").executes(guarded(SeasCommand::pass)))
                 .then(CommandManager.literal("row")
@@ -339,6 +347,32 @@ public final class SeasCommand {
         }
         boolean now = component.dummyAutoplay();
         context.getSource().sendFeedback(() -> Text.translatable("heavyseas.command.autoplay",
+                Text.translatable(now ? "heavyseas.command.autoplay_on" : "heavyseas.command.autoplay_off")),
+                on != null);
+        return 1;
+    }
+
+    /**
+     * 替身随机行动的开关（{@code StandInPlay}，用户 2026-10-07）。不带参数时只报当前值。写到雾海的组件上，理由与 {@link #dummyAuto} 同。
+     * {@code on fast} 是调试用的快档：替身几乎不停顿；{@code on} 是慢档（替身轮到后停 4 秒，「demo 玩家不要出牌太快」）。
+     * 打开时顺带把自动推进也打开 —— 随机行动是自动推进的一种，关着自动推进时替身等指令，随机开关就没有意义。
+     */
+    private static int dummyRandom(CommandContext<ServerCommandSource> context, Boolean on, boolean fast) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        GameComponent component = GameComponents.of(sea != null ? sea : context.getSource().getWorld());
+        if (on != null) {
+            component.setDummyRandom(on);
+            component.setDummyFast(on && fast);
+            if (on && !component.dummyAutoplay()) {
+                component.setDummyAutoplay(true);
+            }
+            LOGGER.info("替身随机行动：{}", on ? (fast ? "开 · 快档" : "开") : "关");
+            if (on && sea != null) {
+                GameFlow.resumeStandIn(sea, component);
+            }
+        }
+        boolean now = component.dummyRandom();
+        context.getSource().sendFeedback(() -> Text.translatable("heavyseas.command.dummy_random",
                 Text.translatable(now ? "heavyseas.command.autoplay_on" : "heavyseas.command.autoplay_off")),
                 on != null);
         return 1;

@@ -378,18 +378,59 @@ public abstract class GameScreen extends Screen {
             }
         }
         if (shown != null) {
-            int w = Math.max(60, Math.min(220, width - 2 * SIDE));
+            // 一段一段排（换行分段）：头像说明签是「名字 · 状态」一段 + 规则书里那个人的几段（CharacterNotes），
+            // 折行归 GuiText，它不认换行。说明签比一句状态长，框放宽一些。
+            String[] paras = shown.getString().split("\n");
+            int w = Math.max(60, Math.min(paras.length > 1 ? 260 : 220, width - 2 * SIDE));
             int pad = 6;
-            int h = GuiText.height(shown.getString(), w - 2 * pad, GuiText.BODY, false, 6) + 2 * pad;
+            int gap = 2;
+            int[] hs = new int[paras.length];
+            int h = 2 * pad;
+            for (int i = 0; i < paras.length; i++) {
+                hs[i] = GuiText.height(paras[i], w - 2 * pad, GuiText.BODY, false, 6);
+                h += hs[i] + (i > 0 ? gap : 0);
+            }
             x = MathHelper.clamp(x + pad, SIDE, Math.max(SIDE, width - w - SIDE));
             y = MathHelper.clamp(y + pad, pad, Math.max(pad, height - h - pad));
             context.getMatrices().push();
             context.getMatrices().translate(0, 0, 400);
             GuiMaterial.plate(context, x, y, w, h, -1);
-            GuiText.draw(context, shown.getString(), x + pad, y + pad, w - 2 * pad,
-                    GuiText.BODY, false, GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT, 6);
+            int ty = y + pad;
+            for (int i = 0; i < paras.length; i++) {
+                GuiText.draw(context, paras[i], x + pad, ty, w - 2 * pad, GuiText.BODY, false,
+                        GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT, 6);
+                ty += hs[i] + gap;
+            }
             context.getMatrices().pop();
         }
+    }
+
+    /** 这一帧在 {@code box} 上停着就显示 {@code text}（悬停说明签）。各面在 {@code drawChrome} 之后调；每帧随 drawChrome 清空。 */
+    protected void addDetail(Box box, Text text) {
+        detailHits.add(new DetailHit(box, text));
+    }
+
+    /**
+     * 一个角色的说明：名字一段 + 规则书里那个人底下的几段（{@link CharacterNotes}）。阵容一面挑人时停在头像上看它
+     * （用户 2026-10-07：「全靠脑子记记不住」）。
+     */
+    protected static Text characterDetail(String characterId) {
+        List<String> notes = CharacterNotes.of(characterId);
+        return notes.isEmpty() ? nameOf(characterId)
+                : Text.literal(nameOf(characterId).getString() + "\n" + String.join("\n", notes));
+    }
+
+    /**
+     * 滚轮：航海日志钉住（L）时上下翻日志（用户 2026-10-07：「航海日志不能滚动」）。没钉住时照 Minecraft 的默认。
+     * 各面都不拿滚轮做别的事，所以收在这一处。
+     */
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (SidebarReveal.pinned() && verticalAmount != 0) {
+            SidebarReveal.scroll(verticalAmount);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
     /** 左键：选 / 按。返回 {@code true} = 这一下已经处理了。 */
@@ -1132,8 +1173,12 @@ public abstract class GameScreen extends Screen {
         for (var seat : io.github.heavyseasmc.mod.state.GameComponents.of(client.world).tableView().seats()) {
             if (seat.id().equals(characterId)) {
                 Text state = seat.offline() ? Text.translatable("heavyseas.table.offline") : conditionName(seat.condition());
-                return java.util.Optional.of(Text.translatable("heavyseas.seat.detail", nameOf(characterId),
-                        Math.max(0, seat.health()), seat.size(), state));
+                Text line = Text.translatable("heavyseas.seat.detail", nameOf(characterId),
+                        Math.max(0, seat.health()), seat.size(), state);
+                // 下面接规则书里这个人的本事（用户 2026-10-07：「鼠标移动到角色头像上是浮窗气泡显示角色介绍」）
+                List<String> notes = CharacterNotes.of(characterId);
+                return java.util.Optional.of(notes.isEmpty() ? line
+                        : Text.literal(line.getString() + "\n" + String.join("\n", notes)));
             }
         }
         return java.util.Optional.empty();
@@ -1381,6 +1426,12 @@ public abstract class GameScreen extends Screen {
         }
         List<KeyHint> all = new ArrayList<>(left);
         all.addAll(right);
+        // 能按 Esc 关的面一律写上「Esc 收起」，窗口多小都不省（用户 2026-10-07：「能按 Esc 关的面都写上」——
+        // 行动 · 划船 · 站队几面按 Esc 能关、底下却没写）。这一面自己已经写了 Esc（不押 · 取消 · 收起）就不再加。
+        // 收在这一处而不是各面各写：靠每一面记得写，新加的一面迟早忘。
+        if (shouldCloseOnEsc() && all.stream().noneMatch(h -> h.keys().contains("Esc"))) {
+            all.add(keys("close", "Esc"));
+        }
         drawHintsPx(context, l, cue(), all);
         pxEnd(context);
     }

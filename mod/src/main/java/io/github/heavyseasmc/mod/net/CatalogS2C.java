@@ -75,17 +75,78 @@ public record CatalogS2C(List<Provisions> provisions, List<Characters> character
         }
     }
 
-    /** 一张物资牌的目录条目。 */
-    public record Provisions(String id, String category, int count, List<Badge> badges) {
+    /**
+     * 手牌一面的「打出」对这张牌什么时候行得通。判据与服务端 {@code ActionPhase#onUseProvision} 同源（都问引擎的
+     * {@link Provision}）：界面给出一件必然失败的事，比不给更糟 —— 2026-10-07 用户实拍「按 Enter 没反应」，
+     * 按的是一张根本不能打出的牌，服务端那句拒绝落在动作栏、被纸板盖住了。
+     */
+    public enum Play {
+        /** 特殊行动：行动阶段轮到你时才行（医疗箱 · 撑伞 · 信号枪当信号 · 绝境）。 */
+        TURN,
+        /** 喝了加体型的那种：只要还能行动，什么时候都行。 */
+        ANYTIME,
+        // 以下都<b>不是</b>从手牌一面打出的牌 —— 按一下要说清它在哪儿用（用户 2026-10-07：「闷棍这些也打不出」）。
+        /** 武器：打架时在挂武器那一面上押。 */
+        FIGHT,
+        /** 挡口渴的（水）：口渴那一面上用。 */
+        THIRST,
+        /** 有人落海时用的（血饵）。 */
+        OVERBOARD,
+        /** 亮在面前就一直起作用（救生圈 · 指南针）。 */
+        FRONT,
+        /** 财宝：不「用」，终局计分。 */
+        SCORE,
+        /** 数据包加了一种上面都不是的：只说「不是打出的牌」。 */
+        OTHER;
+
+        public boolean playable() {
+            return this == TURN || this == ANYTIME;
+        }
+
+        public static Play of(Provision card) {
+            io.github.heavyseasmc.engine.model.ProvisionEffect e = card.effect();
+            if (e instanceof io.github.heavyseasmc.engine.model.ProvisionEffect.BuffSize) {
+                return ANYTIME;               // 与服务端同一个先后：先认它，再认特殊行动
+            }
+            if (card.isSpecialAction()) {
+                return TURN;
+            }
+            if (e.weaponPower() > 0) {
+                return FIGHT;
+            }
+            if (e instanceof io.github.heavyseasmc.engine.model.ProvisionEffect.PreventThirst) {
+                return THIRST;
+            }
+            if (e instanceof io.github.heavyseasmc.engine.model.ProvisionEffect.DamageInWater) {
+                return OVERBOARD;
+            }
+            if (e.timings().isEmpty()) {
+                return SCORE;
+            }
+            if (e.timings().equals(java.util.Set.of(io.github.heavyseasmc.engine.model.ProvisionEffect.Timing.PASSIVE))) {
+                return FRONT;
+            }
+            return OTHER;
+        }
+    }
+
+    /** 一张物资牌的目录条目。{@code play} 按名字传（{@link Play}），不按序号 —— 与 {@link Chip} 同一条。 */
+    public record Provisions(String id, String category, int count, List<Badge> badges, String play) {
         public static final PacketCodec<ByteBuf, Provisions> CODEC = PacketCodec.tuple(
                 PacketCodecs.STRING, Provisions::id,
                 PacketCodecs.STRING, Provisions::category,
                 PacketCodecs.VAR_INT, Provisions::count,
                 Badge.CODEC.collect(PacketCodecs.toList(4)), Provisions::badges,
+                PacketCodecs.STRING, Provisions::play,
                 Provisions::new);
 
         public Provisions {
             badges = List.copyOf(badges);
+        }
+
+        /** 认不出的名字当场抛：与 {@link Chip#face} 同一条。 */
+        public Play playWhen() {
+            return Play.valueOf(play);
         }
     }
 
@@ -120,7 +181,8 @@ public record CatalogS2C(List<Provisions> provisions, List<Characters> character
                 cards.stream()
                         .map(card -> new Provisions(card.id(),
                                 card.category().name().toLowerCase(java.util.Locale.ROOT), card.count(),
-                                CardFaces.provisionBadges(card).stream().map(Badge::of).toList()))
+                                CardFaces.provisionBadges(card).stream().map(Badge::of).toList(),
+                                Play.of(card).name()))
                         .toList(),
                 roster.stream()
                         .map(s -> new Characters(s.id().value(),

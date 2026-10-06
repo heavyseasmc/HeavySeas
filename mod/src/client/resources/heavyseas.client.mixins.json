@@ -10,6 +10,7 @@
     "InGameHudMixin",
     "ItemStackTooltipMixin",
     "KeyBindingPriorityMixin",
+    "MouseScrollMixin",
     "NativeImageMixin",
     "TrueTypeFontMixin",
     "WorldWeatherMixin"

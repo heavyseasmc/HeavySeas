@@ -4,6 +4,7 @@ import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.UseProvisionC2S;
 import io.github.heavyseasmc.mod.net.CardActionC2S;
+import io.github.heavyseasmc.mod.net.CatalogS2C;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.HudView;
 import io.github.heavyseasmc.mod.ui.SheetLayout;
@@ -351,19 +352,48 @@ public final class HandScreen extends GameScreen {
         y += l.len(26 * 1.35 + 4);
         GuiText.paragraphPx(context, effect, tx, y, box, bodyPx, false, ink, 3, l.len(17 * 1.65));
 
-        // 两枚按钮：签子下面 20，间距 14（样张 .acts）
+        // 两枚按钮：签子下面 20，间距 14（样张 .acts）。
+        // 「打出」只给打得出的牌（2026-10-07 用户实拍「按 Enter 没反应」）：水、武器、财宝不是打出用的，不画这一枚
+        // （点下去时说它在哪儿用，见 use()）；
+        // 特殊行动没轮到你时画成按不动的样子并写明（界面给出一件必然失败的事，比不给更糟）。
         int by = top + h + l.len(20);
         int bh = l.len(io.github.heavyseasmc.mod.ui.SheetLayout.HINTS_H);
-        String play = Text.translatable("heavyseas.keys.play").getString();
+        CatalogS2C.Play when = playWhen(card);
+        boolean live = playableNow(card);
+        String play = Text.translatable(!live && when == CatalogS2C.Play.TURN ? "heavyseas.hand.play_wait"
+                : "heavyseas.keys.play").getString();
         String front = Text.translatable("heavyseas.keys.reveal_front").getString();
-        int w1 = buttonPx(l, List.of("Enter"), play);
+        int x2 = x;
+        playBox = null;
+        if (when.playable()) {
+            int w1 = buttonPx(l, List.of("Enter"), play);
+            drawButtonPx(context, l, x, by, w1, bh, List.of("Enter"), play, live && !revealFocus, live);
+            playBox = unitBox(new Rect(x, by, w1, bh));
+            x2 = x + w1 + l.len(14);
+        }
         int w2 = buttonPx(l, List.of("↓", "Enter"), front);
-        drawButtonPx(context, l, x, by, w1, bh, List.of("Enter"), play, !revealFocus);
-        int x2 = x + w1 + l.len(14);
-        drawButtonPx(context, l, x2, by, w2, bh, List.of("↓", "Enter"), front, revealFocus);
+        drawButtonPx(context, l, x2, by, w2, bh, List.of("↓", "Enter"), front, revealFocus, true);
         pxEnd(context);
-        playBox = unitBox(new Rect(x, by, w1, bh));
         revealBox = unitBox(new Rect(x2, by, w2, bh));
+    }
+
+    /** 这张牌的「打出」什么时候行得通；没收到目录时当作「轮到你时」，由服务端裁决。 */
+    private static CatalogS2C.Play playWhen(String card) {
+        CatalogS2C.Provisions entry = Catalog.provision(card);
+        return entry == null ? CatalogS2C.Play.TURN : entry.playWhen();
+    }
+
+    /**
+     * 此刻按「打出」行不行得通。与服务端 {@code ActionPhase#onUseProvision} 的门同一套：
+     * 特殊行动要「行动阶段轮到你、没在划船 / 收场 / 指定 / 挑目标」（即 {@link HudView#myTurnToAct}），
+     * 加体型的那种只要还能行动。服务端仍会再核一遍（这一回合喝过了、没人受伤……），拒绝的那句由 {@link ActionBarEcho} 显出来。
+     */
+    private boolean playableNow(String card) {
+        return switch (playWhen(card)) {
+            case TURN -> view.myTurnToAct();
+            case ANYTIME -> view.active() && view.seated() && view.condition().canAct();
+            default -> false;
+        };
     }
 
     private static int buttonPx(SheetLayout l, List<String> keys, String label) {
@@ -374,11 +404,15 @@ public final class HandScreen extends GameScreen {
         return w + l.len(10) - l.len(7) + GuiText.widthPx(label, l.len(18), false, l.len(2));
     }
 
-    /** 一枚搪瓷按钮（样张 .btn；{@code focus} 时外一圈金，.btn.focus）：键帽 + 一句话。 */
+    /**
+     * 一枚搪瓷按钮（样张 .btn；{@code focus} 时外一圈金，.btn.focus）：键帽 + 一句话。
+     * {@code enabled = false}：按不动 —— 字与键帽上的字压成三四成墨，不画金圈。
+     */
     private static void drawButtonPx(DrawContext context, SheetLayout l, int x, int y, int w, int h, List<String> keys,
-                                     String label, boolean focus) {
+                                     String label, boolean focus, boolean enabled) {
         GuiMaterial.hudPart(context, focus ? io.github.heavyseasmc.mod.ui.HudPart.BTN_FOCUS
                 : io.github.heavyseasmc.mod.ui.HudPart.BTN, x, y, w, h, l.k());
+        int ink = enabled ? GuiLanguage.Hud.ENAMEL_LINE : GuiLanguage.Hud.alpha(GuiLanguage.Hud.ENAMEL_LINE, 0.4f);
         int cx = x + l.len(20);
         int key = l.len(26);
         int cy = y + h / 2;
@@ -387,13 +421,13 @@ public final class HandScreen extends GameScreen {
             int kw = Math.max(key, GuiText.widthPx(k, keyPx, true, 0) + 2 * l.len(7));
             GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.KEY, cx, cy - key / 2, kw, key, l.k());
             GuiText.drawPx(context, k, cx, cy - key / 2 + (key - GuiText.linePxAt(keyPx, true)) / 2, kw, keyPx, true,
-                    GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.CENTER, 0);
+                    ink, GuiText.Align.CENTER, 0);
             cx += kw + l.len(7);
         }
         cx += l.len(10) - l.len(7);
         int px = l.len(18);
         GuiText.drawPx(context, label, cx, cy - GuiText.linePxAt(px, false) / 2, x + w - cx, px, false,
-                GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.LEFT, l.len(2));
+                ink, GuiText.Align.LEFT, l.len(2));
     }
 
     /**
@@ -552,6 +586,20 @@ public final class HandScreen extends GameScreen {
             return;
         }
         String card = hand.get(selected);
+        if (!playableNow(card)) {
+            // 发出去也只会被拒（或者被静默丢掉）：当场说一句，位置与服务端那几句拒绝相同（2026-10-07「按 Enter 没反应」）。
+            LOGGER.info("手牌：打不出 {}（{}）", card, playWhen(card));
+            CatalogS2C.Play when = playWhen(card);
+            ActionBarEcho.record(switch (when) {
+                case TURN -> Text.translatable("heavyseas.hand.not_your_turn");
+                case ANYTIME -> Text.translatable("heavyseas.card_action.rejected");
+                case OTHER -> Text.translatable("heavyseas.command.not_special", provisionName(card));
+                // 不是打出的牌：说它在哪儿用（「闷棍这些也打不出」—— 武器只在打架时押）
+                default -> Text.translatable("heavyseas.hand.used." + when.name().toLowerCase(java.util.Locale.ROOT),
+                        provisionName(card));
+            });
+            return;
+        }
         LOGGER.info("手牌：打出 {}", card);
         ClientPlayNetworking.send(UseProvisionC2S.play(card));
     }
@@ -581,7 +629,12 @@ public final class HandScreen extends GameScreen {
         if (!inspecting()) {
             int i = cardAt(mouseX, mouseY);
             if (i >= 0) {
-                select(i);                    // 点一下只是选中：打出与亮出都要再按一下，不随手花掉
+                // 左键点牌 = 打出这一张，与补给箱、挂武器两面「左键点牌 = 就它了」同一条（用户 2026-10-07：「左键不能使用牌，
+                // 而是查看介绍」）。看说明靠悬停（停上去就选中）与右键；亮出不可逆，仍只走那枚按钮或 ↓ Enter。
+                // 打不出的牌点下去只说一句为什么，什么都不花掉。
+                select(i);
+                revealFocus = false;
+                use();
                 return true;
             }
         }
@@ -628,7 +681,7 @@ public final class HandScreen extends GameScreen {
         }
         // 打出：花掉这一个行动打出去（医疗箱 · 撑伞 · 信号枪当信号 · 绝境）。Enter 在两个状态里都是它
         // （ADR-0037 §7.12 ①「Enter 在两个状态里都能确认」）—— 除非焦点在「亮出」上。
-        // ❗只有轮到你时才行得通 —— 它占行动。按不动时服务端会回一句人话，不是静默丢掉。
+        // ❗特殊行动只有轮到你时才行得通 —— 它占行动。打不出时客户端当场说一句（use()），不往服务端发。
         if (count > 0 && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
             if (revealFocus) {
                 reveal();

@@ -179,6 +179,37 @@ class RulebookTest {
         assertTrue(html.contains("<html lang=\"" + lang.replace('_', '-') + "\">"), "页面的语言标记");
     }
 
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"zh_cn", "en_us"})
+    @DisplayName("头像说明签取的那一段（notesUnder）：八个人每人都取得到、不串到下一个人、列表项换成「· 」、不留 ** —— 中英各查")
+    void rosterNotesForEveryCharacter(String lang) {
+        String src = src(lang);
+        List<String> ids = facts(lang).roster().characters().stream().map(s -> s.id().value()).toList();
+        for (String id : ids) {
+            List<String> notes = Rulebook.notesUnder(src, "roster", id);
+            assertFalse(notes.isEmpty(), lang + "：" + id + " 底下没取到一行 —— 说明签会是空的");
+            for (String line : notes) {
+                assertFalse(line.startsWith("@") || line.startsWith("#") || line.startsWith("- ") || line.contains("**"),
+                        lang + "：" + id + " 取到了不该有的一行：" + line);
+            }
+        }
+        // 不串：每个人取到的第一行，在别人那一段里不出现（取过头的话，上一个人的段落会把下一个人的头一行吞进来）
+        for (String id : ids) {
+            String first = Rulebook.notesUnder(src, "roster", id).getFirst();
+            for (String other : ids) {
+                if (!other.equals(id)) {
+                    assertFalse(Rulebook.notesUnder(src, "roster", other).contains(first),
+                            lang + "：" + other + " 那一段串进了 " + id + " 的「" + first + "」");
+                }
+            }
+        }
+        // 正向对照：一个不存在的 id 必须取不到 —— 否则「取到了」可能只是取到了别的东西
+        assertTrue(Rulebook.notesUnder(src, "roster", "nobody_here").isEmpty());
+        // 列表项真的换成了「· 」：陪酒女那一段是列表（中英两份书都是）
+        assertTrue(Rulebook.notesUnder(src, "roster", "hostess").stream().anyMatch(l -> l.startsWith("· ")),
+                lang + "：陪酒女那一段的列表项没换成「· 」");
+    }
+
     /** 章名进 HTML 前转义过，比对时照同一规则转义。 */
     private static String esc(String s) {
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");

@@ -2,11 +2,13 @@ package io.github.heavyseasmc.mod.client.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import io.github.heavyseasmc.mod.client.ActionBarEcho;
 import io.github.heavyseasmc.mod.client.GameHud;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.hud.InGameHud;
 import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -41,6 +43,12 @@ public abstract class InGameHudMixin {
     @Shadow
     @Final
     private static Identifier HOTBAR_SELECTION_TEXTURE;
+
+    /** 动作栏收到的每一句都记一份：对局各面的纸板盖住了它，由 {@link ActionBarEcho} 在界面最上层再画一遍。 */
+    @Inject(method = "setOverlayMessage", at = @At("HEAD"))
+    private void heavyseas$echoOverlay(Text message, boolean tinted, CallbackInfo ci) {
+        ActionBarEcho.record(message);
+    }
 
     @Inject(method = "renderStatusBars", at = @At("HEAD"), cancellable = true)
     private void heavyseas$statusBars(DrawContext context, CallbackInfo ci) {

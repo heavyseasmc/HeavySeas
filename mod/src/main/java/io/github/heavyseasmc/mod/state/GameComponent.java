@@ -867,6 +867,33 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     /**
+     * 替身随机行动（{@code /seas dummy random on}，用户 2026-10-07）：自动推进开着时，替身不再一律「什么也不做 · 同意 ·
+     * 不加入 · 不押」，而是照模拟器的分布随机动（{@code StandInPlay}）。
+     *
+     * <p><b>默认关，不持久化</b>：回归脚本都按「替身什么也不做」写，开着就全红了；与 {@link #dummyAutoplay} 同一个理由挂在组件上。
+     */
+    private boolean dummyRandom = false;
+
+    public boolean dummyRandom() {
+        return dummyRandom;
+    }
+
+    public void setDummyRandom(boolean on) {
+        this.dummyRandom = on;
+    }
+
+    /** 随机行动的快档（{@code /seas dummy random on fast}）：调试用，替身几乎不停顿。默认慢档（用户 2026-10-07「demo 玩家不要出牌太快」）。 */
+    private boolean dummyFast = false;
+
+    public boolean dummyFast() {
+        return dummyFast;
+    }
+
+    public void setDummyFast(boolean on) {
+        this.dummyFast = on;
+    }
+
+    /**
      * 推迟到之后某个 tick 再做的一步（ADR-0019）。
      *
      * <h2>为什么要有它</h2>

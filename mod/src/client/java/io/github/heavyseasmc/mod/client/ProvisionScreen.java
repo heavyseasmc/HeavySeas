@@ -326,7 +326,7 @@ public final class ProvisionScreen extends GameScreen {
         }
         drawFootBand(context, b, List.of(keys("swap_card", "←", "→")), inspectHints("keep"), now,
                 new Countdown(data.deadlineMs(),
-                        Math.max(1, data.offer().size()) * ProvisionPhase.MILLIS_PER_CARD, l.rowW()));
+                        ProvisionPhase.windowMillis(data.offer().size()), l.rowW()));
     }
 
     /**
