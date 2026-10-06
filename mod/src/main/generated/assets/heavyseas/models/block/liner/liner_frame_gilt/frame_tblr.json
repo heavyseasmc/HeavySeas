@@ -1,8 +1,0 @@
-{
-  "parent": "heavyseas:block/liner/template/frame_tblr",
-  "textures": {
-    "back": "heavyseas:block/liner/wall_white",
-    "front": "heavyseas:block/liner/frame_gilt_tblr",
-    "particle": "heavyseas:block/liner/frame_gilt_tblr"
-  }
-}

@@ -1,8 +1,0 @@
-{
-  "parent": "minecraft:block/block",
-  "ambientocclusion": false,
-  "textures": {"particle": "#glass"},
-  "elements": [
-    {"from": [0, 0, 15], "to": [16, 16, 15], "faces": {"south": {"texture": "#glass"}, "north": {"texture": "#glass"}}}
-  ]
-}

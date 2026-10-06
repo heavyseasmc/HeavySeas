@@ -46,6 +46,11 @@ public final class LinerBlocks {
     public static final BooleanProperty DOWN = Properties.DOWN;
     public static final BooleanProperty LEFT = BooleanProperty.of("left");
     public static final BooleanProperty RIGHT = BooleanProperty.of("right");
+    /**
+     * 墙面类整块的背面朝着船外（ADR-0093 B9，用户 2026-10-07 定）：一格厚的墙一边是屋子、一边是露天甲板 / 散步廊时，
+     * 背面、两个侧面与顶底画外墙白（就是改之前的样子）；不打开就四个侧面都画饰面。手放默认不打开，生成器按背后那一格在不在屋里打开。
+     */
+    public static final BooleanProperty EXTERIOR = BooleanProperty.of("exterior");
     /** 地毯：四边接不接地毯。 */
     public static final BooleanProperty NORTH = Properties.NORTH;
     public static final BooleanProperty EAST = Properties.EAST;
@@ -309,11 +314,11 @@ public final class LinerBlocks {
     public static final LinerBlock WALL_WHITE = add("liner_wall_white", solid(MapColor.OFF_WHITE), LinerBlock.Kind.PLAIN,
             s -> look("cube", tex("all", "wall_white")));
     public static final LinerBlock WALL = add("liner_wall", solid(MapColor.OFF_WHITE), LinerBlock.Kind.FRONT,
-            s -> look("cube_front", tex("front", "wall", "back", "wall_white")), FACING);
+            s -> s.get(EXTERIOR) ? outward("wall") : look("cube", tex("all", "wall")), FACING, EXTERIOR);
     public static final LinerBlock CEILING = add("liner_ceiling", solid(MapColor.OFF_WHITE), LinerBlock.Kind.PLAIN,
             s -> look("cube", tex("all", "ceiling")));
     public static final LinerBlock MAHOGANY_WALL = add("liner_mahogany_wall", solid(MapColor.DARK_RED), LinerBlock.Kind.FRONT,
-            s -> look("cube_front", tex("front", "mahogany", "back", "wall_white")), FACING);
+            s -> s.get(EXTERIOR) ? outward("mahogany") : look("cube", tex("all", "mahogany")), FACING, EXTERIOR);
     public static final LinerBlock TEAK_DECK = add("liner_teak_deck", solid(MapColor.OAK_TAN), LinerBlock.Kind.DECK,
             s -> look("floor", tex("top", "teak_deck", "side", "teak_side"), s.get(AXIS) == Direction.Axis.X ? 90 : 0), AXIS);
     // 地毯（ADR-0093 B3 · B14，用户 2026-10-07「按倾向」）：铺了毯的柚木地板 —— 拿地毯点一格柚木甲板就铺上（{@link CarpetItem}），
@@ -331,9 +336,9 @@ public final class LinerBlocks {
     public static final LinerBlock FRAME_MAHOGANY = frame("liner_frame_mahogany", "mahogany", MapColor.DARK_RED);
     public static final LinerBlock FRAME_MAHOGANY_GILT = frame("liner_frame_mahogany_gilt", "mahogany_gilt", MapColor.DARK_RED);
     public static final LinerBlock WAINSCOT = add("liner_wainscot", solid(MapColor.OFF_WHITE), LinerBlock.Kind.WAINSCOT,
-            s -> look("cube_front", tex("front", "wainscot_" + s.get(PART).code, "back", "wall_white")), FACING, PART);
+            s -> faced("wainscot_", s.get(PART).code, "wall", s.get(EXTERIOR)), FACING, PART, EXTERIOR);
     public static final LinerBlock WAINSCOT_MAHOGANY = add("liner_wainscot_mahogany", solid(MapColor.DARK_RED), LinerBlock.Kind.WAINSCOT,
-            s -> look("cube_front", tex("front", "wainscot_mahogany_" + s.get(PART).code, "back", "wall_white")), FACING, PART);
+            s -> faced("wainscot_mahogany_", s.get(PART).code, "mahogany", s.get(EXTERIOR)), FACING, PART, EXTERIOR);
     public static final LinerBlock CHAIR_RAIL = add("liner_chair_rail", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
             s -> look("chair_rail" + s.get(SHAPE).suffix(), tex("t", "chair_rail")), FACING, SHAPE);
     public static final LinerBlock CORNICE = add("liner_cornice", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
@@ -473,9 +478,38 @@ public final class LinerBlocks {
     private static LinerBlock frame(String name, String style, MapColor color) {
         return add(name, solid(color), LinerBlock.Kind.FRAME, s -> {
             String mask = LinerConnect.Rules.frameMask(s.get(UP), s.get(DOWN), s.get(LEFT), s.get(RIGHT));
-            return look(mask.equals("c") ? "cube_front" : "frame_" + mask,
-                    tex("front", "frame_" + style + "_" + mask, "back", "wall_white"));
-        }, FACING, UP, DOWN, LEFT, RIGHT);
+            LinerLooks.Look faced = faced("frame_" + style + "_", mask, "frame_" + style + "_c", s.get(EXTERIOR));
+            return mask.equals("c") ? faced : look("frame_" + mask, faced.textures());
+        }, FACING, UP, DOWN, LEFT, RIGHT, EXTERIOR);
+    }
+
+    /**
+     * 有正面的整块四面都画（ADR-0093 B9）：背面画正面左右对调的那一张 —— 从背后看，正面那一格框的左半落在右手边，
+     * 所以换成「右半」那一张（不是把贴图翻过来：翻过来的高光会落到另一侧）；两个侧面画素段 {@code c}，顶底素色。
+     * 背面朝船外（{@link #EXTERIOR}）时只有正面画饰面，其余五面外墙白。
+     */
+    private static LinerLooks.Look faced(String prefix, String code, String end, boolean exterior) {
+        if (exterior) {
+            return outward(prefix + code);
+        }
+        return look("cube_front", tex("front", prefix + code, "back", prefix + mirrored(code), "side", prefix + "c", "end", end));
+    }
+
+    /** 背面朝船外的墙：正面一张，其余五面外墙白（与 B9 之前所有墙面类整块的样子相同）。 */
+    private static LinerLooks.Look outward(String front) {
+        return look("cube_front", tex("front", front, "back", "wall_white", "side", "wall_white", "end", "wall_white"));
+    }
+
+    /** 框的 mask / 护墙的段名左右对调（l ↔ r），其余不变；mask 照 t · b · l · r 的次序重排。 */
+    static String mirrored(String code) {
+        StringBuilder out = new StringBuilder();
+        for (char c : "tblrcms".toCharArray()) {
+            char from = c == 'l' ? 'r' : c == 'r' ? 'l' : c;
+            if (code.indexOf(from) >= 0) {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     private static LinerBlock add(String name, AbstractBlock.Settings settings, LinerBlock.Kind kind,

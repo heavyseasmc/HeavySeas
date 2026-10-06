@@ -1,78 +1,153 @@
 {
   "variants": {
-    "facing=east,part=left": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l",
+    "exterior=false,facing=east,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wainscot_r_wainscot_c_wall",
       "y": 270
     },
-    "facing=east,part=middle": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m",
+    "exterior=false,facing=east,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wainscot_m_wainscot_c_wall",
       "y": 270
     },
-    "facing=east,part=plain": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c",
+    "exterior=false,facing=east,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wainscot_c_wainscot_c_wall",
       "y": 270
     },
-    "facing=east,part=right": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r",
+    "exterior=false,facing=east,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wainscot_l_wainscot_c_wall",
       "y": 270
     },
-    "facing=east,part=single": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s",
+    "exterior=false,facing=east,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wainscot_s_wainscot_c_wall",
       "y": 270
     },
-    "facing=north,part=left": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l",
+    "exterior=false,facing=north,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wainscot_r_wainscot_c_wall",
       "y": 180
     },
-    "facing=north,part=middle": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m",
+    "exterior=false,facing=north,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wainscot_m_wainscot_c_wall",
       "y": 180
     },
-    "facing=north,part=plain": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c",
+    "exterior=false,facing=north,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wainscot_c_wainscot_c_wall",
       "y": 180
     },
-    "facing=north,part=right": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r",
+    "exterior=false,facing=north,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wainscot_l_wainscot_c_wall",
       "y": 180
     },
-    "facing=north,part=single": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s",
+    "exterior=false,facing=north,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wainscot_s_wainscot_c_wall",
       "y": 180
     },
-    "facing=south,part=left": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l"
+    "exterior=false,facing=south,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wainscot_r_wainscot_c_wall"
     },
-    "facing=south,part=middle": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m"
+    "exterior=false,facing=south,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wainscot_m_wainscot_c_wall"
     },
-    "facing=south,part=plain": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c"
+    "exterior=false,facing=south,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wainscot_c_wainscot_c_wall"
     },
-    "facing=south,part=right": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r"
+    "exterior=false,facing=south,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wainscot_l_wainscot_c_wall"
     },
-    "facing=south,part=single": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s"
+    "exterior=false,facing=south,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wainscot_s_wainscot_c_wall"
     },
-    "facing=west,part=left": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l",
+    "exterior=false,facing=west,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wainscot_r_wainscot_c_wall",
       "y": 90
     },
-    "facing=west,part=middle": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m",
+    "exterior=false,facing=west,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wainscot_m_wainscot_c_wall",
       "y": 90
     },
-    "facing=west,part=plain": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c",
+    "exterior=false,facing=west,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wainscot_c_wainscot_c_wall",
       "y": 90
     },
-    "facing=west,part=right": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r",
+    "exterior=false,facing=west,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wainscot_l_wainscot_c_wall",
       "y": 90
     },
-    "facing=west,part=single": {
-      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s",
+    "exterior=false,facing=west,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wainscot_s_wainscot_c_wall",
+      "y": 90
+    },
+    "exterior=true,facing=east,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "exterior=true,facing=east,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "exterior=true,facing=east,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "exterior=true,facing=east,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "exterior=true,facing=east,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "exterior=true,facing=north,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "exterior=true,facing=north,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "exterior=true,facing=north,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "exterior=true,facing=north,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "exterior=true,facing=north,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "exterior=true,facing=south,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wall_white_wall_white_wall_white"
+    },
+    "exterior=true,facing=south,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wall_white_wall_white_wall_white"
+    },
+    "exterior=true,facing=south,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wall_white_wall_white_wall_white"
+    },
+    "exterior=true,facing=south,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wall_white_wall_white_wall_white"
+    },
+    "exterior=true,facing=south,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wall_white_wall_white_wall_white"
+    },
+    "exterior=true,facing=west,part=left": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_l_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "exterior=true,facing=west,part=middle": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_m_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "exterior=true,facing=west,part=plain": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_c_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "exterior=true,facing=west,part=right": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_r_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "exterior=true,facing=west,part=single": {
+      "model": "heavyseas:block/liner/liner_wainscot/cube_front_wainscot_s_wall_white_wall_white_wall_white",
       "y": 90
     }
   }

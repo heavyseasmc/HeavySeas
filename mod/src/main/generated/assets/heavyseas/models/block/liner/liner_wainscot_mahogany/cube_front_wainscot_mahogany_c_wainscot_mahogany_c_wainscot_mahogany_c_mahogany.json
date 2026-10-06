@@ -1,0 +1,10 @@
+{
+  "parent": "heavyseas:block/liner/template/cube_front",
+  "textures": {
+    "back": "heavyseas:block/liner/wainscot_mahogany_c",
+    "end": "heavyseas:block/liner/mahogany",
+    "front": "heavyseas:block/liner/wainscot_mahogany_c",
+    "particle": "heavyseas:block/liner/wainscot_mahogany_c",
+    "side": "heavyseas:block/liner/wainscot_mahogany_c"
+  }
+}

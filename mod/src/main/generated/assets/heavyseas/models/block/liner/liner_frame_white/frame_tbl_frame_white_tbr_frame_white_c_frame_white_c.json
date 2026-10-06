@@ -1,0 +1,10 @@
+{
+  "parent": "heavyseas:block/liner/template/frame_tbl",
+  "textures": {
+    "back": "heavyseas:block/liner/frame_white_tbr",
+    "end": "heavyseas:block/liner/frame_white_c",
+    "front": "heavyseas:block/liner/frame_white_tbl",
+    "particle": "heavyseas:block/liner/frame_white_tbl",
+    "side": "heavyseas:block/liner/frame_white_c"
+  }
+}

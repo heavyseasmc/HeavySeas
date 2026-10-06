@@ -127,6 +127,28 @@ public final class LinerGlass {
 
     public static final EnumProperty<RibShape> RIB_SHAPE = EnumProperty.of("shape", RibShape.class);
 
+    /**
+     * 窗台在哪一侧（ADR-0093 B10，用户 2026-10-07 定）：没有 · 屋里（正面那一侧，放的人站的那一侧）· 屋外 · 两边。窗台收在窗这一格里。
+     * 玻璃面跟着窗台走（{@link #glassZ}，模板 z：16 = 屋里那一面墙面）：屋外窗台 → 玻璃靠屋里 · 屋里窗台 → 玻璃靠屋外、屋里一块深窗台板 ·
+     * 两边 / 没有 → 居中。与 {@code liner_glass.py} 的 {@code GLASS_Z} 同一份。
+     */
+    public enum Sill implements StringIdentifiable {
+        NONE(8), INSIDE(3), OUTSIDE(13), BOTH(8);
+
+        final int glassZ;
+
+        Sill(int glassZ) {
+            this.glassZ = glassZ;
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    public static final EnumProperty<Sill> SILL = EnumProperty.of("sill", Sill.class);
+
     private static final Map<String, Block> BLOCKS = new LinkedHashMap<>();
 
     private static final List<Window> WINDOWS = new ArrayList<>();
@@ -243,13 +265,13 @@ public final class LinerGlass {
             this.height = height;
             this.col = COLS[width];
             this.row = ROWS[height];
-            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH));
+            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH).with(SILL, Sill.INSIDE));
         }
 
         @Override
         protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
             int[] size = PENDING.get();
-            builder.add(FACING);
+            builder.add(FACING, SILL);
             if (size[0] > 1) {
                 builder.add(COLS[size[0]]);
             }
@@ -291,6 +313,19 @@ public final class LinerGlass {
             return LinerConnect.Rules.frameMask(r < height - 1, r > 0, c > 0, c < width - 1);
         }
 
+        /** 同一扇里每一格的位置：按 pos 这一格的列 · 排推回左下角，再摆满（窗发光按整扇判，GlassGlow）。 */
+        public List<BlockPos> cellsOf(BlockPos pos, BlockState s) {
+            Direction f = s.get(FACING);
+            BlockPos origin = at(pos, f, -col(s), -row(s));
+            List<BlockPos> out = new ArrayList<>(width * height);
+            for (int c = 0; c < width; c++) {
+                for (int r = 0; r < height; r++) {
+                    out.add(at(origin, f, c, r));
+                }
+            }
+            return out;
+        }
+
         /** 左下角 origin 起，往右第 c 列、往上第 r 排那一格（左右按站在正面看的人算）。 */
         static BlockPos at(BlockPos origin, Direction facing, int c, int r) {
             return origin.offset(LinerConnect.viewerRight(facing), c).up(r);
@@ -300,7 +335,8 @@ public final class LinerGlass {
         public LinerLooks.Look look(BlockState s) {
             String mask = mask(col(s), row(s), width, height);
             // 玻璃每种 mask 一张：画框那几边一圈压边，左上那一格（上、左都画框）带反光 —— 一扇窗一到两段斜纹，不论多大
-            return LinerLooks.look("glass/window_" + mask, tex("frame", "glass/window_frame", "glass", "glass/window_glass_" + mask))
+            String template = "glass/window_" + mask + "_" + s.get(SILL).asString();
+            return LinerLooks.look(template, tex("frame", "glass/window_frame", "glass", "glass/window_glass_" + mask))
                     .turned(LinerBlock.yawOf(s.get(FACING)));
         }
 
@@ -331,7 +367,7 @@ public final class LinerGlass {
                     }
                 }
             }
-            return getDefaultState().with(FACING, facing);
+            return getDefaultState().with(FACING, facing).with(SILL, Sill.INSIDE);     // 窗台在放的人站的那一侧（正面）
         }
 
         /** 点中的那一格放的是左下角；其余几格在这里摆满（同游戏自带的门放上半扇）。 */
@@ -373,10 +409,13 @@ public final class LinerGlass {
             return stateFrom.isOf(this) && stateFrom.get(FACING) == state.get(FACING) || super.isSideInvisible(state, stateFrom, direction);
         }
 
-        /** 轮廓 = 玻璃面那 2 像素厚的一片（前出的框条不进轮廓，与大框相同）。 */
+        /** 轮廓 = 玻璃面到画框前沿那一片（玻璃面后 1 · 画框前出 3，收在格内；窗台不进轮廓）。 */
         @Override
         protected VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-            return shapes.computeIfAbsent(state, s -> turned(LinerBlock.yawOf(s.get(FACING)), new double[]{0, 0, 14, 16, 16, 16}));
+            return shapes.computeIfAbsent(state, s -> {
+                int gz = s.get(SILL).glassZ;
+                return turned(LinerBlock.yawOf(s.get(FACING)), new double[]{0, 0, gz - 1, 16, 16, Math.min(16, gz + 3)});
+            });
         }
 
         @Override

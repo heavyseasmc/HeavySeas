@@ -1,243 +1,483 @@
 {
   "variants": {
-    "down=false,facing=east,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr",
+    "down=false,exterior=false,facing=east,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_frame_mahogany_tblr_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=east,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr",
+    "down=false,exterior=false,facing=east,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_frame_mahogany_blr_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=east,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl",
+    "down=false,exterior=false,facing=east,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_frame_mahogany_tbr_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=east,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl",
+    "down=false,exterior=false,facing=east,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_frame_mahogany_br_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=east,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr",
+    "down=false,exterior=false,facing=east,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_frame_mahogany_tbl_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=east,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br",
+    "down=false,exterior=false,facing=east,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_frame_mahogany_bl_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=east,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb",
+    "down=false,exterior=false,facing=east,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_frame_mahogany_tb_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=east,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b",
+    "down=false,exterior=false,facing=east,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_frame_mahogany_b_frame_mahogany_c_frame_mahogany_c",
       "y": 270
     },
-    "down=false,facing=north,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr",
+    "down=false,exterior=false,facing=north,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_frame_mahogany_tblr_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=north,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr",
+    "down=false,exterior=false,facing=north,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_frame_mahogany_blr_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=north,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl",
+    "down=false,exterior=false,facing=north,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_frame_mahogany_tbr_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=north,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl",
+    "down=false,exterior=false,facing=north,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_frame_mahogany_br_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=north,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr",
+    "down=false,exterior=false,facing=north,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_frame_mahogany_tbl_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=north,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br",
+    "down=false,exterior=false,facing=north,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_frame_mahogany_bl_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=north,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb",
+    "down=false,exterior=false,facing=north,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_frame_mahogany_tb_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=north,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b",
+    "down=false,exterior=false,facing=north,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_frame_mahogany_b_frame_mahogany_c_frame_mahogany_c",
       "y": 180
     },
-    "down=false,facing=south,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr"
+    "down=false,exterior=false,facing=south,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_frame_mahogany_tblr_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=south,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr"
+    "down=false,exterior=false,facing=south,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_frame_mahogany_blr_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=south,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl"
+    "down=false,exterior=false,facing=south,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_frame_mahogany_tbr_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=south,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl"
+    "down=false,exterior=false,facing=south,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_frame_mahogany_br_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=south,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr"
+    "down=false,exterior=false,facing=south,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_frame_mahogany_tbl_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=south,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br"
+    "down=false,exterior=false,facing=south,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_frame_mahogany_bl_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=south,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb"
+    "down=false,exterior=false,facing=south,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_frame_mahogany_tb_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=south,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b"
+    "down=false,exterior=false,facing=south,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_frame_mahogany_b_frame_mahogany_c_frame_mahogany_c"
     },
-    "down=false,facing=west,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr",
+    "down=false,exterior=false,facing=west,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_frame_mahogany_tblr_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=false,facing=west,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr",
+    "down=false,exterior=false,facing=west,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_frame_mahogany_blr_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=false,facing=west,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl",
+    "down=false,exterior=false,facing=west,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_frame_mahogany_tbr_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=false,facing=west,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl",
+    "down=false,exterior=false,facing=west,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_frame_mahogany_br_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=false,facing=west,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr",
+    "down=false,exterior=false,facing=west,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_frame_mahogany_tbl_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=false,facing=west,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br",
+    "down=false,exterior=false,facing=west,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_frame_mahogany_bl_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=false,facing=west,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb",
+    "down=false,exterior=false,facing=west,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_frame_mahogany_tb_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=false,facing=west,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b",
+    "down=false,exterior=false,facing=west,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_frame_mahogany_b_frame_mahogany_c_frame_mahogany_c",
       "y": 90
     },
-    "down=true,facing=east,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr",
+    "down=false,exterior=true,facing=east,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=east,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr",
+    "down=false,exterior=true,facing=east,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=east,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl",
+    "down=false,exterior=true,facing=east,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=east,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l",
+    "down=false,exterior=true,facing=east,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=east,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr",
+    "down=false,exterior=true,facing=east,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=east,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r",
+    "down=false,exterior=true,facing=east,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=east,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t",
+    "down=false,exterior=true,facing=east,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=east,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front",
+    "down=false,exterior=true,facing=east,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_wall_white_wall_white_wall_white",
       "y": 270
     },
-    "down=true,facing=north,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr",
+    "down=false,exterior=true,facing=north,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=north,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr",
+    "down=false,exterior=true,facing=north,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=north,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl",
+    "down=false,exterior=true,facing=north,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=north,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l",
+    "down=false,exterior=true,facing=north,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=north,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr",
+    "down=false,exterior=true,facing=north,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=north,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r",
+    "down=false,exterior=true,facing=north,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=north,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t",
+    "down=false,exterior=true,facing=north,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=north,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front",
+    "down=false,exterior=true,facing=north,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_wall_white_wall_white_wall_white",
       "y": 180
     },
-    "down=true,facing=south,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr"
+    "down=false,exterior=true,facing=south,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=south,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr"
+    "down=false,exterior=true,facing=south,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=south,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl"
+    "down=false,exterior=true,facing=south,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=south,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l"
+    "down=false,exterior=true,facing=south,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=south,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr"
+    "down=false,exterior=true,facing=south,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=south,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r"
+    "down=false,exterior=true,facing=south,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=south,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t"
+    "down=false,exterior=true,facing=south,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=south,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front"
+    "down=false,exterior=true,facing=south,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_wall_white_wall_white_wall_white"
     },
-    "down=true,facing=west,left=false,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr",
+    "down=false,exterior=true,facing=west,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tblr_wall_white_wall_white_wall_white",
       "y": 90
     },
-    "down=true,facing=west,left=false,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr",
+    "down=false,exterior=true,facing=west,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_blr_wall_white_wall_white_wall_white",
       "y": 90
     },
-    "down=true,facing=west,left=false,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl",
+    "down=false,exterior=true,facing=west,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbl_wall_white_wall_white_wall_white",
       "y": 90
     },
-    "down=true,facing=west,left=false,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l",
+    "down=false,exterior=true,facing=west,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_bl_wall_white_wall_white_wall_white",
       "y": 90
     },
-    "down=true,facing=west,left=true,right=false,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr",
+    "down=false,exterior=true,facing=west,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tbr_wall_white_wall_white_wall_white",
       "y": 90
     },
-    "down=true,facing=west,left=true,right=false,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r",
+    "down=false,exterior=true,facing=west,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_br_wall_white_wall_white_wall_white",
       "y": 90
     },
-    "down=true,facing=west,left=true,right=true,up=false": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t",
+    "down=false,exterior=true,facing=west,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tb_wall_white_wall_white_wall_white",
       "y": 90
     },
-    "down=true,facing=west,left=true,right=true,up=true": {
-      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front",
+    "down=false,exterior=true,facing=west,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_b_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=east,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_frame_mahogany_tlr_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=east,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_frame_mahogany_lr_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=east,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_frame_mahogany_tr_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=east,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_frame_mahogany_r_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=east,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_frame_mahogany_tl_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=east,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_frame_mahogany_l_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=east,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_frame_mahogany_t_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=east,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_frame_mahogany_c_frame_mahogany_c_frame_mahogany_c",
+      "y": 270
+    },
+    "down=true,exterior=false,facing=north,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_frame_mahogany_tlr_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=north,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_frame_mahogany_lr_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=north,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_frame_mahogany_tr_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=north,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_frame_mahogany_r_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=north,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_frame_mahogany_tl_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=north,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_frame_mahogany_l_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=north,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_frame_mahogany_t_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=north,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_frame_mahogany_c_frame_mahogany_c_frame_mahogany_c",
+      "y": 180
+    },
+    "down=true,exterior=false,facing=south,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_frame_mahogany_tlr_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=south,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_frame_mahogany_lr_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=south,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_frame_mahogany_tr_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=south,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_frame_mahogany_r_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=south,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_frame_mahogany_tl_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=south,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_frame_mahogany_l_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=south,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_frame_mahogany_t_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=south,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_frame_mahogany_c_frame_mahogany_c_frame_mahogany_c"
+    },
+    "down=true,exterior=false,facing=west,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_frame_mahogany_tlr_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=west,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_frame_mahogany_lr_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=west,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_frame_mahogany_tr_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=west,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_frame_mahogany_r_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=west,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_frame_mahogany_tl_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=west,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_frame_mahogany_l_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=west,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_frame_mahogany_t_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=false,facing=west,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_frame_mahogany_c_frame_mahogany_c_frame_mahogany_c",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=east,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=east,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=east,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=east,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=east,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=east,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=east,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=east,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_wall_white_wall_white_wall_white",
+      "y": 270
+    },
+    "down=true,exterior=true,facing=north,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=north,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=north,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=north,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=north,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=north,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=north,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=north,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_wall_white_wall_white_wall_white",
+      "y": 180
+    },
+    "down=true,exterior=true,facing=south,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=south,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=south,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=south,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=south,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=south,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=south,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=south,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_wall_white_wall_white_wall_white"
+    },
+    "down=true,exterior=true,facing=west,left=false,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tlr_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=west,left=false,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_lr_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=west,left=false,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tl_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=west,left=false,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_l_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=west,left=true,right=false,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_tr_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=west,left=true,right=false,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_r_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=west,left=true,right=true,up=false": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/frame_t_wall_white_wall_white_wall_white",
+      "y": 90
+    },
+    "down=true,exterior=true,facing=west,left=true,right=true,up=true": {
+      "model": "heavyseas:block/liner/liner_frame_mahogany/cube_front_wall_white_wall_white_wall_white",
       "y": 90
     }
   }

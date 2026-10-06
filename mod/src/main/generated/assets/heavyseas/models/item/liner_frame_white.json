@@ -1,5 +1,5 @@
 {
-  "parent": "heavyseas:block/liner/liner_frame_white/frame_tblr",
+  "parent": "heavyseas:block/liner/liner_frame_white/frame_tblr_wall_white_wall_white_wall_white",
   "display": {
     "gui": {
       "rotation": [

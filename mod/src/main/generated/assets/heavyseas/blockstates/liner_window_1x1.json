@@ -1,18 +1,63 @@
 {
   "variants": {
-    "facing=east": {
-      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr",
+    "facing=east,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_both",
       "y": 270
     },
-    "facing=north": {
-      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr",
+    "facing=east,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_inside",
+      "y": 270
+    },
+    "facing=east,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_none",
+      "y": 270
+    },
+    "facing=east,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_outside",
+      "y": 270
+    },
+    "facing=north,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_both",
       "y": 180
     },
-    "facing=south": {
-      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr"
+    "facing=north,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_inside",
+      "y": 180
     },
-    "facing=west": {
-      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr",
+    "facing=north,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_none",
+      "y": 180
+    },
+    "facing=north,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_outside",
+      "y": 180
+    },
+    "facing=south,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_both"
+    },
+    "facing=south,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_inside"
+    },
+    "facing=south,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_none"
+    },
+    "facing=south,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_outside"
+    },
+    "facing=west,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_both",
+      "y": 90
+    },
+    "facing=west,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_inside",
+      "y": 90
+    },
+    "facing=west,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_none",
+      "y": 90
+    },
+    "facing=west,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_1x1/glass/window_tblr_outside",
       "y": 90
     }
   }

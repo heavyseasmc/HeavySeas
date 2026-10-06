@@ -45,7 +45,7 @@ import java.util.function.Supplier;
  *
  * <ul>
  *   <li>舷窗：{@code facing} 朝船外；只从屋里那一面进光，所以看<b>这一格自己</b>的方块光（{@code LinerHull.Porthole}）。</li>
- *   <li>大窗：{@code facing}（正面）朝屋里；光两边都进，所以看<b>屋里那一格</b>（正面前面那一格）。</li>
+ *   <li>大窗：{@code facing}（正面）朝屋里；光两边都进，所以看<b>屋里那一格</b>（正面前面那一格）—— 按整扇看，任何一格前面亮就整扇亮（{@link #lit}）。</li>
  * </ul>
  *
  * <p>只认贴图认出玻璃，不改模型。没有渲染器（{@link RendererAccess} 拿不到）时不包，窗照旧只被屋里的光照亮 —— 走的是哪一条路，日志里说一行。
@@ -151,6 +151,27 @@ public final class GlassGlow extends ForwardingBakedModel {
         return out;
     }
 
+    /**
+     * 屋里那一侧亮不亮。大窗按<b>整扇</b>判：任何一格前面那一格的方块光到阈值，整扇都亮 —— 逐格判时，一扇两格宽的窗前面
+     * 一格挨着灯、一格被家具挡着（或者恰好暗一级），从船外看就是半扇暖、半扇透（用户 2026-10-07 实拍）。
+     * 读的是建网格时那一块区域（区块段四周各多一圈），一扇窗至多 3 格宽，读得到；只是灯开关时游戏只重建光变了的那几段，
+     * 一扇窗正好跨在段与段之间、灯只照到其中一段那一半时，另一半要等那一段下次重建。
+     */
+    private boolean lit(BlockRenderView view, BlockState state, BlockPos pos, Direction facing) {
+        if (kind == Kind.PORTHOLE) {
+            return view.getLightLevel(LightType.BLOCK, pos) >= THRESHOLD;
+        }
+        if (state.getBlock() instanceof LinerGlass.Window w) {
+            for (BlockPos p : w.cellsOf(pos, state)) {
+                if (view.getLightLevel(LightType.BLOCK, p.offset(facing)) >= THRESHOLD) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return view.getLightLevel(LightType.BLOCK, pos.offset(facing)) >= THRESHOLD;
+    }
+
     @Override
     public boolean isVanillaAdapter() {
         return false;
@@ -160,8 +181,7 @@ public final class GlassGlow extends ForwardingBakedModel {
     public void emitBlockQuads(BlockRenderView view, BlockState state, BlockPos pos, Supplier<Random> random, RenderContext context) {
         Direction facing = state.get(Properties.HORIZONTAL_FACING);
         Direction outward = kind == Kind.PORTHOLE ? facing : facing.getOpposite();
-        BlockPos room = kind == Kind.PORTHOLE ? pos : pos.offset(facing);
-        if (view.getLightLevel(LightType.BLOCK, room) < THRESHOLD) {
+        if (!lit(view, state, pos, facing)) {
             wrapped.emitBlockQuads(view, state, pos, random, context);
             return;
         }

@@ -2,7 +2,9 @@
   "parent": "heavyseas:block/liner/template/cube_front",
   "textures": {
     "back": "heavyseas:block/liner/wall_white",
+    "end": "heavyseas:block/liner/wall_white",
     "front": "heavyseas:block/liner/wall",
-    "particle": "heavyseas:block/liner/wall"
+    "particle": "heavyseas:block/liner/wall",
+    "side": "heavyseas:block/liner/wall_white"
   }
 }
