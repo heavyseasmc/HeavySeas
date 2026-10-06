@@ -5,7 +5,10 @@ import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 规则书（ADR-0087 §2）：源文件能展开，数据里的每一个人、每一张牌都写到了，写坏了当场点名。
+ * 中英两份源文件各查一遍；英文那份还要与中文同构（生成指令同序、章与小节一样多）。
  */
 class RulebookTest {
 
@@ -28,18 +32,24 @@ class RulebookTest {
         return RulebookData.facts(strings::get, KEYS);
     }
 
-    private static String zh() {
-        return RulebookData.source("zh_cn").orElseThrow(() -> new AssertionError("jar 里没有 rulebook/zh_cn.md —— 没在测，不是通过"));
+    private static String src(String lang) {
+        return RulebookData.source(lang)
+                .orElseThrow(() -> new AssertionError("jar 里没有 rulebook/" + lang + ".md —— 没在测，不是通过"));
     }
 
-    @Test
-    @DisplayName("中文那份整本展开得了：扉页开头、十五章加附录")
-    void chineseExpands() {
-        List<Rulebook.Block> blocks = Rulebook.parse(zh(), facts("zh_cn"));
+    private static String zh() {
+        return src("zh_cn");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"zh_cn", "en_us"})
+    @DisplayName("整本展开得了：扉页开头、十五章加附录（中英各一份）")
+    void wholeBookExpands(String lang) {
+        List<Rulebook.Block> blocks = Rulebook.parse(src(lang), facts(lang));
         assertInstanceOf(Rulebook.TitlePage.class, blocks.getFirst());
         long chapters = blocks.stream().filter(b -> b instanceof Rulebook.Chapter).count();
-        assertEquals(16, chapters, "十五章 + 附");
-        System.out.println("规则书 zh_cn：" + blocks.size() + " 块，" + chapters + " 章");
+        assertEquals(16, chapters, lang + "：十五章 + 附");
+        System.out.println("规则书 " + lang + "：" + blocks.size() + " 块，" + chapters + " 章");
     }
 
     @Test
@@ -48,17 +58,18 @@ class RulebookTest {
         assertDoesNotThrow(() -> Rulebook.parse(zh(), facts("en_us")));
     }
 
-    @Test
-    @DisplayName("❗数据里的每个角色、每种物资、每张天候在书里各恰好一次 —— 新加一张牌而书没跟上，这里红")
-    void everyEntityWrittenOnce() {
-        String src = zh();
-        Rulebook.Facts f = facts("zh_cn");
-        assertExactlyOnce(src, "roster", f.roster().characters().stream().map(s -> s.id().value()).toList());
-        assertExactlyOnce(src, "provision", f.provisions().all().stream().map(Provision::id).toList());
-        assertExactlyOnce(src, "weather", f.weather().stream().map(WeatherCard::id).toList());
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"zh_cn", "en_us"})
+    @DisplayName("❗数据里的每个角色、每种物资、每张天候在书里各恰好一次（中英各查）—— 新加一张牌而书没跟上，这里红")
+    void everyEntityWrittenOnce(String lang) {
+        String src = src(lang);
+        Rulebook.Facts f = facts(lang);
+        assertExactlyOnce(lang, src, "roster", f.roster().characters().stream().map(s -> s.id().value()).toList());
+        assertExactlyOnce(lang, src, "provision", f.provisions().all().stream().map(Provision::id).toList());
+        assertExactlyOnce(lang, src, "weather", f.weather().stream().map(WeatherCard::id).toList());
     }
 
-    private static void assertExactlyOnce(String src, String directive, List<String> expected) {
+    private static void assertExactlyOnce(String lang, String src, String directive, List<String> expected) {
         List<String> written = Rulebook.directiveIds(src, directive);
         assertFalse(expected.isEmpty(), "数据里一个 " + directive + " 都没读到 —— 判据坏了");
         Set<String> dup = written.stream().filter(id -> Collections.frequency(written, id) > 1)
@@ -67,9 +78,43 @@ class RulebookTest {
         missing.removeAll(written);
         Set<String> extra = new TreeSet<>(written);
         expected.forEach(extra::remove);
-        assertEquals(Set.of(), missing, "@" + directive + " 书里没写到");
-        assertEquals(Set.of(), extra, "@" + directive + " 书里写了数据里没有的");
-        assertEquals(Set.of(), dup, "@" + directive + " 写了两遍");
+        assertEquals(Set.of(), missing, lang + " @" + directive + " 书里没写到");
+        assertEquals(Set.of(), extra, lang + " @" + directive + " 书里写了数据里没有的");
+        assertEquals(Set.of(), dup, lang + " @" + directive + " 写了两遍");
+    }
+
+    @Test
+    @DisplayName("英文与中文同构：生成指令一条不差、次序相同，章与小节一样多 —— 中文改了结构而英文没跟上，这里红")
+    void englishMirrorsChinese() {
+        assertEquals(generators(zh()), generators(src("en_us")), "en_us 的 @ 指令与 zh_cn 不同（缺、多或次序不同）");
+        List<Rulebook.Block> zhBlocks = Rulebook.parse(zh(), facts("zh_cn"));
+        List<Rulebook.Block> enBlocks = Rulebook.parse(src("en_us"), facts("en_us"));
+        assertEquals(count(zhBlocks, Rulebook.Chapter.class), count(enBlocks, Rulebook.Chapter.class), "章数");
+        assertEquals(count(zhBlocks, Rulebook.Heading.class), count(enBlocks, Rulebook.Heading.class), "小节数");
+    }
+
+    /** 从数据展开的那几条 @ 指令，按出现次序（扉页三行是各语言自己的字，不比）。 */
+    private static List<String> generators(String source) {
+        return Arrays.stream(source.split("\n")).map(String::strip)
+                .filter(l -> l.startsWith("@"))
+                .filter(l -> !l.startsWith("@title") && !l.startsWith("@subtitle") && !l.startsWith("@motto"))
+                .toList();
+    }
+
+    private static long count(List<Rulebook.Block> blocks, Class<?> kind) {
+        return blocks.stream().filter(kind::isInstance).count();
+    }
+
+    @Test
+    @DisplayName("讲台按客户端语言挑源文件：en_us 用英文那份、zh_cn 用中文那份，别的语言退到 en_us")
+    void pickFollowsClientLanguage() {
+        Map.Entry<String, String> en = RulebookData.pick("en_us");
+        assertEquals("en_us", en.getKey());
+        assertEquals(src("en_us"), en.getValue());
+        Map.Entry<String, String> zh = RulebookData.pick("zh_cn");
+        assertEquals("zh_cn", zh.getKey());
+        assertEquals(zh(), zh.getValue());
+        assertEquals("en_us", RulebookData.pick("fr_fr").getKey(), "没有那一种语言时依次退到 FALLBACK_LANGUAGES，第一个是 en_us");
     }
 
     @Test
@@ -122,13 +167,20 @@ class RulebookTest {
         assertFalse(RulebookView.open());
     }
 
-    @Test
-    @DisplayName("网页版与书同一串块：每一章都进了目录")
-    void htmlHasEveryChapter() {
-        String html = RulebookHtml.render("zh_cn", zh());
-        List<Rulebook.Block> blocks = Rulebook.parse(zh(), facts("zh_cn"));
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"zh_cn", "en_us"})
+    @DisplayName("网页版与书同一串块：每一章都进了目录（中英各一份）")
+    void htmlHasEveryChapter(String lang) {
+        String html = RulebookHtml.render(lang, src(lang));
+        List<Rulebook.Block> blocks = Rulebook.parse(src(lang), facts(lang));
         blocks.stream().filter(b -> b instanceof Rulebook.Chapter).map(b -> ((Rulebook.Chapter) b).title())
-                .forEach(t -> assertTrue(html.contains(">" + t + "</a>"), "目录里缺 " + t));
+                .forEach(t -> assertTrue(html.contains(">" + esc(t) + "</a>"), lang + " 目录里缺 " + t));
         assertTrue(html.indexOf("<nav>") < html.indexOf("<h2"), "目录在正文之前");
+        assertTrue(html.contains("<html lang=\"" + lang.replace('_', '-') + "\">"), "页面的语言标记");
+    }
+
+    /** 章名进 HTML 前转义过，比对时照同一规则转义。 */
+    private static String esc(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 }

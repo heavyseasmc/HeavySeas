@@ -147,7 +147,8 @@ public final class PlayerBodies {
                     continue;
                 }
                 ServerPlayerEntity player = server.getPlayerManager().getPlayer(id);
-                if (player == null || player.isSpectator()) {
+                // 有 OP 权限、自己切到创造模式的人不改回冒险（2026-10-07 用户在船上用 Axiom 搭船，每秒被改回冒险）：普通玩家切不了创造，规矩照旧
+                if (player == null || player.isSpectator() || (player.isCreative() && player.hasPermissionLevel(2))) {
                     continue;
                 }
                 if (player.interactionManager.getGameMode() != GameMode.ADVENTURE) {

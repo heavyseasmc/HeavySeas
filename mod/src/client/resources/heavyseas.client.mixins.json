@@ -8,6 +8,7 @@
     "ClientWorldPropertiesMixin",
     "GameScreenRenderMixin",
     "InGameHudMixin",
+    "ItemStackTooltipMixin",
     "KeyBindingPriorityMixin",
     "NativeImageMixin",
     "TrueTypeFontMixin",

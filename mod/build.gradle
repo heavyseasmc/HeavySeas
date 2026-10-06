@@ -239,6 +239,108 @@ tasks.named('check') {
     dependsOn checkLangKeys
 }
 
+// ADR-0093 B13 · B8：物品名与创造物品栏。两件事在游戏里都不报错 ——
+//   ① 名字带括号或「 · 」（用户 2026-10-07「物品名后面不要带括号」：说明写进名字；分不开的写进 <键>.desc，名字下面那一行灰字）
+//   ② 页表（CreativeTabs）漏了一件、写了两次、写了没登记的 id —— 物品栏里只是「找不到」
+// 名字从两份 lang 读；登记的物品从各族源码的登记写法读，与页表不同源。起服时 CreativeTabs 还会照 Registries 再核一遍。
+def checkItemCatalog = tasks.register('checkItemCatalog') {
+    group = 'verification'
+    description = '物品名不带括号与「 · 」· 每件登记的物品在创造物品栏里恰好出现一次（场景用的几件除外）'
+    // 任务属性：红测要能把它们指向造坏的副本（docs/tools/build-redtests.sh）
+    ext.langDir = file('src/main/resources/assets/heavyseas/lang')
+    ext.tabsSource = file('src/main/java/io/github/heavyseasmc/mod/world/CreativeTabs.java')
+    ext.mainSource = file('src/main/java')
+    inputs.dir(ext.langDir)
+    inputs.file(ext.tabsSource)
+    inputs.dir(ext.mainSource)
+    doLast { Task t ->
+        def problems = []
+        def slurper = new groovy.json.JsonSlurper()
+        def names = 0
+        ['zh_cn', 'en_us'].each { lang ->
+            def m = slurper.parse(new File(t.ext.langDir, "${lang}.json"), 'UTF-8') as Map
+            m.each { k, v ->
+                if (k ==~ /(block|item|entity)\.heavyseas\.[a-z0-9_]+/) {
+                    names++
+                    if (v =~ /[()（）\[\]【】]/ || v.contains(' · ')) {
+                        problems << "${lang}：${k} =「${v}」—— 名字里有括号或「 · 」（说明写进名字；分不开的写进 ${k}.desc）"
+                    }
+                }
+            }
+        }
+        if (names < 200) {
+            throw new GradleException("只认出 ${names} 条物品名 —— 判据坏了，不是名字干净")
+        }
+
+        // 页表：「页表开始」与「页表结束」之间的每个字符串字面量（页 id 是 p<数字>_…）
+        def tabs = t.ext.tabsSource.getText('UTF-8')
+        int a = tabs.indexOf('// ---- 页表开始'), b = tabs.indexOf('// ---- 页表结束')
+        if (a < 0 || b < a) {
+            throw new GradleException("${t.ext.tabsSource.name} 里找不到「页表开始 / 页表结束」—— 判据坏了")
+        }
+        def pages = [:]
+        def listed = []
+        String page = null
+        tabs.substring(a, b).findAll(/"([a-z0-9_]+)"/) { whole, id ->
+            if (id ==~ /p\d_[a-z_]+/) {
+                page = id
+                pages[page] = 0
+            } else {
+                listed << id
+                pages[page] = pages[page] + 1
+            }
+        }
+        def exempt = [] as Set
+        def ex = tabs =~ /NOT_IN_TABS = Set\.of\(([^;]*)\);/
+        if (ex.find()) {
+            ex.group(1).findAll(/"([a-z0-9_]+)"/) { whole, id -> exempt << id }
+        }
+
+        // 登记的物品：各族的登记写法（与 checkLinerBlocks 同一套）· 直接按 id 登记物品的 · 场景物品
+        def registered = [] as Set
+        def files = project.fileTree(t.ext.mainSource).matching { include '**/*.java' }.files
+        files.each { File f ->
+            def text = f.getText('UTF-8')
+            if (f.name ==~ /(Liner(Blocks|Props|Glass|Hull|Doors|Stairs)|SkiffBlocks)\.java/) {
+                text.findAll(/(?:add|frame|prop|glass|hull|door|window)\("((?:liner|skiff)_[a-z0-9_]+)"/) { whole, id -> registered << id }
+            }
+            text.findAll(/Registries\.ITEM, Identifier\.of\(HeavySeasMod\.MOD_ID, "([a-z0-9_]+)"\)/) { whole, id -> registered << id }
+            if (f.name == 'SceneItems.java') {
+                text.findAll(/register\("([a-z0-9_]+)"/) { whole, id -> registered << id }
+            }
+        }
+        // 正向对照：每一种登记写法都得认出东西来，否则「没登记」与「没在扫」一样
+        ['liner_wall', 'liner_sofa_cream', 'liner_window_2x2', 'liner_door_cabin', 'liner_balustrade', 'skiff_hull',
+         'gull_spawn_egg', 'chart_ship'].each {
+            if (!registered.contains(it)) {
+                throw new GradleException("登记的物品里没认出 ${it}（共认出 ${registered.size()} 件）—— 判据坏了")
+            }
+        }
+
+        def seen = [] as Set
+        listed.each { id ->
+            if (!seen.add(id)) {
+                problems << "${id} 在物品栏里出现了两次"
+            }
+            if (!registered.contains(id)) {
+                problems << "物品栏里的 ${id} 没有登记"
+            }
+        }
+        (registered - seen - exempt).sort().each { problems << "${it} 没进物品栏的任何一页（场景用的写进 NOT_IN_TABS）" }
+        (exempt - registered).sort().each { problems << "NOT_IN_TABS 里的 ${it} 没有登记" }
+
+        if (problems) {
+            throw new GradleException((['物品目录核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        t.logger.lifecycle("物品目录核对通过：两份 lang 共 ${names} 条名字不带括号 · 登记 ${registered.size()} 件 = " +
+                "物品栏 ${listed.size()} 件（${pages.collect { k, v -> "$k $v" }.join(' · ')}）+ 场景用 ${exempt.size()} 件")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkItemCatalog
+}
+
 // 通知侧栏有两条容易“看起来代码都在、实机却完全看不见”的约束：
 //   ① HudRenderCallback 比 Screen 先画，GameScreen 打开的那一帧必须改由 afterRender 画；
 //   ② GameScreen 的 width 必须在绘制和输入前收窄，否则牌与按钮仍会钻进侧栏下面。
@@ -1071,7 +1173,7 @@ def checkDecorBlocks = { Task task, Map fam ->
             f.getText('UTF-8').eachLine { line, i ->
                 if (line =~ /ItemGroups\.[A-Z_]+/ && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
                     // String.eachLine 的行号从 0 数（红测抓到：报成了第 2 行）—— 报给人看的要从 1 数
-                    problems << "${f.name}:${i + 1}：往 Minecraft 自带的创造物品栏页签里加了东西 —— 本模组的物品只进自己的三页（CreativeTabs）"
+                    problems << "${f.name}:${i + 1}：往 Minecraft 自带的创造物品栏页签里加了东西 —— 本模组的物品只进自己的那几页（CreativeTabs）"
                 }
             }
         }
@@ -1123,10 +1225,9 @@ def checkLinerBlocks = tasks.register('checkLinerBlocks') {
     inputs.files(ext.extraSources).optional()
     doLast { Task t ->
         // 大框五款走 frame("liner_frame_…") 登记，灯与家具走 prop("liner_…")（LinerProps），船壳与舷窗走 hull("liner_…")（LinerHull），
-        //   门走 door("liner_…")（LinerDoors），整扇窗走 window("liner_window_<宽>x<高>", …)、毯边件走 carpetPiece("liner_carpet_…", …)
-        //   （ADR-0091；名字里有数字），其余走 add("liner_…")
+        //   门走 door("liner_…")（LinerDoors），整扇窗走 window("liner_window_<宽>x<高>", …)（ADR-0091；名字里有数字），其余走 add("liner_…")
         checkDecorBlocks(t, [label: '大邮轮', prefix: 'liner_', dir: 'liner', blocksClass: 'LinerBlocks / LinerProps',
-                             registerPattern: /(?:add|frame|prop|glass|hull|door|window|carpetPiece)\("(liner_[a-z0-9_]+)"/, hull: false, scanTabs: false])
+                             registerPattern: /(?:add|frame|prop|glass|hull|door|window)\("(liner_[a-z0-9_]+)"/, hull: false, scanTabs: false])
     }
 }
 

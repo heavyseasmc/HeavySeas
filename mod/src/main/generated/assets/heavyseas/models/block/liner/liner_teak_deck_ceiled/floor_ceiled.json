@@ -1,9 +1,0 @@
-{
-  "parent": "heavyseas:block/liner/template/floor_ceiled",
-  "textures": {
-    "bottom": "heavyseas:block/liner/ceiling",
-    "particle": "heavyseas:block/liner/teak_deck",
-    "side": "heavyseas:block/liner/teak_side",
-    "top": "heavyseas:block/liner/teak_deck"
-  }
-}

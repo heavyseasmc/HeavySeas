@@ -1,15 +1,387 @@
 {
   "variants": {
-    "cell=0": {
+    "axis=x,cell=0,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=x,cell=0,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=x,cell=0,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=x,cell=0,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=x,cell=0,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=x,cell=0,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=x,cell=0,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=x,cell=0,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=x,cell=0,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=x,cell=0,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=x,cell=0,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=x,cell=0,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=x,cell=0,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=x,cell=0,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=x,cell=0,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=x,cell=0,east=true,north=true,south=true,west=true": {
       "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_00"
     },
-    "cell=1": {
+    "axis=x,cell=1,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=x,cell=1,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=x,cell=1,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=x,cell=1,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=x,cell=1,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=x,cell=1,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=x,cell=1,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=x,cell=1,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=x,cell=1,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=x,cell=1,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=x,cell=1,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=x,cell=1,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=x,cell=1,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=x,cell=1,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=x,cell=1,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=x,cell=1,east=true,north=true,south=true,west=true": {
       "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_10"
     },
-    "cell=2": {
+    "axis=x,cell=2,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=x,cell=2,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=x,cell=2,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=x,cell=2,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=x,cell=2,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=x,cell=2,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=x,cell=2,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=x,cell=2,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=x,cell=2,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=x,cell=2,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=x,cell=2,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=x,cell=2,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=x,cell=2,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=x,cell=2,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=x,cell=2,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=x,cell=2,east=true,north=true,south=true,west=true": {
       "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_01"
     },
-    "cell=3": {
+    "axis=x,cell=3,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=x,cell=3,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=x,cell=3,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=x,cell=3,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=x,cell=3,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=x,cell=3,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=x,cell=3,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=x,cell=3,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=x,cell=3,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=x,cell=3,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=x,cell=3,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=x,cell=3,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=x,cell=3,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=x,cell=3,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=x,cell=3,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=x,cell=3,east=true,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_11"
+    },
+    "axis=z,cell=0,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=z,cell=0,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=z,cell=0,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=z,cell=0,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=z,cell=0,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=z,cell=0,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=z,cell=0,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=z,cell=0,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=z,cell=0,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=z,cell=0,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=z,cell=0,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=z,cell=0,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=z,cell=0,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=z,cell=0,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=z,cell=0,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=z,cell=0,east=true,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_00"
+    },
+    "axis=z,cell=1,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=z,cell=1,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=z,cell=1,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=z,cell=1,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=z,cell=1,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=z,cell=1,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=z,cell=1,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=z,cell=1,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=z,cell=1,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=z,cell=1,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=z,cell=1,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=z,cell=1,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=z,cell=1,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=z,cell=1,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=z,cell=1,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=z,cell=1,east=true,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_10"
+    },
+    "axis=z,cell=2,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=z,cell=2,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=z,cell=2,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=z,cell=2,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=z,cell=2,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=z,cell=2,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=z,cell=2,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=z,cell=2,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=z,cell=2,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=z,cell=2,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=z,cell=2,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=z,cell=2,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=z,cell=2,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=z,cell=2,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=z,cell=2,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=z,cell=2,east=true,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_01"
+    },
+    "axis=z,cell=3,east=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nesw"
+    },
+    "axis=z,cell=3,east=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nes"
+    },
+    "axis=z,cell=3,east=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_new"
+    },
+    "axis=z,cell=3,east=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ne"
+    },
+    "axis=z,cell=3,east=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_esw"
+    },
+    "axis=z,cell=3,east=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_es"
+    },
+    "axis=z,cell=3,east=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ew"
+    },
+    "axis=z,cell=3,east=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_e"
+    },
+    "axis=z,cell=3,east=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nsw"
+    },
+    "axis=z,cell=3,east=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_ns"
+    },
+    "axis=z,cell=3,east=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_nw"
+    },
+    "axis=z,cell=3,east=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_n"
+    },
+    "axis=z,cell=3,east=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_sw"
+    },
+    "axis=z,cell=3,east=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_s"
+    },
+    "axis=z,cell=3,east=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_carpet/floor_carpet_border_w"
+    },
+    "axis=z,cell=3,east=true,north=true,south=true,west=true": {
       "model": "heavyseas:block/liner/liner_carpet/floor_carpet_cell_11"
     }
   }

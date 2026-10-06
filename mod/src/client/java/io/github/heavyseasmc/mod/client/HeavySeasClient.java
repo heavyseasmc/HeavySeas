@@ -158,6 +158,7 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 夜里亮着灯的舱室，从船外看舷窗与大窗是暖的（ADR-0082）：建网格时按屋里那一侧的光换上亮着的玻璃
         GlassGlow.register();
         GameScreenSidebar.register();
+        DesignNotes.register();                 // 装修标注 /hsnote：只在测试客户端里开（-DhsDesignNotes=true）
         // C3 第二轮 · c3-gallery：肖像画框右键看牌 —— 方块在 main，界面在这里；钩子由客户端塞进去，main 里从不引用客户端类（ADR-0013）。
         //   方块的 onUse 在客户端那一侧（渲染线程）调它
         io.github.heavyseasmc.mod.world.liner.PortraitView.install(sitter ->

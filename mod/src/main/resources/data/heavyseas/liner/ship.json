@@ -10,55 +10,55 @@
    "structure": "heavyseas:liner/seg_000",
    "x0": 0,
    "x1": 40,
-   "sha1": "72ff819ff907bc5a7181a144d0001c1bdb1f7fd9"
+   "sha1": "c43ff709d43e8c776b648ef94cc3ee63cd461e6c"
   },
   {
    "structure": "heavyseas:liner/seg_040",
    "x0": 40,
    "x1": 80,
-   "sha1": "cec18cd7a30559cdb359188677f4440875aa00b4"
+   "sha1": "800d21f37b5129c64967a3e0a27b987003f0d855"
   },
   {
    "structure": "heavyseas:liner/seg_080",
    "x0": 80,
    "x1": 120,
-   "sha1": "19b0f65042cbe4a292e48e02289324aecbb3d691"
+   "sha1": "d723b53d794257f8946c779b37c215ff5fa8ce18"
   },
   {
    "structure": "heavyseas:liner/seg_120",
    "x0": 120,
    "x1": 160,
-   "sha1": "c9c557211df8066e32b709acd605777fdb54b746"
+   "sha1": "4e15fb2461d114100397d7c3c25db4520c34706f"
   },
   {
    "structure": "heavyseas:liner/seg_160",
    "x0": 160,
    "x1": 186,
-   "sha1": "ce5dd452fe3f7a8464bf33074d3e0b057d09a922"
+   "sha1": "2b425b165b45b79e2819b5dbc58fb461f68cda6f"
   },
   {
    "structure": "heavyseas:liner/seg_186",
    "x0": 186,
    "x1": 226,
-   "sha1": "48eb439b37f3a285b1421ec535cde994423eb0d1"
+   "sha1": "65db77fad997b797df6a61b7f920c69a3adc76d5"
   },
   {
    "structure": "heavyseas:liner/seg_226",
    "x0": 226,
    "x1": 266,
-   "sha1": "8b5f4cb82b83df6006775e546661e1ff0453be41"
+   "sha1": "82fded0f567104b762c302da7f889ee83ecac583"
   },
   {
    "structure": "heavyseas:liner/seg_266",
    "x0": 266,
    "x1": 308,
-   "sha1": "05e7b876b0d438f35f17a95ba7497bb97899a5e5"
+   "sha1": "5165cadb97a0c353e54e7dbbf2fddc7f18beca83"
   },
   {
    "structure": "heavyseas:liner/seg_308",
    "x0": 308,
    "x1": 336,
-   "sha1": "653a2ddc56246dfdac58b5677fe30475a177476b"
+   "sha1": "18b44ee6003b56b0f39da09efe752664c9992600"
   }
  ],
  "skiffs": [
@@ -169,6 +169,6 @@
   8
  ],
  "chart_table_facing": "south",
- "blocks": 207120,
+ "blocks": 203344,
  "air": 117794
 }

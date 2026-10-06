@@ -331,8 +331,8 @@ public final class LinerConnect {
         }
 
         /**
-         * 毯边贴图的名字：参数为 true 的那一边不画边，画边的那几边按 n · e · s · w 的次序（与 {@code liner_decor.py} 的 CARPET_MASKS 一致）；
-         * 四边都不画 = 空串。ADR-0091 之前地毯按「这一边接不接地毯」调它，现在由 {@link #carpetBorders} 调。
+         * 毯边贴图的名字：参数为 true 的那一边（接着地毯）不画边，画边的那几边按 n · e · s · w 的次序
+         * （与 {@code liner_decor.py} 的 CARPET_MASKS 一致）；四边都接着 = 空串（走花纹）。ADR-0093 起地毯又按邻居收边。
          */
         public static String carpetMask(boolean north, boolean east, boolean south, boolean west) {
             StringBuilder s = new StringBuilder();
@@ -349,51 +349,6 @@ public final class LinerConnect {
                 s.append('w');
             }
             return s.toString();
-        }
-
-        /**
-         * 毯边件画哪几边（ADR-0091：毯边不再看邻居，由摆的人挑一件）。facing 用北 0 · 东 1 · 南 2 · 西 3，边朝着摆它的人：
-         * <ul>
-         *   <li>{@code edge} 毯边：朝向那一边；</li>
-         *   <li>{@code corner} 转角：朝向那一边 + 它顺时针的下一边（朝南 = 西南角）；</li>
-         *   <li>{@code runner} 一格宽的长条：朝向的左右两边（朝南 = 东西两边，顺着南北走）；</li>
-         *   <li>{@code end} 长条的端头：朝向那一边 + 左右两边，背着朝向的那一边开口接长条；</li>
-         *   <li>{@code mat} 单块小方毯：四边。</li>
-         * </ul>
-         * 回的字母次序与 {@link #carpetMask} 相同，贴图就是旧地毯那一张 {@code carpet_border_<字母>}；模型不转，绒毛与旧地毯逐像素相同。
-         */
-        public static String carpetBorders(String piece, int facing) {
-            int f = facing & 3;
-            int cw = (f + 1) & 3;
-            int ccw = (f + 3) & 3;
-            boolean[] on = new boolean[4];
-            switch (piece) {
-                case "edge" -> on[f] = true;
-                case "corner" -> on[f] = on[cw] = true;
-                case "runner" -> on[cw] = on[ccw] = true;
-                case "end" -> on[f] = on[cw] = on[ccw] = true;
-                case "mat" -> on[0] = on[1] = on[2] = on[3] = true;
-                default -> throw new IllegalArgumentException("没有这种毯边件：" + piece);
-            }
-            return carpetMask(!on[0], !on[1], !on[2], !on[3]);
-        }
-
-        /**
-         * 转角放下时朝哪：两条边落在摆它的人那一侧的斜对角。lookX / lookZ 是摆的人的水平视线（x 向东、z 向南）；
-         * 朝东北看 → 西南角（朝南），朝西北看 → 东南角（朝东）。
-         */
-        public static int carpetCorner(double lookX, double lookZ) {
-            int towardX = lookX > 0 ? 3 : 1;
-            int towardZ = lookZ > 0 ? 0 : 2;
-            return ((towardZ + 1) & 3) == towardX ? towardZ : towardX;
-        }
-
-        /**
-         * 转角镜像之后朝哪：朝向照游戏自带的做法镜像成 mirroredFacing 之后，「朝向 + 顺时针下一边」成了「朝向 + 逆时针下一边」，
-         * 再逆时针拨一格才是原来那两条边的镜像。
-         */
-        public static int carpetCornerAfterMirror(int mirroredFacing) {
-            return (mirroredFacing + 3) & 3;
         }
     }
 }

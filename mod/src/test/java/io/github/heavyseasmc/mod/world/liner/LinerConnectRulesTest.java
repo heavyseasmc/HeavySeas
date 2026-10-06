@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.IntUnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -70,91 +69,6 @@ final class LinerConnectRulesTest {
         }
         // 与 liner_decor.py 的 CARPET_MASKS 一一对应（贴图名 carpet_border_<这几个字母>）
         assertEquals(Set.of("n", "e", "s", "w", "ne", "ns", "nw", "es", "ew", "sw", "nes", "new", "nsw", "esw", "nesw"), all);
-    }
-
-    // ---------------------------------------------------------------- 毯边件（ADR-0091）：边朝着摆它的人，贴图就是旧地毯那一张
-
-    private static final String[] PIECES = {"edge", "corner", "runner", "end", "mat"};
-
-    /** 生成器（liner_build.py 的毯边件抄本）用同一组答案：改了这里，那边的「规则抄本对照」要跟着改。 */
-    @Test
-    void carpetPiecesDrawTheSidesFacingThePlacer() {
-        assertEquals("s", LinerConnect.Rules.carpetBorders("edge", 2), "朝南的毯边：边在南");
-        assertEquals("sw", LinerConnect.Rules.carpetBorders("corner", 2), "朝南的转角 = 西南角");
-        assertEquals("nw", LinerConnect.Rules.carpetBorders("corner", 3));
-        assertEquals("ne", LinerConnect.Rules.carpetBorders("corner", 0));
-        assertEquals("es", LinerConnect.Rules.carpetBorders("corner", 1));
-        assertEquals("ew", LinerConnect.Rules.carpetBorders("runner", 2), "朝南的长条顺着南北走：边在东西");
-        assertEquals("ns", LinerConnect.Rules.carpetBorders("runner", 1));
-        assertEquals("esw", LinerConnect.Rules.carpetBorders("end", 2), "朝南的端头：北边开口接长条");
-        assertEquals("nes", LinerConnect.Rules.carpetBorders("end", 1));
-        assertEquals("nesw", LinerConnect.Rules.carpetBorders("mat", 0));
-    }
-
-    /** 旧地毯的十五种毯边，新的几件每一种都拼得出 —— 船上原来的样子照样铺得出来；满铺（空串）是满铺块自己。 */
-    @Test
-    void carpetPiecesCoverEveryOldBorder() {
-        Map<String, String> who = new HashMap<>();
-        for (String piece : PIECES) {
-            for (int f = 0; f < 4; f++) {
-                who.putIfAbsent(LinerConnect.Rules.carpetBorders(piece, f), piece + "/" + f);
-            }
-        }
-        Set<String> old = new HashSet<>();
-        for (int m = 1; m < 16; m++) {
-            old.add(LinerConnect.Rules.carpetMask((m & 1) == 0, (m & 2) == 0, (m & 4) == 0, (m & 8) == 0));
-        }
-        assertEquals(old, who.keySet());
-    }
-
-    /** 结构整体转 / 镜像之后，边跟着转到对的那几边：转是朝向跟着转；转角镜像要再拨一格（LinerBlock.mirror）。 */
-    @Test
-    void carpetPiecesFollowRotationAndMirror() {
-        for (String piece : PIECES) {
-            for (int f = 0; f < 4; f++) {
-                String before = LinerConnect.Rules.carpetBorders(piece, f);
-                for (int k = 1; k < 4; k++) {
-                    int turn = k;
-                    assertEquals(mapSides(before, d -> (d + turn) & 3), LinerConnect.Rules.carpetBorders(piece, (f + k) & 3),
-                            piece + " 朝 " + f + " 转 " + k + " 次");
-                }
-            }
-        }
-        // 两种镜像：东西对调（x 翻）· 南北对调（z 翻）
-        IntUnaryOperator[] mirrors = {d -> d % 2 == 1 ? 4 - d : d, d -> d % 2 == 0 ? (d + 2) & 3 : d};
-        for (IntUnaryOperator m : mirrors) {
-            for (String piece : PIECES) {
-                for (int f = 0; f < 4; f++) {
-                    int after = m.applyAsInt(f);
-                    if (piece.equals("corner")) {
-                        after = LinerConnect.Rules.carpetCornerAfterMirror(after);
-                    }
-                    assertEquals(mapSides(LinerConnect.Rules.carpetBorders(piece, f), m), LinerConnect.Rules.carpetBorders(piece, after),
-                            piece + " 朝 " + f + " 镜像");
-                }
-            }
-        }
-    }
-
-    @Test
-    void carpetCornerLandsOnThePlacersSide() {
-        assertEquals(S, LinerConnect.Rules.carpetCorner(1, -1), "朝东北看 → 西南角");
-        assertEquals(E, LinerConnect.Rules.carpetCorner(-1, -1), "朝西北看 → 东南角");
-        assertEquals(W, LinerConnect.Rules.carpetCorner(1, 1), "朝东南看 → 西北角");
-        assertEquals(N, LinerConnect.Rules.carpetCorner(-1, 1), "朝西南看 → 东北角");
-        for (double[] look : new double[][]{{1, -1}, {-1, -1}, {1, 1}, {-1, 1}}) {
-            String sides = LinerConnect.Rules.carpetBorders("corner", LinerConnect.Rules.carpetCorner(look[0], look[1]));
-            assertTrue(sides.contains(look[1] < 0 ? "s" : "n") && sides.contains(look[0] > 0 ? "w" : "e"), "两条边都朝着摆的人：" + sides);
-        }
-    }
-
-    /** 毯边字母（n e s w）按方向编号映射一遍，再按 carpetMask 的次序排好。 */
-    private static String mapSides(String sides, IntUnaryOperator f) {
-        boolean[] on = new boolean[4];
-        for (char c : sides.toCharArray()) {
-            on[f.applyAsInt("nesw".indexOf(c))] = true;
-        }
-        return LinerConnect.Rules.carpetMask(!on[0], !on[1], !on[2], !on[3]);
     }
 
     // ---------------------------------------------------------------- 墙角：檐口、腰线拐内角 / 外角（同楼梯）

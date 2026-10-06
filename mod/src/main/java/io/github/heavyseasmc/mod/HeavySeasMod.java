@@ -99,7 +99,7 @@ public final class HeavySeasMod implements ModInitializer {
         io.github.heavyseasmc.mod.world.liner.DeckChairSeat.register();
         PlayerBodies.register();
         GullEntity.register();
-        CreativeTabs.register();                       // 物品都登记完之后：本模组自己的三页（ADR-0058 Q6）
+        CreativeTabs.register();                       // 物品都登记完之后：本模组自己的九页（ADR-0058 Q6 · ADR-0093 B8）
         // ❗孤儿座位：加载事件只登记，tick 末尾才清。加载回调仍在实体管理器的遍历里，
         //   当场 discard 会让存档检查点抛 ConcurrentModificationException。
         ServerEntityEvents.ENTITY_LOAD.register(Seats::onSeatLoaded);

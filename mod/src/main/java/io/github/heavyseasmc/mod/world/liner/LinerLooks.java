@@ -107,7 +107,6 @@ public final class LinerLooks {
      */
     private static Map<String, List<double[]>> withAttach(Map<String, List<double[]>> base) {
         Map<String, List<double[]>> out = new java.util.HashMap<>(base);
-        out.put("floor_ceiled", List.of(box(0, 0, 0, 16, 16, 16)));
         List<double[]> skirting = List.of(box(0, 0, 0, 16, 3, 1), box(0, 3, 0, 16, 4, 0.5));
         List<double[]> corniceThin = List.of(box(0, 15, 0, 16, 16, 2), box(0, 13, 0, 16, 15, 1));
         withCorners(out, "skirting", skirting);

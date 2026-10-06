@@ -27,7 +27,7 @@ final class LinerLooksTest {
 
     private static final Path TEMPLATES = Path.of("src", "main", "resources", "assets", "heavyseas", "models", "block", "liner", "template");
     /** 整块的几种：轮廓就是满格（大框前出 1 像素的框条按设计不进轮廓），不在这里对。 */
-    private static final Set<String> FULL = Set.of("cube", "cube_front", "floor", "floor_ceiled");
+    private static final Set<String> FULL = Set.of("cube", "cube_front", "floor");
     private static final double EPS = 0.01;
 
     @Test
