@@ -118,7 +118,8 @@ public final class ThirstPhase {
             return;
         }
         int suggested = canDecide ? clamp(session, prompt, prompt.waterNeeded(), 0) : 0;
-        component.setThirstDeadline(System.currentTimeMillis() + CHOOSE_MILLIS);
+        component.clearDecided();
+        component.setThirstDeadline(System.currentTimeMillis() + component.humanWindow(CHOOSE_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
         component.setThirstHighlight(suggested);
         GameFlow.broadcast(world, Text.translatable(canDecide
                         ? "heavyseas.game.thirst_choose" : "heavyseas.game.thirst_ask_donors",
@@ -159,7 +160,7 @@ public final class ThirstPhase {
 
     /** 旁人的捐水一面：一次只承诺 1 张，真正扣牌与当前角色自己的选择一起在 {@link #resolve} 完成。 */
     public static void onDonation(ServerPlayerEntity player, WaterDonationC2S action) {
-        if (action.waters() != 1) {
+        if (action.waters() != 1 && action.waters() != 0) {
             return;
         }
         ServerWorld world = player.getServerWorld();
@@ -171,7 +172,38 @@ public final class ThirstPhase {
         if (donor.isEmpty()) {
             return;
         }
+        if (action.waters() == 0) {
+            decline(world, component, donor.get());   // 「不给」（ADR-0095 D1）
+            return;
+        }
         donate(world, component, donor.get());
+    }
+
+    /**
+     * 替人打水那一面按了「不给」（ADR-0095 D1）。原先只是收起界面、服务端不知道，代打窗口只能空等到时；
+     * 演示局不限时之后会一直等下去。本人无从决定（昏迷 · 水不够）的那一窗，所有能打水的真人都给过或不给了，就照到时那样结算。
+     */
+    private static void decline(ServerWorld world, GameComponent component, CharacterId donor) {
+        Session session = component.requireSession();
+        Optional<Session.ThirstPrompt> pending = session.thirstPending();
+        if (pending.isEmpty() || donor.equals(pending.get().who())) {
+            return;
+        }
+        component.markDecided(donor);
+        LOGGER.info("口渴：{} 不替 {} 打水", donor.value(), pending.get().who().value());
+        Session.ThirstPrompt prompt = pending.get();
+        if (canDecide(session, prompt)) {
+            return;                           // 本人还要自己定喝几张：等他
+        }
+        boolean waiting = component.occupants().entrySet().stream().anyMatch(e -> !e.getValue().isDummy()
+                && !e.getKey().equals(prompt.who()) && !component.hasDecided(e.getKey())
+                && !component.thirstDonors().contains(e.getKey())
+                && session.state().canAct(e.getKey()) && !session.state().isOffline(e.getKey())
+                && availableDonationWater(session, component, e.getKey()) > 0);
+        if (!waiting) {
+            LOGGER.info("代打水窗口：能打水的真人都表过态了，按已收到的承诺结算");
+            resolve(world, component, clamp(session, prompt, component.thirstHighlight(), component.thirstDonors().size()));
+        }
     }
 
     /** 指令那条路（dev）：{@code /seas water <张数>}。 */

@@ -47,11 +47,15 @@ public record CatalogS2C(List<Provisions> provisions, List<Characters> character
         }
     }
 
-    /** 一张天候牌的目录条目：信息带里那一排效果图示。 */
-    public record Weathers(String id, List<Chip> glyph) {
+    /**
+     * 一张天候牌的目录条目：信息带里那一排效果图示，加上它的<b>效果</b>（引擎 {@code WeatherEffect} 的 id）。
+     * 效果给航海牌的预告用：今天是暴风雨还是浓雾，牌上那几栏会变（ADR-0095 A5）—— 按名字传，不按序号（与 {@link Chip} 同一条）。
+     */
+    public record Weathers(String id, List<Chip> glyph, String effect) {
         public static final PacketCodec<ByteBuf, Weathers> CODEC = PacketCodec.tuple(
                 PacketCodecs.STRING, Weathers::id,
                 Chip.CODEC.collect(PacketCodecs.toList(8)), Weathers::glyph,
+                PacketCodecs.STRING, Weathers::effect,
                 Weathers::new);
 
         public Weathers {
@@ -190,7 +194,8 @@ public record CatalogS2C(List<Provisions> provisions, List<Characters> character
                         .toList(),
                 weather.stream()
                         .map(w -> new Weathers(w.id(),
-                                CardFaces.weatherGlyph(w.effect()).stream().map(Chip::of).toList()))
+                                CardFaces.weatherGlyph(w.effect()).stream().map(Chip::of).toList(),
+                                w.effect().id()))
                         .toList());
     }
 

@@ -33,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -175,7 +177,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     @Override
     public void writeSyncPacket(RegistryByteBuf buf, ServerPlayerEntity recipient) {
         writeView(buf, recipient);
-        TableView.of(session, seatOf(recipient.getUuid()), overboardDeadline).write(buf);
+        TableView.of(session, seatOf(recipient.getUuid()), overboardDeadline,
+                id -> occupantOf(id).filter(o -> !o.isDummy()).map(o -> o.player().toString()).orElse("")).write(buf);
         buf.writeInt(SYNC_END);           // ❗必须是最后一笔，且每条分支都经过这里
     }
 
@@ -277,8 +280,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeVarLong(contestDeadline);
             buf.writeVarLong(contestWindow);
             Optional<Fight> fight = c.fight();
-            writeSide(buf, g, fight.map(Fight::attackSide).orElse(Set.of()));
-            writeSide(buf, g, fight.map(Fight::defendSide).orElse(Set.of()));
+            writeSide(buf, session, fight.map(Fight::attackSide).orElse(Set.of()));
+            writeSide(buf, session, fight.map(Fight::defendSide).orElse(Set.of()));
         }
 
         Optional<CharacterId> seat = seatOf(recipient.getUuid());
@@ -406,17 +409,18 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     /**
-     * 一边：站了谁（公开），加上他们的<b>体型和</b>。
+     * 一边：站了谁（公开），加上他们的<b>打架体型和</b>（满体型 + 今天喝的酒，与引擎结算同一个函数 {@code Session#fightingSize}）。
      *
-     * <p>❗只有体型。押下的武器是暗牌，加进来就等于提前把它亮了 —— 而且是以最难发现的方式：
+     * <p>❗不含押下的武器：那是暗牌，加进来就等于提前把它亮了 —— 而且是以最难发现的方式：
      * 界面上只是一个数变大了，没有任何人会报错。
+     * <p>❗酒要算（ADR-0095 A4）：喝酒是公开的，原先只加体型，有人喝了酒时界面上的数与结算对不上。
      */
-    private static void writeSide(RegistryByteBuf buf, GameState g, Set<CharacterId> side) {
+    private static void writeSide(RegistryByteBuf buf, Session session, Set<CharacterId> side) {
         buf.writeVarInt(side.size());
         int power = 0;
         for (CharacterId who : side) {
             buf.writeString(who.value());
-            power += g.roster().get(who).size();
+            power += session.fightingSize(who);
         }
         buf.writeVarInt(power);
     }
@@ -893,6 +897,42 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.dummyFast = on;
     }
 
+    /** 「不限时」的窗口有多长：一年。客户端见到窗口长过一天就画「∞」、倒计时条不动（用户 2026-10-07）。 */
+    public static final long UNLIMITED_MS = 365L * 24 * 3600 * 1000;
+
+    /**
+     * 演示局里真人不限时（用户 2026-10-07：「demo 局里真人不限时」）：替身随机行动开着、名单里有替身也有真人。
+     * 只认随机开关开着的局 —— 回归脚本都关着它跑，那几条「超时替你选」的路照旧测得到。
+     */
+    public boolean demoNoTimeout() {
+        return dummyAutoplay && dummyRandom && anyHumanSeated()
+                && occupants.values().stream().anyMatch(Occupant::isDummy);
+    }
+
+    /** 等真人的那一扇窗口开多长：演示局不限时，否则照给的毫秒数。只给「在等真人」的窗口用。 */
+    public long humanWindow(long millis) {
+        return demoNoTimeout() ? UNLIMITED_MS : millis;
+    }
+
+    /**
+     * 这一扇窗口里已经表过态、不必再等的真人（站队选了旁观或加入 · 押完武器 · 不给水 · 落海时不用牌）。
+     * 每扇窗口开时清空（{@link #clearDecided}）。所有该答的人都答了，窗口就提前收（ADR-0095 D1）——
+     * 不限时的演示局里没有这一条就会一直等下去。
+     */
+    private final java.util.Set<CharacterId> decided = new java.util.HashSet<>();
+
+    public void markDecided(CharacterId who) {
+        decided.add(who);
+    }
+
+    public boolean hasDecided(CharacterId who) {
+        return decided.contains(who);
+    }
+
+    public void clearDecided() {
+        decided.clear();
+    }
+
     /**
      * 推迟到之后某个 tick 再做的一步（ADR-0019）。
      *
@@ -906,14 +946,24 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * @param what    这一步是什么，出错时进日志
      * @param action  要做的事
      */
-    public record Step(long dueMs, Session session, String what, Runnable action) {
+    public record Step(long dueMs, Session session, String what, Runnable action, long seq) {
     }
 
-    private final ArrayDeque<Step> steps = new ArrayDeque<>();
+    /**
+     * 按到期时刻排、同一时刻按排进来的先后（{@code seq}）。
+     *
+     * <p>❗原先是先进先出、只看队头到没到期（「流程上同一时刻只会有一步排着」）。替身随机行动之后不再成立：
+     * 站队、押武器一次排好几步、各带一个随机延迟（StandInPlay），队头那一步要 6 秒，后面 1.5 秒的就被它堵住，
+     * 等它一到，后面几步一 tick 一步地连着做完 —— 屏幕上就是「替身加入防守 / 进攻没有延迟」（用户 2026-10-07），
+     * 下一个替身的回合也跟着被拖后。按到期时刻排，谁先到谁先做（ADR-0095 F1）。
+     */
+    private final PriorityQueue<Step> steps = new PriorityQueue<>(
+            Comparator.comparingLong(Step::dueMs).thenComparingLong(Step::seq));
+    private long stepSeq;
 
     /** 排一步。只能在有对局时排：排进来的一步都属于当前这一局。 */
     public void schedule(long dueMs, String what, Runnable action) {
-        steps.add(new Step(dueMs, requireSession(), what, action));
+        steps.add(new Step(dueMs, requireSession(), what, action, stepSeq++));
     }
 
     /**
@@ -928,7 +978,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * 到期的下一步；属于别的对局的一律丢掉。
      *
      * <p>每 tick 至多取一步：一步推进一个人，客户端的投影才一格一格地跟得上。
-     * 先进先出 —— 流程上同一时刻只会有一步排着（下一个替身、或者航海结算后的停顿）。
+     * 取的是<b>最早到期</b>的那一步（见 {@link #steps}）；同一时刻到期的按排进来的先后。
      */
     public Optional<Step> pollDueStep(long nowMs) {
         while (!steps.isEmpty()) {

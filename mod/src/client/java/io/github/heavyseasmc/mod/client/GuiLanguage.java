@@ -260,6 +260,17 @@ public final class GuiLanguage {
         public static final float LOG_OLD_ALPHA = 0.55f;
         /** 日志里的朱砂（{@code .cinn}）。 */
         public static final int LOG_CINNABAR = 0xFFDA5B3E;
+        /**
+         * 日志里认得出的几类字（{@link LogInk}；用户 2026-10-07：「行动或者牌的字应该有主题色」）。搪瓷永远是浅底，
+         * 这几色都压到与搪瓷底对比 ≥ 4.5 : 1，小字也读得出：人名藏青 · 物资牌琥珀 · 天候铜绿。
+         */
+        public static final int LOG_NAME = 0xFF23466E;
+        public static final int LOG_CARD = 0xFF8A5A0A;
+        public static final int LOG_WEATHER = 0xFF2F6E64;
+        /** 左边那一格的类别字，各类一色（与正文里同类的字同色系）。 */
+        public static final int LOG_CAT_THIRST = 0xFF2F5F8F;
+        public static final int LOG_CAT_CONTEST = 0xFFA8432B;
+        public static final int LOG_CAT_ACTION = 0xFF5E3F78;
 
         /** 热栏（样张 {@code .hotbar}）：外圈 {@code rgba(20,20,20,.8)} · 格 {@code rgba(0,0,0,.55)} · 格间线 {@code rgba(140,140,140,.7)}。 */
         public static final int HOTBAR_EDGE = 0xCC141414;

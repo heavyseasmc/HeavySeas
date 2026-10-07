@@ -10,7 +10,8 @@ import net.minecraft.util.Identifier;
 import java.util.Optional;
 
 public record CardActionC2S(int code, String card, String target, int token) implements CustomPayload {
-    public enum Kind { REVEAL, GIVE_HAND, GIVE_FRONT, OVERBOARD }
+    /** 编码只许往后加。{@code OVERBOARD_DONE}：落海那一窗「不用」—— 我这一窗不再出牌（ADR-0095 D1）。 */
+    public enum Kind { REVEAL, GIVE_HAND, GIVE_FRONT, OVERBOARD, OVERBOARD_DONE }
 
     public static final Id<CardActionC2S> ID = new Id<>(Identifier.of(HeavySeasMod.MOD_ID, "card_action"));
     public static final PacketCodec<RegistryByteBuf, CardActionC2S> CODEC = PacketCodec.tuple(

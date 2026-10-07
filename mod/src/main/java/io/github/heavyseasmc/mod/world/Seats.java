@@ -51,8 +51,13 @@ public final class Seats {
     private static final String HULL_TAG = "heavyseas_hull";
     private static final Queue<LoadedEntity> LOADED_ENTITIES = new ConcurrentLinkedQueue<>();
 
-    /** 座位比脚下的地面略高一点：贴地放的话，骑上去的人会有半个身子陷进方块里。 */
-    private static final double LIFT = 0.35;
+    /**
+     * 座位实体比布局给的座点再高多少。❗现在是 0：座点（{@code bow} 的 y 小数 .15）就已经让人坐在横座板上，
+     * 与北辰号演习艇那一条（{@code DrillSkiff.SEAT_HEIGHT = 0.15}）同一个高度。
+     * 原先的 0.35 是横座板方块之前留下的（那时人坐在船底板上，贴地会陷进方块）；加上座位实体自己 0.3 高、
+     * 乘客挂在它顶上，人浮在座板上方一截（用户 2026-10-07：「人物是浮在凳子上的，非常滑稽」）。
+     */
+    private static final double LIFT = 0.0;
 
     /**
      * 演示局里每个真人上一次被摆到第几位（玩家 → 下标）。演示局不钉人（用户 2026-10-07：「demo 局不要把玩家钉在座位上」）：
@@ -143,7 +148,12 @@ public final class Seats {
                 continue;                     // 已经坐对了 —— 这是绝大多数帧走到的分支
             }
             if (demo && Integer.valueOf(i).equals(PLACED.get(uuid))) {
-                continue;                     // 演示局：摆过这一位，他自己起身走开了 —— 不按回去
+                // 演示局：摆过这一位，他自己起身走开了 —— 不按回去；但跳进海里（或掉到艇下面）就摆回座位，
+                // 不然上不来（用户 2026-10-07）。落海那几秒的「下水」不走这里（bodyInWater 在上面已经跳过）。
+                if (!player.isTouchingWater() && player.getY() > seat.getY() - 3) {
+                    continue;
+                }
+                LOGGER.info("座位：{} 掉进海里，摆回第 {} 位", player.getGameProfile().getName(), i + 1);
             }
             player.stopRiding();
             player.teleport(world, seat.getX(), seat.getY(), seat.getZ(), seat.getYaw(), 0f);

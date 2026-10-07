@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.mod.game;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.weather.WeatherEffect;
 import io.github.heavyseasmc.mod.state.NavCardView;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
@@ -28,16 +29,54 @@ public final class NavCardText {
     private NavCardText() {
     }
 
-    /** 一行说完：「海鸥 +1 · 落海：船长 · 口渴：水手、划过船的人」。聊天播报与界面的说明行用它。 */
+    /** 一行说完：「海鸥 +1 · 落海：船长 · 口渴：水手、划过船的人」。不看天候（没有天候、或天候不改航海牌时用）。 */
     public static Text describe(NavCardView card, List<String> seatOrder) {
+        return describe(card, seatOrder, "");
+    }
+
+    /**
+     * 同上，按今天的天候改写成<b>这张牌今天实际会怎样</b>（ADR-0095 A5）。
+     *
+     * <h2>为什么要它</h2>
+     * 原先只照牌面写：暴风雨那天带桨的牌会把划过船的人送下水，划船与舵手两面上却写「口渴：划过船的人」；
+     * 浓雾天照样写「海鸥 +1」。舵手与划船的人照着错的预告做决定 —— 这是<b>信息错</b>，不只是信息少。
+     * 改写的每一条与引擎 {@code Session#beginNavigation} · {@code prepareThirst} · {@code effectiveThirst} 一一对应：
+     * <ul>
+     *   <li>浓雾（{@code ignore_gulls}）：海鸥那一栏不写；</li>
+     *   <li>暴风雨（{@code rowers_overboard}）/ 巨浪（{@code fighters_overboard}）：牌上有桨 / 打架图示时，那些人从「口渴」挪到「落海」；</li>
+     *   <li>无渴（{@code ignore_thirst}）：口渴那一栏写「无人」；全渴（{@code all_thirst}）：口渴那一栏先写「全员」。</li>
+     * </ul>
+     *
+     * @param weatherEffect 今天天候的效果 id（引擎 {@code WeatherEffect#id}）；空串 = 没有天候
+     */
+    public static Text describe(NavCardView card, List<String> seatOrder, String weatherEffect) {
+        String effect = weatherEffect == null ? "" : weatherEffect;
+        boolean noGulls = WeatherEffect.IGNORE_GULLS.id().equals(effect);
+        boolean rowersOverboard = WeatherEffect.ROWERS_OVERBOARD.id().equals(effect) && card.thirstRowers();
+        boolean fightersOverboard = WeatherEffect.FIGHTERS_OVERBOARD.id().equals(effect) && card.thirstFighters();
+        boolean noThirst = WeatherEffect.IGNORE_THIRST.id().equals(effect);
+        boolean allThirst = WeatherEffect.ALL_THIRST.id().equals(effect);
+
         MutableText out = Text.empty();
-        Text gull = gull(card);
+        Text gull = noGulls ? null : gull(card);
         if (gull != null) {
             out.append(gull).append(SECTION_SEP);
         }
-        out.append(Text.translatable("heavyseas.nav.overboard_line", names(card.overboard(), seatOrder)));
+        List<Text> overboard = new ArrayList<>();
+        if (card.overboard().mode() != NavCardView.Mode.NOBODY || !(rowersOverboard || fightersOverboard)) {
+            overboard.add(names(card.overboard(), seatOrder));
+        }
+        if (rowersOverboard) {
+            overboard.add(Text.translatable("heavyseas.nav.rowers"));
+        }
+        if (fightersOverboard) {
+            overboard.add(Text.translatable("heavyseas.nav.fighters"));
+        }
+        out.append(Text.translatable("heavyseas.nav.overboard_line", join(overboard)));
         out.append(SECTION_SEP);
-        out.append(Text.translatable("heavyseas.nav.thirst_line", thirst(card, seatOrder)));
+        Text thirst = noThirst ? Text.translatable("heavyseas.nav.nobody")
+                : thirst(card, seatOrder, !rowersOverboard, !fightersOverboard, allThirst);
+        out.append(Text.translatable("heavyseas.nav.thirst_line", thirst));
         return out;
     }
 
@@ -67,15 +106,28 @@ public final class NavCardText {
      * 牌面一个人都没点、只有图示时，只列图示，不写「无人」。
      */
     public static Text thirst(NavCardView card, List<String> seatOrder) {
+        return thirst(card, seatOrder, true, true, false);
+    }
+
+    /**
+     * 口渴那一栏的通用版：天候把划船 / 打架图示挪去落海时，这一栏就不再列它们；全渴天先写「全员」。
+     */
+    private static Text thirst(NavCardView card, List<String> seatOrder, boolean rowers, boolean fighters,
+                               boolean everyone) {
         List<Text> parts = new ArrayList<>();
-        boolean icons = card.thirstRowers() || card.thirstFighters();
-        if (card.thirst().mode() != NavCardView.Mode.NOBODY || !icons) {
+        if (everyone) {
+            parts.add(Text.translatable("heavyseas.nav.everyone"));
+        }
+        boolean showRowers = rowers && card.thirstRowers();
+        boolean showFighters = fighters && card.thirstFighters();
+        boolean icons = showRowers || showFighters;
+        if (card.thirst().mode() != NavCardView.Mode.NOBODY || (!icons && !everyone)) {
             parts.add(names(card.thirst(), seatOrder));
         }
-        if (card.thirstRowers()) {
+        if (showRowers) {
             parts.add(Text.translatable("heavyseas.nav.rowers"));
         }
-        if (card.thirstFighters()) {
+        if (showFighters) {
             parts.add(Text.translatable("heavyseas.nav.fighters"));
         }
         return join(parts);

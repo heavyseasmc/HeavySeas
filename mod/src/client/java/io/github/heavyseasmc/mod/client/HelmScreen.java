@@ -175,7 +175,7 @@ public final class HelmScreen extends GameScreen {
         // 航海牌没有牌名，签子上只有说明。
         if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
             drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
-                    null, null, NavCardText.describe(offer.get(highlight), view.seats()));
+                    null, null, NavCardText.describe(offer.get(highlight), view.seats(), Catalog.weatherEffect(view.weather())));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
                 new Countdown(deadlineMs, NavigationPhase.PICK_MILLIS, l.rowW()));

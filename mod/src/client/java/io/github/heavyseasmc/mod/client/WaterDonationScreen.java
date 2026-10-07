@@ -55,8 +55,17 @@ public final class WaterDonationScreen extends GameScreen {
         if (view.myDonatedWater() > seenMine) {
             seenMine = view.myDonatedWater();
             awaiting = false;                 // 服务端认下上一张，若还有水便可再给
+        } else if (awaiting && System.currentTimeMillis() - sentAt > AWAIT_MS) {
+            // 服务端拒了（不回话，ThirstPhase 只返回 false —— 比如这一下与窗口收尾擦肩而过）：牌落回原处、能再按，
+            // 不再一直抬着、按什么都没反应（ADR-0095 A8）
+            awaiting = false;
+            LOGGER.info("口渴：替人打水那一下没被认下，牌落回");
         }
     }
+
+    /** 等服务端认下这一张最多等多久；投影一个往返通常不到 0.2 秒。 */
+    private static final long AWAIT_MS = 1_500L;
+    private long sentAt;
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -106,6 +115,11 @@ public final class WaterDonationScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && !awaiting) {
+            // 「Esc 不给」真的告诉服务端（ADR-0095 D1）：没人等你了，代打窗口就提前结算
+            ClientPlayNetworking.send(new WaterDonationC2S(0));
+            LOGGER.info("口渴：不替 {} 打水", view.thirstPrompt().who());
+        }
         if (!awaiting && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER
                 || keyCode == GLFW.GLFW_KEY_SPACE)) {
             donate();
@@ -116,6 +130,7 @@ public final class WaterDonationScreen extends GameScreen {
 
     private void donate() {
         awaiting = true;
+        sentAt = System.currentTimeMillis();
         ClientPlayNetworking.send(new WaterDonationC2S(1));
         LOGGER.info("口渴：替 {} 打 1 张水", view.thirstPrompt().who());
     }

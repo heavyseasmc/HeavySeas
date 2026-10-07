@@ -60,7 +60,10 @@ final class SidebarReveal {
         if (last != null) {
             n = NotificationArrivals.count(last, current);
             if (n > 0) {
-                shownAt = now;
+                // 已经露出来（滑入中 · 停着 · 收回途中）时不从零再滑一遍，只把停留重新算起（用户 2026-10-07：
+                // 「如果关闭倒计时没结束之前有新的日志他又会弹一遍」）；收着的时候照旧滑出来
+                boolean showing = !pinned && openness(now) > 0f;
+                shownAt = showing ? now - GuiLanguage.SLIDE_MS : now;
                 arrived += n;
                 lastBatch = n;
             }
@@ -91,7 +94,7 @@ final class SidebarReveal {
     }
 
     /**
-     * 滚轮翻日志：往上滚（正数）翻到更早的，往下滚回到新的。只在钉住时调（{@code GameScreen#mouseScrolled} 与主画面的滚轮）。
+     * 滚轮翻日志：往上滚（正数）翻到更早的，往下滚回到新的。只在钉住时调：界面里的滚轮（{@code GameScreen#mouseScrolled}）· 世界里的 ↑ ↓（用户 2026-10-07：世界里滚轮留给指人换人）。
      * 最多翻到只剩最早那一条在最上面；具体一屏放几条由画的那一侧决定，这里只管不越过两头。
      */
     static void scroll(double amount) {
@@ -154,6 +157,37 @@ final class SidebarReveal {
         pinned = !pinned;
         scroll = 0;                           // 再钉上时从最新的看起
         scrollRest = 0;
+        if (!pinned) {
+            expanded = false;
+        }
+    }
+
+    /** 往回翻过（暂停在某一处）：新到的播报不挪动这一屏，直到按键回到最新（用户 2026-10-07）。 */
+    static boolean paused() {
+        return pinned && scroll > 0;
+    }
+
+    /** 回到最新的那一条（世界里与界面里都是 End）。 */
+    static void toLatest() {
+        scroll = 0;
+        scrollRest = 0;
+    }
+
+    /**
+     * 拉伸：日志占满整条右栏，天候卡与说明签收起（用户 2026-10-07：「放大不是全屏放大，而是拉升到整个右侧，其他元素压缩」）。
+     * Shift + L 切换；拉伸时一定钉着。
+     */
+    private static boolean expanded;
+
+    static boolean expanded() {
+        return pinned && expanded;
+    }
+
+    static void toggleExpanded() {
+        expanded = !expanded();
+        if (expanded) {
+            pinned = true;
+        }
     }
 
     /**

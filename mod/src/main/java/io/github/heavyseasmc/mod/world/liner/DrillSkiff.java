@@ -226,21 +226,26 @@ public final class DrillSkiff {
             player.sendMessage(Text.translatable("heavyseas.lobby.need_players", registered.size()), true);
             return;
         }
+        // 被拒的几种情况各说一句按语言走的话（ADR-0095 A8）：原先抛中文异常、把异常信息直接发给玩家，英文客户端也是中文
+        List<CharacterId> selected = request.characters().stream().map(CharacterId::of).toList();
+        if (selected.size() != registered.size()) {
+            // 开着阵容面板时有人起身或坐下：面板里的人数是打开那一刻的
+            player.sendMessage(Text.translatable("heavyseas.lobby.roster_mismatch", registered.size(), selected.size()), true);
+            return;
+        }
+        ServerWorld sea = MistSea.world(player.server);
+        if (sea == null || GameComponents.of(sea).session().isPresent()) {
+            player.sendMessage(Text.translatable("heavyseas.lobby.voyage_busy"), true);
+            return;
+        }
         try {
-            List<CharacterId> selected = request.characters().stream().map(CharacterId::of).toList();
             GameDataLoader.require().roster().select(selected);
-            if (selected.size() != registered.size()) {
-                throw new IllegalArgumentException("阵容人数必须与已报名人数一致");
-            }
-            ServerWorld sea = MistSea.world(player.server);
-            if (sea == null || GameComponents.of(sea).session().isPresent()) {
-                throw new IllegalStateException("雾海不可用或已有一局进行中");
-            }
             rig.world().playSound(null, BlockPos.ofFloored(rig.seats().getFirst()), SoundEvents.BLOCK_BELL_USE, SoundCategory.BLOCKS, 1f, 1f);
             LOGGER.info("演习艇：{} 人入座，敲钟开局", registered.size());
             MistSea.startVoyage(player.server, registered.size(), registered, Set.of(), selected);
         } catch (RuntimeException failure) {
-            player.sendMessage(Text.literal(String.valueOf(failure.getMessage())), true);
+            LOGGER.warn("演习艇：开局被拒：{}", failure.getMessage());   // 异常信息留在日志里
+            player.sendMessage(Text.translatable("heavyseas.lobby.start_failed"), true);
         }
     }
 

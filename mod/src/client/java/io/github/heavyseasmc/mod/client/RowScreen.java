@@ -163,7 +163,7 @@ public final class RowScreen extends GameScreen {
         // 航海牌没有牌名（id 形如 nav_07），它的身份就是那一句 —— 所以签子上只有说明。
         if (gathered > 0f && focus >= 0 && focus < cards.size()) {
             drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
-                    null, null, NavCardText.describe(cards.get(focus), view.seats()));
+                    null, null, NavCardText.describe(cards.get(focus), view.seats(), Catalog.weatherEffect(view.weather())));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("use"), now,
                 new Countdown(view.actionDeadlineMs(), view.actionWindowMs(), l.rowW()));
@@ -233,7 +233,7 @@ public final class RowScreen extends GameScreen {
     private void drawHint(DrawContext context, Layout l) {
         // 这一行说的是**这张牌会做什么**（牌面上的字在这个尺寸下读不出来），不是规矩 ——
         // 航海卡去字并接上提示签之后，这一行也该跟着走（ADR-0037 §7.4 第 3 条还欠）。
-        drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats()), l.hintY(), 2, GuiLanguage.ink());
+        drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats(), Catalog.weatherEffect(view.weather())), l.hintY(), 2, GuiLanguage.ink());
     }
 
     private int cardAt(int mouseX, int mouseY, Layout l) {
@@ -246,13 +246,11 @@ public final class RowScreen extends GameScreen {
         if (l != null && focus >= 0 && !inspecting()) {
             int card = cardAt((int) mouseX, (int) mouseY, l);
             if (card >= 0 && fates[card] == Session.RowFate.UNDECIDED) {
-                // 第一下选中，再点同一张才使用 —— 与补给箱「点一下就定」不同：那一面点错还能等超时，
-                // 这一面一点下去其余几张当场塞回牌堆底，不可逆（朱砂那一类）。按键那一行写着这条。
-                if (card == focus) {
-                    choose(card);
-                } else {
-                    focus = card;
-                }
+                // 左键点牌 = 就它了，与舵手、补给箱两面同一条（ADR-0095 A7）。
+                // 原先是「第一下选中、再点同一张才使用」，可悬停已经把焦点带到指针下那张，第一下点击就成了确认 ——
+                // 那个「点两下」只在注释里存在，屏幕上没有写，实际上也不成立。看清这张靠悬停与右键（查看态）。
+                focus = card;
+                choose(card);
                 return true;
             }
         }

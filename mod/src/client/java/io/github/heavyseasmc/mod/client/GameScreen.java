@@ -310,8 +310,18 @@ public abstract class GameScreen extends Screen {
             return true;
         }
         if (HeavySeasClient.logKey() != null && HeavySeasClient.logKey().matchesKey(keyCode, scanCode)) {
+            if ((modifiers & GLFW.GLFW_MOD_SHIFT) != 0) {
+                SidebarReveal.toggleExpanded();   // Shift + L：拉伸，日志占满整条右栏（用户 2026-10-07）
+                LOGGER.info("航海日志：{}", SidebarReveal.expanded() ? "拉伸" : "收回原宽");
+                return true;
+            }
             SidebarReveal.togglePin();       // 钉住 / 放开右栏：界面开着时按键不走按键绑定
             LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");
+            return true;
+        }
+        if (SidebarReveal.paused() && HeavySeasClient.logLatestKey() != null
+                && HeavySeasClient.logLatestKey().matchesKey(keyCode, scanCode)) {
+            SidebarReveal.toLatest();        // 往回翻过之后回到最新（用户 2026-10-07）
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -331,7 +341,10 @@ public abstract class GameScreen extends Screen {
             return true;
         }
         detail = null;
-        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && inspectSeat(mouseX, mouseY)) {
+        // 右键座位开那个人的座位面板 —— 但<b>只在这一面关得掉时</b>（ADR-0095 A6）：
+        // 关不掉的那几面（补给箱 · 表态 · 舵手 · 挑牌 · 口渴 · 医疗箱目标）是一个正在走的决定，换成座位面板之后
+        // 补给箱再也找不回来（它只在收到包时打开），只能干等超时替选。这时右键座位走下面那一支，只出说明签。
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && shouldCloseOnEsc() && inspectSeat(mouseX, mouseY)) {
             return true;
         }
         if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
@@ -356,7 +369,7 @@ public abstract class GameScreen extends Screen {
     private boolean inspectSeat(double x, double y) {
         for (SeatHit hit : seatHits) {
             if (hit.box().contains((int) x, (int) y)) {
-                client.setScreen(new TableScreen(hit.character()));
+                openChild(new TableScreen(hit.character()));   // 二级页面：Esc 回到这一面
                 return true;
             }
         }
@@ -553,7 +566,43 @@ public abstract class GameScreen extends Screen {
             super.close();
             return;
         }
+        // 二级页面：回到打开它的那一面，不合上（用户 2026-10-07：「在二级页面时 esc 应该返回上一页而不是直接关闭页面」）。
+        // 那一面已经没意义了（对局结束、轮次走了而它只在轮到时才有用……）就照常收起。
+        if (parent != null && parent.stillWanted()) {
+            GameScreen back = parent;
+            parent = null;
+            LOGGER.info("界面：返回 {}", back.getClass().getSimpleName());
+            client.setScreen(back);
+            return;
+        }
         closingAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 打开它的那一面（二级页面的「上一页」）；直接从世界里打开的为 {@code null}。只记一层：
+     * 回到上一页时上一页自己的 {@code parent} 还在，所以连着返回也成立（手牌 → 赠送 → Esc 回手牌 → Esc 回行动）。
+     */
+    private GameScreen parent;
+
+    /** 以「上一页是我」打开另一面：它收起时回到我这里（{@link #close}）。 */
+    protected void openChild(GameScreen child) {
+        if (client == null) {
+            return;
+        }
+        child.parent = this;
+        LOGGER.info("界面：从 {} 打开 {}", getClass().getSimpleName(), child.getClass().getSimpleName());
+        client.setScreen(child);
+    }
+
+    /** 上一页（没有就是 {@code null}）。 */
+    protected GameScreen parent() {
+        return parent;
+    }
+
+    /** 从二级页面回来时，这一面还值不值得回来。默认值得；只在某个时刻才有意义的面覆写它。 */
+    protected boolean stillWanted() {
+        return client != null && client.world != null
+                && io.github.heavyseasmc.mod.state.GameComponents.of(client.world).hudView().active();
     }
 
     // ------------------------------------------------------------------ 骨架：照样张的物理像素（ADR-0046 · SheetLayout）
@@ -878,12 +927,14 @@ public abstract class GameScreen extends Screen {
     private void drawCountdown(DrawContext context, Bands b, long now, long deadlineMs, long totalMs, int stageW) {
         long left = Math.max(0L, deadlineMs - now);
         long total = Math.max(1L, totalMs);
-        float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
-        boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
+        boolean infinite = total >= UNLIMITED_THRESHOLD_MS || left >= UNLIMITED_THRESHOLD_MS;   // 演示局不限时：满条、∞
+        float frac = infinite ? 1f : MathHelper.clamp(left / (float) total, 0f, 1f);
+        boolean urgent = !infinite && left <= GuiLanguage.urgencyThreshold(total);
         // ❗秒数排在横杠**旁边**，不排在它下面：叠成两行时这一条带要 21 个单位，并排只要一行字那么高。
         //   省下来的十几个单位全归舞台（总纲 §7.8）。
         // 样张里这个数是墨色的、没有 s 后缀 —— 它是这一条带上唯一要读的东西，不该比刻度还淡。
-        Text seconds = Text.literal(String.format("%.1f", left / 1000f));
+        Text seconds = infinite ? Text.translatable("heavyseas.hud.unlimited")
+                : Text.literal(String.format("%.1f", left / 1000f));
         // ❗秒数占的宽按**这一局最宽的那一种写法**算，不按这一帧真正要印的那几个字：
         //   「12.0」比「9.8」宽，而整块是居中的 —— 按当帧宽度算，每跨过一个数位整根管子就横着跳一下
         //   （用户 2026-09-23：「在倒计时的时候管子会左右横移」）。定宽之后管子一动不动，只有数字在变。
@@ -1173,8 +1224,9 @@ public abstract class GameScreen extends Screen {
         for (var seat : io.github.heavyseasmc.mod.state.GameComponents.of(client.world).tableView().seats()) {
             if (seat.id().equals(characterId)) {
                 Text state = seat.offline() ? Text.translatable("heavyseas.table.offline") : conditionName(seat.condition());
-                Text line = Text.translatable("heavyseas.seat.detail", nameOf(characterId),
-                        Math.max(0, seat.health()), seat.size(), state);
+                // 关不掉的那几面右键座位不开面板（ADR-0095 A6），签上就不写「右键看面前的牌」—— 不给出一件做不到的事
+                Text line = Text.translatable(shouldCloseOnEsc() ? "heavyseas.seat.detail" : "heavyseas.seat.detail_short",
+                        nameOf(characterId), Math.max(0, seat.health()), seat.size(), state);
                 // 下面接规则书里这个人的本事（用户 2026-10-07：「鼠标移动到角色头像上是浮窗气泡显示角色介绍」）
                 List<String> notes = CharacterNotes.of(characterId);
                 return java.util.Optional.of(notes.isEmpty() ? line
@@ -1440,6 +1492,18 @@ public abstract class GameScreen extends Screen {
     private void drawCountdownPx(DrawContext context, SheetLayout l, long now, long deadlineMs, long totalMs) {
         long left = Math.max(0L, deadlineMs - now);
         long total = Math.max(1L, totalMs);
+        // 演示局里等真人不限时（用户 2026-10-07：「demo 局玩家时间显示直接改成 ∞，倒计时条不动」）：
+        // 窗口长过一天就是不限时 —— 条画满、不动，秒数写 ∞
+        if (total >= UNLIMITED_THRESHOLD_MS || left >= UNLIMITED_THRESHOLD_MS) {
+            Rect bar = l.countBar();
+            GuiMaterial.hudPart(context, HudPart.COUNT_BAR, bar.x(), bar.y(), bar.w(), bar.h(), l.k());
+            GuiMaterial.hudPartLeft(context, HudPart.COUNT_FILL, bar.x(), bar.y(), bar.w(), bar.h(), bar.w(), l.k());
+            Rect sec = l.countSeconds();
+            int px = l.len(SheetLayout.SEC_PX);
+            GuiText.drawPx(context, Text.translatable("heavyseas.hud.unlimited").getString(), sec.x(), sec.y() + (sec.h() - GuiText.linePxAt(px, true)) / 2,
+                    sec.w(), px, true, GuiLanguage.ink(), GuiText.Align.RIGHT, 0);
+            return;
+        }
         float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
         boolean urgent = left <= GuiLanguage.urgencyThreshold(total);
         Rect bar = l.countBar();
@@ -1768,6 +1832,9 @@ public abstract class GameScreen extends Screen {
         }
         return List.of(primary(confirm, "Enter"), extra, keys(inspecting ? "close" : "inspect", "U"));
     }
+
+    /** 窗口长过这么久就算「不限时」（服务端用 {@code GameComponent.UNLIMITED_MS} = 一年）。 */
+    static final long UNLIMITED_THRESHOLD_MS = 24L * 3600 * 1000;
 
     /** 那一叠牌与签子之间。 */
     private static final int PLATE_GAP = 14;

@@ -53,7 +53,7 @@ public final class DesignationPhase {
     public static void begin(ServerWorld world, GameComponent component, CharacterId actor, Contest.Kind kind) {
         boolean quiet = quiet(component, actor);
         component.clearActionWindow();
-        component.beginDesignation(actor, kind, WINDOW_MILLIS);
+        component.beginDesignation(actor, kind, component.humanWindow(WINDOW_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
         ServerPlayerEntity player = playerOf(world, component, actor);
         if (player != null && !quiet) {
             player.setGlowing(true);          // 全船看得见的那一下（ADR-0025 §7.3：头顶图标的替身）
@@ -64,7 +64,9 @@ public final class DesignationPhase {
         if (!quiet) {
             GameFlow.broadcast(world, Text.translatable(kind == Contest.Kind.STEAL
                             ? "heavyseas.designate.announce_steal" : "heavyseas.designate.announce_swap",
-                    GameFlow.characterName(actor), WINDOW_MILLIS / 1000).formatted(Formatting.RED));
+                    GameFlow.characterName(actor), component.demoNoTimeout()
+                            ? Text.translatable("heavyseas.hud.unlimited") : String.valueOf(WINDOW_MILLIS / 1000))
+                    .formatted(Formatting.RED));
         }
         GameComponents.sync(world);
     }
@@ -89,37 +91,68 @@ public final class DesignationPhase {
         if (me.isEmpty() || !me.get().equals(who.get())) {
             return ActionResult.PASS;         // 举着拳头的不是他：这一下与我们无关
         }
+        pick(world, component, player, me.get(), target);
+        return ActionResult.SUCCESS;
+    }
+
+    /**
+     * 客户端按准星方向挑出来的那一个（ADR-0095 F2，{@link io.github.heavyseasmc.mod.net.DesignateC2S}）。
+     *
+     * <p>大家在艇上坐成一排，准星射线先打到中间那个人，右键实体那条路点不到后面的 —— 交互距离加多长都一样
+     * （用户 2026-10-07：「实际上手长 16 也点不到，因为大家都是坐成一排的」）。客户端按「与准星方向夹角最小」挑人，
+     * 服务端只认举着拳头的本人、只认船上的身体，判据与右键实体那条路同一份（{@link #pick}）。
+     */
+    public static void onDesignate(ServerPlayerEntity player, io.github.heavyseasmc.mod.net.DesignateC2S payload) {
+        ServerWorld world = player.getServerWorld();
+        GameComponent component = GameComponents.of(world);
+        Optional<CharacterId> who = component.designating();
+        if (who.isEmpty() || component.session().isEmpty()) {
+            return;                           // 包与收尾擦肩而过：指定模式已经结束
+        }
+        Optional<CharacterId> me = component.seatOf(player.getUuid());
+        if (me.isEmpty() || !me.get().equals(who.get())) {
+            return;                           // 举着拳头的不是他（改过的客户端发得出任何东西）
+        }
+        Entity body = world.getEntity(payload.body());
+        if (body == null) {
+            player.sendMessage(Text.translatable("heavyseas.designate.not_aboard").formatted(Formatting.GRAY), true);
+            return;
+        }
+        pick(world, component, player, me.get(), body);
+    }
+
+    /** 指中了一具身体：认出是谁、核对能不能指，能就宣告。两条路（右键实体 · 看着谁）共用这一份。 */
+    private static void pick(ServerWorld world, GameComponent component, ServerPlayerEntity player, CharacterId me,
+                             Entity target) {
         // 真人按玩家认；替身按它坐着的那具人形认（StandInBodies，用户 2026-10-07：「抢夺也不能抢人」—— 替身原先没有身体，点不到）
         Optional<CharacterId> picked = component.seatOf(target.getUuid())
                 .or(() -> io.github.heavyseasmc.mod.world.StandInBodies.characterOf(world, target));
         if (picked.isEmpty()) {
-            // 点到了船外的东西（路过的牛、旁观者）。吃掉这一下并说一句 ——
-            // 不说的话，玩家会以为自己点中了，然后干等 15 秒。
+            // 点到了船外的东西（路过的牛、旁观者）。说一句 —— 不说的话，玩家会以为自己点中了，然后干等到超时。
             player.sendMessage(Text.translatable("heavyseas.designate.not_aboard").formatted(Formatting.GRAY), true);
-            return ActionResult.SUCCESS;
+            return;
         }
-        if (picked.get().equals(me.get())) {
+        if (picked.get().equals(me)) {
             player.sendMessage(Text.translatable("heavyseas.designate.not_self").formatted(Formatting.GRAY), true);
-            return ActionResult.SUCCESS;
+            return;
         }
         Contest.Kind kind = component.designationKind().orElse(Contest.Kind.SWAP);
         Session session = component.requireSession();
         if (session.state().isRemoved(picked.get())) {
             player.sendMessage(Text.translatable("heavyseas.command.removed",
                     GameFlow.characterName(picked.get())).formatted(Formatting.GRAY), true);
-            return ActionResult.SUCCESS;
+            return;
         }
-        LOGGER.info("指定模式：{} 点了 {}", me.get().value(), picked.get().value());
-        finish(world, component, me.get());
-        ContestPhase.declare(world, component, me.get(), kind, picked.get());
-        return ActionResult.SUCCESS;
+        LOGGER.info("指定模式：{} 点了 {}", me.value(), picked.get().value());
+        finish(world, component, me);
+        ContestPhase.declare(world, component, me, kind, picked.get());
     }
 
     /** 主动取消：退回行动一面，这一回合还没用掉。ADR-0025 §7.6 用它代替决策 ⑦ 的「退回 GUI 重选」。 */
     public static void cancel(ServerWorld world, GameComponent component, CharacterId actor) {
         LOGGER.info("指定模式：{} 取消了", actor.value());
         finish(world, component, actor);
-        component.openActionWindow(ActionPhase.ACTION_MILLIS);
+        component.openActionWindow(component.humanWindow(ActionPhase.ACTION_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
         GameComponents.sync(world);
     }
 

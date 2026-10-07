@@ -36,10 +36,14 @@ public final class ActionBarEcho {
         if (text == null || text.getString().isBlank()) {
             return;
         }
+        boolean changed = message == null || !message.getString().equals(text.getString());
         message = text;
         at = System.currentTimeMillis();
-        // 客户端回归靠这一行判「拒绝那句真的到了」（文字随语言变，前缀不变）。
-        LOGGER.info("动作栏：{}", text.getString());
+        // 客户端回归靠这一行判「拒绝那句真的到了」（文字随语言变，前缀不变）。只在换了一句时记：
+        // 北辰号上的房间名每秒刷一次动作栏，原先每秒一行把日志冲烂（2026-10-07 用户客户端日志）
+        if (changed) {
+            LOGGER.info("动作栏：{}", text.getString());
+        }
     }
 
     /** 在这一面的最上层画（{@code GameScreenSidebar} 的 afterRender 里，侧栏与悬停签之后）。 */

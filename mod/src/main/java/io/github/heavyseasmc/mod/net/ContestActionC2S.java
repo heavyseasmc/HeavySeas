@@ -36,7 +36,11 @@ public record ContestActionC2S(int code, String card) implements CustomPayload {
         JOIN_DEFEND,
         COMMIT_WEAPON,
         PICK_FRONT,
-        PICK_HAND
+        PICK_HAND,
+        /** 站队一面选「旁观」：这一场我不加入（ADR-0095 D1）。原先不发包，窗口只能空等到时。 */
+        STAND_ASIDE,
+        /** 挂武器一面「不押了」：我押完了 / 不押（ADR-0095 D1）。 */
+        WEAPONS_DONE
     }
 
     public static final CustomPayload.Id<ContestActionC2S> ID =

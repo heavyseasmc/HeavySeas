@@ -149,11 +149,15 @@ public final class StanceScreen extends GameScreen {
         pxEnd(context);
     }
 
-    /** 站队。「旁观」不发包 —— 规则里没有「宣布中立」这种状态，不加入就只是不加入。 */
+    /**
+     * 站队。「旁观」也发一个包（ADR-0095 D1）：规则里没有「宣布中立」，它不改局面，只告诉服务端「我不加入了」——
+     * 该答的真人都答了，这一段就提前收；演示局不限时之后没有它会一直等。
+     */
     private boolean confirm(int i) {
         ActionCard c = CARDS.get(i);
         if (c == ActionCard.WATCH) {
-            LOGGER.info("站队：确认「WATCH」，不发包");
+            ClientPlayNetworking.send(ContestActionC2S.of(ContestActionC2S.Kind.STAND_ASIDE));
+            LOGGER.info("站队：确认「WATCH」，告诉服务端不加入");
             return true;
         }
         boolean attack = c == ActionCard.ATTACK;

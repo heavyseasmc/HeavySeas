@@ -36,10 +36,20 @@ final class Catalog {
         for (CatalogS2C.Characters c : payload.characters()) {
             CHARACTERS.put(c.id(), c.badges().stream().map(CatalogS2C.Badge::face).toList());
         }
+        WEATHER_EFFECTS.clear();
         for (CatalogS2C.Weathers w : payload.weathers()) {
             WEATHERS.put(w.id(), w.glyph().stream().map(CatalogS2C.Chip::face).toList());
+            WEATHER_EFFECTS.put(w.id(), w.effect());
         }
         generation++;
+    }
+
+    /** 天候牌 id → 它的效果 id（引擎 {@code WeatherEffect}）。航海牌预告按它改写（ADR-0095 A5）。 */
+    private static final Map<String, String> WEATHER_EFFECTS = new HashMap<>();
+
+    /** 这张天候的效果 id；没有天候、或没收到目录时是空串（预告照牌面写）。 */
+    static String weatherEffect(String weatherId) {
+        return weatherId == null ? "" : WEATHER_EFFECTS.getOrDefault(weatherId, "");
     }
 
     /** 天候牌信息带里的效果图示；没收到目录时是空的（信息带空着，不编一排顶上）。 */

@@ -262,7 +262,9 @@ public final class GameFlow {
                 announceTurn(world, component);
                 return;
             }
-            component.openActionWindow(ActionPhase.ACTION_MILLIS);
+            boolean humanTurn = component.occupantOf(actor.get()).map(o -> !o.isDummy()).orElse(false);
+            component.openActionWindow(humanTurn ? component.humanWindow(ActionPhase.ACTION_MILLIS)
+                    : ActionPhase.ACTION_MILLIS);   // 演示局里等真人不限时（用户 2026-10-07）
             // 投影要在播报与替身排程之前推出去，真人客户端才能在轮到他的第一帧拿到完整倒计时。
             sync(world);
             GameComponent.Occupant who = component.occupantOf(actor.get()).orElseThrow();
@@ -351,7 +353,8 @@ public final class GameFlow {
         // 结算后只公开被执行的那一张（决策 ⑭）。播的是它印着什么，不是它的 id —— id 不是给人读的。
         List<String> seats = session.state().bySeat().stream().map(CharacterId::value).toList();
         broadcast(world, Text.translatable("heavyseas.game.card_played",
-                NavCardText.describe(NavCardView.of(card), seats)).formatted(Formatting.AQUA));
+                NavCardText.describe(NavCardView.of(card), seats,
+                        session.currentWeather().map(w -> w.effect().id()).orElse(""))).formatted(Formatting.AQUA));
         OverboardPhase.begin(world, component);
     }
 

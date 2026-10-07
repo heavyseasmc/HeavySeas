@@ -24,7 +24,8 @@ public final class OverboardPhase {
         }
         boolean choices = component.occupants().entrySet().stream().anyMatch(entry ->
                 !entry.getValue().isDummy() && !session.overboardPlays(entry.getKey()).isEmpty());
-        component.setOverboardDeadline(System.currentTimeMillis() + (choices ? CHOOSE_MILLIS : 1));
+        component.clearDecided();
+        component.setOverboardDeadline(System.currentTimeMillis() + (choices ? component.humanWindow(CHOOSE_MILLIS) : 1));   // 演示局里等真人不限时（用户 2026-10-07）
         var names = Text.empty();
         for (var id : pending.get().swimmers()) {
             if (!names.getSiblings().isEmpty()) {

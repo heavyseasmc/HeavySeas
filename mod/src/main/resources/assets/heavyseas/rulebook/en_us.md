@@ -196,7 +196,7 @@ Thirst is the one exception: it resolves in the characters' fixed order, with th
 
 ## Time Limit
 
-Whoever holds the crate is on a timer: 2 seconds for each card left in it. When time runs out, the card you are looking at is kept for you.
+Whoever holds the crate is on a timer: 2 seconds for each card left in it, but never less than 20 seconds. When time runs out, the card you are looking at is kept for you.
 
 ## When the Deck Runs Out, It Is Gone
 
@@ -251,18 +251,18 @@ You cannot pick yourself, or anyone already taken by the sea.
    - either name a card in front of them, which goes in front of you, still face up;
    - or draw one at random from their hand, which goes into your hand.
 
-If they have no cards at all, you get nothing. You have 12 seconds to choose. If time runs out, one card is drawn at random from their hand for you; if their hand is empty, you take the first card in front of them.
+If they have no cards at all, you get nothing. You have 20 seconds to choose. If time runs out, one card is drawn at random from their hand for you; if their hand is empty, you take the first card in front of them.
 
 The Child steals by different rules; see Chapter 3.
 
 ## Picking a Target
 
-After choosing Swap seats or Steal, you go back to the world to right-click the person. You have 15 seconds.
+After choosing Swap seats or Steal, you go back to the world to right-click the person. You have 20 seconds.
 
 - During this time everyone in the boat sees you glowing, and hears that you want to swap seats or steal, but not whom you are after. This is time for the others to bargain.
 - When the Child steals, he does not glow and nothing is announced.
 - You can cancel and go back to choosing an action. This does not use up your action.
-- If you pick nobody within 15 seconds, you do nothing.
+- If you pick nobody within 20 seconds, you do nothing.
 
 Once you have picked someone, this uses your action for the day, whatever the outcome.
 
@@ -296,7 +296,7 @@ You cannot start a fight just because you dislike someone.
 
 ## First, an Answer
 
-The person targeted has 12 seconds to decide whether to agree. If time runs out, they agree.
+The person targeted has 20 seconds to decide whether to agree. If time runs out, they agree.
 
 ## Taking Sides
 
@@ -307,7 +307,7 @@ Until the sides are settled, anyone in the boat who is conscious, online and not
 - Once you join, you cannot leave or switch sides. Declaring yourself neutral counts for nothing.
 - The unconscious and the dead cannot join.
 
-Taking sides lasts 15 seconds. Each time someone joins, the timer is reset to 8 seconds.
+Taking sides lasts 20 seconds. Each time someone joins, the timer is reset to 8 seconds.
 
 Everyone can see who is on each side and each side's total Size.
 
@@ -319,7 +319,7 @@ Anyone in the fight can commit a weapon.
 - Only committed weapons count. A weapon face up in front of you does not count unless you commit it.
 - When the fight is over, committed weapons are shown: those already in front of you are used first; any more are turned up from your hand and placed in front of you. From then on they stay face up.
 
-Committing weapons lasts 10 seconds. Each time someone commits one, the timer is reset to 6 seconds.
+Committing weapons lasts 20 seconds. Each time someone commits one, the timer is reset to 6 seconds.
 
 ## Who Wins
 
@@ -358,7 +358,7 @@ The helmsman is the conscious, online person sitting nearest the stern. The helm
 - If nobody rowed today and the rowing pile is empty: turn over the top card of the deck and play it.
 - If the rowing pile has cards but nobody in the boat is conscious: also turn over the top card.
 
-The helmsman has 12 seconds to choose. If time runs out, the card they are looking at is played.
+The helmsman has 20 seconds to choose. If time runs out, the card they are looking at is played.
 
 Everyone sees the card played. The cards not chosen go back to the bottom of the deck, and nobody but the helmsman knows what they were. Navigation cards always go back to the bottom of the deck after use, so the deck never runs out.
 
@@ -382,7 +382,7 @@ The gull count starts at 0 and never goes below 0. The moment it reaches 4, the 
 - Everyone who goes in takes 1 damage, except two kinds of people: a conscious Sailor, and anyone with a Life Preserver in front of them. A Life Preserver clutched in your hand does not count.
 - Every card in front of someone who goes in is washed away into the discard pile, except a Life Preserver. Cards in hand are not affected. An open Parasol is washed away too.
 
-At the moment people go into the water, the conscious people in the boat can still do two things. When anyone holds a card they could use, this moment lasts 12 seconds.
+At the moment people go into the water, the conscious people in the boat can still do two things. When anyone holds a card they could use, this moment lasts 20 seconds.
 
 - **Throw a Life Preserver**: throw a Life Preserver from your hand or from in front of you to a conscious person overboard, as long as they do not already have one in front of them. You can throw it to yourself. An unconscious person cannot catch it; only a Life Preserver already in front of them protects them.
 - **Play Chum**: it draws sharks, and everyone going overboard in this group takes 1 more damage. The Chum is discarded. Chum already face up in front of someone overboard counts too, even if that person is you. Neither the Sailor nor a Life Preserver protects against sharks. Several Chum together still add only 1 damage.
@@ -411,7 +411,7 @@ For each thirst, drinking 1 Water deals with it; if you do not drink, you take 1
 - An open Parasol covers one thirst for you each day.
 - The Hostess always resolves last. Each Water drunk by someone before her cancels one of her thirst.
 
-Thirst goes one person at a time, in the characters' fixed order, not by where people sit now. Anyone who is not thirsty at all today does not have to wait. Each person has 12 seconds; if time runs out, you drink the number you have selected.
+Thirst goes one person at a time, in the characters' fixed order, not by where people sit now. Anyone who is not thirsty at all today does not have to wait. Each person has 20 seconds; if time runs out, you drink the number you have selected.
 
 ## What the Weather Changes
 

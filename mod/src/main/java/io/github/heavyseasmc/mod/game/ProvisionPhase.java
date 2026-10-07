@@ -215,7 +215,11 @@ public final class ProvisionPhase {
     }
 
     private static void armDeadline(GameComponent component, int cards) {
-        component.setProvisionDeadline(System.currentTimeMillis() + windowMillis(cards));
+        // 演示局里真人拿着箱子时不限时（用户 2026-10-07）；替身拿着的照旧（它不等窗口）
+        boolean human = component.requireSession().provisionHolder()
+                .flatMap(component::occupantOf).map(o -> !o.isDummy()).orElse(false);
+        long window = windowMillis(cards);
+        component.setProvisionDeadline(System.currentTimeMillis() + (human ? component.humanWindow(window) : window));
         component.setProvisionHighlight(0);
     }
 

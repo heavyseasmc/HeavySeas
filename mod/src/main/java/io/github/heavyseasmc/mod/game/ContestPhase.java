@@ -136,7 +136,10 @@ public final class ContestPhase {
         GameFlow.broadcast(world, Text.translatable("heavyseas.contest.joined", GameFlow.characterName(who),
                 Text.translatable(side == Fight.Side.ATTACK
                         ? "heavyseas.contest.side_attack" : "heavyseas.contest.side_defend")));
-        component.openContestWindow(STANCE_BUMP_MILLIS);
+        component.markDecided(who);
+        if (!endIfAllDecided(world, component)) {
+            component.openContestWindow(component.humanWindow(STANCE_BUMP_MILLIS));
+        }
         GameComponents.sync(world);
     }
 
@@ -150,8 +153,64 @@ public final class ContestPhase {
         LOGGER.info("挂武器：{} 押下一张", who.value());          // ❗日志也不写是哪一张：开服的人往往也是玩家
         GameFlow.broadcast(world, Text.translatable("heavyseas.contest.weapon_committed",
                 GameFlow.characterName(who)).formatted(Formatting.GRAY));
-        component.openContestWindow(WEAPON_BUMP_MILLIS);
+        if (!endIfAllDecided(world, component)) {
+            component.openContestWindow(component.humanWindow(WEAPON_BUMP_MILLIS));
+        }
         GameComponents.sync(world);
+    }
+
+    /**
+     * 这一段该答的真人都答完了吗（ADR-0095 D1）。站队：每个还能加入的清醒真人都加入了或选了旁观；
+     * 挂武器：每个还押得出武器的真人参战者都说了「押完了」。没有人要答时也算答完。
+     */
+    static boolean allHumansDecided(GameComponent component, Contest contest) {
+        Session session = component.requireSession();
+        for (var entry : component.occupants().entrySet()) {
+            CharacterId who = entry.getKey();
+            if (entry.getValue().isDummy() || session.state().isOffline(who) || component.hasDecided(who)) {
+                continue;
+            }
+            boolean owes = switch (contest.stage()) {
+                case STANCES -> canJoin(session, contest, who);
+                case WEAPONS -> session.state().canAct(who)
+                        && contest.fight().map(f -> f.combatants().contains(who)).orElse(false)
+                        && hasCommittableWeapon(session, contest, who);
+                default -> false;
+            };
+            if (owes) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasCommittableWeapon(Session session, Contest contest, CharacterId who) {
+        var state = session.state().stateOf(who);
+        List<String> all = new java.util.ArrayList<>(state.hand());
+        all.addAll(state.front());
+        return all.stream().anyMatch(card -> canCommitWeapon(session, contest, who, card));
+    }
+
+    /**
+     * 该答的都答了就把这一段收短（ADR-0095 D1）：留一小截尾巴让排着的替身动作露个面（真人局 2 秒 · 替身随机慢档 7 秒、
+     * 盖得住替身 1.5–6.5 秒的站队延迟 · 快档 0.6 秒），
+     * 不再让全船空等满 20 秒；演示局不限时的窗口也靠它收场。
+     *
+     * @return 收短了没有
+     */
+    static boolean endIfAllDecided(ServerWorld world, GameComponent component) {
+        Optional<Contest> contest = component.requireSession().contest();
+        if (contest.isEmpty() || component.contestDeadline() <= 0
+                || (contest.get().stage() != Contest.Stage.STANCES && contest.get().stage() != Contest.Stage.WEAPONS)
+                || !allHumansDecided(component, contest.get())) {
+            return false;
+        }
+        long tail = !component.dummyRandom() ? 2_000L : component.dummyFast() ? 600L : 7_000L;
+        if (component.contestDeadline() - System.currentTimeMillis() > tail) {
+            component.openContestWindow(tail);
+            LOGGER.info("这一场：{} 该答的真人都答了，{} 秒后收", contest.get().stage(), tail / 1000.0);
+        }
+        return true;
     }
 
     /** 站队段结束，进挂武器段。 */
@@ -328,6 +387,26 @@ public final class ContestPhase {
                 LOGGER.info("挑牌（界面）：{} 挑了面前的一张", who.value());
                 pickFromFront(world, component, action.card());
             }
+            case STAND_ASIDE -> {
+                // 站队一面选「旁观」（ADR-0095 D1）：原先不发包，窗口只能空等到时
+                if (contest.stage() != Contest.Stage.STANCES || !canJoin(session, contest, who)) {
+                    return;
+                }
+                LOGGER.info("站队（界面）：{} 旁观", who.value());
+                component.markDecided(who);
+                endIfAllDecided(world, component);
+                GameComponents.sync(world);
+            }
+            case WEAPONS_DONE -> {
+                if (contest.stage() != Contest.Stage.WEAPONS
+                        || !contest.fight().map(f -> f.combatants().contains(who)).orElse(false)) {
+                    return;
+                }
+                LOGGER.info("挂武器（界面）：{} 押完了", who.value());
+                component.markDecided(who);
+                endIfAllDecided(world, component);
+                GameComponents.sync(world);
+            }
             case PICK_HAND -> {
                 // ❗手上一张都没有时 pickFromHand 会对 0 求随机数 —— 那是个异常，不是一次被拒绝的操作。
                 if (contest.stage() != Contest.Stage.PICK || !contest.attacker().equals(who)
@@ -410,10 +489,13 @@ public final class ContestPhase {
                     "这一场：没人要等，按默认往下走", () -> advanceWithoutHumans(world, component));
             return;
         }
-        component.openContestWindow(millis);
+        component.clearDecided();
+        component.openContestWindow(component.humanWindow(millis));   // 演示局里等真人不限时（用户 2026-10-07）
+        Object seconds = component.demoNoTimeout() ? Text.translatable("heavyseas.hud.unlimited")
+                : String.valueOf(millis / 1000);   // 演示局不限时
         GameFlow.broadcast(world, who == null
-                ? Text.translatable(key, millis / 1000)
-                : Text.translatable(key, who, millis / 1000));
+                ? Text.translatable(key, seconds)
+                : Text.translatable(key, who, seconds));
         Contest.Stage stage = component.requireSession().contest().orElseThrow().stage();
         LOGGER.info("这一场：{} 开窗口 {} 秒", stage, millis / 1000);
         GameComponents.sync(world);
@@ -425,6 +507,8 @@ public final class ContestPhase {
                 default -> { }
             }
         }
+        // 一开窗就没有哪个真人要答（他本人就在场上 · 一张武器都押不出）：直接收短，不空等（ADR-0095 D1）
+        endIfAllDecided(world, component);
     }
 
     /** 替身随机行动开着（{@code /seas dummy random on}）：这一场里替身的那几下随机做，不再一律同意 / 不加入 / 不押。 */

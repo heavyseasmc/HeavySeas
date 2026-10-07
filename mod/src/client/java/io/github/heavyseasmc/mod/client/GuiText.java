@@ -214,6 +214,67 @@ final class GuiText {
         return Math.max(1, fit.lines().size());
     }
 
+    /**
+     * 同 {@link #paragraphPx}，但每个字可以有自己的颜色（{@code colors[i]} 对应 {@code text} 的第 i 个 char）。
+     * 折行与缩字和单色那一版完全一样（同一套 {@link TextFit}），之后按原文的位置把颜色对回去、一截一截画 ——
+     * 航海日志里人名、牌名、伤害各用主题色（用户 2026-10-07：「日志看起来很费劲，行动或者牌的字应该有主题色」）。
+     *
+     * @return 实际排了几行
+     */
+    static int paragraphRunsPx(DrawContext context, String text, int[] colors, int x, int top, int boxPx, int sizePx,
+                               boolean bold, int maxLines, int lineStepPx) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        TextFit.Result fit = TextFit.fit(text, boxPx, maxLines, candidates(bold, sizePx),
+                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.WRAP_FIRST);
+        int lead = (lineStepPx - linePx(fit.size())) / 2;
+        List<String> lines = fit.lines().stream().map(TextFit.Line::text).toList();
+        int[][] perLine = lineColors(text, colors, lines);
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            int py = top + i * lineStepPx + lead + baselineIn(fit.size()) - BASELINE_BELOW_DRAW_Y;
+            int cx = x;
+            int runStart = 0;
+            for (int j = 1; j <= line.length(); j++) {
+                if (j == line.length() || perLine[i][j] != perLine[i][runStart]) {
+                    String seg = line.substring(runStart, j);
+                    context.drawText(renderer, styled(seg, bold, fit.size()), cx, py, perLine[i][runStart], false);
+                    cx += renderer.getWidth(styled(seg, bold, fit.size()));
+                    runStart = j;
+                }
+            }
+        }
+        return Math.max(1, fit.lines().size());
+    }
+
+    /**
+     * 排好的每一行、每一个字是什么颜色：按原文的位置对回去。
+     * TextFit 会丢掉折行处与首尾的空白、把连着的几个空白并成一个，截断时补一个「…」——
+     * 所以对下一个实字之前，原文里的空白一律跳过；对不上的（「…」）沿用前一个字的颜色。
+     */
+    static int[][] lineColors(String text, int[] colors, List<String> lines) {
+        int[][] out = new int[lines.size()][];
+        int cursor = 0;
+        int last = colors.length > 0 ? colors[0] : 0xFF000000;
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            out[i] = new int[line.length()];
+            for (int j = 0; j < line.length(); j++) {
+                char ch = line.charAt(j);
+                if (!Character.isWhitespace(ch)) {
+                    while (cursor < text.length() && Character.isWhitespace(text.charAt(cursor))) {
+                        cursor++;
+                    }
+                }
+                if (cursor < text.length() && text.charAt(cursor) == ch) {
+                    last = colors[cursor];
+                    cursor++;
+                }
+                out[i][j] = last;
+            }
+        }
+        return out;
+    }
+
     /** 这段字在 {@link #paragraphPx} 里会排成几行（先量后铺底用）。 */
     static int paragraphLines(String text, int boxPx, int sizePx, boolean bold, int maxLines) {
         TextRenderer renderer = MinecraftClient.getInstance().textRenderer;

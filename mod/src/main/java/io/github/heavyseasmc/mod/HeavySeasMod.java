@@ -187,6 +187,12 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayNetworking.registerGlobalReceiver(RowDecisionC2S.ID,
                 (payload, context) -> context.player().server.execute(
                         () -> ActionPhase.onRowDecision(context.player(), payload)));
+        // 指定模式里「看着谁」的那一下（ADR-0095 F2）：坐成一排时准星射线点不到后面的人，客户端按夹角挑。
+        PayloadTypeRegistry.playC2S().register(io.github.heavyseasmc.mod.net.DesignateC2S.ID,
+                io.github.heavyseasmc.mod.net.DesignateC2S.CODEC);
+        ServerPlayNetworking.registerGlobalReceiver(io.github.heavyseasmc.mod.net.DesignateC2S.ID,
+                (payload, context) -> context.player().server.execute(
+                        () -> DesignationPhase.onDesignate(context.player(), payload)));
         // 舵手挑牌：移高亮 / 执行，以及「这张是替你挑的」。
         PayloadTypeRegistry.playC2S().register(HelmActionC2S.ID, HelmActionC2S.CODEC);
         PayloadTypeRegistry.playS2C().register(HelmAutoPickS2C.ID, HelmAutoPickS2C.CODEC);

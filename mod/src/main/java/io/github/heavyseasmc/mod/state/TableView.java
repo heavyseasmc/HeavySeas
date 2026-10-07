@@ -20,10 +20,15 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
         plays = List.copyOf(plays);
     }
 
+    /**
+     * 一个座位。{@code occupant} 是坐在这一座的真人的 UUID（字符串），替身是空串 ——
+     * 指人时客户端要知道准星前面那个玩家是哪个角色（ADR-0095 F2：看着谁就选谁），谁坐哪本来就是公开的。
+     */
     public record Seat(String id, int health, int size, Condition condition, boolean offline,
-                       boolean removed, List<String> front) {
+                       boolean removed, List<String> front, String occupant) {
         public Seat {
             front = List.copyOf(front);
+            occupant = occupant == null ? "" : occupant;
         }
     }
 
@@ -31,13 +36,19 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
     }
 
     public static TableView of(Session session, Optional<CharacterId> recipient, long deadline) {
+        return of(session, recipient, deadline, id -> "");
+    }
+
+    /** @param occupant 角色 → 坐在那一座的真人 UUID（字符串；替身返回空串） */
+    public static TableView of(Session session, Optional<CharacterId> recipient, long deadline,
+                               java.util.function.Function<CharacterId, String> occupant) {
         if (session == null) {
             return EMPTY;
         }
         var g = session.state();
         List<Seat> seats = g.bySeat().stream().map(id -> new Seat(id.value(),
                 g.roster().get(id).size() - g.stateOf(id).damage(), g.roster().get(id).size(),
-                g.conditionOf(id), g.isOffline(id), g.isRemoved(id), g.stateOf(id).front())).toList();
+                g.conditionOf(id), g.isOffline(id), g.isRemoved(id), g.stateOf(id).front(), occupant.apply(id))).toList();
         var prompt = session.overboardPending();
         List<Play> plays = deadline <= 0 ? List.of() : recipient.map(session::overboardPlays)
                 .orElse(List.of()).stream().map(p -> new Play(p.card(), p.target().value())).toList();
@@ -59,6 +70,7 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
             buf.writeBoolean(seat.offline());
             buf.writeBoolean(seat.removed());
             buf.writeCollection(seat.front(), PacketByteBuf::writeString);
+            buf.writeString(seat.occupant());
         }
         buf.writeVarInt(token);
         buf.writeVarLong(deadline);
@@ -76,7 +88,7 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
         for (int i = 0; i < count; i++) {
             seats.add(new Seat(buf.readString(), buf.readVarInt(), buf.readVarInt(),
                     buf.readEnumConstant(Condition.class), buf.readBoolean(), buf.readBoolean(),
-                    buf.readList(PacketByteBuf::readString)));
+                    buf.readList(PacketByteBuf::readString), buf.readString()));
         }
         int token = buf.readVarInt();
         long deadline = buf.readVarLong();

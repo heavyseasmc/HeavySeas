@@ -67,6 +67,8 @@ public final class GameHud {
     private static final int LOG_ENTRIES = 4;
     /** 钉住（L）时一屏最多几条：放得下就多给，放不下照旧从最旧的往回减；再早的靠滚轮翻（用户 2026-10-07）。 */
     private static final int PINNED_LOG_ENTRIES = 12;
+    /** 拉伸（Shift + L）时一屏最多几条：放得下多少就排多少，一直排到快捷栏上面。 */
+    private static final int EXPANDED_LOG_ENTRIES = 60;
     private static final int LOG_LINES_PER_ENTRY = 2;
     /** 效果说明签最多几行。 */
     private static final int TIP_LINES = 3;
@@ -116,6 +118,9 @@ public final class GameHud {
         drawRail(context, layout, view);
         drawRight(context, layout, view, now, scale);
         matrices.pop();
+        if (client.currentScreen == null) {
+            DesignationAim.draw(context, client);   // 举着拳头时准星下面「指着：谁 · 滚轮换人」（ADR-0095 F2）
+        }
         OverboardCue.drawFlash(context);
     }
 
@@ -422,7 +427,7 @@ public final class GameHud {
         double k = l.k();
         double y = HudLayout.DOCK_Y;
         String weather = view.weather();
-        if (!weather.isEmpty()) {
+        if (!weather.isEmpty() && !SidebarReveal.expanded()) {   // 拉伸时收起天候卡与说明签，日志占满整条右栏
             Rect card = l.drawerCard();
             GuiMaterial.hudPart(context, HudPart.CARD_SHADOW, card.x(), card.y(), card.w(), card.h(), k);
             CardTexture.drawWeatherPx(context, weather, card.x(), card.y(), card.w(), card.h());
@@ -445,10 +450,12 @@ public final class GameHud {
         }
         // 钉住时多一块「只有你看得到」的爱恨（用户 2026-10-07：「爱恨提示不能只在手牌页面，L 菜单也放一个」）。
         // 只在钉住时给：自己滑出来那一下是播报，不是摊开自己的底牌。
+        // （拉伸时天候卡与说明签在上面已经跳过：日志占满整条右栏）
         if (SidebarReveal.pinned() && view.seated() && !view.love().isEmpty()) {
             y += drawSecret(context, l, view, y) + HudLayout.DRAWER_GAP;
         }
-        drawLog(context, l, view, now, y, scale, SidebarReveal.pinned() ? PINNED_LOG_ENTRIES : maxEntries);
+        drawLog(context, l, view, now, y, scale, SidebarReveal.expanded() ? EXPANDED_LOG_ENTRIES
+                : SidebarReveal.pinned() ? PINNED_LOG_ENTRIES : maxEntries);
     }
 
     /**
@@ -482,10 +489,17 @@ public final class GameHud {
         int rowH = l.len(rowDesign);
         int tok = l.len(38);
         int namePx = l.len(17);
+        // 名字前写「爱」「恨」两个字（用户 2026-10-07：「爱恨的显示很反直觉」）
+        String[] word = {Text.translatable("heavyseas.hand.love").getString(), Text.translatable("heavyseas.hand.hate").getString()};
+        int wordPx = l.len(17);
+        int wordW = Math.max(GuiText.widthPx(word[0], wordPx, true, 0), GuiText.widthPx(word[1], wordPx, true, 0));
         for (int i = 0; i < 2; i++) {
             int cy = y + rowH / 2;
-            GuiMaterial.hudIcon(context, mark[i], tx, cy - icon / 2, icon, icon, color[i], k);
-            int tokX = tx + icon + l.len(10);
+            GuiText.drawPx(context, word[i], tx, cy - GuiText.linePxAt(wordPx, true) / 2, wordW + 2, wordPx, true,
+                    color[i], GuiText.Align.LEFT, 0);
+            int ix = tx + wordW + l.len(6);
+            GuiMaterial.hudIcon(context, mark[i], ix, cy - icon / 2, icon, icon, color[i], k);
+            int tokX = ix + icon + l.len(10);
             GuiMaterial.portrait(context, who[i], tokX, cy - tok / 2, tok, 1f);
             GuiMaterial.hudPart(context, HudPart.TOK38_PLAIN, tokX, cy - tok / 2, tok, tok, k);
             GuiText.drawPx(context, Text.translatable("heavyseas.character." + who[i]).getString(), tokX + tok + l.len(10),
@@ -520,15 +534,21 @@ public final class GameHud {
             Text note = notes.get(i);
             int age = notes.size() - 1 - i;
             boolean fresh = age < batch;
-            String label = fresh ? (age == 0 ? Text.translatable("heavyseas.hud.log.just_now").getString() : "")
-                    : category(note);
+            // 最新那一条标「刚刚」；其余（同一批的也是）标类别 —— 原先同一批的几条左边空着，
+            // 一眼分不出哪条是打架、哪条是口渴（用户 2026-10-07：「日志看起来很费劲」）
+            String cat = age == 0 ? "" : category(note);
+            String label = age == 0 ? Text.translatable("heavyseas.hud.log.just_now").getString()
+                    : cat.isEmpty() ? "" : Text.translatable("heavyseas.hud.log.cat." + cat).getString();
             int lines = GuiText.paragraphLines(note.getString(), textBox, textPx, false, LOG_LINES_PER_ENTRY);
-            entries.add(new Entry(note, label, fresh, lines));
+            entries.add(new Entry(note, label, cat, fresh, lines));
         }
         // 放不下就从最旧的那条往回减：日志底边不许压到热栏（热栏 22 个 GUI 单位，贴底）
         int hotbarTop = l.height() - 22 * scale;
+        // 往回翻过就停在那儿（用户 2026-10-07：「使用滚轮调整日志后应该暂停滚动 可以按键恢复」）：底下多一行说怎么回到最新
+        boolean paused = SidebarReveal.paused();
         double fixed = HudLayout.LOG_PAD_T + HudLayout.LOG_HEAD_H + HudLayout.LOG_HEAD_GAP + HudLayout.LOG_PAD_B
-                + (autoclose ? HudLayout.AUTOCLOSE_GAP + HudLayout.AUTOCLOSE_H : 0);
+                + (autoclose ? HudLayout.AUTOCLOSE_GAP + HudLayout.AUTOCLOSE_H : 0)
+                + (paused ? HudLayout.LOG_LINE : 0);
         double h;
         while (true) {
             int lines = entries.stream().mapToInt(Entry::lines).sum();
@@ -561,18 +581,25 @@ public final class GameHud {
                 line, k);
         int y = headTop + headH + l.len(HudLayout.LOG_HEAD_GAP);
         for (Entry e : entries) {
-            int color = e.fresh() ? noteInk(e.note()) : GuiLanguage.Hud.alpha(noteInk(e.note()), GuiLanguage.Hud.LOG_OLD_ALPHA);
+            float old = e.fresh() ? 1f : GuiLanguage.Hud.LOG_OLD_ALPHA;
             if (!e.label().isEmpty()) {
-                float a = GuiLanguage.Hud.LOG_LABEL_ALPHA * (e.fresh() ? 1f : GuiLanguage.Hud.LOG_OLD_ALPHA);
+                // 类别字各类一色（用户 2026-10-07：「日志看起来很费劲」）；「刚刚」仍是次墨
+                int labelInk = e.category().isEmpty() ? line : categoryInk(e.category());
+                float a = (e.category().isEmpty() ? GuiLanguage.Hud.LOG_LABEL_ALPHA : 1f) * old;
                 // 样张 .log .l i：13px、行高 1.75、padding-top 2，与正文顶对齐
                 // 右沿对齐在那一格的右边；框往左伸进内边距 —— 小窗口里字号有地板（12 px），
                 // 「刚刚」两个字比按比例缩下来的 34 宽，不伸就被截成「…」（2026-09-30 854×480 实拍）
                 int pad = l.len(HudLayout.LOG_PAD_X) - 1;
                 GuiText.drawPx(context, e.label(), x0 - pad, y + l.len(2)
                                 + (l.len(HudLayout.LOG_HEAD_TEXT * 1.75) - GuiText.linePxAt(labelPx, false)) / 2,
-                        labelW + pad, labelPx, false, GuiLanguage.Hud.alpha(line, a), GuiText.Align.RIGHT, 0);
+                        labelW + pad, labelPx, false, GuiLanguage.Hud.alpha(labelInk, a), GuiText.Align.RIGHT, 0);
             }
-            GuiText.paragraphPx(context, e.note().getString(), log.x() + textX0, y, textBox, textPx, false, color,
+            LogInk.Runs runs = LogInk.runs(e.note());
+            int[] colors = new int[runs.kinds().length];
+            for (int c = 0; c < colors.length; c++) {
+                colors[c] = GuiLanguage.Hud.alpha(runInk(runs.kinds()[c], runs.styledRgb()[c]), old);
+            }
+            GuiText.paragraphRunsPx(context, runs.text(), colors, log.x() + textX0, y, textBox, textPx, false,
                     LOG_LINES_PER_ENTRY, lineStep);
             y += e.lines() * lineStep;
         }
@@ -589,6 +616,14 @@ public final class GameHud {
             context.fill(barX, thumbTop, barX + barW, Math.min(trackTop + trackH, thumbTop + thumbH),
                     GuiLanguage.Hud.alpha(line, 0.6f));
         }
+        if (paused) {
+            String latest = HeavySeasClient.logLatestKey() == null ? "End"
+                    : HeavySeasClient.logLatestKey().getBoundKeyLocalizedText().getString();
+            GuiText.drawPx(context, Text.translatable("heavyseas.hud.log.paused", latest).getString(), x0, y,
+                    log.w() - 2 * l.len(HudLayout.LOG_PAD_X), labelPx, false,
+                    GuiLanguage.Hud.alpha(line, GuiLanguage.Hud.LOG_LABEL_ALPHA), GuiText.Align.LEFT, 0);
+            y += lineStep;
+        }
         if (autoclose) {
             int barW = Math.round(l.len(HudLayout.DRAWER_W - 2 * HudLayout.LOG_PAD_X) * SidebarReveal.remaining(now));
             int by = y + l.len(HudLayout.AUTOCLOSE_GAP);
@@ -596,17 +631,39 @@ public final class GameHud {
         }
     }
 
-    private record Entry(Text note, String label, boolean fresh, int lines) {
-    }
-
-    /** 播报印在搪瓷上：服务端标了红（战斗结算）的用日志里的朱砂，其余一律深墨（样张 .log 与 .cinn）。 */
-    private static int noteInk(Text entry) {
-        return noteColor(entry) == GuiLanguage.cinnabar() ? GuiLanguage.Hud.LOG_CINNABAR : GuiLanguage.Hud.ENAMEL_LINE;
+    private record Entry(Text note, String label, String category, boolean fresh, int lines) {
     }
 
     /**
-     * 一条旧播报属于哪一类（样张 b-2 左边那一格：物资 · 天候……）：按服务端文本键的前缀归，归不上的不标。
-     * 键是服务端 {@code GameFlow.broadcast} 发的那一串，客户端收到的仍是可翻译文本。
+     * 播报印在搪瓷上，一个字一个字地定色（{@link LogInk}）：人名 · 物资牌 · 天候各一色；
+     * 服务端标了红（战斗结算）的用日志里的朱砂，其余一律深墨（样张 .log 与 .cinn）。
+     */
+    private static int runInk(LogInk.Kind kind, int styledRgb) {
+        return switch (kind) {
+            case NAME -> GuiLanguage.Hud.LOG_NAME;
+            case CARD -> GuiLanguage.Hud.LOG_CARD;
+            case WEATHER -> GuiLanguage.Hud.LOG_WEATHER;
+            case STYLED -> GuiLanguage.semantic(styledRgb) == GuiLanguage.cinnabar()
+                    ? GuiLanguage.Hud.LOG_CINNABAR : GuiLanguage.Hud.ENAMEL_LINE;
+            case PLAIN -> GuiLanguage.Hud.ENAMEL_LINE;
+        };
+    }
+
+    /** 左边那一格类别字的颜色：与正文里同类的字同色系。 */
+    private static int categoryInk(String category) {
+        return switch (category) {
+            case "weather", "navigation" -> GuiLanguage.Hud.LOG_WEATHER;
+            case "provision" -> GuiLanguage.Hud.LOG_CARD;
+            case "thirst" -> GuiLanguage.Hud.LOG_CAT_THIRST;
+            case "contest" -> GuiLanguage.Hud.LOG_CAT_CONTEST;
+            case "action" -> GuiLanguage.Hud.LOG_CAT_ACTION;
+            default -> GuiLanguage.Hud.ENAMEL_LINE;
+        };
+    }
+
+    /**
+     * 一条播报属于哪一类（样张 b-2 左边那一格：物资 · 天候……），返回类别 id（lang 里 {@code hud.log.cat.*} 的尾巴）：
+     * 按服务端文本键的前缀归，归不上的返回空串、不标。键是服务端 {@code GameFlow.broadcast} 发的那一串，客户端收到的仍是可翻译文本。
      */
     private static final String NAMESPACE = "heavyseas.";
 
@@ -624,18 +681,22 @@ public final class GameHud {
         } else if (key.startsWith("game.provision") || key.startsWith("game.card_played")) {
             cat = "provision";
         } else if (key.startsWith("game.row") || key.startsWith("game.helmsman") || key.startsWith("game.compass")
-                || key.startsWith("game.overboard") || key.startsWith("row.") || key.startsWith("overboard.")) {
+                || key.startsWith("game.overboard") || key.startsWith("game.top_card") || key.startsWith("game.removed")
+                || key.startsWith("row.") || key.startsWith("overboard.") || key.startsWith("command.rowed")) {
             cat = "navigation";
-        } else if (key.startsWith("contest.") || key.startsWith("command.swapped")) {
+        } else if (key.startsWith("contest.") || key.startsWith("command.swapped") || key.startsWith("command.fought")
+                || key.startsWith("command.cannot_fight") || key.startsWith("designate.")) {
             cat = "contest";
-        } else if (key.startsWith("game.your_turn") || key.startsWith("game.seat") || key.startsWith("command.passed")) {
+        } else if (key.startsWith("game.your_turn") || key.startsWith("game.seat") || key.startsWith("command.")
+                || key.startsWith("action.")) {
+            // 其余的 command.*：亮出 · 赠送 · 喝 · 治 · 撑伞 · 分食 · 信号枪 · 什么也没做 —— 都是谁在自己那一手里做了什么
             cat = "action";
-        } else if (key.startsWith("endgame.")) {
+        } else if (key.startsWith("endgame.") || key.startsWith("game.over") || key.startsWith("game.final_line")) {
             cat = "endgame";
         } else {
             return "";
         }
-        return Text.translatable("heavyseas.hud.log.cat." + cat).getString();
+        return cat;
     }
 
     // ---------------------------------------------------------------- 键帽
@@ -690,18 +751,18 @@ public final class GameHud {
     }
 
     /**
-     * 主画面（没开界面）里的滚轮：对局中、航海日志钉住（L）时翻日志，吃掉这一下（{@code MouseScrollMixin}）。
-     * 对局中背包托管清空（{@code MistSea}），快捷栏换格本来就没有意义；没钉住时照 Minecraft 的默认。
+     * 主画面（没开界面）里的滚轮（{@code MouseScrollMixin}）：举着拳头找人时换一个人、吃掉这一下；其余照 Minecraft 的默认。
      *
      * @return 这一下用掉了没有
      */
     public static boolean scrollLog(double vertical) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.currentScreen != null || vertical == 0 || !SidebarReveal.pinned() || !voyageHud()) {
+        if (client.currentScreen != null || vertical == 0) {
             return false;
         }
-        SidebarReveal.scroll(vertical);
-        return true;
+        // 世界里滚轮只在举着拳头时「换人」（ADR-0095 F2）；日志在世界里用 ↑ ↓ 翻（用户 2026-10-07：
+        // 「在世界里的时候使用上下键控制日志滚动，在 gui 界面才使用滚轮」）
+        return DesignationAim.scroll(vertical);
     }
 
     /** GameScreen 与实际绘制共用这一份几何；两边各算一遍仍会得到完全相同的边界。 */
@@ -711,15 +772,6 @@ public final class GameHud {
         return NotificationSidebarLayout.of(screenWidth, visible);
     }
 
-
-    /** 播报自带的颜色（服务端给战斗结算标的红）照原样用；没标色的是纸色。 */
-    private static int noteColor(Text entry) {
-        net.minecraft.text.TextColor c = entry.getStyle().getColor();
-        if (c == null && !entry.getSiblings().isEmpty()) {
-            c = entry.getSiblings().get(0).getStyle().getColor();
-        }
-        return c == null ? GuiLanguage.ink() : GuiLanguage.semantic(c.getRgb());
-    }
 
     // ---------------------------------------------------------------- 小件
 

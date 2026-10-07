@@ -25,6 +25,8 @@ public final class CardChoiceScreen extends GameScreen {
     private static final double TOKEN = 80;
     private static final double CELL = 112;
 
+    private static final org.slf4j.Logger LOGGER =
+            org.slf4j.LoggerFactory.getLogger(io.github.heavyseasmc.mod.HeavySeasMod.MOD_ID);
     private final String gift;
     private final boolean fromFront;
     private final int token;
@@ -153,6 +155,11 @@ public final class CardChoiceScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (key == GLFW.GLFW_KEY_ESCAPE && token > 0) {
+            // 落海那一窗「Esc 不用」真的告诉服务端（ADR-0095 D1）：手上有牌的真人都不用了，这一窗当场收
+            ClientPlayNetworking.send(CardActionC2S.of(CardActionC2S.Kind.OVERBOARD_DONE, "", "", token));
+            LOGGER.info("落海：这一窗不用牌");
+        }
         if (pick.keyPressed(key, choices.size())) {
             return true;
         }

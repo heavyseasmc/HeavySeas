@@ -168,7 +168,8 @@ public final class ActionPhase {
         } catch (RuntimeException e) {
             // 与指令层同一条：规则拒绝要让真人知道，不把一次无效点击伪装成「包没到」。
             LOGGER.info("特殊物资（界面）：{} 的操作被拒绝：{}", actor.value(), e.getMessage());
-            player.sendMessage(Text.literal(String.valueOf(e.getMessage())).formatted(Formatting.RED), true);
+            // 引擎的异常信息是给日志看的（中文、带 world= 前缀）：给玩家一句按语言走的话（ADR-0095 A8）
+            player.sendMessage(Text.translatable("heavyseas.card_action.rejected").formatted(Formatting.RED), true);
             if (component.provisionTargeter().map(actor::equals).orElse(false)) {
                 component.clearProvisionTarget();
             }
@@ -204,6 +205,20 @@ public final class ActionPhase {
             component.beginProvisionTarget(actor, cardId);
             LOGGER.info("特殊物资（界面）：{} 用 {}，等他挑治疗目标", actor.value(), cardId);
             GameComponents.sync(world);
+            return;
+        }
+        // 分食要船上有尸体（ADR-0095 A2）：与医疗箱「没人受伤」同一个路数 —— 先说一句、不花行动，
+        // 不让引擎抛出一句内部报错（英文客户端也是中文）。
+        if (card.effect() instanceof ProvisionEffect.HealAll heal && heal.requiresCorpse()
+                && session.state().onBoatBySeat().stream().noneMatch(id -> session.state().conditionOf(id) == Condition.DEAD)) {
+            player.sendMessage(Text.translatable("heavyseas.command.no_corpse", provisionName(cardId))
+                    .formatted(Formatting.GRAY), true);
+            return;
+        }
+        // 已经撑开的伞再「撑」一次只是白花一个行动（ADR-0095 A3）：说一句、不花行动
+        if (card.effect() instanceof ProvisionEffect.PreventThirst && session.state().stateOf(actor).isOpen(cardId)) {
+            player.sendMessage(Text.translatable("heavyseas.command.already_open", provisionName(cardId))
+                    .formatted(Formatting.GRAY), true);
             return;
         }
         useUntargeted(world, component, actor, cardId, card.effect());
@@ -279,7 +294,7 @@ public final class ActionPhase {
             Session session = component.requireSession();
             List<NavigationCard> drawn = session.beginRow(who);
             if (session.rower().isPresent()) {
-                component.openActionWindow(ROW_MILLIS);
+                component.openActionWindow(component.humanWindow(ROW_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
             }
             GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
             if (session.rower().isEmpty()) {
@@ -290,7 +305,8 @@ public final class ActionPhase {
             GameComponents.sync(world);
         } catch (RuntimeException failure) {
             LOGGER.info("划船（界面）：{} 的操作被拒绝：{}", who.value(), failure.getMessage());
-            player.sendMessage(Text.literal(String.valueOf(failure.getMessage())).formatted(Formatting.RED), true);
+            // 引擎的异常信息留在日志里；给玩家一句按语言走的话（ADR-0095 A8）
+            player.sendMessage(Text.translatable("heavyseas.action.rejected").formatted(Formatting.RED), true);
         }
     }
 

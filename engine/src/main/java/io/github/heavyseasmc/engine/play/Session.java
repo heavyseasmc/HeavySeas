@@ -817,8 +817,11 @@ public final class Session {
      * 战斗时算几点体型：满体型 + 本回合喝过的酒。
      *
      * <p>❗<b>与伤害无关</b> —— 「攻击力 = 剩余血量」是村规，{@link Fight} 连伤害都看不到。
+     *
+     * <p>公开给投影用（模组站队一面的两边体型和，ADR-0095 A4）：喝酒是公开的，界面上那个数要与结算同源 ——
+     * 原先投影只加体型，有人喝了酒时屏幕上的数是错的。押下的武器不在这里（暗牌），由结算另加。
      */
-    private int fightingSize(CharacterId id) {
+    public int fightingSize(CharacterId id) {
         int size = state.roster().get(id).size();
         SurvivorState s = state.stateOf(id);
         for (String cardId : new LinkedHashSet<>(s.front())) {

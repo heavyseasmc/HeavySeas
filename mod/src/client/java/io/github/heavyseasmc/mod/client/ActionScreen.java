@@ -61,7 +61,11 @@ public final class ActionScreen extends GameScreen {
      * 无风那一天界面照样给出「划船」，按下去才被服务端拒。<b>界面给出一件必然失败的事，比不给更糟</b>。
      */
     private boolean enabled(ActionCard c) {
-        return c != ActionCard.ROW || view.canRow();
+        if (c == ActionCard.USE) {
+            return true;                      // 「用物资」打开手牌：没轮到你时也能进去看（二级页面，Esc 回来）
+        }
+        // 没轮到你时这一面只能看（用户 2026-10-07：「行动页面要能随时打开」）—— 四件事一律按不动
+        return view.myTurnToAct() && (c != ActionCard.ROW || view.canRow());
     }
 
     /** 说明板上那一句：按不动的划船说为什么按不动，其余照牌上的说明。 */
@@ -94,9 +98,16 @@ public final class ActionScreen extends GameScreen {
             }
             return;
         }
-        if (!view.myTurnToAct()) {
-            close();                          // 轮次已经走了（对局结束、被指令推进……）
+        if (!view.active() || !view.seated()) {
+            close();                          // 对局结束 / 不在局里了。轮次走了不收：没轮到你时这一面照样能看
         }
+    }
+
+    /** 从手牌（二级页面）回来时：还在局里就回来，轮没轮到都一样（没轮到时是只能看的那一版）。 */
+    @Override
+    protected boolean stillWanted() {
+        refresh();
+        return view.active() && view.seated();
     }
 
     @Override
@@ -111,18 +122,23 @@ public final class ActionScreen extends GameScreen {
         Bands b = drawChrome(context, view);
         var l = sheet();
         cards.render(context, b, mouseX, mouseY, now, dt, l.railBottom() + CardRow.RAIL_CLEAR * l.k(), 0);
-        drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
-                new Countdown(view.actionDeadlineMs(), view.actionWindowMs(), 0));
+        // R 在这一面打开手牌（用户 2026-10-07：「行动页面里也要能打开手牌页面」）；倒计时只在轮到你时有
+        List<KeyHint> right = new java.util.ArrayList<>(inspectHints("confirm"));
+        right.add(0, keys("hand", HeavySeasClient.handKey().getBoundKeyLocalizedText().getString()));
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), right, now,
+                view.myTurnToAct() ? new Countdown(view.actionDeadlineMs(), view.actionWindowMs(), 0) : null);
     }
 
     /** 确认第 i 张。返回 {@code true} = 定了，播一次「顿」。 */
     private boolean confirm(int i) {
         ActionCard c = CARDS.get(i);
         if (c == ActionCard.USE) {
-            if (client != null) {
-                client.setScreen(new HandScreen());
-                LOGGER.info("行动：打开手牌挑特殊物资");
-            }
+            openChild(new HandScreen());      // 二级页面：Esc 回到这一面（用户 2026-10-07）
+            LOGGER.info("行动：打开手牌挑特殊物资");
+            return false;
+        }
+        if (!view.myTurnToAct()) {
+            ActionBarEcho.record(Text.translatable("heavyseas.hand.not_your_turn"));   // 只能看的那一版：说一句，不发包
             return false;
         }
         ClientPlayNetworking.send(ActionChoiceC2S.of(kindOf(c)));
@@ -153,6 +169,10 @@ public final class ActionScreen extends GameScreen {
             close();
             return true;
         }
+        if (HeavySeasClient.handKey().matchesKey(keyCode, scanCode)) {
+            openChild(new HandScreen());      // 行动一面里按 R 看手牌（二级页面，Esc / R 回来）
+            return true;
+        }
         if (cards.keyPressed(keyCode, this::confirm)) {
             return true;
         }
@@ -162,6 +182,6 @@ public final class ActionScreen extends GameScreen {
     /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
     @Override
     protected Text cue() {
-        return Text.translatable("heavyseas.hud.cue.act");
+        return Text.translatable(view.myTurnToAct() ? "heavyseas.hud.cue.act" : "heavyseas.hud.cue.not_your_turn");
     }
 }

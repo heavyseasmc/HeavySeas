@@ -256,11 +256,19 @@ public final class HandScreen extends GameScreen {
                     zonePx, false, GuiLanguage.Hud.alpha(GuiLanguage.ink(), 0.7f), GuiText.Align.LEFT, l.len(4));
         }
         pxEnd(context);
-        // 提示那一行：←→ 换一张 · G 赠送（送得出去时）· U 查看 · Esc 收起。打出与亮出是上面两枚按钮。
-        List<KeyHint> right = canGive()
-                ? List.of(keys("gift", "G"), keys(inspecting() ? "close" : "inspect", "U"), keys("close", "Esc"))
-                : List.of(keys(inspecting() ? "close" : "inspect", "U"), keys("close", "Esc"));
-        drawFootBand(context, b, List.of(keys("swap_card", "←", "→")), right, now, null);
+        // 提示那一行：←→ 换一张 · G 行动（轮到你时）· T 赠送（送得出去时）· U 查看 · Esc 收起。打出与亮出是上面两枚按钮。
+        // 轮到你时这一面也画行动的倒计时（ADR-0095 B3）：开着手牌看水的时候，60 秒原先在后台无声走完。
+        List<KeyHint> right = new java.util.ArrayList<>();
+        if (view.myTurnToAct()) {
+            right.add(keys("act", HeavySeasClient.actKey().getBoundKeyLocalizedText().getString()));
+        }
+        if (canGive()) {
+            right.add(keys("gift", "T"));
+        }
+        right.add(keys(inspecting() ? "close" : "inspect", "U"));
+        right.add(keys("close", "Esc"));
+        drawFootBand(context, b, List.of(keys("swap_card", "←", "→")), right, now,
+                view.myTurnToAct() ? new Countdown(view.actionDeadlineMs(), view.actionWindowMs(), 0) : null);
     }
 
     /** 这一面没有上带（样张 b-4）。 */
@@ -372,28 +380,22 @@ public final class HandScreen extends GameScreen {
             x2 = x + w1 + l.len(14);
         }
         int w2 = buttonPx(l, List.of("↓", "Enter"), front);
-        drawButtonPx(context, l, x2, by, w2, bh, List.of("↓", "Enter"), front, revealFocus, true);
+        drawButtonPx(context, l, x2, by, w2, bh, List.of("↓", "Enter"), front, revealFocus && canReveal(), canReveal());
         pxEnd(context);
         revealBox = unitBox(new Rect(x2, by, w2, bh));
     }
 
-    /** 这张牌的「打出」什么时候行得通；没收到目录时当作「轮到你时」，由服务端裁决。 */
+    /** 判据与座位面板共用一份（{@link CardPlay}，ADR-0095 A3）。 */
     private static CatalogS2C.Play playWhen(String card) {
-        CatalogS2C.Provisions entry = Catalog.provision(card);
-        return entry == null ? CatalogS2C.Play.TURN : entry.playWhen();
+        return CardPlay.when(card);
     }
 
     /**
-     * 此刻按「打出」行不行得通。与服务端 {@code ActionPhase#onUseProvision} 的门同一套：
-     * 特殊行动要「行动阶段轮到你、没在划船 / 收场 / 指定 / 挑目标」（即 {@link HudView#myTurnToAct}），
-     * 加体型的那种只要还能行动。服务端仍会再核一遍（这一回合喝过了、没人受伤……），拒绝的那句由 {@link ActionBarEcho} 显出来。
+     * 此刻按「打出」行不行得通（{@link CardPlay#playableNow}）。服务端仍会再核一遍（这一回合喝过了、没人受伤、没有尸体……），
+     * 拒绝的那句由 {@link ActionBarEcho} 显出来。手里的牌不会是「已撑开的伞」，所以第三个参数恒为 {@code false}。
      */
     private boolean playableNow(String card) {
-        return switch (playWhen(card)) {
-            case TURN -> view.myTurnToAct();
-            case ANYTIME -> view.active() && view.seated() && view.condition().canAct();
-            default -> false;
-        };
+        return CardPlay.playableNow(view, card, false);
     }
 
     private static int buttonPx(SheetLayout l, List<String> keys, String label) {
@@ -462,10 +464,17 @@ public final class HandScreen extends GameScreen {
         int[] color = {GuiLanguage.Hud.LOG_CINNABAR, ink};
         int tok = l.len(38);
         int namePx = l.len(17);
+        // 名字前写「爱」「恨」两个字（用户 2026-10-07：「爱恨的显示很反直觉」—— 只有心与碎心，看不出哪个是恨）
+        String[] word = {Text.translatable("heavyseas.hand.love").getString(), Text.translatable("heavyseas.hand.hate").getString()};
+        int wordPx = l.len(17);
+        int wordW = Math.max(GuiText.widthPx(word[0], wordPx, true, 0), GuiText.widthPx(word[1], wordPx, true, 0));
         for (int i = 0; i < 2; i++) {
             int cy = y + rowH / 2;
-            GuiMaterial.hudIcon(context, mark[i], tx, cy - icon / 2, icon, icon, color[i], k);
-            int tokX = tx + icon + l.len(10);
+            GuiText.drawPx(context, word[i], tx, cy - GuiText.linePxAt(wordPx, true) / 2, wordW + 2, wordPx, true,
+                    color[i], GuiText.Align.LEFT, 0);
+            int ix = tx + wordW + l.len(6);
+            GuiMaterial.hudIcon(context, mark[i], ix, cy - icon / 2, icon, icon, color[i], k);
+            int tokX = ix + icon + l.len(10);
             GuiMaterial.portrait(context, who[i], tokX, cy - tok / 2, tok, 1f);
             GuiMaterial.hudPart(context, io.github.heavyseasmc.mod.ui.HudPart.TOK38_PLAIN, tokX, cy - tok / 2, tok, tok, k);
             GuiText.drawPx(context, nameOf(who[i]).getString(), tokX + tok + l.len(10), cy - GuiText.linePxAt(namePx, false) / 2,
@@ -559,9 +568,27 @@ public final class HandScreen extends GameScreen {
             return;
         }
         String card = hand.get(selected);
+        if (!canReveal()) {
+            // 服务端会拒（昏迷 · 死了 · 终局 · 正被抢到挑牌那一刻）：当场说一句，不发一个注定被丢掉的包（ADR-0095 A8）
+            ActionBarEcho.record(Text.translatable("heavyseas.hand.cannot_reveal"));
+            return;
+        }
         // 与语言无关的一行：GUI 回归靠它判「亮出这一下真的发出去了」。
         LOGGER.info("手牌：亮出 {}", card);
         ClientPlayNetworking.send(CardActionC2S.of(CardActionC2S.Kind.REVEAL, card, "", 0));
+    }
+
+    /**
+     * 此刻亮得出吗。与引擎 {@code Session#reveal} 的门同一套：能行动（清醒、在局里），而且不是「被抢、挑牌那一刻的被抢方」
+     * （规则 §5 抢夺：那一刻把手牌亮出来就躲掉了这一抢）；终局翻牌时也不再动牌。
+     */
+    private boolean canReveal() {
+        if (!view.active() || !view.seated() || !view.condition().canAct() || view.endgame().active()) {
+            return false;
+        }
+        var contest = view.contest();
+        return !(contest.active() && contest.stage() == io.github.heavyseasmc.engine.play.Contest.Stage.PICK
+                && view.character().equals(contest.target()));
     }
 
     private boolean canGive() {
@@ -571,7 +598,7 @@ public final class HandScreen extends GameScreen {
 
     private void give() {
         if (canGive() && selected >= 0 && selected < view.hand().size()) {
-            client.setScreen(new CardChoiceScreen(view.hand().get(selected), false));
+            openChild(new CardChoiceScreen(view.hand().get(selected), false));   // 送完 / Esc 回手牌
         }
     }
 
@@ -589,15 +616,7 @@ public final class HandScreen extends GameScreen {
         if (!playableNow(card)) {
             // 发出去也只会被拒（或者被静默丢掉）：当场说一句，位置与服务端那几句拒绝相同（2026-10-07「按 Enter 没反应」）。
             LOGGER.info("手牌：打不出 {}（{}）", card, playWhen(card));
-            CatalogS2C.Play when = playWhen(card);
-            ActionBarEcho.record(switch (when) {
-                case TURN -> Text.translatable("heavyseas.hand.not_your_turn");
-                case ANYTIME -> Text.translatable("heavyseas.card_action.rejected");
-                case OTHER -> Text.translatable("heavyseas.command.not_special", provisionName(card));
-                // 不是打出的牌：说它在哪儿用（「闷棍这些也打不出」—— 武器只在打架时押）
-                default -> Text.translatable("heavyseas.hand.used." + when.name().toLowerCase(java.util.Locale.ROOT),
-                        provisionName(card));
-            });
+            ActionBarEcho.record(CardPlay.whyNot(view, card, false, provisionName(card)));
             return;
         }
         LOGGER.info("手牌：打出 {}", card);
@@ -654,7 +673,8 @@ public final class HandScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_G) {
+        // 赠送是 T（用户 2026-10-07）：G 在哪儿都只表示「行动」，从行动一面进手牌之后按 G 回不去行动、弹出赠送，那是两件事撞了一个键
+        if (keyCode == GLFW.GLFW_KEY_T) {
             give();
             return true;
         }
@@ -694,6 +714,15 @@ public final class HandScreen extends GameScreen {
         // 用哪个键开的，就用哪个键收起来。写死 R 的话玩家改了键位就收不起来了。
         if (HeavySeasClient.handKey().matchesKey(keyCode, scanCode)) {
             close();
+            return true;
+        }
+        // G 是「行动」（赠送已改 T）：从行动一面进来的就回去，否则把行动一面当二级页面打开（用户 2026-10-07）
+        if (HeavySeasClient.actKey().matchesKey(keyCode, scanCode) && view.active() && view.seated()) {
+            if (parent() instanceof ActionScreen) {
+                close();
+            } else {
+                openChild(new ActionScreen());
+            }
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);

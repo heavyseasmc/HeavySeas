@@ -84,6 +84,14 @@ public final class HeavySeasClient implements ClientModInitializer {
 
     private static KeyBinding themeKey;
     private static KeyBinding logKey;
+    /** 世界里翻航海日志：↑ 往前（更早）· ↓ 往后（更新）· End 回到最新（用户 2026-10-07）。界面里用滚轮与 End。 */
+    private static KeyBinding logOlderKey;
+    private static KeyBinding logNewerKey;
+    private static KeyBinding logLatestKey;
+
+    public static KeyBinding logLatestKey() {
+        return logLatestKey;
+    }
 
     /** 换界面主题的键。界面开着时 {@link GameScreen} 用它认按键。 */
     /** 航海日志（右栏）钉住 / 放开。界面开着时按键不走按键绑定，由 GameScreen 接。 */
@@ -97,7 +105,8 @@ public final class HeavySeasClient implements ClientModInitializer {
 
     /** 本模组注册的全部按键：对局进行中它们先于 Minecraft 自带的绑定与别的模组接键（{@link KeyPriority}）。还没注册时为空。 */
     static List<KeyBinding> ownKeys() {
-        return Stream.of(handKey, actKey, themeKey, logKey).filter(Objects::nonNull).toList();
+        return Stream.of(handKey, actKey, themeKey, logKey, logOlderKey, logNewerKey, logLatestKey)
+                .filter(Objects::nonNull).toList();
     }
 
     /** 上一次记过的「别的界面」：窗口改尺寸会让同一个界面再 init 一次，同一个实例只记一次。 */
@@ -195,6 +204,8 @@ public final class HeavySeasClient implements ClientModInitializer {
                 "key.heavyseas.act", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G,
                 "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollTurn);
+        // 指定模式里「指着谁」：候选、按方向重挑（ADR-0095 F2）
+        ClientTickEvents.END_CLIENT_TICK.register(DesignationAim::tick);
         // 界面主题（ADR-0037）：浅色海图桌 / 深色船舱木作。没开界面时由这里接；开着界面时按键不走按键绑定，由 GameScreen 接。
         ClientPrefs.load();
         themeKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -205,6 +216,12 @@ public final class HeavySeasClient implements ClientModInitializer {
         logKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.log", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_L,
                 "key.categories.heavyseas"));
+        logOlderKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log_older", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UP, "key.categories.heavyseas"));
+        logNewerKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log_newer", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_DOWN, "key.categories.heavyseas"));
+        logLatestKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log_latest", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_END, "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (themeKey.wasPressed()) {
                 ClientPrefs.toggleTheme();
@@ -212,8 +229,36 @@ public final class HeavySeasClient implements ClientModInitializer {
             CardComposite.tick(client);      // 一 tick 合成一张牌；渲染中途不动帧缓冲
             OverboardCue.tick(client);       // 有人落海：溅水一声 · 四边朱砂一闪（ADR-0048）
             while (logKey.wasPressed()) {
-                SidebarReveal.togglePin();
-                LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");
+                // Shift + L：拉伸（日志占满整条右栏，用户 2026-10-07）；L：钉住 / 放开
+                if (net.minecraft.client.gui.screen.Screen.hasShiftDown()) {
+                    SidebarReveal.toggleExpanded();
+                    LOGGER.info("航海日志：{}", SidebarReveal.expanded() ? "拉伸" : "收回原宽");
+                } else {
+                    SidebarReveal.togglePin();
+                    LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");
+                }
+            }
+            // 世界里翻日志用 ↑ ↓（用户 2026-10-07：「在世界里的时候使用上下键控制日志滚动，在 gui 界面才使用滚轮」）
+            // 没钉住时按 ↑ 就顺手钉上再往回翻一条：只是自己滑出来的那几秒里按 ↑ 没反应，等于「世界里翻不了」
+            boolean voyage = GameHud.voyageHud() && client.currentScreen == null;
+            while (logOlderKey.wasPressed()) {
+                if (voyage) {
+                    if (!SidebarReveal.pinned()) {
+                        SidebarReveal.togglePin();
+                        LOGGER.info("航海日志：钉住（↑ 往回翻）");
+                    }
+                    SidebarReveal.scroll(1);
+                }
+            }
+            while (logNewerKey.wasPressed()) {
+                if (voyage && SidebarReveal.pinned()) {
+                    SidebarReveal.scroll(-1);
+                }
+            }
+            while (logLatestKey.wasPressed()) {
+                if (voyage && SidebarReveal.pinned()) {
+                    SidebarReveal.toLatest();
+                }
             }
         });
 
@@ -319,6 +364,15 @@ public final class HeavySeasClient implements ClientModInitializer {
         boolean mine = view.myTurnToAct();
         if (mine && !wasMyTurn) {
             actionPending = true;
+            // 轮到你时开着别的对局界面（手牌 · 座位面板……）：行动一面不会弹出来顶掉它，所以在最上层说一句
+            // （ADR-0095 B1）；窗口不在前台时让任务栏闪一下 —— 原先 60 秒在后台无声走完
+            if (client.currentScreen instanceof GameScreen && !(client.currentScreen instanceof ActionScreen)) {
+                ActionBarEcho.record(net.minecraft.text.Text.translatable("heavyseas.hud.turn_banner",
+                        actKey.getBoundKeyLocalizedText()));
+            }
+            if (!client.isWindowFocused()) {
+                org.lwjgl.glfw.GLFW.glfwRequestWindowAttention(client.getWindow().getHandle());
+            }
         }
         if (!mine) {
             actionPending = false;
@@ -363,6 +417,12 @@ public final class HeavySeasClient implements ClientModInitializer {
             return;
         }
         endgameStageShown = null;
+
+        // 正在聊天框里打字时不弹任何一面（ADR-0095 D2）：站队、表态那几秒正是靠聊天谈判，弹出来会把没发出去的那句关掉。
+        // 聊天一关，下一 tick 照常弹；窗口的倒计时在服务端照走，所以只是晚几秒看到，不会错过结算。
+        if (client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
+            return;
+        }
 
         var table = client.world == null ? io.github.heavyseasmc.mod.state.TableView.EMPTY
                 : GameComponents.of(client.world).tableView();
@@ -467,6 +527,10 @@ public final class HeavySeasClient implements ClientModInitializer {
         }
         if (mine && (actionPending || pressed)) {
             actionPending = false;
+            client.setScreen(new ActionScreen());
+        } else if (pressed && view.active() && view.seated()) {
+            // 没轮到你也能打开行动一面，只能看（用户 2026-10-07：「行动页面要能随时打开」）
+            LOGGER.info("行动：没轮到我，打开只能看的那一版");
             client.setScreen(new ActionScreen());
         }
     }

@@ -99,7 +99,7 @@ public final class NavigationPhase {
             resolve(world, component, pick);
             return;
         }
-        component.setHelmDeadline(System.currentTimeMillis() + PICK_MILLIS);
+        component.setHelmDeadline(System.currentTimeMillis() + component.humanWindow(PICK_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
         component.setHelmOwner(helm);         // 窗口开了就不换人（ADR-0051 B5）：之后掉线 / 重连都认这一位
         component.setHelmHighlight(0);        // 高亮一进界面就在第一张：它是「你的默认答案」
         LOGGER.info("舵手挑牌：{}（{}）· 划船堆 {} 张 · {} 秒", helm.value(), who.isDummy() ? "替身" : "真人",

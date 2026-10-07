@@ -200,6 +200,11 @@ public final class WeaponScreen extends GameScreen {
         if (inspectKey(keyCode)) {
             return true;
         }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            // 「Esc 不押」真的告诉服务端（ADR-0095 D1）：该押的人都说完了，这一段就提前结算
+            ClientPlayNetworking.send(ContestActionC2S.of(ContestActionC2S.Kind.WEAPONS_DONE));
+            LOGGER.info("挂武器：不押了");
+        }
         int count = view.contest().myWeapons().size();
         switch (keyCode) {
             case GLFW.GLFW_KEY_LEFT -> {

@@ -87,8 +87,11 @@ public final class TableScreen extends GameScreen {
         int w = GuiLanguage.cardWidth(h);
         int top = cardsTopIn(b.stageTop() + lineStep(), bottom, h, room);
         if (n == 0) {
-            drawLine(context, Text.translatable("heavyseas.hand.empty_none"), width / 2,
-                    top + h / 2, GuiLanguage.muted());
+            // 这一面看的是「面前亮出的牌」，不是手牌；看别人时写那个人的名字（用户 2026-10-07：点他人头像时显示「你没有手牌」）
+            Text empty = character.equals(projection().character())
+                    ? Text.translatable("heavyseas.table.empty_self")
+                    : Text.translatable("heavyseas.table.empty_other", nameOf(character));
+            drawLine(context, empty, width / 2, top + h / 2, GuiLanguage.muted());
         } else {
             int step = CardRow.step(n, w, CARD_GAP, width - 2 * SIDE);
             int left = (width - ((n - 1) * step + w)) / 2;
@@ -124,20 +127,50 @@ public final class TableScreen extends GameScreen {
                 drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
                         provisionCaption(card), provisionName(card), provisionEffect(card));
             }
-            if (canGive()) {
-                Text label = Text.translatable("heavyseas.trade.give");
-                Text play = Text.translatable("heavyseas.keys.play");
-                int buttonsW = buttonWidth(label) + BTN_GAP + buttonWidth(play);
-                giveBox = new Box((width - buttonsW) / 2, bottom + BTN_GAP,
-                        buttonWidth(label), buttonHeight());
-                playBox = new Box(giveBox.x() + giveBox.w() + BTN_GAP, giveBox.y(),
-                        buttonWidth(play), buttonHeight());
+            // 「打出」只给此刻打得出的那一张（与手牌一面同一份判据，CardPlay · ADR-0095 A3）：
+            // 原先只要能赠送就画，没轮到你时按下去被服务端静默丢掉，已经撑开的伞还能再撑一次、白花一个行动。
+            Text label = Text.translatable("heavyseas.trade.give");
+            Text play = Text.translatable("heavyseas.keys.play");
+            boolean give = canGive();
+            boolean playable = canPlay();
+            int buttonsW = (give ? buttonWidth(label) : 0) + (give && playable ? BTN_GAP : 0)
+                    + (playable ? buttonWidth(play) : 0);
+            int bx = (width - buttonsW) / 2;
+            if (give) {
+                giveBox = new Box(bx, bottom + BTN_GAP, buttonWidth(label), buttonHeight());
                 drawButton(context, giveBox, label, false, GuiLanguage.verdigris(), 0);
+                bx += giveBox.w() + BTN_GAP;
+            }
+            if (playable) {
+                playBox = new Box(bx, bottom + BTN_GAP, buttonWidth(play), buttonHeight());
                 drawButton(context, playBox, play, false, GuiLanguage.verdigris(), 0);
             }
         }
-        drawFootBand(context, b, List.of(keys("select", "←", "→")),
-                List.of(keys("close", "Esc")), System.currentTimeMillis(), null);
+        // 这一面接 G（赠送）与 Enter（打出）却从没写在底下（ADR-0095 A8）：给得出、打得出时才写
+        List<KeyHint> right = new java.util.ArrayList<>();
+        if (canGive()) {
+            right.add(keys("gift", "T"));
+        }
+        if (canPlay()) {
+            right.add(keys("play", "Enter"));
+        }
+        right.add(keys("close", "Esc"));
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), right, System.currentTimeMillis(), null);
+    }
+
+    /** 自己面前、选中的那一张此刻打得出吗（{@link CardPlay}）。别人的座位一律不行。 */
+    private boolean canPlay() {
+        var view = projection();
+        if (seat == null || seat.front().isEmpty() || !character.equals(view.character())) {
+            return false;
+        }
+        String card = seat.front().get(Math.max(0, Math.min(seat.front().size() - 1, selected)));
+        return CardPlay.playableNow(view, card, openParasol(view, card));
+    }
+
+    /** 这一张是不是已经撑开的伞（投影里自己面前那一排带着「撑开」标记）。 */
+    private static boolean openParasol(io.github.heavyseasmc.mod.state.HudView view, String card) {
+        return view.front().stream().anyMatch(f -> f.id().equals(card) && f.open());
     }
 
     /**
@@ -184,7 +217,7 @@ public final class TableScreen extends GameScreen {
 
     private void give() {
         if (canGive()) {
-            client.setScreen(new CardChoiceScreen(seat.front().get(selected), true));
+            openChild(new CardChoiceScreen(seat.front().get(selected), true));   // 送完 / Esc 回座位面板
         }
     }
 
@@ -218,10 +251,16 @@ public final class TableScreen extends GameScreen {
 
     private void play() {
         var view = projection();
-        if (seat != null && !seat.front().isEmpty() && character.equals(view.character())
-                && !view.endgame().active() && view.condition().canAct()) {
-            ClientPlayNetworking.send(UseProvisionC2S.play(seat.front().get(selected)));
+        if (seat == null || seat.front().isEmpty() || !character.equals(view.character())) {
+            return;                           // 别人的座位：没有「打出」这回事
         }
+        String card = seat.front().get(selected);
+        if (!CardPlay.playableNow(view, card, openParasol(view, card))) {
+            // 发出去只会被静默丢掉（或者白花一个行动）：当场说一句为什么（ADR-0095 A3）
+            ActionBarEcho.record(CardPlay.whyNot(view, card, openParasol(view, card), provisionName(card)));
+            return;
+        }
+        ClientPlayNetworking.send(UseProvisionC2S.play(card));
     }
 
     @Override
@@ -233,7 +272,7 @@ public final class TableScreen extends GameScreen {
             selected = Math.max(0, Math.min(seat.front().size() - 1, selected + (key == GLFW.GLFW_KEY_RIGHT ? 1 : -1)));
             return true;
         }
-        if (key == GLFW.GLFW_KEY_G) {
+        if (key == GLFW.GLFW_KEY_T) {          // 赠送是 T（用户 2026-10-07），G 只表示「行动」
             give();
             return true;
         }
