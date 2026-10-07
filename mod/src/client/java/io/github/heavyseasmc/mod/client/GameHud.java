@@ -132,6 +132,17 @@ public final class GameHud {
      * <p>对局中这几条不带信息：服务端每 tick 把饥饿钉在满、血量只是引擎体力的镜像、身体不许受伤（{@code PlayerBodies}），
      * 背包在开航时托管清空（{@code MistSea}）—— 体力已经画在状态牌的点上。偏好 {@code vanillaHud=show} 回到 Minecraft 自带的样子。
      */
+    /**
+     * 这一帧热栏画不画：在雾海维度里不画（用户 2026-10-07，{@code InGameHudMixin}）。
+     *
+     * <p>「在不在雾海」认服务端那一包天色（{@link SkyOverride}）：服务端只给进了雾海的人发接管，维度名来自航程布局的数据，
+     * 客户端不另写一份。偏好 {@code vanillaHud=show} 照旧回到 Minecraft 自带的样子（用户 2026-09-30：「不要直接删除这些功能」）。
+     */
+    public static boolean hotbarHidden() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        return client.world != null && !ClientPrefs.vanillaHudInVoyage() && SkyOverride.forWorld(client.world) != null;
+    }
+
     public static boolean voyageHud() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || ClientPrefs.vanillaHudInVoyage()) {
@@ -448,10 +459,11 @@ public final class GameHud {
                     box, textPx, false, GuiLanguage.Hud.ENAMEL_LINE, TIP_LINES, l.len(HudLayout.TIP_LINE));
             y += HudLayout.DRAWER_GAP - HudLayout.TIP_OVERLAP + h;
         }
-        // 钉住时多一块「只有你看得到」的爱恨（用户 2026-10-07：「爱恨提示不能只在手牌页面，L 菜单也放一个」）。
-        // 只在钉住时给：自己滑出来那一下是播报，不是摊开自己的底牌。
+        // 「只有你看得到」的爱恨跟着侧栏一起出来：自己滑出来（来了新播报）与按 L 钉住都有
+        // （用户 2026-10-07：「爱恨提示不能只在手牌页面，L 菜单也放一个」，随后「爱恨随侧边滑出，不是按键触发」——
+        // 原先只在钉住时给，L 就成了「看爱恨」的键，与它「钉住日志」的本意撞在一起）。
         // （拉伸时天候卡与说明签在上面已经跳过：日志占满整条右栏）
-        if (SidebarReveal.pinned() && view.seated() && !view.love().isEmpty()) {
+        if (view.seated() && !view.love().isEmpty()) {
             y += drawSecret(context, l, view, y) + HudLayout.DRAWER_GAP;
         }
         drawLog(context, l, view, now, y, scale, SidebarReveal.expanded() ? EXPANDED_LOG_ENTRIES
@@ -543,7 +555,7 @@ public final class GameHud {
             entries.add(new Entry(note, label, cat, fresh, lines));
         }
         // 放不下就从最旧的那条往回减：日志底边不许压到热栏（热栏 22 个 GUI 单位，贴底）
-        int hotbarTop = l.height() - 22 * scale;
+        int hotbarTop = hotbarHidden() ? l.height() : l.height() - 22 * scale;   // 雾海里热栏不画：那一截让给日志
         // 往回翻过就停在那儿（用户 2026-10-07：「使用滚轮调整日志后应该暂停滚动 可以按键恢复」）：底下多一行说怎么回到最新
         boolean paused = SidebarReveal.paused();
         double fixed = HudLayout.LOG_PAD_T + HudLayout.LOG_HEAD_H + HudLayout.LOG_HEAD_GAP + HudLayout.LOG_PAD_B

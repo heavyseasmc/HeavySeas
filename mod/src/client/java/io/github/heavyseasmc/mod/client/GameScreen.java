@@ -369,7 +369,12 @@ public abstract class GameScreen extends Screen {
     private boolean inspectSeat(double x, double y) {
         for (SeatHit hit : seatHits) {
             if (hit.box().contains((int) x, (int) y)) {
-                openChild(new TableScreen(hit.character()));   // 二级页面：Esc 回到这一面
+                GameScreen next = new TableScreen(hit.character());
+                if (this instanceof TableScreen) {
+                    openSibling(next);                // 已经在看一个人：换成看下一个人，Esc 一次回到看之前那一面
+                } else {
+                    openChild(next);                  // 二级页面：Esc 回到这一面
+                }
                 return true;
             }
         }
@@ -592,6 +597,22 @@ public abstract class GameScreen extends Screen {
         child.parent = this;
         LOGGER.info("界面：从 {} 打开 {}", getClass().getSimpleName(), child.getClass().getSimpleName());
         client.setScreen(child);
+    }
+
+    /**
+     * 换成<b>同一层</b>的另一面：它收起时回到我的上一页，不回到我。
+     *
+     * <p>连着看几个人的亮牌：在一个人的座位面板里点另一个人的头像，原先是一层叠一层，看了几个人就要按几次 Esc
+     * （用户 2026-10-07：「我看了几个人就要按几次 esc，这要特殊处理的吧，很反直觉」）。看下一个人是「换一页」，不是「往里走一层」。
+     */
+    protected void openSibling(GameScreen next) {
+        if (client == null) {
+            return;
+        }
+        next.parent = parent;
+        parent = null;
+        LOGGER.info("界面：{} 换成同一层的 {}", getClass().getSimpleName(), next.getClass().getSimpleName());
+        client.setScreen(next);
     }
 
     /** 上一页（没有就是 {@code null}）。 */

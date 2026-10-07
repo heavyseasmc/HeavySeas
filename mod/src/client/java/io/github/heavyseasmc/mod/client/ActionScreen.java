@@ -133,7 +133,11 @@ public final class ActionScreen extends GameScreen {
     private boolean confirm(int i) {
         ActionCard c = CARDS.get(i);
         if (c == ActionCard.USE) {
-            openChild(new HandScreen());      // 二级页面：Esc 回到这一面（用户 2026-10-07）
+            if (parent() instanceof HandScreen) {
+                close();                      // 从手牌进来的：回手牌就是「去挑物资」，不再叠一层
+            } else {
+                openChild(new HandScreen());  // 二级页面：Esc 回到这一面（用户 2026-10-07）
+            }
             LOGGER.info("行动：打开手牌挑特殊物资");
             return false;
         }
@@ -170,7 +174,13 @@ public final class ActionScreen extends GameScreen {
             return true;
         }
         if (HeavySeasClient.handKey().matchesKey(keyCode, scanCode)) {
-            openChild(new HandScreen());      // 行动一面里按 R 看手牌（二级页面，Esc / R 回来）
+            // 行动一面里按 R 看手牌（二级页面，Esc / R 回来）；从手牌进来的就回手牌，不再叠一层 ——
+            // 与手牌一面的 G 对称，来回按 R · G 不会越叠越深、最后要按好几次 Esc
+            if (parent() instanceof HandScreen) {
+                close();
+            } else {
+                openChild(new HandScreen());
+            }
             return true;
         }
         if (cards.keyPressed(keyCode, this::confirm)) {

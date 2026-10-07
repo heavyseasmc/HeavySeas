@@ -78,6 +78,25 @@ public abstract class InGameHudMixin {
         }
     }
 
+    /**
+     * 雾海维度里整条热栏不画（用户 2026-10-07：「下面装备栏可以去掉了，整个隐藏，在雾海维度里都隐藏」）：
+     * 过了魔镜背包就托管清空，热栏只剩一排空格。北辰号上没开局时也一样 —— 判据是「在不在雾海」，不是「有没有对局」。
+     */
+    @Inject(method = "renderHotbar", at = @At("HEAD"), cancellable = true)
+    private void heavyseas$hideHotbar(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
+        if (GameHud.hotbarHidden()) {
+            ci.cancel();
+        }
+    }
+
+    /** 换格时浮在热栏上方的那一行物品名：热栏都不画了，它也跟着不画。 */
+    @Inject(method = "renderHeldItemTooltip", at = @At("HEAD"), cancellable = true)
+    private void heavyseas$hideHeldItemName(DrawContext context, CallbackInfo ci) {
+        if (GameHud.hotbarHidden()) {
+            ci.cancel();
+        }
+    }
+
     @WrapOperation(method = "renderHotbar", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/gui/DrawContext;drawGuiTexture(Lnet/minecraft/util/Identifier;IIII)V"))
     private void heavyseas$hotbar(DrawContext context, Identifier texture, int x, int y, int w, int h,

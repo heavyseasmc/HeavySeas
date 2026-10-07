@@ -191,19 +191,39 @@ public final class ThirstPhase {
         }
         component.markDecided(donor);
         LOGGER.info("口渴：{} 不替 {} 打水", donor.value(), pending.get().who().value());
-        Session.ThirstPrompt prompt = pending.get();
-        if (canDecide(session, prompt)) {
-            return;                           // 本人还要自己定喝几张：等他
+        settleIfNoDonorLeft(world, component, pending.get());
+    }
+
+    /**
+     * 本人无从决定的那一窗：还能打水、又没表过态的真人一个都不剩，就照到时那样结算。
+     *
+     * <p>❗「不给」与「打出最后一张」都要走到这里。只在「不给」时问的话，把水打光的人那一面会自己收起（他没水了），
+     * 再没有人告诉服务端他做完了 —— 正常局等满 20 秒，演示局不限时就永远等下去（用户 2026-10-07：「无限时间后，有的阶段会卡住」）。
+     *
+     * @return 结算了没有
+     */
+    private static boolean settleIfNoDonorLeft(ServerWorld world, GameComponent component, Session.ThirstPrompt prompt) {
+        Session session = component.requireSession();
+        if (!donationsSettled(session, component, prompt)) {
+            return false;
         }
-        boolean waiting = component.occupants().entrySet().stream().anyMatch(e -> !e.getValue().isDummy()
+        LOGGER.info("代打水窗口：能打水的真人都表过态了（或水打光了），按已收到的承诺结算");
+        resolve(world, component, clamp(session, prompt, component.thirstHighlight(), component.thirstDonors().size()));
+        return true;
+    }
+
+    /**
+     * 代打水这一窗还要不要等：本人能自己定（等他）· 或者还有真人能打水、又没表过态（给过一张、手上还有的也算 —— 他可能还要再给）。
+     * 纯判断，单测在 {@code ThirstDonationSettleTest}。
+     */
+    static boolean donationsSettled(Session session, GameComponent component, Session.ThirstPrompt prompt) {
+        if (canDecide(session, prompt)) {
+            return false;                     // 本人还要自己定喝几张：等他
+        }
+        return component.occupants().entrySet().stream().noneMatch(e -> !e.getValue().isDummy()
                 && !e.getKey().equals(prompt.who()) && !component.hasDecided(e.getKey())
-                && !component.thirstDonors().contains(e.getKey())
                 && session.state().canAct(e.getKey()) && !session.state().isOffline(e.getKey())
                 && availableDonationWater(session, component, e.getKey()) > 0);
-        if (!waiting) {
-            LOGGER.info("代打水窗口：能打水的真人都表过态了，按已收到的承诺结算");
-            resolve(world, component, clamp(session, prompt, component.thirstHighlight(), component.thirstDonors().size()));
-        }
     }
 
     /** 指令那条路（dev）：{@code /seas water <张数>}。 */
@@ -253,8 +273,8 @@ public final class ThirstPhase {
                 donor.value(), prompt.who().value(), already + 1);
         if (already + 1 >= prompt.waterNeeded()) {
             resolve(world, component, 0);      // 全部被代打化解了，不再让全船空等倒计时
-        } else {
-            GameComponents.sync(world);
+        } else if (!settleIfNoDonorLeft(world, component, prompt)) {
+            GameComponents.sync(world);        // 打出这一张之后还有人能再打（或本人还要自己定）：接着等
         }
         return true;
     }

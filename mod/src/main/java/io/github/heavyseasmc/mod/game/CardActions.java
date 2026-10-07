@@ -3,6 +3,7 @@ package io.github.heavyseasmc.mod.game;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.mod.net.CardActionC2S;
+import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -29,10 +30,7 @@ public final class CardActions {
             // 落海那一窗「不用」（ADR-0095 D1）：原先只是收起界面，窗口空等到时；演示局不限时之后会一直等。
             // 手上有牌可出的真人都说了「不用」，这一窗就当场收（下一 tick 照到时那样结算）。
             component.markDecided(seat.get());
-            var session = component.requireSession();
-            boolean waiting = component.occupants().entrySet().stream().anyMatch(e -> !e.getValue().isDummy()
-                    && !component.hasDecided(e.getKey()) && !session.state().isOffline(e.getKey())
-                    && !session.overboardPlays(e.getKey()).isEmpty());
+            boolean waiting = humanStillChoosing(component.requireSession(), component);
             LOGGER.info("落海：{} 这一窗不用牌{}", seat.get().value(), waiting ? "" : "，没人要等了，收");
             if (!waiting) {
                 component.setOverboardDeadline(System.currentTimeMillis());
@@ -43,10 +41,27 @@ public final class CardActions {
             apply(component.requireSession(), seat.get(), action);
             LOGGER.info("Card UI: {} {} -> {}", seat.get().value(), action.kind().orElseThrow(),
                     action.target());
+            // ❗出了牌之后也要问一遍：把手上唯一一张落海牌打出去的人再没有可选的，那一面空着，
+            // 没人会再按「不用」—— 正常局等满 20 秒，演示局不限时就永远等下去（用户 2026-10-07：「无限时间后，有的阶段会卡住」）
+            if (action.kind().get() == CardActionC2S.Kind.OVERBOARD
+                    && !humanStillChoosing(component.requireSession(), component)) {
+                LOGGER.info("落海：{} 出过牌之后没有真人还有牌可出，收", seat.get().value());
+                component.setOverboardDeadline(System.currentTimeMillis());
+            }
             GameComponents.sync(world);
         } catch (IllegalArgumentException | IllegalStateException rejected) {
             player.sendMessage(Text.translatable("heavyseas.card_action.rejected"), true);
         }
+    }
+
+    /**
+     * 落海这一窗还要不要等：还有真人手上有落海时能出的牌、又没说过「不用」。替身不在这一窗出牌，不等。
+     * 「不用」与「出了牌」两条路都问这一份。
+     */
+    static boolean humanStillChoosing(Session session, GameComponent component) {
+        return component.occupants().entrySet().stream().anyMatch(e -> !e.getValue().isDummy()
+                && !component.hasDecided(e.getKey()) && !session.state().isOffline(e.getKey())
+                && !session.overboardPlays(e.getKey()).isEmpty());
     }
 
     static void apply(Session session, CharacterId actor, CardActionC2S action) {
