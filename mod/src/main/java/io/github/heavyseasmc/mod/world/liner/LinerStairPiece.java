@@ -41,7 +41,8 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  *
  * <ul>
  *   <li><b>平台栏杆</b>（{@link Kind#BALUSTRADE}）：铸铁栏杆 + 桃花心木扶手，四向按邻居接（像玻璃板）：
- *       邻居是平台栏杆、起步柱，或者斜栏杆的顶段放平的那一头正对着这一格，就往那边伸一臂。</li>
+ *       邻居是平台栏杆、起步柱，或者斜栏杆的顶段放平的那一头正对着这一格，就往那边伸一臂；也像游戏自带的栅栏那样接整面实心的那一面
+ *       （墙、船壳板，ADR-0093 B2）。直着穿过这一格才画栏杆，拐角 · 端头 · 丁字 · 十字 · 孤零零一格立起一根起步柱（B4）。</li>
  *   <li><b>斜栏杆</b>（{@link Kind#SLOPE}）：坐在楼梯方块上面那一格，扶手斜 45°；朝向 = 上坡的方向。
  *       哪一段（底 · 中 · 顶 · 单独一格）看斜下方与斜上方是不是同朝向的斜栏杆：底段的扶手往回伸到起步柱，顶段经 22.5° 一折放平。</li>
  *   <li><b>起步柱</b>（{@link Kind#NEWEL} · {@link Kind#NEWEL_LAMP}）：四向接扶手的短截，接法同平台栏杆；带灯的那一种右键开关，亮着时 13。</li>
@@ -147,7 +148,9 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
     @Override
     public LinerLooks.Look look(BlockState s) {
         return switch (kind) {
-            case BALUSTRADE -> LinerLooks.look("stairs/balustrade_" + mask(s), tex("b", "stairs/balustrade"), 0);
+            // 拐角 · 端头 · 丁字 · 十字 · 孤零零一格：立起一根起步柱（ADR-0093 B4，同大楼梯那一种：球形柱头，短臂接两边的扶手）
+            case BALUSTRADE -> Rules.straight(mask(s)) ? LinerLooks.look("stairs/balustrade_" + mask(s), tex("b", "stairs/balustrade"), 0)
+                    : LinerLooks.look("stairs/newel_" + mask(s), tex("b", "stairs/newel"), 0);
             case SLOPE -> LinerLooks.look("stairs/balustrade_slope_" + s.get(SLOPE_PART).asString(), tex("b", "stairs/balustrade"),
                     LinerProp.yawOf(s.get(FACING)));
             case NEWEL -> LinerLooks.look("stairs/newel_" + mask(s), tex("b", "stairs/newel"), 0);
@@ -164,6 +167,8 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
     @Override
     public LinerLooks.Look itemLook() {
         return switch (kind) {
+            // 平台栏杆单放一格是起步柱（B4），物品图标仍画一段直栏杆，不然与起步柱那一件分不开
+            case BALUSTRADE -> LinerLooks.look("stairs/balustrade_ns", tex("b", "stairs/balustrade"), 0);
             case SLOPE -> LinerLooks.look("stairs/balustrade_slope_item", tex("b", "stairs/balustrade"), 0);
             case NEWEL_LAMP -> LinerLooks.look("stairs/newel_lamp_item", tex("b", "stairs/newel", "g", "stairs/newel_glow_lit"), 0);
             default -> null;
@@ -268,11 +273,14 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
         return other.isOf(this) && other.get(FACING) == f;
     }
 
-    /** 往 d 那边接不接（{@link Rules#joins}）。 */
-    private static boolean joins(BlockView world, BlockPos pos, Direction d) {
+    /**
+     * 往 d 那边接不接（{@link Rules#joins}）。平台栏杆另外像游戏自带的栅栏那样，也接整面实心的那一面（墙、船壳板……，ADR-0093 B2）——
+     * 靠墙那一头不再空一截；起步柱不接（船上的起步柱有挨着墙的，接了就多出一截短臂）。
+     */
+    private boolean joins(BlockView world, BlockPos pos, Direction d) {
         BlockState n = world.getBlockState(pos.offset(d));
         if (!(n.getBlock() instanceof LinerStairPiece p)) {
-            return false;
+            return kind == Kind.BALUSTRADE && !Block.cannotConnect(n) && n.isSideSolidFullSquare(world, pos.offset(d), d.getOpposite());
         }
         return Rules.joins(p.kind, p.kind == Kind.SLOPE ? n.get(FACING) : null, p.kind == Kind.SLOPE ? n.get(SLOPE_PART) : null, d);
     }
@@ -352,8 +360,9 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
         int yaw = 0;
         switch (kind) {
             case BALUSTRADE, NEWEL, NEWEL_LAMP -> {
-                double top = collision ? 24 : (kind == Kind.BALUSTRADE ? 16 : kind == Kind.NEWEL ? 24 : 24);
-                boolean post = kind != Kind.BALUSTRADE;
+                // 平台栏杆在拐角 / 端头立起的起步柱（B4）照起步柱的形状
+                boolean post = kind != Kind.BALUSTRADE || !Rules.straight(mask(s));
+                double top = collision ? 24 : (post ? 24 : 16);
                 if (post) {
                     boxes.add(new double[]{4, 0, 4, 12, top, 12});
                 } else {
@@ -453,6 +462,11 @@ public final class LinerStairPiece extends Block implements LinerLooks.Styled {
         }
 
         /** 四向接的那几边拼成模板名的后缀（n · e · s · w 的次序；一边都不接 = {@code none}，与 {@code liner_stairs.py} 的 MASKS 一致）。 */
+        /** 平台栏杆是不是直着穿过这一格（南北两臂或东西两臂）；别的（拐角 · 端头 · 丁字 · 十字 · 孤零零一格）立起步柱（ADR-0093 B4）。 */
+        public static boolean straight(String mask) {
+            return mask.equals("ns") || mask.equals("ew");
+        }
+
         public static String mask(boolean north, boolean east, boolean south, boolean west) {
             StringBuilder b = new StringBuilder();
             if (north) {

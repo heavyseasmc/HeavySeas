@@ -72,4 +72,23 @@ final class LinerStairRulesTest {
         assertEquals(LinerStairPiece.Rules.railTop(0, LinerStairPiece.SlopePart.MIDDLE) + 16,
                 LinerStairPiece.Rules.railTop(16, LinerStairPiece.SlopePart.MIDDLE), 1e-9);
     }
+
+    /** ADR-0093 B4：16 种接法里只有南北、东西两种画栏杆，其余 14 种（拐角 · 端头 · 丁字 · 十字 · 孤零零一格）立起步柱。 */
+    @Test
+    void onlyStraightRunsDrawTheRailingTheRestRaiseANewel() {
+        int straight = 0;
+        for (int bits = 0; bits < 16; bits++) {
+            String m = LinerStairPiece.Rules.mask((bits & 1) != 0, (bits & 2) != 0, (bits & 4) != 0, (bits & 8) != 0);
+            if (LinerStairPiece.Rules.straight(m)) {
+                straight++;
+            }
+        }
+        assertEquals(2, straight);
+        assertTrue(LinerStairPiece.Rules.straight("ns"));
+        assertTrue(LinerStairPiece.Rules.straight("ew"));
+        assertFalse(LinerStairPiece.Rules.straight("ne"), "拐角");
+        assertFalse(LinerStairPiece.Rules.straight("n"), "端头");
+        assertFalse(LinerStairPiece.Rules.straight("nes"), "丁字");
+        assertFalse(LinerStairPiece.Rules.straight("none"), "孤零零一格");
+    }
 }
