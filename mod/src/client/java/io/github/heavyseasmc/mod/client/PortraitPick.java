@@ -37,7 +37,22 @@ final class PortraitPick {
         boolean pips() {
             return max > 0;
         }
+
+        /** 一排最后那一格「什么也不做」（{@link #PASS}）。 */
+        static Person pass() {
+            return new Person(PASS, 0, 0);
+        }
+
+        boolean isPass() {
+            return PASS.equals(id);
+        }
     }
+
+    /**
+     * 「什么也不做」那一格的 id（不是任何角色）：落海那一窗的「不用」与行动面最后那一张同一张牌、同一套键 ——
+     * ← → 挑到它、Enter / 点它就定（用户 2026-10-07：已有的键复用，不另起一个；Esc 只收起）。
+     */
+    static final String PASS = "";
 
     /**
      * 这一帧的几何，全部是物理像素。
@@ -153,6 +168,10 @@ final class PortraitPick {
     }
 
     private void drawPerson(DrawContext context, SheetLayout l, int i, Person p, boolean on, double kk) {
+        if (p.isPass()) {
+            drawPass(context, i, on, kk);
+            return;
+        }
         int d = geo.d();
         int tx = geo.x()[i] + (geo.col() - d) / 2;
         int ty = geo.top() - Math.round(lift[i]);
@@ -179,6 +198,27 @@ final class PortraitPick {
                         pip, pip, kk);
             }
         }
+    }
+
+    /** 「什么也不做」那一格：一张与头像同高的小牌（行动面那一张），选中时描金，名字写在下面 —— 与人那几格同一个高度与名字行。 */
+    private void drawPass(DrawContext context, int i, boolean on, double kk) {
+        int h = geo.d();
+        int w = GuiLanguage.cardWidth(h);
+        int tx = geo.x()[i] + (geo.col() - w) / 2;
+        int ty = geo.top() - Math.round(lift[i]);
+        CardTexture.drawAction(context, io.github.heavyseasmc.mod.card.ActionCard.PASS, tx, ty, w, h);
+        if (on) {
+            int t = Math.max(1, (int) Math.round(3 * kk));
+            for (int k = 1; k <= t; k++) {
+                context.drawBorder(tx - k, ty - k, w + 2 * k, h + 2 * k, GuiLanguage.gold());
+            }
+        }
+        int namePx = Math.max(1, (int) Math.round(NAME_PX * kk));
+        int y = ty + h + (int) Math.round(UNDER * kk);
+        GuiText.drawPx(context, net.minecraft.text.Text.translatable(
+                        io.github.heavyseasmc.mod.card.ActionCard.PASS.titleKey()).getString(),
+                geo.x()[i], y, geo.col(), namePx, true,
+                on ? GuiLanguage.ink() : GuiLanguage.Hud.ink2(), GuiText.Align.CENTER, 0);
     }
 
     /** 指针落在第几格（GUI 单位）：一格从提起后的头像顶到名字（体力点）底。 */

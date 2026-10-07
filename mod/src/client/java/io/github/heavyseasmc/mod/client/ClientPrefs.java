@@ -82,10 +82,31 @@ final class ClientPrefs {
         GuiLanguage.setTheme(next);
         LOGGER.info("界面主题：{}", next);
         PROPS.setProperty(THEME, next == GuiLanguage.Theme.DARK ? "dark" : "light");
+        save("这次的主题只到退出为止");
+    }
+
+    /**
+     * 主画面状态牌下面那块图例展开着没有（用户 2026-10-07，样张 A；H 收起 / 展开）。
+     * 第一次默认展开，之后记着上一次 —— 看熟了的人收起来就不再每局弹出来。
+     */
+    private static final String LEGEND = "legend";
+
+    static boolean legendShown() {
+        return !"hide".equals(PROPS.getProperty(LEGEND));
+    }
+
+    static void toggleLegend() {
+        boolean show = !legendShown();
+        PROPS.setProperty(LEGEND, show ? "show" : "hide");
+        LOGGER.info("图例：{}", show ? "展开" : "收起");
+        save("这次的展开 / 收起只到退出为止");
+    }
+
+    private static void save(String lost) {
         try (Writer out = Files.newBufferedWriter(file(), StandardCharsets.UTF_8)) {
             PROPS.store(out, "Heavy Seas client preferences");
         } catch (IOException e) {
-            LOGGER.warn("客户端偏好没存上（这次的主题只到退出为止）：{}", e.toString());
+            LOGGER.warn("客户端偏好没存上（{}）：{}", lost, e.toString());
         }
     }
 }

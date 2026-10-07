@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.card.ActionCard;
 import io.github.heavyseasmc.mod.net.ContestActionC2S;
 import io.github.heavyseasmc.mod.state.ContestView;
 import io.github.heavyseasmc.mod.state.HudView;
@@ -30,7 +31,9 @@ import java.util.List;
  * 手里那支不该被翻出来。这里只告诉服务端「押哪个 id」。
  *
  * <h2>不押也是一种答案</h2>
- * 所以这一面 Esc 收得掉：窗口到点就结算，不押的人什么也不会失去。
+ * 那一排最后一张是「什么也不做」（行动面那一张）：挑到它、Enter / 点它，就告诉服务端不押了（ADR-0095 D1）。
+ * Esc（与背包键）只收起、不替你做决定（用户 2026-10-07：「esc 是关闭页面」），金签上按 G 回来；
+ * 窗口到点就结算，不押的人什么也不会失去。
  */
 public final class WeaponScreen extends GameScreen {
 
@@ -44,7 +47,7 @@ public final class WeaponScreen extends GameScreen {
     public WeaponScreen(HudView view) {
         super(Text.translatable("heavyseas.weapon.title"));
         this.view = view;
-        this.lift = new float[Math.max(1, view.contest().myWeapons().size())];
+        this.lift = new float[view.contest().myWeapons().size() + 1];
     }
 
     @Override
@@ -87,30 +90,31 @@ public final class WeaponScreen extends GameScreen {
         if (weapons.isEmpty()) {
             return;                           // 这一帧什么都不画，tick 会把它收起来
         }
-        if (lift.length != weapons.size()) {
-            lift = new float[weapons.size()];
-            highlight = Math.min(highlight, weapons.size() - 1);
+        int count = weapons.size() + 1;       // 最后一张是「什么也不做」
+        if (lift.length != count) {
+            lift = new float[count];
+            highlight = Math.min(highlight, count - 1);
         }
         Bands b = drawChrome(context, view);
-        Layout l = layout(b, weapons.size());
+        Layout l = layout(b, count);
         Inspect in = inspect(b);
         float gathered = gathered(now);
 
         // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
         boolean moved = mouseActuallyMoved(mouseX, mouseY);
         if (moved && !inspecting()) {
-            int hovered = indexAt(mouseX, mouseY, l, weapons.size());
+            int hovered = indexAt(mouseX, mouseY, l, count);
             if (hovered >= 0) {
                 highlight = hovered;
             }
         }
         // 高亮那一张最后画：收成一叠时它在堆顶，摊开时它抬起来。
-        for (int i = 0; i < weapons.size(); i++) {
+        for (int i = 0; i < count; i++) {
             if (i != highlight) {
                 drawOne(context, dt, l, in, gathered, weapons, i);
             }
         }
-        if (highlight >= 0 && highlight < weapons.size()) {
+        if (highlight >= 0 && highlight < count) {
             drawOne(context, dt, l, in, gathered, weapons, highlight);
         }
 
@@ -125,9 +129,14 @@ public final class WeaponScreen extends GameScreen {
             String card = weapons.get(highlight);
             drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
                     provisionCaption(card), provisionName(card), provisionEffect(card));
+        } else if (gathered > 0f && highlight == weapons.size()) {
+            drawCardPlate(context, in.plateX(), in.plateY(), in.plateW(), -1,
+                    Text.translatable(ActionCard.PASS.group().captionKey()), Text.translatable(ActionCard.PASS.titleKey()),
+                    Text.translatable(ActionCard.PASS.effectKey()));
         }
+        // Esc 不写在这里：底栏自己补「Esc 收起」（GameScreen.drawFootBand）
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
-                inspectHints("commit", keys("skip", "Esc")), now,
+                inspectHints(highlight == weapons.size() ? "confirm" : "commit"), now,
                 new Countdown(c.deadlineMs(), c.windowMs(), l.rowW()));
     }
 
@@ -141,7 +150,11 @@ public final class WeaponScreen extends GameScreen {
         context.getMatrices().push();
         context.getMatrices().translate(pose.cx() - pose.w() / 2f,
                 pose.bottom() - pose.h() - lift[i] * (1f - gathered), 0);
-        CardTexture.drawProvision(context, weapons.get(i), 0, 0, pose.w(), pose.h());
+        if (i < weapons.size()) {
+            CardTexture.drawProvision(context, weapons.get(i), 0, 0, pose.w(), pose.h());
+        } else {
+            CardTexture.drawAction(context, ActionCard.PASS, 0, 0, pose.w(), pose.h());
+        }
         if (hi) {
             drawCardFrame(context, pose.w(), pose.h());
         }
@@ -160,6 +173,13 @@ public final class WeaponScreen extends GameScreen {
      */
     private void commit() {
         List<String> weapons = view.contest().myWeapons();
+        if (highlight == weapons.size()) {
+            // 「什么也不做」= 不押了（ADR-0095 D1）：该押的人都说完了，这一段就提前结算
+            ClientPlayNetworking.send(ContestActionC2S.of(ContestActionC2S.Kind.WEAPONS_DONE));
+            LOGGER.info("挂武器：不押了");
+            close();
+            return;
+        }
         if (highlight < 0 || highlight >= weapons.size()) {
             return;
         }
@@ -172,7 +192,8 @@ public final class WeaponScreen extends GameScreen {
     protected boolean leftClick(double mouseX, double mouseY) {
         List<String> weapons = view.contest().myWeapons();
         if (!weapons.isEmpty() && !inspecting()) {
-            int i = indexAt((int) mouseX, (int) mouseY, layout(bands(), weapons.size()), weapons.size());
+            int count = weapons.size() + 1;
+            int i = indexAt((int) mouseX, (int) mouseY, layout(bands(), count), count);
             if (i >= 0) {
                 highlight = i;
                 commit();
@@ -186,7 +207,7 @@ public final class WeaponScreen extends GameScreen {
     protected boolean rightClick(double mouseX, double mouseY) {
         List<String> weapons = view.contest().myWeapons();
         int i = weapons.isEmpty() || inspecting()
-                ? -1 : indexAt((int) mouseX, (int) mouseY, layout(bands(), weapons.size()), weapons.size());
+                ? -1 : indexAt((int) mouseX, (int) mouseY, layout(bands(), weapons.size() + 1), weapons.size() + 1);
         return inspectClick(i, k -> highlight = k);
     }
     @Override
@@ -200,12 +221,7 @@ public final class WeaponScreen extends GameScreen {
         if (inspectKey(keyCode)) {
             return true;
         }
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            // 「Esc 不押」真的告诉服务端（ADR-0095 D1）：该押的人都说完了，这一段就提前结算
-            ClientPlayNetworking.send(ContestActionC2S.of(ContestActionC2S.Kind.WEAPONS_DONE));
-            LOGGER.info("挂武器：不押了");
-        }
-        int count = view.contest().myWeapons().size();
+        int count = view.contest().myWeapons().size() + 1;   // 最后一张是「什么也不做」
         switch (keyCode) {
             case GLFW.GLFW_KEY_LEFT -> {
                 highlight = Math.max(0, highlight - 1);

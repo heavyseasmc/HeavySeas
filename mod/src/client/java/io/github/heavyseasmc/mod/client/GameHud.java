@@ -115,6 +115,7 @@ public final class GameHud {
         matrices.scale(1f / scale, 1f / scale, 1f);          // 往下全是物理像素（HudLayout 的坐标）
         drawPlaque(context, layout, view);
         drawRibbon(context, layout, view, now);
+        drawLegend(context, layout, view);
         drawRail(context, layout, view);
         drawRight(context, layout, view, now, scale);
         matrices.pop();
@@ -216,6 +217,17 @@ public final class GameHud {
             GuiMaterial.hudIcon(context, PHASE_ICONS[i], ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
                     icon, icon, on ? GuiLanguage.Hud.PHASE_ON_ICON : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.PHASE_OFF_ALPHA), k);
         }
+        // 此刻是什么阶段，写出字来（用户 2026-10-07：「另外写出当前阶段」，样张 A：四格阶段右头）。
+        // 那一截在窄窗口里放不下「行动阶段」四个字时只写「行动」（HudLayout.phaseWord）
+        Rect pw = l.phaseWord();
+        int wordPx = l.len(PHASE_WORD_PX);
+        String name = phaseName(view.phase()).getString();
+        String word = Text.translatable("heavyseas.hud.phase_now", name).getString();
+        if (GuiText.widthPx(word, wordPx, true, 0) > pw.w()) {
+            word = name;
+        }
+        GuiText.drawPx(context, word, pw.x(), pw.y() + (pw.h() - GuiText.linePxAt(wordPx, true)) / 2, pw.w(), wordPx,
+                true, GuiLanguage.verdigris(), GuiText.Align.LEFT, 0);
         // 第三行：第几天（罗马数字）· 四只海鸥 · 手牌几张与开手牌的键
         Rect ro = l.roman();
         int romanPx = l.len(ROMAN_PX);
@@ -240,6 +252,253 @@ public final class GameHud {
             Rect hi = l.handIcon(keyW, numW);
             GuiMaterial.hudIcon(context, HudPart.IC_CARD, hi.x(), hi.y(), hi.w(), hi.h(), ink, l.k());
         }
+    }
+
+    /** 阶段字的字号（稿子像素）：比海鸥那一行的数字小一号，四个字才塞得进第四格右头那一截。 */
+    private static final double PHASE_WORD_PX = 13;
+
+    /** 阶段名。写成 switch 而不是拼键：拼出来的键 checkLangKeys 扫不到（与 GameFlow.phaseName 同一条）。 */
+    private static Text phaseName(io.github.heavyseasmc.engine.state.Phase phase) {
+        return Text.translatable(switch (phase) {
+            case WEATHER -> "heavyseas.phase.weather";
+            case PROVISION -> "heavyseas.phase.provision";
+            case ACTION -> "heavyseas.phase.action";
+            case NAVIGATION -> "heavyseas.phase.navigation";
+        });
+    }
+
+    // ---------------------------------------------------------------- 图例（用户 2026-10-07 · 样张 A）
+
+    /**
+     * 状态牌下面那块图例：主画面上每一个不带字的图标是什么（用户 2026-10-07：「左侧角色卡下面并排列出图示，
+     * 每个没有文字解释的图标都是做什么的，类似于 how to play 那种，可以按 H 收起，按键提示写在列表下方」）。
+     *
+     * <p>只写名字，不写规则（memory「界面不是说明书」）：「口渴」「舵手 · 划船堆」，不写口渴了会怎样。
+     * 图标用主画面上那同一套贴图，颜色压到搪瓷底上读得出的那一档（与日志同一块搪瓷）。
+     * 收起之后只剩一枚「H 图例」小签；展开与否记在客户端偏好里（{@link ClientPrefs#legendShown}）。
+     */
+    private static void drawLegend(DrawContext context, HudLayout l, HudView view) {
+        double k = l.k();
+        int ink = GuiLanguage.Hud.ENAMEL_LINE;
+        int textPx = l.len(LEGEND_TEXT_PX);
+        String legendKey = keyLabel(HeavySeasClient.legendKey());
+        String title = Text.translatable("heavyseas.hud.legend.title").getString();
+        if (!ClientPrefs.legendShown()) {
+            double keyW = keyWidthDesign(l, legendKey);
+            double w = 10 + keyW + 7 + GuiText.widthPx(title, textPx, false, 0) / k + 12;
+            Rect tab = l.legendTab(w);
+            GuiMaterial.hudPart(context, HudPart.ENAMEL, tab.x(), tab.y(), tab.w(), tab.h(), k);
+            Rect kr = new Rect(tab.x() + l.len(10), tab.y() + (tab.h() - l.len(HudLayout.KEY)) / 2, l.len(keyW),
+                    l.len(HudLayout.KEY));
+            drawKey(context, l, kr, legendKey, false);
+            int tx = kr.right() + l.len(7);
+            GuiText.drawPx(context, title, tx, tab.y() + (tab.h() - GuiText.linePxAt(textPx, false)) / 2,
+                    tab.right() - tx, textPx, false, ink, GuiText.Align.LEFT, 0);
+            return;
+        }
+        Rect box = l.legend(HudLayout.LEGEND_ROWS);
+        GuiMaterial.hudPart(context, HudPart.ENAMEL, box.x(), box.y(), box.w(), box.h(), k);
+        Rect head = l.legendHead();
+        int headPx = l.len(HudLayout.LOG_HEAD_TEXT);
+        GuiText.drawPx(context, title, head.x(), head.y() + (head.h() - GuiText.linePxAt(headPx, false)) / 2, head.w(),
+                headPx, false, GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.LOG_LABEL_ALPHA), GuiText.Align.LEFT,
+                (int) Math.round(HEAD_SPACING * k));
+
+        int verd = GuiLanguage.Hud.LOG_WEATHER;
+        int cinn = GuiLanguage.Hud.LOG_CINNABAR;
+        int gap = Math.max(1, l.len(3));
+        // 第 0 行：体力 · 口渴
+        legendItem(context, l, 0, 0, false, "heavyseas.hud.legend.hp", (x, y, s) -> {
+            int d = Math.max(2, (int) Math.round(s * 0.56));
+            int cy = y + (s - d) / 2;
+            for (int i = 0; i < 3; i++) {
+                GuiMaterial.hudPart(context, i < 2 ? HudPart.PIP_ON : HudPart.PIP_OFF, x + i * (d + gap), cy, d, d,
+                        d / (double) HudPart.PIP_ON.w());
+            }
+            return 3 * d + 2 * gap;
+        });
+        legendItem(context, l, 0, 1, false, "heavyseas.hud.legend.thirst", (x, y, s) -> {
+            GuiMaterial.hudIcon(context, HudPart.IC_DROP, x, y, s, s, verd, s / 24.0);
+            GuiMaterial.hudIcon(context, HudPart.IC_DROP, x + s + gap, y, s, s, cinn, s / 24.0);
+            return 2 * s + gap;
+        });
+        // 第 1 行：清醒 / 昏迷 · 手牌张数
+        legendItem(context, l, 1, 0, false, "heavyseas.hud.legend.awake", (x, y, s) -> {
+            GuiMaterial.hudIcon(context, HudPart.IC_EYE, x, y, s, s, ink, s / 24.0);
+            GuiMaterial.icon(context, "eye_closed", x + s + gap, y, s, ink);
+            return 2 * s + gap;
+        });
+        legendItem(context, l, 1, 1, false, "heavyseas.hud.legend.hand", (x, y, s) -> {
+            GuiMaterial.hudIcon(context, HudPart.IC_CARD, x, y, s, s, ink, s / 24.0);
+            int px = l.len(LEGEND_TEXT_PX);
+            int w = GuiText.drawPx(context, "3", x + s + gap, y + (s - GuiText.linePxAt(px, true)) / 2, s * 2, px, true,
+                    ink, GuiText.Align.LEFT, 0);
+            return s + gap + w;
+        });
+        // 第 2 行：四格阶段（亮的那一格垫铜绿圆底）· 名字就是那四个阶段名
+        String phases = String.join(" · ", phaseName(io.github.heavyseasmc.engine.state.Phase.WEATHER).getString(),
+                phaseName(io.github.heavyseasmc.engine.state.Phase.PROVISION).getString(),
+                phaseName(io.github.heavyseasmc.engine.state.Phase.ACTION).getString(),
+                phaseName(io.github.heavyseasmc.engine.state.Phase.NAVIGATION).getString());
+        legendItemText(context, l, 2, 0, true, phases, (x, y, s) -> {
+            int cx = x;
+            for (int i = 0; i < HudLayout.PHASES; i++) {
+                if (i == 2) {
+                    int d = s + l.len(2);
+                    GuiMaterial.hudPart(context, HudPart.PHASE_ON, cx, y - l.len(1), d, d, d / (double) HudPart.PHASE_ON.w());
+                    int ic = (int) Math.round(d * 0.66);
+                    GuiMaterial.hudIcon(context, PHASE_ICONS[i], cx + (d - ic) / 2, y - l.len(1) + (d - ic) / 2, ic, ic,
+                            GuiLanguage.Hud.PHASE_ON_ICON, ic / 24.0);
+                    cx += d + gap;
+                } else {
+                    GuiMaterial.hudIcon(context, PHASE_ICONS[i], cx, y, s, s, ink, s / 24.0);
+                    cx += s + gap;
+                }
+            }
+            return cx - gap - x;
+        });
+        // 第 3 行：第几天 · 海鸥
+        legendItem(context, l, 3, 0, false, "heavyseas.hud.legend.day", (x, y, s) -> {
+            int px = l.len(16);
+            return GuiText.drawPx(context, roman(3), x, y + (s - GuiText.linePxAt(px, true)) / 2, s * 2, px, true, ink,
+                    GuiText.Align.LEFT, 0);
+        });
+        legendItemText(context, l, 3, 1, false,
+                Text.translatable("heavyseas.hud.legend.gulls", GameState.GULLS_TO_LAND).getString(), (x, y, s) -> {
+                    int w = (int) Math.round(s * 26 / 20.0);
+                    GuiMaterial.hudIcon(context, HudPart.IC_GULL, x, y, w, s, ink, s / 20.0);
+                    return w;
+                });
+        // 第 4 行：三种圈（你 · 正在等他 · 被抢 / 被换），用这一局里真有的人
+        List<String> seats = view.seats();
+        String you = view.seated() && !view.character().isEmpty() ? view.character() : seats.isEmpty() ? "" : seats.get(0);
+        List<String> others = seats.stream().filter(id -> !id.equals(you)).toList();
+        legendItem(context, l, 4, 0, true, "heavyseas.hud.legend.rings", (x, y, s) -> {
+            HudPart[] rings = {HudPart.TOK40_YOU, HudPart.TOK40_ACT, HudPart.TOK40_CINN};
+            String[] who = {you, others.isEmpty() ? you : others.get(0), others.size() < 2 ? you : others.get(1)};
+            int d = s + l.len(2);
+            int cx = x;
+            for (int i = 0; i < 3; i++) {
+                if (!who[i].isEmpty()) {
+                    GuiMaterial.portrait(context, who[i], cx, y - l.len(1), d, 1f);
+                }
+                GuiMaterial.hudPart(context, rings[i], cx, y - l.len(1), d, d, d / (double) rings[i].w());
+                cx += d + gap * 2;
+            }
+            return cx - gap * 2 - x;
+        });
+        // 第 5 行：舵手那枚牌 · 体力 / 体型的印章
+        legendItem(context, l, 5, 0, false, "heavyseas.hud.legend.helm", (x, y, s) -> {
+            int px = l.len(BADGE_PX);
+            int numW = GuiText.widthPx("2", px, true, 0);
+            int ic = (int) Math.round(s * 0.8);
+            int bw = l.len(4) + ic + l.len(2) + numW + l.len(6);
+            GuiMaterial.hudPart(context, HudPart.BADGE, x, y, bw, s, s / (double) HudPart.BADGE.h());
+            GuiMaterial.hudIcon(context, HudPart.IC_HELM18, x + l.len(4), y + (s - ic) / 2, ic, ic, ink, ic / 18.0);
+            GuiText.drawPx(context, "2", x + l.len(4) + ic + l.len(2), y + (s - GuiText.linePxAt(px, true)) / 2, numW + 2,
+                    px, true, ink, GuiText.Align.LEFT, 0);
+            return bw;
+        });
+        legendItem(context, l, 5, 1, false, "heavyseas.hud.legend.seal", (x, y, s) -> {
+            int big = l.len(14);
+            int small = l.len(11);
+            int bw = GuiText.widthPx("3", big, true, 0);
+            int sw = GuiText.widthPx("/4", small, false, 0);
+            int pad = l.len(4);
+            int w = pad + bw + sw + pad;
+            int edge = Math.max(1, l.len(1.5));
+            context.fill(x, y, x + w, y + s, cinn);
+            context.fill(x + edge, y + edge, x + w - edge, y + s - edge, GuiLanguage.Hud.COUNT_FILL);
+            GuiText.drawPx(context, "3", x + pad, y + (s - GuiText.linePxAt(big, true)) / 2, bw + 2, big, true, ink,
+                    GuiText.Align.LEFT, 0);
+            GuiText.drawPx(context, "/4", x + pad + bw, y + (s - GuiText.linePxAt(small, false)) / 2 + l.len(1), sw + 2,
+                    small, false, ink, GuiText.Align.LEFT, 0);
+            return w;
+        });
+        // 第 6 行：落海 / 死亡 · 轮到你（金签）
+        legendItem(context, l, 6, 0, false, "heavyseas.hud.legend.gone", (x, y, s) -> {
+            int ww = s;
+            int wh = (int) Math.round(s * 11 / 25.0);
+            GuiMaterial.hudIcon(context, HudPart.IC_WAVES40, x, y + (s - wh) / 2, ww, wh, ink, ww / 25.0);
+            int cs = (int) Math.round(s * 0.62);
+            GuiMaterial.hudIcon(context, HudPart.IC_CROSS40, x + ww + gap * 2, y + (s - cs) / 2, cs, cs, ink, cs / 11.0);
+            return ww + gap * 2 + cs;
+        });
+        legendItem(context, l, 6, 1, false, "heavyseas.hud.legend.turn", (x, y, s) -> {
+            String act = keyLabel(HeavySeasClient.actKey());
+            int px = l.len(12);
+            int ic = (int) Math.round(s * 0.75);
+            int w = l.len(5) + ic + l.len(3) + GuiText.widthPx(act, px, true, 0) + l.len(6);
+            GuiMaterial.hudPart(context, HudPart.RIBBON, x, y, w, s, s / (double) HudPart.RIBBON.h());
+            GuiMaterial.hudIcon(context, HudPart.IC_BELL, x + l.len(5), y + (s - ic) / 2, ic, ic,
+                    GuiLanguage.Hud.RIBBON_INK, ic / 24.0);
+            GuiText.drawPx(context, act, x + l.len(5) + ic + l.len(3), y + (s - GuiText.linePxAt(px, true)) / 2,
+                    w, px, true, GuiLanguage.Hud.RIBBON_INK, GuiText.Align.LEFT, 0);
+            return w;
+        });
+        // 第 7 行：今天的天候（舷窗）· 航海日志
+        legendItem(context, l, 7, 0, false, "heavyseas.hud.legend.weather", (x, y, s) -> {
+            if (!view.weather().isEmpty()) {
+                CardTexture.drawWeatherDisc(context, view.weather(), x, y, s);
+            }
+            GuiMaterial.hudPart(context, HudPart.MEDAL, x, y, s, s, s / (double) HudPart.MEDAL.w());
+            return s;
+        });
+        legendItem(context, l, 7, 1, false, "heavyseas.hud.legend.log", (x, y, s) -> {
+            GuiMaterial.hudIcon(context, HudPart.IC_BOOK, x, y, s, s, ink, s / 24.0);
+            return s;
+        });
+
+        // 键位那一行（「按键提示写在列表下方」）：先一道细线，再 H 收起 · 手牌 · 行动 · 日志，都印实际绑定的键
+        Rect keys = l.legendKeys(HudLayout.LEGEND_ROWS);
+        int ly = keys.y() - l.len(8);
+        context.fill(keys.x(), ly, keys.right(), ly + Math.max(1, l.len(1)), GuiLanguage.Hud.alpha(ink, 0.25f));
+        int kx = keys.x();
+        int keyPx = l.len(14);
+        String[][] pairs = {
+                {legendKey, "heavyseas.keys.close"},
+                {keyLabel(HeavySeasClient.handKey()), "heavyseas.keys.hand"},
+                {keyLabel(HeavySeasClient.actKey()), "heavyseas.keys.act"},
+                {keyLabel(HeavySeasClient.logKey()), "heavyseas.keys.log"}};
+        for (String[] p : pairs) {
+            double keyW = keyWidthDesign(l, p[0]);
+            Rect kr = new Rect(kx, keys.y(), l.len(keyW), keys.h());
+            String label = Text.translatable(p[1]).getString();
+            int lw = GuiText.widthPx(label, keyPx, false, 0);
+            if (kr.right() + l.len(5) + lw > keys.right()) {
+                break;                        // 放不下就不排了：小窗口里 H 收起永远在第一个
+            }
+            drawKey(context, l, kr, p[0], false);
+            GuiText.drawPx(context, label, kr.right() + l.len(5), keys.y() + (keys.h() - GuiText.linePxAt(keyPx, false)) / 2,
+                    lw + 2, keyPx, false, ink, GuiText.Align.LEFT, 0);
+            kx = kr.right() + l.len(5) + lw + l.len(12);
+        }
+    }
+
+    /** 图例里名字的字号（稿子像素）。 */
+    private static final double LEGEND_TEXT_PX = 15;
+
+    /** 一格里先画图标、返回它们占了多宽（物理像素）。{@code s} 是图标的边长。 */
+    @FunctionalInterface
+    private interface LegendIcons {
+        int draw(int x, int y, int s);
+    }
+
+    /** 名字取自 lang 的一格；键写全（拼出来的键 checkLangKeys 扫不到）。 */
+    private static void legendItem(DrawContext context, HudLayout l, int row, int col, boolean wide, String key,
+                                   LegendIcons icons) {
+        legendItemText(context, l, row, col, wide, Text.translatable(key).getString(), icons);
+    }
+
+    private static void legendItemText(DrawContext context, HudLayout l, int row, int col, boolean wide, String label,
+                                       LegendIcons icons) {
+        Rect cell = l.legendCell(row, col, wide);
+        int s = cell.h();
+        int w = icons.draw(cell.x(), cell.y(), s);
+        int tx = cell.x() + w + l.len(6);
+        int px = l.len(LEGEND_TEXT_PX);
+        GuiText.drawPx(context, label, tx, cell.y() + (s - GuiText.linePxAt(px, false)) / 2, Math.max(1, cell.right() - tx),
+                px, false, GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.LEFT, 0);
     }
 
     // ---------------------------------------------------------------- 金签（样张 .ribbon）
@@ -315,6 +574,10 @@ public final class GameHud {
         if (view.myWaterDonation()) {
             return new Cue("donate", null, 0);
         }
+        if (overboardChoice()) {
+            // 落海那一窗：收起之后按 G 回来（HeavySeasClient.pollTurn 认 G）—— 原先这一窗没有金签，收起就找不回来了
+            return new Cue("overboard", null, 0);
+        }
         if (view.myRowPending()) {
             return new Cue("row", null, 0);
         }
@@ -322,6 +585,16 @@ public final class GameHud {
             return new Cue("act", null, 0);
         }
         return null;
+    }
+
+    /** 落海那一窗开着、而我手上有牌可出（与 {@code HeavySeasClient.pollTurn} 弹那一面同一个判据）。 */
+    private static boolean overboardChoice() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.world == null) {
+            return false;
+        }
+        var table = GameComponents.of(client.world).tableView();
+        return table.overboardOpen() && !table.plays().isEmpty();
     }
 
     // ---------------------------------------------------------------- 座位轨（样张 .rail）

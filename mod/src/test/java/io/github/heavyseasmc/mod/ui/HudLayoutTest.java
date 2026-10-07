@@ -262,6 +262,55 @@ class HudLayoutTest {
         return new Rect(x0, y0, x1 - x0, y1 - y0);
     }
 
+    @Test
+    @DisplayName("图例（用户 2026-10-07 · 样张 A）：各档窗口都不出窗口，不压金签 · 座位轨 · 右上一列 · 热栏；每一格与键位行都在框里")
+    void legendFitsUnderThePlaque() {
+        List<String> problems = new ArrayList<>();
+        for (int[] win : WINDOWS) {
+            HudLayout l = HudLayout.of(win[0], win[1]);
+            int ring = l.len(HudLayout.RING);
+            Rect legend = l.legend(HudLayout.LEGEND_ROWS);
+            Rect dock = union(l.medal().grow(l.len(HudLayout.MEDAL_RING)), l.logTab().grow(ring), l.logKey(0));
+            String at = win[0] + "×" + win[1] + "@" + win[2];
+            inside(problems, at, "图例", legend, win);
+            inside(problems, at, "收起后的小签", l.legendTab(120), win);
+            check(problems, at, "图例", legend, "金签", l.ribbon());
+            check(problems, at, "图例", legend, "状态牌", l.plaque().grow(ring));
+            check(problems, at, "图例", legend, "座位轨", l.rail(8).grow(ring));
+            check(problems, at, "图例", legend, "右上一列", dock);
+            check(problems, at, "图例", legend, "热栏", hotbar(win));
+            for (int row = 0; row < HudLayout.LEGEND_ROWS; row++) {
+                inside(problems, at, "图例第 " + row + " 行左格", l.legendCell(row, 0, false), legend);
+                inside(problems, at, "图例第 " + row + " 行右格", l.legendCell(row, 1, false), legend);
+                inside(problems, at, "图例第 " + row + " 行整行", l.legendCell(row, 0, true), legend);
+            }
+            inside(problems, at, "图例键位行", l.legendKeys(HudLayout.LEGEND_ROWS), legend);
+            check(problems, at, "图例末行", l.legendCell(HudLayout.LEGEND_ROWS - 1, 0, true), "键位行",
+                    l.legendKeys(HudLayout.LEGEND_ROWS));
+        }
+        assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
+    @Test
+    @DisplayName("阶段字（用户 2026-10-07）：在状态牌外框之内、不压第四格阶段，竖向与阶段那一排对齐")
+    void phaseWordSitsRightOfThePhases() {
+        List<String> problems = new ArrayList<>();
+        for (int[] win : WINDOWS) {
+            HudLayout l = HudLayout.of(win[0], win[1]);
+            String at = win[0] + "×" + win[1] + "@" + win[2];
+            Rect word = l.phaseWord();
+            inside(problems, at, "阶段字", word, l.plaque());
+            check(problems, at, "阶段字", word, "第四格阶段", l.phase(HudLayout.PHASES - 1));
+            if (word.y() != l.phase(0).y() || word.h() != l.phase(0).h()) {
+                problems.add(at + "：阶段字 " + word + " 与阶段那一排 " + l.phase(0) + " 不齐");
+            }
+            if (word.w() <= 0) {
+                problems.add(at + "：阶段字没有宽度 " + word);
+            }
+        }
+        assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
     private static void check(List<String> problems, String at, String a, Rect ra, String b, Rect rb) {
         if (ra.intersects(rb)) {
             problems.add(at + "：" + a + " " + ra + " 压着 " + b + " " + rb);

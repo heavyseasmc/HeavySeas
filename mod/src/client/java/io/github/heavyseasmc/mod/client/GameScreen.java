@@ -305,6 +305,13 @@ public abstract class GameScreen extends Screen {
             detail = null;
             return true;
         }
+        // 背包键（默认 E）与 Esc 同义：只收起（用户 2026-10-07 定）。Minecraft 自带的箱子、背包里就是这样 ——
+        // 它在 HandledScreen.keyPressed 里认 inventoryKey 就 close（字节码核过），左手不用去够 Esc。
+        // 读玩家自己绑的背包键，不写死 E；收不得的面（补给箱、口渴……）照旧不收。
+        if (shouldCloseOnEsc() && client != null && client.options.inventoryKey.matchesKey(keyCode, scanCode)) {
+            close();
+            return true;
+        }
         if (HeavySeasClient.themeKey() != null && HeavySeasClient.themeKey().matchesKey(keyCode, scanCode)) {
             ClientPrefs.toggleTheme();
             return true;

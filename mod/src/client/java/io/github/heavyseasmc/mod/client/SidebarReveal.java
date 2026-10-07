@@ -152,14 +152,16 @@ final class SidebarReveal {
         return pinned;
     }
 
-    /** 钉住 / 取消钉住。钉住时它一直在，不再自己收回去。 */
+    /**
+     * 钉住 / 取消钉住。钉住时它一直在，不再自己收回去。
+     *
+     * <p>收起时<b>记着</b>拉伸没有：再按 L 钉上还是拉伸的样子（用户 2026-10-07：「日志放大后 L 收起再展开，就取消放大了」）。
+     * 拉伸只在钉住时作数（{@link #expanded()}），所以收着的时候不会有一条拉伸的空栏挂在那儿；要回到原宽按 Shift + L。
+     */
     static void togglePin() {
         pinned = !pinned;
         scroll = 0;                           // 再钉上时从最新的看起
         scrollRest = 0;
-        if (!pinned) {
-            expanded = false;
-        }
     }
 
     /** 往回翻过（暂停在某一处）：新到的播报不挪动这一屏，直到按键回到最新（用户 2026-10-07）。 */

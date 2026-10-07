@@ -356,6 +356,82 @@ public final class HudLayout {
         return left(keyX - CLUSTER_GAP - numW - CLUSTER_GAP - ICON, rowBY() + (ROW_B_H - ICON) / 2, ICON, ICON);
     }
 
+    /**
+     * 此刻是什么阶段的那几个字（「行动阶段」）：第四格阶段右边 4，到状态牌外框往里 6。
+     *
+     * <p>❗用到了右内边距：内区在第四格右边只剩 42，四个字放不下（样张 A 也是这样压进去的，用户 2026-10-07 选了 A）。
+     * 窄窗口里连这一截也放不下时，调用方只写阶段名（两个字）。
+     */
+    public Rect phaseWord() {
+        double x = columnX() + PHASES * (PHASE + PHASE_GAP) - PHASE_GAP + PHASE_WORD_GAP;
+        return left(x, contentY() + ROW_A1_H + ROW_A_GAP, PLAQUE_X + PLAQUE_W - PHASE_WORD_RIGHT - x, PHASE);
+    }
+
+    private static final double PHASE_WORD_GAP = 4;
+    private static final double PHASE_WORD_RIGHT = 6;
+
+    // ---------------------------------------------------------------- 图例（用户 2026-10-07 · 样张 A）
+
+    /**
+     * 图例：状态牌下面、金签之下 19，左沿与宽同状态牌；两列，每格「图标 + 名字」，跨两列的格（四格阶段 · 三种圈）占一整行；
+     * 表头一行、最底下一行键位（H 收起 · 手牌 · 行动 · 日志）。行数由调用方的条目决定，几何全在这里（可单测）。
+     */
+    public static final double LEGEND_X = PLAQUE_X;
+    public static final double LEGEND_Y = PLAQUE_Y + PLAQUE_H + RIBBON_BELOW + 19;
+    public static final double LEGEND_W = PLAQUE_W;
+    public static final double LEGEND_PAD_X = 15;
+    public static final double LEGEND_PAD_T = 11;
+    public static final double LEGEND_PAD_B = 12;
+    /** 表头那一行（13 px · 行高 1.75，与日志栏头同一个字号）。 */
+    public static final double LEGEND_HEAD_H = 13 * 1.75;
+    public static final double LEGEND_HEAD_GAP = 4;
+    /** 一行：图标 20 + 行距 7。 */
+    public static final double LEGEND_ROW_H = 27;
+    public static final double LEGEND_ICON = 20;
+    public static final double LEGEND_COL_GAP = 10;
+    /** 键位那一行：上面留 11 + 一道细线 + 8，键帽 26。 */
+    public static final double LEGEND_KEYS_GAP = 19;
+    public static final double LEGEND_KEYS_H = 26;
+    /** 图例有几行（GameHud.drawLegend 排的那八行；跨两列的格占一整行）。 */
+    public static final int LEGEND_ROWS = 8;
+    /** 收起之后剩下的那枚小签：「H 图例」。 */
+    public static final double LEGEND_TAB_H = 34;
+
+    /** 图例整块（{@code rows} 行条目）。 */
+    public Rect legend(int rows) {
+        return left(LEGEND_X, LEGEND_Y, LEGEND_W, legendHeight(rows));
+    }
+
+    public static double legendHeight(int rows) {
+        return LEGEND_PAD_T + LEGEND_HEAD_H + LEGEND_HEAD_GAP + rows * LEGEND_ROW_H + LEGEND_KEYS_GAP + LEGEND_KEYS_H
+                + LEGEND_PAD_B;
+    }
+
+    /** 表头那一行。 */
+    public Rect legendHead() {
+        return left(LEGEND_X + LEGEND_PAD_X, LEGEND_Y + LEGEND_PAD_T, LEGEND_W - 2 * LEGEND_PAD_X, LEGEND_HEAD_H);
+    }
+
+    /** 第 {@code row} 行、第 {@code col} 列（0 / 1）的那一格；{@code wide} 占满一行。 */
+    public Rect legendCell(int row, int col, boolean wide) {
+        double inner = LEGEND_W - 2 * LEGEND_PAD_X;
+        double colW = (inner - LEGEND_COL_GAP) / 2;
+        double x = LEGEND_X + LEGEND_PAD_X + (wide ? 0 : col * (colW + LEGEND_COL_GAP));
+        double y = LEGEND_Y + LEGEND_PAD_T + LEGEND_HEAD_H + LEGEND_HEAD_GAP + row * LEGEND_ROW_H;
+        return left(x, y, wide ? inner : colW, LEGEND_ICON);
+    }
+
+    /** 键位那一行（{@code rows} 行条目之下）；它上沿往上 8 是那道细线。 */
+    public Rect legendKeys(int rows) {
+        double y = LEGEND_Y + LEGEND_PAD_T + LEGEND_HEAD_H + LEGEND_HEAD_GAP + rows * LEGEND_ROW_H + LEGEND_KEYS_GAP;
+        return left(LEGEND_X + LEGEND_PAD_X, y, LEGEND_W - 2 * LEGEND_PAD_X, LEGEND_KEYS_H);
+    }
+
+    /** 收起之后那枚小签（宽 {@code w}，稿子像素）。 */
+    public Rect legendTab(double w) {
+        return left(LEGEND_X, LEGEND_Y, w, LEGEND_TAB_H);
+    }
+
     // ---------------------------------------------------------------- 金签
 
     /** 金签的胶囊（圆角半径 = 高的一半）。 */

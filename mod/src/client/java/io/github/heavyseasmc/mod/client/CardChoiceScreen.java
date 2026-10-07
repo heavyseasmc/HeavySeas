@@ -78,10 +78,23 @@ public final class CardChoiceScreen extends GameScreen {
             choices = table.seats().stream().filter(s -> !s.removed() && !s.id().equals(view.character()))
                     .map(s -> new TableView.Play(gift, s.id())).toList();
         }
-        pick.focus(Math.max(0, Math.min(pick.focus(), choices.size() - 1)));
+        pick.focus(Math.max(0, Math.min(pick.focus(), rowSize() - 1)));
         if (choices.isEmpty()) {
             close();
         }
+    }
+
+    /** 落海那一窗的这一排最后多一格「什么也不做」（= 这一窗不用）；赠送没有它（不送就 Esc 取消）。 */
+    private boolean hasPass() {
+        return token > 0;
+    }
+
+    private int rowSize() {
+        return choices.size() + (hasPass() ? 1 : 0);
+    }
+
+    private boolean onPass() {
+        return hasPass() && pick.focus() == choices.size();
     }
 
     @Override
@@ -118,19 +131,38 @@ public final class CardChoiceScreen extends GameScreen {
         for (TableView.Play p : choices) {
             people.add(new PortraitPick.Person(p.target(), 0, 0));
         }
+        if (hasPass()) {
+            people.add(PortraitPick.Person.pass());
+        }
         var l = sheet();
         double top0 = Math.max(l.railBottom() + CardRow.RAIL_CLEAR * l.k(),
                 (stageTop + lineStep() + HINT_GAP) * (double) guiScale());
-        String card = choices.get(pick.focus()).card();
-        pick.render(context, mouseX, mouseY, dt, top0, people,
-                (ctx, x, y, w, h) -> CardTexture.drawProvision(ctx, card, x, y, w, h));
+        // 左边那张跟着选中的那一项走：挑到「什么也不做」时它也是那一张。
+        // ❗在画的那一刻才取：render 里悬停可能刚挪过焦点，先取好的话会拿着上一格去画这一格
+        pick.render(context, mouseX, mouseY, dt, top0, people, (ctx, x, y, w, h) -> {
+            if (onPass()) {
+                CardTexture.drawAction(ctx, io.github.heavyseasmc.mod.card.ActionCard.PASS, x, y, w, h);
+            } else {
+                CardTexture.drawProvision(ctx, choices.get(Math.min(pick.focus(), choices.size() - 1)).card(),
+                        x, y, w, h);
+            }
+        });
         Countdown countdown = token > 0 ? new Countdown(GameComponents.of(client.world).tableView().deadline(),
                 OverboardPhase.CHOOSE_MILLIS, 0) : null;
+        // 落海那一窗：Esc 只收起（金签上按 G 回来），「不用」是那一排最后一格；赠送：Esc 取消
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
-                List.of(confirm("Enter"), keys("cancel", "Esc")), now, countdown);
+                hasPass() ? List.of(confirm("Enter")) : List.of(confirm("Enter"), keys("cancel", "Esc")),
+                now, countdown);
     }
 
     private void commit() {
+        if (onPass()) {
+            // 「什么也不做」= 这一窗不用（ADR-0095 D1）：告诉服务端，手上有牌的真人都不用了，这一窗当场收
+            ClientPlayNetworking.send(CardActionC2S.of(CardActionC2S.Kind.OVERBOARD_DONE, "", "", token));
+            LOGGER.info("落海：这一窗不用牌");
+            close();
+            return;
+        }
         int selected = pick.focus();
         if (selected < 0 || selected >= choices.size()) {
             return;
@@ -144,7 +176,7 @@ public final class CardChoiceScreen extends GameScreen {
 
     @Override
     protected boolean leftClick(double x, double y) {
-        int i = pick.indexAt(x, y, choices.size());
+        int i = pick.indexAt(x, y, rowSize());
         if (i >= 0) {
             pick.focus(i);
             commit();
@@ -155,12 +187,8 @@ public final class CardChoiceScreen extends GameScreen {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (key == GLFW.GLFW_KEY_ESCAPE && token > 0) {
-            // 落海那一窗「Esc 不用」真的告诉服务端（ADR-0095 D1）：手上有牌的真人都不用了，这一窗当场收
-            ClientPlayNetworking.send(CardActionC2S.of(CardActionC2S.Kind.OVERBOARD_DONE, "", "", token));
-            LOGGER.info("落海：这一窗不用牌");
-        }
-        if (pick.keyPressed(key, choices.size())) {
+        // Esc（与背包键）只收起，不替你做决定（用户 2026-10-07：「esc 是关闭页面」）—— 落海那一窗的「不用」是最后那一格
+        if (pick.keyPressed(key, rowSize())) {
             return true;
         }
         if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER || key == GLFW.GLFW_KEY_SPACE) {

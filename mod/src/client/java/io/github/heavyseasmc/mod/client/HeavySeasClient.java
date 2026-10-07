@@ -93,6 +93,13 @@ public final class HeavySeasClient implements ClientModInitializer {
         return logLatestKey;
     }
 
+    /** 主画面状态牌下面那块图例展开 / 收起（用户 2026-10-07，默认 H）。 */
+    private static KeyBinding legendKey;
+
+    public static KeyBinding legendKey() {
+        return legendKey;
+    }
+
     /** 换界面主题的键。界面开着时 {@link GameScreen} 用它认按键。 */
     /** 航海日志（右栏）钉住 / 放开。界面开着时按键不走按键绑定，由 GameScreen 接。 */
     public static KeyBinding logKey() {
@@ -105,7 +112,7 @@ public final class HeavySeasClient implements ClientModInitializer {
 
     /** 本模组注册的全部按键：对局进行中它们先于 Minecraft 自带的绑定与别的模组接键（{@link KeyPriority}）。还没注册时为空。 */
     static List<KeyBinding> ownKeys() {
-        return Stream.of(handKey, actKey, themeKey, logKey, logOlderKey, logNewerKey, logLatestKey)
+        return Stream.of(handKey, actKey, themeKey, logKey, logOlderKey, logNewerKey, logLatestKey, legendKey)
                 .filter(Objects::nonNull).toList();
     }
 
@@ -222,9 +229,18 @@ public final class HeavySeasClient implements ClientModInitializer {
                 "key.heavyseas.log_newer", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_DOWN, "key.categories.heavyseas"));
         logLatestKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.log_latest", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_END, "key.categories.heavyseas"));
+        // 图例（用户 2026-10-07：「可以按 H 收起」）：H 在 Minecraft 自带的键位与本模组里都没人用（1.21.1 GameOptions 字节码核过）
+        legendKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.legend", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_H, "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (themeKey.wasPressed()) {
                 ClientPrefs.toggleTheme();
+            }
+            while (legendKey.wasPressed()) {
+                if (client.world != null && client.currentScreen == null
+                        && GameComponents.of(client.world).hudView().active()) {
+                    ClientPrefs.toggleLegend();
+                }
             }
             CardComposite.tick(client);      // 一 tick 合成一张牌；渲染中途不动帧缓冲
             OverboardCue.tick(client);       // 有人落海：溅水一声 · 四边朱砂一闪（ADR-0048）
