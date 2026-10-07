@@ -436,6 +436,7 @@ public final class LinerBlocks {
             Registry.register(Registries.ITEM, id, block == CARPET ? new CarpetItem(block, new Item.Settings())
                     : new BlockItem(block, new Item.Settings()));
         });
+        DecorHammer.register();                        // 装修锤（ADR-0093 B15）：放下以后再改，右键轮换形态
     }
 
     /** 全部方块，按登记顺序（批量生成工具、物品栏与判据用）。 */

@@ -41,7 +41,8 @@ public final class CreativeTabs {
                     "liner_teak_deck",
                     "liner_carpet",
                     "liner_hull_white", "liner_hull_black", "liner_hull_red", "liner_hull_waterline", "liner_hull_buff",
-                    "liner_funnel_buff", "liner_funnel_black")),
+                    "liner_funnel_buff", "liner_funnel_black",
+                    "decor_hammer")),                     // 装修锤（ADR-0093 B15）：放下以后再改，排在结构材料末尾、不当页签图标
             new Page("p2_trim", List.of(
                     "liner_cornice", "liner_cornice_thin", "liner_chair_rail", "liner_pilaster", "liner_door_casing",
                     "liner_door_casing_tall", "liner_trellis",
