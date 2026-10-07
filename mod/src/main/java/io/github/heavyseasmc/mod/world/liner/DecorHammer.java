@@ -35,7 +35,7 @@ import java.util.Map;
  *   <li>格架的常春藤（有 ↔ 没有）· 躺椅的毯（搭 ↔ 不搭）· 肖像画的是谁（八个人轮着）· 吊艇架的艇在哪一边（左 ↔ 右）</li>
  * </ul>
  * 在「右键方块」事件里最先接：灯这类方块自己的右键（开关灯）会先于手里的物品被叫到，锤子要在它之前截住。
- * 点中的不是这几样就放行（DrillSkiff 等后面的照常）。潜行右键（锁住）留给舷窗拼大那一步（第 5 批 5b）。
+ * 点中的不是这几样就放行（DrillSkiff 等后面的照常）。潜行右键：舷窗锁成单格 ↔ 自动拼大（第 5 批 5b，{@link LinerHull#toggleLock}），别的放行。
  */
 public final class DecorHammer extends Item {
 
@@ -55,11 +55,14 @@ public final class DecorHammer extends Item {
     }
 
     static ActionResult use(PlayerEntity player, World world, Hand hand, BlockHitResult hit) {
-        if (!player.getStackInHand(hand).isOf(HAMMER) || player.isSneaking()) {
+        if (!player.getStackInHand(hand).isOf(HAMMER)) {
             return ActionResult.PASS;
         }
         BlockPos pos = hit.getBlockPos();
         BlockState state = world.getBlockState(pos);
+        if (player.isSneaking()) {
+            return lock(player, world, pos, state);
+        }
         Change change = next(world, pos, state);
         if (change == null) {
             return ActionResult.PASS;
@@ -72,6 +75,19 @@ public final class DecorHammer extends Item {
             }
             world.playSound(null, pos, SoundEvents.BLOCK_WOOD_HIT, SoundCategory.BLOCKS, 0.6f, 1.2f);
             player.sendMessage(change.label, true);
+        }
+        return ActionResult.success(world.isClient);
+    }
+
+    /** 潜行右键：舷窗锁成单格 ↔ 自动拼（ADR-0093 B12，{@link LinerHull#toggleLock}）；别的方块放行。 */
+    private static ActionResult lock(PlayerEntity player, World world, BlockPos pos, BlockState state) {
+        if (!LinerHull.isPorthole(state)) {
+            return ActionResult.PASS;
+        }
+        if (!world.isClient) {
+            boolean locked = LinerHull.toggleLock(world, pos);
+            world.playSound(null, pos, SoundEvents.BLOCK_WOOD_HIT, SoundCategory.BLOCKS, 0.6f, 0.9f);
+            player.sendMessage(label("porthole", locked ? "locked" : "free"), true);
         }
         return ActionResult.success(world.isClient);
     }

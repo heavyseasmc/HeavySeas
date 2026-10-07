@@ -1091,11 +1091,14 @@ def checkDecorBlocks = { Task task, Map fam ->
                 .replace(File.separator, '/').replaceFirst("^${top}/", '') - ext }
         def scanned = 0
         // 亮着的玻璃（ADR-0082）：没有模型引用，客户端 GlassGlow 建网格时按屋里的光换上 —— 平常那一张有模型在用、
-        //   而且 GlassGlow 源码里写着这一族的换法，才算有人用（只认「…/glass_lit」与「…/window_glass_lit_<压边>」两种名字）
+        //   而且 GlassGlow 源码里写着这一族的换法，才算有人用（只认「…/glass_lit」「…/hull/glass_lit_<n>_<列><行>」（拼大的舷窗）
+        //   与「…/window_glass_lit_<压边>」三种名字）
         def glowSource = task.ext.has('glowSource') ? task.ext.glowSource : null
         def glowText = glowSource?.isFile() ? glowSource.getText('UTF-8') : ''
         def unlitOf = { String id ->
             if (id.endsWith('/hull/glass_lit') && glowText.contains('block/liner/hull/glass_lit')) { return id - '_lit' }
+            def h = (id =~ /^(.*\/hull\/glass_)lit_([0-9]_[0-9]{2})$/)
+            if (h.find() && glowText.contains('"block/liner/hull/glass_"') && glowText.contains('"lit_"')) { return h.group(1) + h.group(2) }
             def m = (id =~ /^(.*\/glass\/window_glass_)lit_([a-z]+)$/)
             if (m.find() && glowText.contains('"lit_"')) { return m.group(1) + m.group(2) }
             return null

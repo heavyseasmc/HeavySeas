@@ -1,17 +1,467 @@
 {
   "variants": {
-    "facing=east": {
+    "facing=east,merge=g2_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_00",
+      "y": 270
+    },
+    "facing=east,merge=g2_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_01",
+      "y": 270
+    },
+    "facing=east,merge=g2_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_10",
+      "y": 270
+    },
+    "facing=east,merge=g2_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_11",
+      "y": 270
+    },
+    "facing=east,merge=g3_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_00",
+      "y": 270
+    },
+    "facing=east,merge=g3_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_01",
+      "y": 270
+    },
+    "facing=east,merge=g3_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_02",
+      "y": 270
+    },
+    "facing=east,merge=g3_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_10",
+      "y": 270
+    },
+    "facing=east,merge=g3_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_11",
+      "y": 270
+    },
+    "facing=east,merge=g3_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_12",
+      "y": 270
+    },
+    "facing=east,merge=g3_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_20",
+      "y": 270
+    },
+    "facing=east,merge=g3_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_21",
+      "y": 270
+    },
+    "facing=east,merge=g3_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_22",
+      "y": 270
+    },
+    "facing=east,merge=g4_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_00",
+      "y": 270
+    },
+    "facing=east,merge=g4_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_01",
+      "y": 270
+    },
+    "facing=east,merge=g4_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_02",
+      "y": 270
+    },
+    "facing=east,merge=g4_03": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_03",
+      "y": 270
+    },
+    "facing=east,merge=g4_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_10",
+      "y": 270
+    },
+    "facing=east,merge=g4_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_11",
+      "y": 270
+    },
+    "facing=east,merge=g4_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_12",
+      "y": 270
+    },
+    "facing=east,merge=g4_13": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_13",
+      "y": 270
+    },
+    "facing=east,merge=g4_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_20",
+      "y": 270
+    },
+    "facing=east,merge=g4_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_21",
+      "y": 270
+    },
+    "facing=east,merge=g4_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_22",
+      "y": 270
+    },
+    "facing=east,merge=g4_23": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_23",
+      "y": 270
+    },
+    "facing=east,merge=g4_30": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_30",
+      "y": 270
+    },
+    "facing=east,merge=g4_31": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_31",
+      "y": 270
+    },
+    "facing=east,merge=g4_32": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_32",
+      "y": 270
+    },
+    "facing=east,merge=g4_33": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_33",
+      "y": 270
+    },
+    "facing=east,merge=locked": {
       "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner",
       "y": 270
     },
-    "facing=north": {
+    "facing=east,merge=single": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner",
+      "y": 270
+    },
+    "facing=north,merge=g2_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_00",
+      "y": 180
+    },
+    "facing=north,merge=g2_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_01",
+      "y": 180
+    },
+    "facing=north,merge=g2_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_10",
+      "y": 180
+    },
+    "facing=north,merge=g2_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_11",
+      "y": 180
+    },
+    "facing=north,merge=g3_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_00",
+      "y": 180
+    },
+    "facing=north,merge=g3_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_01",
+      "y": 180
+    },
+    "facing=north,merge=g3_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_02",
+      "y": 180
+    },
+    "facing=north,merge=g3_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_10",
+      "y": 180
+    },
+    "facing=north,merge=g3_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_11",
+      "y": 180
+    },
+    "facing=north,merge=g3_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_12",
+      "y": 180
+    },
+    "facing=north,merge=g3_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_20",
+      "y": 180
+    },
+    "facing=north,merge=g3_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_21",
+      "y": 180
+    },
+    "facing=north,merge=g3_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_22",
+      "y": 180
+    },
+    "facing=north,merge=g4_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_00",
+      "y": 180
+    },
+    "facing=north,merge=g4_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_01",
+      "y": 180
+    },
+    "facing=north,merge=g4_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_02",
+      "y": 180
+    },
+    "facing=north,merge=g4_03": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_03",
+      "y": 180
+    },
+    "facing=north,merge=g4_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_10",
+      "y": 180
+    },
+    "facing=north,merge=g4_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_11",
+      "y": 180
+    },
+    "facing=north,merge=g4_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_12",
+      "y": 180
+    },
+    "facing=north,merge=g4_13": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_13",
+      "y": 180
+    },
+    "facing=north,merge=g4_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_20",
+      "y": 180
+    },
+    "facing=north,merge=g4_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_21",
+      "y": 180
+    },
+    "facing=north,merge=g4_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_22",
+      "y": 180
+    },
+    "facing=north,merge=g4_23": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_23",
+      "y": 180
+    },
+    "facing=north,merge=g4_30": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_30",
+      "y": 180
+    },
+    "facing=north,merge=g4_31": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_31",
+      "y": 180
+    },
+    "facing=north,merge=g4_32": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_32",
+      "y": 180
+    },
+    "facing=north,merge=g4_33": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_33",
+      "y": 180
+    },
+    "facing=north,merge=locked": {
       "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner",
       "y": 180
     },
-    "facing=south": {
+    "facing=north,merge=single": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner",
+      "y": 180
+    },
+    "facing=south,merge=g2_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_00"
+    },
+    "facing=south,merge=g2_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_01"
+    },
+    "facing=south,merge=g2_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_10"
+    },
+    "facing=south,merge=g2_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_11"
+    },
+    "facing=south,merge=g3_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_00"
+    },
+    "facing=south,merge=g3_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_01"
+    },
+    "facing=south,merge=g3_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_02"
+    },
+    "facing=south,merge=g3_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_10"
+    },
+    "facing=south,merge=g3_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_11"
+    },
+    "facing=south,merge=g3_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_12"
+    },
+    "facing=south,merge=g3_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_20"
+    },
+    "facing=south,merge=g3_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_21"
+    },
+    "facing=south,merge=g3_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_22"
+    },
+    "facing=south,merge=g4_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_00"
+    },
+    "facing=south,merge=g4_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_01"
+    },
+    "facing=south,merge=g4_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_02"
+    },
+    "facing=south,merge=g4_03": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_03"
+    },
+    "facing=south,merge=g4_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_10"
+    },
+    "facing=south,merge=g4_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_11"
+    },
+    "facing=south,merge=g4_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_12"
+    },
+    "facing=south,merge=g4_13": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_13"
+    },
+    "facing=south,merge=g4_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_20"
+    },
+    "facing=south,merge=g4_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_21"
+    },
+    "facing=south,merge=g4_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_22"
+    },
+    "facing=south,merge=g4_23": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_23"
+    },
+    "facing=south,merge=g4_30": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_30"
+    },
+    "facing=south,merge=g4_31": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_31"
+    },
+    "facing=south,merge=g4_32": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_32"
+    },
+    "facing=south,merge=g4_33": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_33"
+    },
+    "facing=south,merge=locked": {
       "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner"
     },
-    "facing=west": {
+    "facing=south,merge=single": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner"
+    },
+    "facing=west,merge=g2_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_00",
+      "y": 90
+    },
+    "facing=west,merge=g2_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_01",
+      "y": 90
+    },
+    "facing=west,merge=g2_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_10",
+      "y": 90
+    },
+    "facing=west,merge=g2_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_2_11",
+      "y": 90
+    },
+    "facing=west,merge=g3_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_00",
+      "y": 90
+    },
+    "facing=west,merge=g3_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_01",
+      "y": 90
+    },
+    "facing=west,merge=g3_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_02",
+      "y": 90
+    },
+    "facing=west,merge=g3_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_10",
+      "y": 90
+    },
+    "facing=west,merge=g3_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_11",
+      "y": 90
+    },
+    "facing=west,merge=g3_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_12",
+      "y": 90
+    },
+    "facing=west,merge=g3_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_20",
+      "y": 90
+    },
+    "facing=west,merge=g3_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_21",
+      "y": 90
+    },
+    "facing=west,merge=g3_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_3_22",
+      "y": 90
+    },
+    "facing=west,merge=g4_00": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_00",
+      "y": 90
+    },
+    "facing=west,merge=g4_01": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_01",
+      "y": 90
+    },
+    "facing=west,merge=g4_02": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_02",
+      "y": 90
+    },
+    "facing=west,merge=g4_03": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_03",
+      "y": 90
+    },
+    "facing=west,merge=g4_10": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_10",
+      "y": 90
+    },
+    "facing=west,merge=g4_11": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_11",
+      "y": 90
+    },
+    "facing=west,merge=g4_12": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_12",
+      "y": 90
+    },
+    "facing=west,merge=g4_13": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_13",
+      "y": 90
+    },
+    "facing=west,merge=g4_20": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_20",
+      "y": 90
+    },
+    "facing=west,merge=g4_21": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_21",
+      "y": 90
+    },
+    "facing=west,merge=g4_22": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_22",
+      "y": 90
+    },
+    "facing=west,merge=g4_23": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_23",
+      "y": 90
+    },
+    "facing=west,merge=g4_30": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_30",
+      "y": 90
+    },
+    "facing=west,merge=g4_31": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_31",
+      "y": 90
+    },
+    "facing=west,merge=g4_32": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_32",
+      "y": 90
+    },
+    "facing=west,merge=g4_33": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner_4_33",
+      "y": 90
+    },
+    "facing=west,merge=locked": {
+      "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner",
+      "y": 90
+    },
+    "facing=west,merge=single": {
       "model": "heavyseas:block/liner/liner_porthole_inner_plain/hull/porthole_inner",
       "y": 90
     }

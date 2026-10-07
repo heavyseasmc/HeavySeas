@@ -7,31 +7,47 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.MapColor;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.block.piston.PistonBehavior;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.sound.BlockSoundGroup;
 import net.minecraft.state.StateManager;
 import net.minecraft.state.property.DirectionProperty;
+import net.minecraft.state.property.EnumProperty;
 import net.minecraft.state.property.IntProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.BlockMirror;
 import net.minecraft.util.BlockRotation;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.StringIdentifiable;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
 import net.minecraft.world.WorldAccess;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
 
@@ -47,6 +63,9 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  *       正面的板缝跟着 {@link #CELL} 走，与左右的船壳板接得上。<b>夜里亮</b>靠的是光：舷窗只从屋里那一面进光（{@link Porthole}），
  *       玻璃与窗洞内壁取这一格自己的光 —— 客舱的灯亮着，舷窗就亮；灯关了就暗；船壳外面不会被照出一圈光晕。</li>
  *   <li><b>舷窗里面那一面</b>（室内白漆墙板 · 白漆外墙两款）：挂在船壳舷窗正里面那一格，黄铜圈 + 玻璃后退 2.5 像素（黄铜唇 1 + 孔套 1.5），与船壳上那一块对齐。</li>
+ *   <li><b>拼大</b>（ADR-0093 B12 · 第 5 批 5b）：同一种舷窗、同一个朝向摆成完整的 2 × 2 · 3 × 3 · 4 × 4，自动拼成一个大圆窗（窗洞直径
+ *       占整块的八分之五：20 · 30 · 40 像素，黄铜圈宽 2）—— 每格记着自己是哪一组的第几片（{@link #MERGE}），模型是整块画好再按格切的。
+ *       放下、拆掉、装修锤潜行右键锁住 / 解锁时整片重拼（{@link #retile}）；游戏放结构时原样写进去、不重拼。</li>
  * </ul>
  *
  * <p>模板一律<b>正面朝南</b>作画（与 {@link LinerBlock} 同一个约定：y 旋转 南 0 · 西 90 · 北 180 · 东 270）。通用件、只在创造模式里拿：
@@ -59,6 +78,10 @@ public final class LinerHull {
     public static final DirectionProperty FACING = Properties.HORIZONTAL_FACING;
     /** 烟囱板：一列板里的下面那一格（0）还是上面那一格（1），按 y 算（{@link Rules#row}）。 */
     public static final IntProperty ROW = IntProperty.of("row", 0, 1);
+    /** 舷窗拼大：单格 · 锁成单格 · 拼大那一片（{@link Merge}）。 */
+    public static final EnumProperty<Merge> MERGE = EnumProperty.of("merge", Merge.class);
+    /** 一次重拼最多认这么多格（一整面墙的舷窗也够；再多的那一截照旧，不至于一次拖住服务端）。 */
+    static final int MAX_REGION = 256;
 
     private static final Map<String, Block> BLOCKS = new LinkedHashMap<>();
 
@@ -222,7 +245,7 @@ public final class LinerHull {
         Porthole(AbstractBlock.Settings settings, String color) {
             super(settings);
             this.color = color;
-            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH).with(CELL, 0));
+            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH).with(CELL, 0).with(MERGE, Merge.SINGLE));
             for (Direction d : Direction.Type.HORIZONTAL) {
                 collision.put(d, turned(Rules.holeCollision(), d));
                 culling.put(d, turned(Rules.outerSkin(), d));
@@ -231,13 +254,30 @@ public final class LinerHull {
 
         @Override
         protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-            builder.add(FACING, CELL);
+            builder.add(FACING, CELL, MERGE);
         }
 
         /** 正面朝着摆它的人（人站在船外摆）；板列照位置。 */
         @Override
         public BlockState getPlacementState(ItemPlacementContext ctx) {
             return getDefaultState().with(FACING, ctx.getHorizontalPlayerFacing().getOpposite()).with(CELL, Rules.cell(ctx.getBlockPos()));
+        }
+
+        /** 人摆下的（游戏放结构不走这里）：连着的同一种舷窗整片重拼。 */
+        @Override
+        public void onPlaced(World world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
+            super.onPlaced(world, pos, state, placer, stack);
+            if (!world.isClient) {
+                retile(world, pos);
+            }
+        }
+
+        @Override
+        protected void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
+            super.onStateReplaced(state, world, pos, newState, moved);
+            if (!world.isClient && !newState.isOf(this)) {
+                retileAround(world, pos, state);
+            }
         }
 
         @Override
@@ -249,15 +289,25 @@ public final class LinerHull {
         @Override
         public LinerLooks.Look look(BlockState state) {
             Direction f = state.get(FACING);
-            return LinerLooks.look("hull/porthole", tex("front", Rules.plateTexture(color, state.get(CELL), f),
-                    "plate", "hull/" + color + "_top", "inside", "wall_white", "ring", "hull/brass_ring", "brass", "hull/brass",
-                    "glass", "hull/glass"),
-                    Rules.yaw(f));
+            Merge m = state.get(MERGE);
+            Map<String, String> t = tex("front", Rules.plateTexture(color, state.get(CELL), f),
+                    "plate", "hull/" + color + "_top", "inside", "wall_white", "ring", Rules.ringTexture(m), "brass", "hull/brass",
+                    "glass", Rules.glassTexture(m));
+            if (t.get("ring") == null) {
+                t.remove("ring");
+            }
+            return LinerLooks.look(m.merged() ? "hull/porthole_" + m.piece() : "hull/porthole", t, Rules.yaw(f));
+        }
+
+        /** 这一格所在那一组的全部格子（单格就是它自己）：客户端判「整扇亮不亮」用（{@code GlassGlow}）。 */
+        public List<BlockPos> cellsOf(BlockPos pos, BlockState state) {
+            return groupCells(pos, state);
         }
 
         @Override
         protected VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-            return collision.get(state.get(FACING));
+            Merge m = state.get(MERGE);
+            return m.merged() ? mergedCollision(m, state.get(FACING), false) : collision.get(state.get(FACING));
         }
 
         /** 遮光与剔面只认外面那一层薄板（见类注释）。 */
@@ -276,9 +326,11 @@ public final class LinerHull {
             return state.with(FACING, rotation.rotate(state.get(FACING)));
         }
 
+        /** 镜像：朝向照转；拼大那一片左右对调（镜像之后看的人的左右反了 —— 朝向不变时格子换了边，朝向翻过来时看的方向换了）。 */
         @Override
         protected BlockState mirror(BlockState state, BlockMirror mirror) {
-            return state.rotate(mirror.getRotation(state.get(FACING)));
+            BlockState s = state.rotate(mirror.getRotation(state.get(FACING)));
+            return mirror == BlockMirror.NONE ? s : s.with(MERGE, state.get(MERGE).mirrored());
         }
     }
 
@@ -296,7 +348,7 @@ public final class LinerHull {
         InnerPorthole(AbstractBlock.Settings settings, String face) {
             super(settings);
             this.face = face;
-            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH));
+            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH).with(MERGE, Merge.SINGLE));
             for (Direction d : Direction.Type.HORIZONTAL) {
                 collision.put(d, turned(Rules.holeCollision(), d));
             }
@@ -304,7 +356,7 @@ public final class LinerHull {
 
         @Override
         protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-            builder.add(FACING);
+            builder.add(FACING, MERGE);
         }
 
         /** 正面朝着摆它的人（人站在屋里摆）。 */
@@ -313,15 +365,38 @@ public final class LinerHull {
             return getDefaultState().with(FACING, ctx.getHorizontalPlayerFacing().getOpposite());
         }
 
+        /** 与船壳上那一块同一套拼法（按世界坐标轴排，两边朝向相反照样拼得一样，窗洞对得上）。 */
+        @Override
+        public void onPlaced(World world, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
+            super.onPlaced(world, pos, state, placer, stack);
+            if (!world.isClient) {
+                retile(world, pos);
+            }
+        }
+
+        @Override
+        protected void onStateReplaced(BlockState state, World world, BlockPos pos, BlockState newState, boolean moved) {
+            super.onStateReplaced(state, world, pos, newState, moved);
+            if (!world.isClient && !newState.isOf(this)) {
+                retileAround(world, pos, state);
+            }
+        }
+
         @Override
         public LinerLooks.Look look(BlockState state) {
-            return LinerLooks.look("hull/porthole_inner", tex("front", face, "back", "wall_white", "ring", "hull/brass_ring",
-                    "brass", "hull/brass", "glass", "hull/glass"), Rules.yaw(state.get(FACING)));
+            Merge m = state.get(MERGE);
+            Map<String, String> t = tex("front", face, "back", "wall_white", "ring", Rules.ringTexture(m),
+                    "brass", "hull/brass", "glass", Rules.glassTexture(m));
+            if (t.get("ring") == null) {
+                t.remove("ring");
+            }
+            return LinerLooks.look(m.merged() ? "hull/porthole_inner_" + m.piece() : "hull/porthole_inner", t, Rules.yaw(state.get(FACING)));
         }
 
         @Override
         protected VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-            return collision.get(state.get(FACING));
+            Merge m = state.get(MERGE);
+            return m.merged() ? mergedCollision(m, state.get(FACING), true) : collision.get(state.get(FACING));
         }
 
         @Override
@@ -329,9 +404,11 @@ public final class LinerHull {
             return state.with(FACING, rotation.rotate(state.get(FACING)));
         }
 
+        /** 镜像：朝向照转；拼大那一片左右对调（镜像之后看的人的左右反了 —— 朝向不变时格子换了边，朝向翻过来时看的方向换了）。 */
         @Override
         protected BlockState mirror(BlockState state, BlockMirror mirror) {
-            return state.rotate(mirror.getRotation(state.get(FACING)));
+            BlockState s = state.rotate(mirror.getRotation(state.get(FACING)));
+            return mirror == BlockMirror.NONE ? s : s.with(MERGE, state.get(MERGE).mirrored());
         }
     }
 
@@ -346,6 +423,172 @@ public final class LinerHull {
                     Math.max(lo[0], hi[0]) / 16, b[4] / 16, Math.max(lo[1], hi[1]) / 16)));
         }
         return shape.simplify();
+    }
+
+    // ================================================================ 舷窗拼大（ADR-0093 B12）
+
+    /**
+     * 拼大那一片：{@code g<n>_<列><行>}（列从站在正面看的左手数、行从下往上；名字与 {@code liner_hull.py} 的 MERGE_VALUES 逐个相同）。
+     * 单格 {@link #SINGLE} 会自动拼；{@link #LOCKED}（装修锤潜行右键）是锁成单格，不拼、也挡着别人拼过去。
+     */
+    public enum Merge implements StringIdentifiable {
+        SINGLE, LOCKED,
+        G2_00, G2_01, G2_10, G2_11,
+        G3_00, G3_01, G3_02, G3_10, G3_11, G3_12, G3_20, G3_21, G3_22,
+        G4_00, G4_01, G4_02, G4_03, G4_10, G4_11, G4_12, G4_13, G4_20, G4_21, G4_22, G4_23, G4_30, G4_31, G4_32, G4_33;
+
+        /** 一组几格见方（单格 1）· 第几列 · 第几行。 */
+        public final int n;
+        public final int col;
+        public final int row;
+
+        Merge() {
+            String s = name();
+            boolean g = s.charAt(0) == 'G';
+            n = g ? s.charAt(1) - '0' : 1;
+            col = g ? s.charAt(3) - '0' : 0;
+            row = g ? s.charAt(4) - '0' : 0;
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+
+        public boolean merged() {
+            return n > 1;
+        }
+
+        /** 模板与窗圈贴图名的后缀：{@code <n>_<列><行>}。 */
+        public String piece() {
+            return n + "_" + col + row;
+        }
+
+        public static Merge of(int n, int col, int row) {
+            return n == 1 ? SINGLE : valueOf("G" + n + "_" + col + row);
+        }
+
+        /** 左右对调（镜像）。 */
+        public Merge mirrored() {
+            return merged() ? of(n, n - 1 - col, row) : this;
+        }
+    }
+
+    /** 船壳上那一块或屋里那一块。 */
+    public static boolean isPorthole(BlockState state) {
+        return state.getBlock() instanceof Porthole || state.getBlock() instanceof InnerPorthole;
+    }
+
+    /** 这一格所在那一组的全部格子（按状态里记的那一片往回推左下角；单格、锁住的就是它自己）。 */
+    static List<BlockPos> groupCells(BlockPos pos, BlockState state) {
+        Merge m = state.get(MERGE);
+        if (!m.merged()) {
+            return List.of(pos);
+        }
+        Direction right = LinerConnect.viewerRight(state.get(FACING));
+        BlockPos origin = pos.offset(right, -m.col).down(m.row);
+        List<BlockPos> out = new ArrayList<>(m.n * m.n);
+        for (int c = 0; c < m.n; c++) {
+            for (int r = 0; r < m.n; r++) {
+                out.add(origin.offset(right, c).up(r));
+            }
+        }
+        return out;
+    }
+
+    /** 墙面里那一条水平轴（朝南北的舷窗是 x，朝东西的是 z）。 */
+    private static Direction.Axis along(Direction facing) {
+        return facing.rotateYClockwise().getAxis();
+    }
+
+    /**
+     * 从 start 起把连着的同一种、同一个朝向、没锁的舷窗整片重拼（{@link Rules#tile}），只改变了的那几格。
+     * 写格「通知客户端、不做邻居的形状更新」：重拼不该引起别的连锁（舷窗自己的邻居更新只重算板列）。
+     */
+    static void retile(World world, BlockPos start) {
+        BlockState s0 = world.getBlockState(start);
+        if (!isPorthole(s0) || s0.get(MERGE) == Merge.LOCKED) {
+            return;
+        }
+        Block block = s0.getBlock();
+        Direction facing = s0.get(FACING);
+        Direction.Axis axis = along(facing);
+        Set<BlockPos> region = new LinkedHashSet<>();
+        Deque<BlockPos> queue = new ArrayDeque<>(List.of(start));
+        while (!queue.isEmpty() && region.size() < MAX_REGION) {
+            BlockPos p = queue.poll();
+            if (region.contains(p) || !world.getChunkManager().isChunkLoaded(p.getX() >> 4, p.getZ() >> 4)) {
+                continue;
+            }
+            BlockState s = world.getBlockState(p);
+            if (!s.isOf(block) || s.get(FACING) != facing || s.get(MERGE) == Merge.LOCKED) {
+                continue;
+            }
+            region.add(p);
+            queue.add(p.up());
+            queue.add(p.down());
+            queue.add(p.offset(axis, 1));
+            queue.add(p.offset(axis, -1));
+        }
+        Map<Long, BlockPos> byKey = new HashMap<>();
+        for (BlockPos p : region) {
+            byKey.put(Rules.key(p.getComponentAlongAxis(axis), p.getY()), p);
+        }
+        boolean rightPositive = LinerConnect.viewerRight(facing).getDirection() == Direction.AxisDirection.POSITIVE;
+        Rules.tile(byKey.keySet()).forEach((key, t) -> {
+            BlockPos p = byKey.get(key);
+            int n = t[0];
+            Merge m = Merge.of(n, rightPositive ? t[1] : n - 1 - t[1], t[2]);
+            BlockState s = world.getBlockState(p);
+            if (s.get(MERGE) != m) {
+                world.setBlockState(p, s.with(MERGE, m), Block.NOTIFY_LISTENERS | Block.FORCE_STATE);
+            }
+        });
+    }
+
+    /** 拆掉 / 锁住了 pos（原来是 old）之后：墙面上挨着它的四格各自那一片重拼（拆开的几块各拼各的）。 */
+    static void retileAround(World world, BlockPos pos, BlockState old) {
+        Direction.Axis axis = along(old.get(FACING));
+        for (BlockPos p : List.of(pos.up(), pos.down(), pos.offset(axis, 1), pos.offset(axis, -1))) {
+            BlockState s = world.getBlockState(p);
+            if (s.isOf(old.getBlock()) && s.get(FACING) == old.get(FACING)) {
+                retile(world, p);
+            }
+        }
+    }
+
+    /**
+     * 装修锤潜行右键：锁成单格 ↔ 解锁（自动拼）。船壳那一块与正里面那一块（屋里那一面，朝向相反）一起换 —— 只锁一边，
+     * 两边拼出来的不一样，窗洞就对不上了。→ 锁上了没有。
+     */
+    public static boolean toggleLock(World world, BlockPos pos) {
+        BlockState s = world.getBlockState(pos);
+        boolean lock = s.get(MERGE) != Merge.LOCKED;
+        Direction facing = s.get(FACING);
+        List<BlockPos> cells = new ArrayList<>(List.of(pos));
+        BlockPos partner = pos.offset(facing.getOpposite());
+        BlockState ps = world.getBlockState(partner);
+        if (isPorthole(ps) && ps.getBlock() != s.getBlock() && ps.get(FACING) == facing.getOpposite()) {
+            cells.add(partner);
+        }
+        for (BlockPos p : cells) {
+            BlockState old = world.getBlockState(p);
+            world.setBlockState(p, old.with(MERGE, lock ? Merge.LOCKED : Merge.SINGLE), Block.NOTIFY_LISTENERS | Block.FORCE_STATE);
+            if (lock) {
+                retileAround(world, p, old);
+            } else {
+                retile(world, p);
+            }
+        }
+        return lock;
+    }
+
+    private static final Map<String, VoxelShape> MERGED_SHAPES = new ConcurrentHashMap<>();
+
+    /** 拼大那一片的碰撞箱：按这一格里的窗洞逐行挖空（{@link Rules#mergedCollision}），转到朝向；一种一份。 */
+    static VoxelShape mergedCollision(Merge m, Direction facing, boolean inner) {
+        return MERGED_SHAPES.computeIfAbsent(m.asString() + facing.asString() + inner,
+                k -> turned(Rules.mergedCollision(m, inner ? 16 - 2.5 : 16 - 3), facing));
     }
 
     // ================================================================ 纯规则
@@ -445,6 +688,147 @@ public final class LinerHull {
         /** 遮光的形状（模板坐标）：贴着外面（南面）那一层 1 像素的薄板。 */
         public static double[][] outerSkin() {
             return new double[][]{{0, 0, 15, 16, 16, 16}};
+        }
+
+        // ---------------------------------------------------------------- 舷窗拼大
+
+        /** 拼大的黄铜圈宽（像素）：用户 10-07 挑的样张。 */
+        public static final int MERGE_RING = 2;
+
+        /** n 格见方那一组的窗洞半径：单格 4（直径 8），拼大的占整块的八分之五（直径 10n）。 */
+        public static double holeRadius(int n) {
+            return n == 1 ? 4 : 5.0 * n;
+        }
+
+        public static double ringRadius(int n) {
+            return n == 1 ? 5 : 5.0 * n + MERGE_RING;
+        }
+
+        /**
+         * 阶梯圆（画布 16n、圆心在正中）第 y 行的半宽，0.5 像素取整；不在圆里是 0 —— {@code liner_hull.disc_rows} 的抄本。
+         * Python 的 round 是「四舍六入五成双」、这里是五入，但这几种半径下 2·半宽 从来不正好落在 .5 上（半径是整数、行心在半格上，
+         * 4·(R² − d²) 是整数而 (k + ½)² 不是），两边答案一样。
+         */
+        public static double rowHalf(double r, int n, int y) {
+            double d = Math.abs(y + 0.5 - 8 * n);
+            if (r <= d) {
+                return 0;
+            }
+            return Math.round(Math.sqrt(r * r - d * d) * 2) / 2.0;
+        }
+
+        /** 拼大那一格里有没有窗圈（没有就不给窗圈贴图 —— 生成器也不出那一张）。取样与 {@code liner_hull.ring_piece} 同一套。 */
+        public static boolean hasRing(Merge m) {
+            double c = 8 * m.n;
+            double hole = holeRadius(m.n);
+            double ring = ringRadius(m.n);
+            for (int y = 16 * m.row; y < 16 * m.row + 16; y++) {
+                double ho = rowHalf(ring, m.n, y);
+                double hh = rowHalf(hole, m.n, y);
+                for (int u = 0; u < 16; u++) {
+                    double dx = Math.abs(16 * m.col + u + 0.5 - c);
+                    if (dx < ho && !(dx < hh)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /** 玻璃贴图：单格 {@code hull/glass}，拼大那一片 {@code hull/glass_<n>_<列><行>}（按原来的像素大小画、按格切；亮着的那一张 {@code GlassGlow} 换）。 */
+        public static String glassTexture(Merge m) {
+            return m.merged() ? "hull/glass_" + m.piece() : "hull/glass";
+        }
+
+        /** 窗圈贴图：单格 {@code hull/brass_ring}，拼大那一片 {@code hull/brass_ring_<n>_<列><行>}；那一片里没有窗圈是 null。 */
+        @Nullable
+        public static String ringTexture(Merge m) {
+            if (!m.merged()) {
+                return "hull/brass_ring";
+            }
+            return hasRing(m) ? "hull/brass_ring_" + m.piece() : null;
+        }
+
+        /**
+         * 拼大那一片的碰撞箱（模板坐标，正面朝南）：逐行把这一格里的窗洞挖空、贯穿；窗洞那一截在玻璃那一层（zGlass − 0.5 … zGlass）补一片
+         * —— 大窗洞人钻得过去，玻璃得挡人。照样「不是整块」，后退的玻璃取这一格自己的光（类注释 {@link Porthole}）。
+         */
+        public static double[][] mergedCollision(Merge m, double zGlass) {
+            List<double[]> out = new ArrayList<>();
+            double c = 8 * m.n;
+            double hole = holeRadius(m.n);
+            for (int y = 0; y < 16; y++) {
+                double hw = rowHalf(hole, m.n, 16 * m.row + y);
+                double lo = Math.max(0, Math.min(16, c - hw - 16 * m.col));
+                double hi = Math.max(0, Math.min(16, c + hw - 16 * m.col));
+                if (hw <= 0 || hi <= lo) {
+                    out.add(new double[]{0, y, 0, 16, y + 1, 16});
+                    continue;
+                }
+                if (lo > 0) {
+                    out.add(new double[]{0, y, 0, lo, y + 1, 16});
+                }
+                if (hi < 16) {
+                    out.add(new double[]{hi, y, 0, 16, y + 1, 16});
+                }
+                out.add(new double[]{lo, y, zGlass - 0.5, hi, y + 1, zGlass});
+            }
+            return out.toArray(new double[0][]);
+        }
+
+        /** 墙面上一格的键：(u, v) = (沿世界坐标轴, y)。 */
+        public static long key(int u, int v) {
+            return ((long) u << 32) | (v & 0xffffffffL);
+        }
+
+        public static int u(long key) {
+            return (int) (key >> 32);
+        }
+
+        public static int v(long key) {
+            return (int) key;
+        }
+
+        /**
+         * 一片墙上的舷窗怎么拼：从最下一行起、每行从 u 小的那一头起，逐格以它为左下角试 4 × 4 · 3 × 3 · 2 × 2（整块都在、而且还没拼进别的），
+         * 都不成就是单格。→ 键 → {n, 这一格在那一组里的第几列（沿 u）, 第几行}。
+         * 按世界坐标轴排、不按看的人的左右：船壳那一块与屋里那一块朝向相反，按世界轴排两边才拼得一样，窗洞对得上。
+         */
+        public static Map<Long, int[]> tile(Set<Long> cells) {
+            List<Long> order = new ArrayList<>(cells);
+            order.sort(Comparator.comparingInt(Rules::v).thenComparingInt(Rules::u));
+            Map<Long, int[]> out = new HashMap<>();
+            for (long k : order) {
+                if (out.containsKey(k)) {
+                    continue;
+                }
+                int u0 = u(k);
+                int v0 = v(k);
+                int n = 4;
+                for (; n > 1; n--) {
+                    if (fits(cells, out, u0, v0, n)) {
+                        break;
+                    }
+                }
+                for (int du = 0; du < n; du++) {
+                    for (int dv = 0; dv < n; dv++) {
+                        out.put(key(u0 + du, v0 + dv), new int[]{n, du, dv});
+                    }
+                }
+            }
+            return out;
+        }
+
+        private static boolean fits(Set<Long> cells, Map<Long, int[]> taken, int u0, int v0, int n) {
+            for (int du = 0; du < n; du++) {
+                for (int dv = 0; dv < n; dv++) {
+                    long k = key(u0 + du, v0 + dv);
+                    if (!cells.contains(k) || taken.containsKey(k)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
     }
 }

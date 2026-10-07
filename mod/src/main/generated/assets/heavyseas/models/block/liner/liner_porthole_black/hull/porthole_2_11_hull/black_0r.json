@@ -1,0 +1,12 @@
+{
+  "parent": "heavyseas:block/liner/template/hull/porthole_2_11",
+  "textures": {
+    "brass": "heavyseas:block/liner/hull/brass",
+    "front": "heavyseas:block/liner/hull/black_0r",
+    "glass": "heavyseas:block/liner/hull/glass_2_11",
+    "inside": "heavyseas:block/liner/wall_white",
+    "particle": "heavyseas:block/liner/hull/black_0r",
+    "plate": "heavyseas:block/liner/hull/black_top",
+    "ring": "heavyseas:block/liner/hull/brass_ring_2_11"
+  }
+}

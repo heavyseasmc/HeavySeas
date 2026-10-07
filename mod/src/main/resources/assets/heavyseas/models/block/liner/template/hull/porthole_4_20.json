@@ -1,0 +1,22 @@
+{
+  "parent": "minecraft:block/block", "ambientocclusion": false, "textures": {"particle": "#front"},
+  "elements": [
+    {"from": [0, 0, 13], "to": [16, 12.0, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "down": {"texture": "#plate", "cullface": "down"}, "up": {"texture": "#brass", "uv": [8.0, 0, 12.0, 3]}}},
+    {"from": [4.5, 12, 13], "to": [16, 13, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [4, 15.8, 1, 16.0]}, "up": {"texture": "#brass", "uv": [9.125, 0, 12.0, 3]}}},
+    {"from": [7.5, 13, 13], "to": [16, 14, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [4, 15.6, 1, 15.8]}, "up": {"texture": "#brass", "uv": [9.875, 0, 12.0, 3]}}},
+    {"from": [9.5, 14, 13], "to": [16, 15, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [4, 15.4, 1, 15.6]}, "up": {"texture": "#brass", "uv": [10.375, 0, 12.0, 3]}}},
+    {"from": [11.5, 15, 13], "to": [16, 16, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [4, 15.2, 1, 15.4]}, "up": {"texture": "#brass", "uv": [10.875, 0, 12.0, 3]}}},
+    {"from": [0, 0, 0], "to": [16, 12.0, 13], "faces": {"north": {"texture": "#plate", "cullface": "north"}, "down": {"texture": "#plate", "cullface": "down"}, "up": {"texture": "#inside"}}},
+    {"from": [4.5, 12, 0], "to": [16, 13, 13], "faces": {"north": {"texture": "#plate", "cullface": "north"}, "west": {"texture": "#inside"}, "up": {"texture": "#inside"}}},
+    {"from": [7.5, 13, 0], "to": [16, 14, 13], "faces": {"north": {"texture": "#plate", "cullface": "north"}, "west": {"texture": "#inside"}, "up": {"texture": "#inside"}}},
+    {"from": [9.5, 14, 0], "to": [16, 15, 13], "faces": {"north": {"texture": "#plate", "cullface": "north"}, "west": {"texture": "#inside"}, "up": {"texture": "#inside"}}},
+    {"from": [11.5, 15, 0], "to": [16, 16, 13], "faces": {"north": {"texture": "#plate", "cullface": "north"}, "west": {"texture": "#inside"}, "up": {"texture": "#inside"}}},
+    {"from": [0, 11, 16], "to": [8.0, 12, 16.75], "faces": {"south": {"texture": "#ring"}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [10.0, 13, 12.1818, 13.75]}, "up": {"texture": "#brass", "uv": [8.0, 3, 10.0, 3.75]}}},
+    {"from": [0, 10, 16], "to": [4.5, 11, 16.75], "faces": {"south": {"texture": "#ring"}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [10.0, 13, 11.2273, 13.75]}}},
+    {"from": [4.5, 12, 16], "to": [10.0, 13, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 15.8, 0.25, 16.0]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [11.2273, 13, 12.7273, 13.75]}, "up": {"texture": "#brass", "uv": [9.125, 3, 10.5, 3.75]}}},
+    {"from": [7.5, 13, 16], "to": [12.0, 14, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 15.6, 0.25, 15.8]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [12.0455, 13, 13.2727, 13.75]}, "up": {"texture": "#brass", "uv": [9.875, 3, 11.0, 3.75]}}},
+    {"from": [9.5, 14, 16], "to": [13.5, 15, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 15.4, 0.25, 15.6]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [12.5909, 13, 13.6818, 13.75]}, "up": {"texture": "#brass", "uv": [10.375, 3, 11.375, 3.75]}}},
+    {"from": [11.5, 15, 16], "to": [14.5, 16, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 15.2, 0.25, 15.4]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [13.1364, 13, 13.9545, 13.75]}, "up": {"texture": "#brass", "uv": [10.875, 3, 11.625, 3.75]}}},
+    {"from": [0, 12.0, 12.5], "to": [16, 16, 13], "faces": {"south": {"texture": "#glass"}, "north": {"texture": "#glass"}}}
+  ]
+}

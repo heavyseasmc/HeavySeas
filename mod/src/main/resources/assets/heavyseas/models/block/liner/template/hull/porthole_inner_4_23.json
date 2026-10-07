@@ -1,0 +1,22 @@
+{
+  "parent": "minecraft:block/block", "ambientocclusion": false, "textures": {"particle": "#front"},
+  "elements": [
+    {"from": [0, 4.0, 13.5], "to": [16, 16, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "down": {"texture": "#brass", "uv": [8.0, 5, 12.0, 7.5]}, "up": {"texture": "#back", "cullface": "up"}}},
+    {"from": [4.5, 3, 13.5], "to": [16, 4, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [3.5, 8.0, 1, 8.2]}, "down": {"texture": "#brass", "uv": [9.125, 5, 12.0, 7.5]}}},
+    {"from": [7.5, 2, 13.5], "to": [16, 3, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [3.5, 8.2, 1, 8.4]}, "down": {"texture": "#brass", "uv": [9.875, 5, 12.0, 7.5]}}},
+    {"from": [9.5, 1, 13.5], "to": [16, 2, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [3.5, 8.4, 1, 8.6]}, "down": {"texture": "#brass", "uv": [10.375, 5, 12.0, 7.5]}}},
+    {"from": [11.5, 0, 13.5], "to": [16, 1, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#brass", "uv": [3.5, 8.6, 1, 8.8]}, "down": {"texture": "#brass", "uv": [10.875, 5, 12.0, 7.5]}}},
+    {"from": [0, 4.0, 0], "to": [16, 16, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "down": {"texture": "#back"}, "up": {"texture": "#back", "cullface": "up"}}},
+    {"from": [4.5, 3, 0], "to": [16, 4, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "west": {"texture": "#back"}, "down": {"texture": "#back"}}},
+    {"from": [7.5, 2, 0], "to": [16, 3, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "west": {"texture": "#back"}, "down": {"texture": "#back"}}},
+    {"from": [9.5, 1, 0], "to": [16, 2, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "west": {"texture": "#back"}, "down": {"texture": "#back"}}},
+    {"from": [11.5, 0, 0], "to": [16, 1, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "west": {"texture": "#back"}, "down": {"texture": "#back"}}},
+    {"from": [0, 4, 16], "to": [8.0, 5, 16.75], "faces": {"south": {"texture": "#ring"}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [8.0, 4.25, 10.0, 5]}, "up": {"texture": "#brass", "uv": [10.0, 8, 12.1818, 8.75]}}},
+    {"from": [0, 5, 16], "to": [4.5, 6, 16.75], "faces": {"south": {"texture": "#ring"}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "up": {"texture": "#brass", "uv": [10.0, 8, 11.2273, 8.75]}}},
+    {"from": [4.5, 3, 16], "to": [10.0, 4, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 8.0, 0.25, 8.2]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [9.125, 4.25, 10.5, 5]}, "up": {"texture": "#brass", "uv": [11.2273, 8, 12.7273, 8.75]}}},
+    {"from": [7.5, 2, 16], "to": [12.0, 3, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 8.2, 0.25, 8.4]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [9.875, 4.25, 11.0, 5]}, "up": {"texture": "#brass", "uv": [12.0455, 8, 13.2727, 8.75]}}},
+    {"from": [9.5, 1, 16], "to": [13.5, 2, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 8.4, 0.25, 8.6]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [10.375, 4.25, 11.375, 5]}, "up": {"texture": "#brass", "uv": [12.5909, 8, 13.6818, 8.75]}}},
+    {"from": [11.5, 0, 16], "to": [14.5, 1, 16.75], "faces": {"south": {"texture": "#ring"}, "west": {"texture": "#brass", "uv": [1, 8.6, 0.25, 8.8]}, "east": {"texture": "#brass", "uv": [4, 9.0, 4.75, 10.0]}, "down": {"texture": "#brass", "uv": [10.875, 4.25, 11.625, 5]}, "up": {"texture": "#brass", "uv": [13.1364, 8, 13.9545, 8.75]}}},
+    {"from": [0, 0, 13.0], "to": [16, 4.0, 13.5], "faces": {"south": {"texture": "#glass"}, "north": {"texture": "#glass"}}}
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "parent": "minecraft:block/block", "ambientocclusion": false, "textures": {"particle": "#front"},
+  "elements": [
+    {"from": [0, 0, 13.5], "to": [16, 12.0, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#back", "cullface": "west"}, "down": {"texture": "#back", "cullface": "down"}, "up": {"texture": "#brass", "uv": [0.0, 0.5, 4.0, 3]}}},
+    {"from": [0, 12.0, 13.5], "to": [12.0, 16, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "west": {"texture": "#back", "cullface": "west"}, "east": {"texture": "#brass", "uv": [1, 15.2, 3.5, 16.0]}}},
+    {"from": [12.0, 15, 13.5], "to": [16, 16, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "up": {"texture": "#brass", "uv": [3.0, 0.5, 4.0, 3]}}},
+    {"from": [12.0, 14, 13.5], "to": [16, 15, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "up": {"texture": "#brass", "uv": [3.0, 0.5, 4.0, 3]}}},
+    {"from": [12.0, 13, 13.5], "to": [16, 14, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "up": {"texture": "#brass", "uv": [3.0, 0.5, 4.0, 3]}}},
+    {"from": [12.0, 12, 13.5], "to": [16, 13, 16], "faces": {"south": {"texture": "#front", "cullface": "south"}, "up": {"texture": "#brass", "uv": [3.0, 0.5, 4.0, 3]}}},
+    {"from": [0, 0, 0], "to": [16, 12.0, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "west": {"texture": "#back", "cullface": "west"}, "down": {"texture": "#back", "cullface": "down"}, "up": {"texture": "#back"}}},
+    {"from": [0, 12.0, 0], "to": [12.0, 16, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "west": {"texture": "#back", "cullface": "west"}, "east": {"texture": "#back"}}},
+    {"from": [12.0, 15, 0], "to": [16, 16, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "up": {"texture": "#back"}}},
+    {"from": [12.0, 14, 0], "to": [16, 15, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "up": {"texture": "#back"}}},
+    {"from": [12.0, 13, 0], "to": [16, 14, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "up": {"texture": "#back"}}},
+    {"from": [12.0, 12, 0], "to": [16, 13, 13.5], "faces": {"north": {"texture": "#back", "cullface": "north"}, "up": {"texture": "#back"}}},
+    {"from": [12.0, 12.0, 13.0], "to": [16, 16, 13.5], "faces": {"south": {"texture": "#glass"}, "north": {"texture": "#glass"}}}
+  ]
+}

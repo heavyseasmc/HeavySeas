@@ -2,6 +2,7 @@ package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.world.liner.LinerGlass;
+import io.github.heavyseasmc.mod.world.liner.LinerHull;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
@@ -44,7 +45,7 @@ import java.util.function.Supplier;
  * 朝屋里那一面不动：从亮着的舱室里看出去，玻璃照旧是透的。
  *
  * <ul>
- *   <li>舷窗：{@code facing} 朝船外；只从屋里那一面进光，所以看<b>这一格自己</b>的方块光（{@code LinerHull.Porthole}）。</li>
+ *   <li>舷窗：{@code facing} 朝船外；只从屋里那一面进光，所以看<b>这一格自己</b>的方块光（{@code LinerHull.Porthole}）；拼大的按整块看。</li>
  *   <li>大窗：{@code facing}（正面）朝屋里；光两边都进，所以看<b>屋里那一格</b>（正面前面那一格）—— 按整扇看，任何一格前面亮就整扇亮（{@link #lit}）。</li>
  * </ul>
  *
@@ -91,7 +92,8 @@ public final class GlassGlow extends ForwardingBakedModel {
         };
     }
 
-    /** 平常那张玻璃 → 亮着那一张的 id：{@code hull/glass → hull/glass_lit} · {@code glass/window_glass_<压边> → glass/window_glass_lit_<压边>}；别的贴图 null。 */
+    /** 平常那张玻璃 → 亮着那一张的 id：{@code hull/glass → hull/glass_lit} · {@code hull/glass_<n>_<列><行> → hull/glass_lit_<n>_<列><行>} ·
+     *  {@code glass/window_glass_<压边> → glass/window_glass_lit_<压边>}；别的贴图 null。 */
     @Nullable
     static Identifier litOf(Identifier texture) {
         if (!texture.getNamespace().equals(HeavySeasMod.MOD_ID)) {
@@ -100,6 +102,11 @@ public final class GlassGlow extends ForwardingBakedModel {
         String path = texture.getPath();
         if (path.equals("block/liner/hull/glass")) {
             return Identifier.of(HeavySeasMod.MOD_ID, "block/liner/hull/glass_lit");
+        }
+        // 拼大的舷窗（ADR-0093 B12）每格一张：hull/glass_<n>_<列><行> → hull/glass_lit_<n>_<列><行>
+        String hull = "block/liner/hull/glass_";
+        if (path.startsWith(hull) && !path.startsWith(hull + "lit_")) {
+            return Identifier.of(HeavySeasMod.MOD_ID, hull + "lit_" + path.substring(hull.length()));
         }
         String window = "block/liner/glass/window_glass_";
         if (path.startsWith(window) && !path.startsWith(window + "lit_")) {
@@ -159,6 +166,15 @@ public final class GlassGlow extends ForwardingBakedModel {
      */
     private boolean lit(BlockRenderView view, BlockState state, BlockPos pos, Direction facing) {
         if (kind == Kind.PORTHOLE) {
+            // 拼大的舷窗（ADR-0093 B12）同样按整块判：任何一格自己的方块光到阈值，整个大圆都亮（至多 4 格见方，读得到）
+            if (state.getBlock() instanceof LinerHull.Porthole p) {
+                for (BlockPos q : p.cellsOf(pos, state)) {
+                    if (view.getLightLevel(LightType.BLOCK, q) >= THRESHOLD) {
+                        return true;
+                    }
+                }
+                return false;
+            }
             return view.getLightLevel(LightType.BLOCK, pos) >= THRESHOLD;
         }
         if (state.getBlock() instanceof LinerGlass.Window w) {
