@@ -14,7 +14,8 @@
     "main": ["io.github.heavyseasmc.mod.HeavySeasMod"],
     "client": ["io.github.heavyseasmc.mod.client.HeavySeasClient"],
     "cardinal-components": ["io.github.heavyseasmc.mod.state.GameComponents"],
-    "fabric-datagen": ["io.github.heavyseasmc.mod.datagen.HeavySeasDataGenerator"]
+    "fabric-datagen": ["io.github.heavyseasmc.mod.datagen.HeavySeasDataGenerator"],
+    "modmenu": ["io.github.heavyseasmc.mod.client.ModMenuEntry"]
   },
   "mixins": [
     { "config": "heavyseas.client.mixins.json", "environment": "client" }
@@ -25,9 +26,11 @@
     "java": ">=${java_version}",
     "fabric-api": ">=${fabric_api_version}",
     "cardinal-components-base": ">=${cca_version}",
-    "cardinal-components-world": ">=${cca_version}"
+    "cardinal-components-world": ">=${cca_version}",
+    "forgeconfigapiport": ">=${forge_config_api_port_version}"
   },
   "suggests": {
-    "voicechat": "*"
+    "voicechat": "*",
+    "modmenu": "*"
   }
 }

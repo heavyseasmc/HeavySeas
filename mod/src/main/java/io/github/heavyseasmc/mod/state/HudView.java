@@ -186,16 +186,17 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
      * @param remaining  还需要化解几次 —— 每一次要么喝 1 张水，要么挨 1 点
      * @param donated    别人已经替他打出的水；公开，因为每打 1 张都会向全船播报
      * @param deadlineMs 超时时刻（服务端时钟）；0 = 没开窗口
+     * @param windowMs   这一窗本来有多长（ADR-0099 D8：时限可配，倒计时条按它画满格；演示局不限时是一年）
      */
     public record Thirst(String who, int sources, int covered, int shared, int remaining, int donated,
                          int waterPerSource,
-                         long deadlineMs) {
+                         long deadlineMs, long windowMs) {
 
         public Thirst {
             who = Objects.requireNonNull(who, "who");
         }
 
-        public static final Thirst NONE = new Thirst("", 0, 0, 0, 0, 0, 1, 0L);
+        public static final Thirst NONE = new Thirst("", 0, 0, 0, 0, 0, 1, 0L, 0L);
 
         public boolean active() {
             return !who.isEmpty();
@@ -325,12 +326,13 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
      * @param rowStack       划船堆有几张 · 公开（决策 ⑭：实物桌上那叠牌本来就能数）
      * @param helmsman       舵手（角色 id）；没有清醒的人时是空串 · 公开
      * @param helmDeadlineMs 舵手挑牌的超时时刻（服务端时钟）；0 = 没人在挑 · 公开
+     * @param helmWindowMs   这一窗本来有多长（ADR-0099 D8）· 公开
      * @param revealed       这一回合执行的航海牌；还没结算时为空 · 公开（结算后只公开这一张）
      * @param rowing         收件人自己划船抽到的牌与去向；他没在划船时为空 · <b>只有划船者本人</b>
      * @param helmOffer      划船堆里的牌 · <b>只有舵手、只在挑牌窗口里</b>，其余人一律为空（决策 ⑭：界面不能揭穿舵手）
      */
-    public record Sea(int rowStack, String helmsman, long helmDeadlineMs, Optional<NavCardView> revealed,
-                      List<RowCard> rowing, List<NavCardView> helmOffer) {
+    public record Sea(int rowStack, String helmsman, long helmDeadlineMs, long helmWindowMs,
+                      Optional<NavCardView> revealed, List<RowCard> rowing, List<NavCardView> helmOffer) {
 
         public Sea {
             helmsman = Objects.requireNonNull(helmsman, "helmsman");
@@ -340,7 +342,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
         }
 
         /** 没有对局、或者这一包里没有航海这一段的样子。 */
-        public static final Sea NONE = new Sea(0, "", 0L, Optional.empty(), List.of(), List.of());
+        public static final Sea NONE = new Sea(0, "", 0L, 0L, Optional.empty(), List.of(), List.of());
 
         /** 划船抽到的一张和它的去向。 */
         public record RowCard(NavCardView card, Session.RowFate fate) {

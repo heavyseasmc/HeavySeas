@@ -73,6 +73,65 @@ public final class GameState {
         return new GameState(base.roster, base.states, Phase.WEATHER, base.turn, base.gulls, base.removed, base.offline);
     }
 
+    /**
+     * 按给定的每一项直接拼出一个状态 —— 不是从开局一步一步推过来的。
+     *
+     * <p>给两处用：席位视角（{@code engine.seat.SeatView}）要一份<b>把别人手牌换成占位</b>的状态，
+     * 往前推演要一份<b>把看不见的牌重新抽过</b>的状态。两处都不是「推进」，是「照着另一份重拼」，
+     * 而推进那几个方法（{@link #advancePhase} 会清标记）拼不出半路上的局面。
+     *
+     * <p>❗它不替调用方检查局面合不合规则（那是 {@code Invariants} 的事），只拦「拼错了」：
+     * 少了人、多了人、键与状态的 id 对不上、被移出与离线的人不在阵容里。
+     *
+     * @throws IllegalArgumentException 上面那几种拼错
+     */
+    public static GameState assemble(Roster roster, Map<CharacterId, SurvivorState> states, Phase phase, int turn,
+                                     int gulls, Set<CharacterId> removed, Set<CharacterId> offline) {
+        Objects.requireNonNull(roster, "roster");
+        Objects.requireNonNull(states, "states");
+        Objects.requireNonNull(phase, "phase");
+        Objects.requireNonNull(removed, "removed");
+        Objects.requireNonNull(offline, "offline");
+        Map<CharacterId, SurvivorState> ordered = new LinkedHashMap<>();
+        for (Survivor s : roster.survivors()) {
+            SurvivorState st = states.get(s.id());
+            if (st == null) {
+                throw new IllegalArgumentException("拼状态时少了 " + s.id());
+            }
+            if (!st.id().equals(s.id())) {
+                throw new IllegalArgumentException("状态的 id 与键不一致: " + s.id() + " vs " + st.id());
+            }
+            ordered.put(s.id(), st);
+        }
+        if (ordered.size() != states.size()) {
+            throw new IllegalArgumentException("拼状态时多了阵容里没有的人: " + states.keySet());
+        }
+        for (CharacterId id : removed) {
+            if (!ordered.containsKey(id)) {
+                throw new IllegalArgumentException("被移出的人不在阵容里: " + id);
+            }
+        }
+        for (CharacterId id : offline) {
+            if (!ordered.containsKey(id)) {
+                throw new IllegalArgumentException("离线的人不在阵容里: " + id);
+            }
+        }
+        if (turn < 1 || gulls < 0) {
+            throw new IllegalArgumentException("回合从 1 起、海鸥不能为负，实际: 回合 %d 海鸥 %d".formatted(turn, gulls));
+        }
+        return new GameState(roster, ordered, phase, turn, gulls, removed, offline);
+    }
+
+    /** 被移出游戏的人（只读）。 */
+    public Set<CharacterId> removedIds() {
+        return removed;
+    }
+
+    /** 离线的人（只读）。 */
+    public Set<CharacterId> offlineIds() {
+        return offline;
+    }
+
     public Roster roster() {
         return roster;
     }

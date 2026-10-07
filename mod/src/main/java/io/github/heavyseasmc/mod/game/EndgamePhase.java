@@ -52,7 +52,10 @@ public final class EndgamePhase {
     /** 胜者翻牌 1.4s + 看清 1.6s + 滑 550ms，再留少量网络余量。 */
     public static final long WINNER_FLIP_HOLD_MS = 3700L;
 
-    /** 计分面板停多久再收起会话。{@code /seas end} 随时照样能提前结束。 */
+    /**
+     * 计分面板停多久再收起会话。{@code /seas end} 随时照样能提前结束。默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。
+     * 上面两段翻牌停顿<b>不</b>可配：客户端的翻 · 看 · 滑动画是按它们排的（{@code RevealScreen}）。
+     */
     public static final long SCORE_HOLD_MS = 45_000L;
 
     /**
@@ -145,7 +148,7 @@ public final class EndgamePhase {
             if (next.stage() == EndgameProgress.Stage.SCORES) {
                 announceScores(world, next);
                 GameComponents.sync(world);
-                GameFlow.schedule(component, hold(component, SCORE_HOLD_MS), "终局：计分面板",
+                GameFlow.schedule(component, hold(component, component.timing().scoreHoldMs()), "终局：计分面板",
                         () -> step(world, component));
             } else {
                 LOGGER.info("终局：第二轮 · 爱");

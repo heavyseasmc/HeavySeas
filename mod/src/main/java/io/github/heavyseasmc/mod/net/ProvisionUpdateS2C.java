@@ -25,10 +25,11 @@ import java.util.List;
  * @param at         箱子传到第几位；{@code >= chain.size()} 表示这一轮结束
  * @param remaining  箱子里还剩几张（公开）
  * @param deadlineMs 服务端的超时时刻（{@code System.currentTimeMillis()} 同一时钟）；0 表示没有计时
+ * @param windowMs   这一手本来有多长（ADR-0099 D8）：时限可配之后客户端不再自己按张数算，倒计时条按它画满格
  * @param offer      <b>只有持有者拿得到内容</b>，其余人一律是空列表
  */
 public record ProvisionUpdateS2C(List<String> chain, int at, int remaining,
-                                 long deadlineMs, List<String> offer) implements CustomPayload {
+                                 long deadlineMs, long windowMs, List<String> offer) implements CustomPayload {
 
     public static final CustomPayload.Id<ProvisionUpdateS2C> ID =
             new CustomPayload.Id<>(Identifier.of(HeavySeasMod.MOD_ID, "provision_update"));
@@ -43,12 +44,13 @@ public record ProvisionUpdateS2C(List<String> chain, int at, int remaining,
             PacketCodecs.VAR_INT, ProvisionUpdateS2C::at,
             PacketCodecs.VAR_INT, ProvisionUpdateS2C::remaining,
             PacketCodecs.VAR_LONG, ProvisionUpdateS2C::deadlineMs,
+            PacketCodecs.VAR_LONG, ProvisionUpdateS2C::windowMs,
             STRINGS, ProvisionUpdateS2C::offer,
             ProvisionUpdateS2C::new);
 
     /** 这一轮结束时发的那一包：客户端收到就关界面。 */
     public static ProvisionUpdateS2C finished() {
-        return new ProvisionUpdateS2C(List.of(), 0, 0, 0L, List.of());
+        return new ProvisionUpdateS2C(List.of(), 0, 0, 0L, 0L, List.of());
     }
 
     public boolean active() {

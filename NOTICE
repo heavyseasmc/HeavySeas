@@ -26,6 +26,20 @@ Cardinal Components API
   MIT License
   随 jar 一并分发（JIJ），其 LICENSE 已包含在 jar 内。
 
+Forge Config API Port 21.1.6（设置的存储层，ADR-0099）
+  https://github.com/Fuzss/forgeconfigapiport
+  Mozilla Public License 2.0
+  随 jar 一并分发（JIJ），原样、未作任何修改；源码见上面的仓库（Minecraft 1.21.1 那一支）。
+  其中取自 NeoForge / Minecraft Forge 配置系统的源文件（net.neoforged.* · net.minecraftforge.*）
+  按 GNU Lesser General Public License 2.1；它自己的 jar 里又打包了 Night Config 3.8.0
+  （core · toml，https://github.com/TheElectronWill/night-config），按 GNU Lesser General Public License 3.0。
+  三份许可证全文都在它的 jar 内（LICENSE.md · LICENSE-FORGE.md · LICENSE-NIGHT-CONFIG.md）。
+  它 jar 内的图标等资源作者保留全部权利（LICENSE-ASSETS.md），随原 jar 原样分发。
+
+Mod Menu（软依赖，仅编译期对其公开 API；不随 jar 分发）
+  https://github.com/TerraformersMC/ModMenu
+  MIT License
+
 Simple Voice Chat（软依赖，仅编译期对其公开 API）
   https://github.com/henkelmax/simple-voice-chat
   许可证待核对后填写 —— 首发前必须确认。

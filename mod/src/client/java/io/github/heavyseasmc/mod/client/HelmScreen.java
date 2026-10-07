@@ -2,7 +2,6 @@ package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.game.NavCardText;
-import io.github.heavyseasmc.mod.game.NavigationPhase;
 import io.github.heavyseasmc.mod.net.HelmActionC2S;
 import io.github.heavyseasmc.mod.state.HudView;
 import io.github.heavyseasmc.mod.state.NavCardView;
@@ -178,7 +177,7 @@ public final class HelmScreen extends GameScreen {
                     null, null, NavCardText.describe(offer.get(highlight), view.seats(), Catalog.weatherEffect(view.weather())));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
-                new Countdown(deadlineMs, NavigationPhase.PICK_MILLIS, l.rowW()));
+                new Countdown(deadlineMs, view.sea().helmWindowMs(), l.rowW()));   // 总长取投影（ADR-0099 D8：时限可配）
     }
 
     /**

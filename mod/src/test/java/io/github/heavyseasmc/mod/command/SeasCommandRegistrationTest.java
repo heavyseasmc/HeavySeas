@@ -39,16 +39,105 @@ class SeasCommandRegistrationTest {
         return dispatcher.getRoot().getChild("seas");
     }
 
+    /**
+     * 普通玩家（0–1 级）在 {@code /seas} 下面看得见、也<b>只</b>看得见 {@code config}（设置菜单，ADR-0099 D4 (a)）；
+     * 2 级以上全看得见。根节点自己看得见与否跟着「下面有没有一条用得了」走。
+     */
     @Test
-    void ordinaryPlayersCannotSeeOrExecuteTheCommandTree() {
+    @DisplayName("普通玩家在 /seas 下面只看得见 config；管理员全看得见")
+    void ordinaryPlayersSeeOnlyConfig() {
         var root = seas();
         for (int level = 0; level <= 4; level++) {
+            assertTrue(root.canUse(source(level)), level + " 级看不见 /seas");
+            List<String> usable = new ArrayList<>();
+            for (CommandNode<ServerCommandSource> child : root.getChildren()) {
+                if (child.canUse(source(level))) {
+                    usable.add(child.getName());
+                }
+            }
             if (level < 2) {
-                assertFalse(root.canUse(source(level)));
+                assertEquals(List.of("config"), usable, level + " 级看得见的");
             } else {
-                assertTrue(root.canUse(source(level)));
+                assertTrue(usable.size() >= 20 && usable.contains("config") && usable.contains("start"),
+                        level + " 级只看得见 " + usable);
             }
         }
+        assertNotNull(root.getChild("config").getCommand(), "config 没挂执行体：打出来什么都不发生");
+    }
+
+    /**
+     * 根节点不设门之后，谁也用不了的一级子指令只靠它自己的 {@code requires} 挡（ADR-0099 D4 (a)）。
+     * 这张表里的是<b>人人可用</b>的一级子指令：设置菜单那一条（能看谁都能看，能不能改由菜单里的快照说了算）。
+     */
+    static final Set<String> OPEN_TO_EVERYONE = Set.of("config");
+
+    /**
+     * 判据本体：根下每一个一级子指令（白名单除外）自己都要拒绝 0–1 级、放行 2 级。返回不合格的那几个。
+     *
+     * @param checked 核了几个（正向对照用）
+     */
+    static List<String> unguardedFirstLevel(CommandNode<ServerCommandSource> root, Set<String> open, int[] checked) {
+        List<String> out = new ArrayList<>();
+        for (CommandNode<ServerCommandSource> child : root.getChildren()) {
+            if (open.contains(child.getName())) {
+                continue;
+            }
+            checked[0]++;
+            for (int level = 0; level < DebugCommand.GAME; level++) {
+                if (child.canUse(source(level))) {
+                    out.add(child.getName() + "：" + level + " 级也能用");
+                }
+            }
+            if (!child.canUse(source(DebugCommand.GAME))) {
+                out.add(child.getName() + "：" + DebugCommand.GAME + " 级反而用不了");
+            }
+        }
+        return out;
+    }
+
+    @Test
+    @DisplayName("根节点不再设门：每个一级子指令（白名单除外）自己都要 2 级")
+    void everyFirstLevelLiteralGuardsItself() {
+        int[] checked = {0};
+        var root = seas();
+        List<String> bad = unguardedFirstLevel(root, OPEN_TO_EVERYONE, checked);
+        // 正向对照：一个都没核时「全都挡着」与「没在核」长得一样（2026-10-07 有 24 个一级子指令）
+        assertTrue(checked[0] >= 20, "只核了 " + checked[0] + " 个一级子指令 —— 没在核，不是都挡着");
+        for (String name : List.of("start", "end", "dummy", "status", "pass", "grant", "debug")) {
+            assertNotNull(root.getChild(name), "一级子指令里少了 " + name + "（改了名？那这条判据就漏核了它）");
+        }
+        System.out.println("/seas 一级子指令：核了 " + checked[0] + " 个");
+        assertEquals(List.of(), bad, String.join("\n", bad));
+    }
+
+    @Test
+    @DisplayName("根节点看得见与否只看「下面有没有一条用得了」：有一条人人可用的，0 级也看得见根")
+    void rootIsVisibleExactlyWhenSomeChildIs() {
+        LiteralArgumentBuilder<ServerCommandSource> dev = CommandManager.<ServerCommandSource>literal("dev")
+                .requires(s -> s.hasPermissionLevel(2));
+        java.util.concurrent.atomic.AtomicReference<CommandNode<ServerCommandSource>> self =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        CommandNode<ServerCommandSource> onlyDev = CommandManager.<ServerCommandSource>literal("x")
+                .requires(s -> SeasCommand.anyChildUsable(self.get(), s)).then(dev).build();
+        self.set(onlyDev);
+        assertFalse(onlyDev.canUse(source(0)), "下面全要 2 级：0 级看不见根");
+        assertTrue(onlyDev.canUse(source(2)));
+        onlyDev.addChild(CommandManager.<ServerCommandSource>literal("config").build());
+        assertTrue(onlyDev.canUse(source(0)), "加了一条人人可用的：0 级看得见根（cut 2 的 /seas config 就是这样露出来的）");
+    }
+
+    @Test
+    @DisplayName("红测：一级子指令漏写 requires，判据点名它，而且只点它")
+    void judgeNamesTheUnguardedFirstLevelLiteral() {
+        CommandNode<ServerCommandSource> tree = CommandManager.<ServerCommandSource>literal("seas")
+                .then(CommandManager.<ServerCommandSource>literal("start").requires(s -> s.hasPermissionLevel(2)))
+                .then(CommandManager.<ServerCommandSource>literal("status"))
+                .then(CommandManager.<ServerCommandSource>literal("config"))
+                .build();
+        int[] checked = {0};
+        assertEquals(List.of("status：0 级也能用", "status：1 级也能用"),
+                unguardedFirstLevel(tree, OPEN_TO_EVERYONE, checked));
+        assertEquals(2, checked[0], "白名单里的 config 不核，另外两个都核");
     }
 
     @Test

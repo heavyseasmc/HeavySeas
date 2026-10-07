@@ -3,7 +3,6 @@ package io.github.heavyseasmc.mod.client;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.card.ActionCard;
-import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.net.WaterDonationC2S;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -129,7 +128,7 @@ public final class WaterDonationScreen extends GameScreen {
         // Esc 不写在这里：底栏自己补「Esc 收起」（GameScreen.drawFootBand）
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
                 List.of(primary(focus == 0 ? "give" : "confirm", "Enter")), now,
-                new Countdown(deadlineMs, ThirstPhase.CHOOSE_MILLIS, rowW));
+                new Countdown(deadlineMs, view.thirstPrompt().windowMs(), rowW));   // 总长取投影（ADR-0099 D8：时限可配）
     }
 
     @Override

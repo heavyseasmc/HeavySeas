@@ -36,7 +36,7 @@ import java.util.Optional;
  */
 public final class DesignationPhase {
 
-    /** 举着拳头找人的时间。到点算 Pass（ADR-0025 §7.6 说明了与决策 ⑦ 的出入）。15 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    /** 举着拳头找人的时间。到点算 Pass（ADR-0025 §7.6 说明了与决策 ⑦ 的出入）。15 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。 */
     public static final long WINDOW_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
@@ -52,20 +52,21 @@ public final class DesignationPhase {
      */
     public static void begin(ServerWorld world, GameComponent component, CharacterId actor, Contest.Kind kind) {
         boolean quiet = quiet(component, actor);
+        long windowMs = component.timing().designationMs();   // 开局快照（ADR-0099 D8）
         component.clearActionWindow();
-        component.beginDesignation(actor, kind, component.humanWindow(WINDOW_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
+        component.beginDesignation(actor, kind, component.humanWindow(windowMs));   // 演示局里等真人不限时（用户 2026-10-07）
         ServerPlayerEntity player = playerOf(world, component, actor);
         if (player != null && !quiet) {
             player.setGlowing(true);          // 全船看得见的那一下（ADR-0025 §7.3：头顶图标的替身）
         }
         // 与语言无关的一行：验收靠它判「指定模式真的开起来了」。
         LOGGER.info("指定模式：{} 要{}（{} 秒{}）", actor.value(), kind == Contest.Kind.STEAL ? "抢夺" : "换座位",
-                WINDOW_MILLIS / 1000, quiet ? " · 无预告" : "");
+                windowMs / 1000, quiet ? " · 无预告" : "");
         if (!quiet) {
             GameFlow.broadcast(world, Text.translatable(kind == Contest.Kind.STEAL
                             ? "heavyseas.designate.announce_steal" : "heavyseas.designate.announce_swap",
                     GameFlow.characterName(actor), component.demoNoTimeout()
-                            ? Text.translatable("heavyseas.hud.unlimited") : String.valueOf(WINDOW_MILLIS / 1000))
+                            ? Text.translatable("heavyseas.hud.unlimited") : String.valueOf(windowMs / 1000))
                     .formatted(Formatting.RED));
         }
         GameComponents.sync(world);
@@ -152,7 +153,7 @@ public final class DesignationPhase {
     public static void cancel(ServerWorld world, GameComponent component, CharacterId actor) {
         LOGGER.info("指定模式：{} 取消了", actor.value());
         finish(world, component, actor);
-        component.openActionWindow(component.humanWindow(ActionPhase.ACTION_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
+        component.openActionWindow(component.humanWindow(component.timing().actionMs()));   // 演示局里等真人不限时（用户 2026-10-07）
         GameComponents.sync(world);
     }
 

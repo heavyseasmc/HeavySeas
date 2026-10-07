@@ -30,7 +30,7 @@ import java.util.Optional;
  * <h2>两段软倒计时（决策 ④）</h2>
  * 站队 {@link #STANCE_MILLIS}，有人加入重置为 {@link #STANCE_BUMP_MILLIS}；
  * 挂武器 {@link #WEAPON_MILLIS}，有人押下重置为 {@link #WEAPON_BUMP_MILLIS}。
- * 表态与挑牌各一个固定窗口。
+ * 表态与挑牌各一个固定窗口。这几个常量是默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8，开局快照）。
  *
  * <p>❗<b>表态超时按「同意」</b>：默认「战斗」会给挂机的人凭空制造伤害 —— 那不是他的默认答案，
  * 那是替他做了一个没人会做的选择（与口渴那一面同一条理由）。
@@ -138,7 +138,7 @@ public final class ContestPhase {
                         ? "heavyseas.contest.side_attack" : "heavyseas.contest.side_defend")));
         component.markDecided(who);
         if (!endIfAllDecided(world, component)) {
-            component.openContestWindow(component.humanWindow(STANCE_BUMP_MILLIS));
+            component.openContestWindow(component.humanWindow(component.timing().stanceBumpMs()));
         }
         GameComponents.sync(world);
     }
@@ -154,7 +154,7 @@ public final class ContestPhase {
         GameFlow.broadcast(world, Text.translatable("heavyseas.contest.weapon_committed",
                 GameFlow.characterName(who)).formatted(Formatting.GRAY));
         if (!endIfAllDecided(world, component)) {
-            component.openContestWindow(component.humanWindow(WEAPON_BUMP_MILLIS));
+            component.openContestWindow(component.humanWindow(component.timing().weaponBumpMs()));
         }
         GameComponents.sync(world);
     }
@@ -205,7 +205,8 @@ public final class ContestPhase {
                 || !allHumansDecided(component, contest.get())) {
             return false;
         }
-        long tail = !component.dummyRandom() ? 2_000L : component.dummyFast() ? 600L : 7_000L;
+        long tail = !component.standInsAct() ? 2_000L : component.dummyFast() ? 600L : 7_000L;
+        tail = StandInMinds.windowTailMs(component, tail);   // 大模型替身在窗口里想：留够它想完的一截
         if (component.contestDeadline() - System.currentTimeMillis() > tail) {
             component.openContestWindow(tail);
             LOGGER.info("这一场：{} 该答的真人都答了，{} 秒后收", contest.get().stage(), tail / 1000.0);
@@ -461,15 +462,16 @@ public final class ContestPhase {
             GameFlow.finishAction(world, component, attacker);
             return;
         }
+        GameTiming timing = component.timing();   // 开局快照（ADR-0099 D8）
         switch (contest.get().stage()) {
-            case CONSENT -> open(world, component, CONSENT_MILLIS, "heavyseas.contest.consent_wait",
+            case CONSENT -> open(world, component, timing.consentMs(), "heavyseas.contest.consent_wait",
                     GameFlow.characterName(contest.get().target()),
                     waiting(component, contest.get().target()));
-            case STANCES -> open(world, component, STANCE_MILLIS, "heavyseas.contest.stances",
+            case STANCES -> open(world, component, timing.stanceMs(), "heavyseas.contest.stances",
                     null, driven(component));
-            case WEAPONS -> open(world, component, WEAPON_MILLIS, "heavyseas.contest.weapons",
+            case WEAPONS -> open(world, component, timing.weaponMs(), "heavyseas.contest.weapons",
                     null, anyHumanCombatant(component, contest.get()) || !component.dummyAutoplay());
-            case PICK -> open(world, component, PICK_MILLIS, "heavyseas.contest.pick_wait",
+            case PICK -> open(world, component, timing.contestPickMs(), "heavyseas.contest.pick_wait",
                     GameFlow.characterName(contest.get().attacker()),
                     waiting(component, contest.get().attacker()));
         }
@@ -484,6 +486,11 @@ public final class ContestPhase {
                              Text who, boolean human) {
         if (!human) {
             component.clearContest();
+            if (StandInMinds.thinks(component)) {
+                // 动脑 / 大模型：替身这就开始想，答完由它往下推；做出来不早于随机替身那一拍
+                StandInMinds.contestStage(world, component, StandInPlay.step(component));
+                return;
+            }
             // 随机行动开着时这一步也停一拍（慢档 1.5 秒）：表态、挑牌一步一步看得见（用户 2026-10-07「demo 玩家不要出牌太快」）
             GameFlow.schedule(component, randomStandIns(component) ? StandInPlay.step(component) : 0L,
                     "这一场：没人要等，按默认往下走", () -> advanceWithoutHumans(world, component));
@@ -506,6 +513,8 @@ public final class ContestPhase {
                 case WEAPONS -> StandInPlay.commitWeapons(world, component, true);
                 default -> { }
             }
+        } else if (StandInMinds.thinks(component)) {
+            StandInMinds.contestWindow(world, component, stage);   // 同上，只是每一个都想过
         }
         // 一开窗就没有哪个真人要答（他本人就在场上 · 一张武器都押不出）：直接收短，不空等（ADR-0095 D1）
         endIfAllDecided(world, component);
@@ -521,6 +530,10 @@ public final class ContestPhase {
         Optional<Contest> contest = component.requireSession().contest();
         if (contest.isEmpty()) {
             return;                               // 这一步排下来之前已经收场了
+        }
+        if (StandInMinds.thinks(component)) {
+            StandInMinds.contestStage(world, component, 0L);   // 掉线收窗之后：替身照自己的脑子答完这一段
+            return;
         }
         boolean random = randomStandIns(component);
         switch (contest.get().stage()) {

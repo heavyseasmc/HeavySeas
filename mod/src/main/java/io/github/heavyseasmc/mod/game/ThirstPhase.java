@@ -46,7 +46,7 @@ import java.util.Optional;
  */
 public final class ThirstPhase {
 
-    /** 每个人的决定时限。与舵手挑牌同一个数：都是「看一眼就能答」的决定。12 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。 */
+    /** 每个人的决定时限。与舵手挑牌同一个数：都是「看一眼就能答」的决定。12 → 20 秒（用户 2026-10-07：决策窗口一律至少 20 秒，「有的时候决策时间太短」）。默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。 */
     public static final long CHOOSE_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
@@ -94,6 +94,21 @@ public final class ThirstPhase {
         }
         boolean canDecide = canDecide(session, prompt);
         boolean canReceiveDonation = hasHumanDonor(session, component, who);
+        if (StandInMinds.thinks(component)) {
+            if (canDecide && occupant.isDummy()) {
+                // 动脑 / 大模型：他自己定喝几次、还差的开不开口，再依座位问有水的替身递不递（StandInMinds.thirst）
+                LOGGER.info("口渴（替身）：{} 在想喝几张（还需化解 {} 次 · 手上 {} 张）", who.value(), prompt.remaining(), own);
+                StandInMinds.thirst(world, component, prompt, true);
+                return;
+            }
+            if (!canDecide && !canReceiveDonation && StandInMinds.anyStandInDonor(session, component, prompt)) {
+                // 他自己定不了（昏迷 · 水不够），也没有真人能递：船上有水的替身还能递
+                LOGGER.info("口渴（替身）：{} 自己定不了（{} · 水 {} 张），问有水的替身递不递", who.value(),
+                        session.state().conditionOf(who), own);
+                StandInMinds.thirst(world, component, prompt, occupant.isDummy());
+                return;
+            }
+        }
         if (!canDecide && !canReceiveDonation) {
             // 没有可做的决定。说一句为什么，不然屏幕上只会看到血无缘无故掉了。
             Text reason = own == 0
@@ -119,14 +134,15 @@ public final class ThirstPhase {
         }
         int suggested = canDecide ? clamp(session, prompt, prompt.waterNeeded(), 0) : 0;
         component.clearDecided();
-        component.setThirstDeadline(System.currentTimeMillis() + component.humanWindow(CHOOSE_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
+        long chooseMs = component.timing().thirstMs();   // 开局快照（ADR-0099 D8）
+        component.openThirstWindow(component.humanWindow(chooseMs));   // 演示局里等真人不限时（用户 2026-10-07）
         component.setThirstHighlight(suggested);
         GameFlow.broadcast(world, Text.translatable(canDecide
                         ? "heavyseas.game.thirst_choose" : "heavyseas.game.thirst_ask_donors",
                 GameFlow.characterName(who), prompt.remaining()).formatted(Formatting.AQUA));
         LOGGER.info("口渴选择：{}（{}）· 还需化解 {} 次 · 手上 {} 张 · {} 秒",
                 who.value(), occupant.isDummy() ? "替身" : "真人", prompt.remaining(), own,
-                CHOOSE_MILLIS / 1000);
+                chooseMs / 1000);
         GameComponents.sync(world);
     }
 
@@ -277,6 +293,37 @@ public final class ThirstPhase {
             GameComponents.sync(world);        // 打出这一张之后还有人能再打（或本人还要自己定）：接着等
         }
         return true;
+    }
+
+    /**
+     * 替身递一张水（动脑 / 大模型，{@link StandInMinds#thirst}）：与真人在捐水一面上按「给」同样攒进这一轮的承诺，
+     * 同样播一句。这里不开窗口（替身不等窗口），不提前结算 —— 递完由 {@link #resolveForStandIn} 一起结算。
+     *
+     * @return 真的记下了吗（已经够了、他没水了、他不能动，都不记）
+     */
+    static boolean donateForStandIn(ServerWorld world, GameComponent component, CharacterId donor) {
+        Session session = component.requireSession();
+        Optional<Session.ThirstPrompt> pending = session.thirstPending();
+        if (pending.isEmpty() || donor.equals(pending.get().who()) || !session.state().canAct(donor)) {
+            return false;
+        }
+        Session.ThirstPrompt prompt = pending.get();
+        int already = component.thirstDonors().size();
+        if (already >= prompt.waterNeeded() || availableDonationWater(session, component, donor) <= 0) {
+            return false;
+        }
+        component.addThirstDonor(donor);
+        GameFlow.broadcast(world, Text.translatable("heavyseas.game.thirst_donated",
+                GameFlow.characterName(donor), GameFlow.characterName(prompt.who())));
+        LOGGER.info("口渴：{} 替 {} 打了一张水（替身 · 这一轮共 {} 张）", donor.value(), prompt.who().value(), already + 1);
+        return true;
+    }
+
+    /** 替身那一轮问完：本人自己喝 {@code waters} 张，连同替身递的一起结算（与超时、界面同一个 {@link #resolve}）。 */
+    static void resolveForStandIn(ServerWorld world, GameComponent component, int waters) {
+        Session.ThirstPrompt prompt = component.requireSession().thirstPending().orElseThrow();
+        LOGGER.info("口渴（替身）：{} 喝 {} 张（别人递了 {} 张）", prompt.who().value(), waters, component.thirstDonors().size());
+        resolve(world, component, waters);
     }
 
     /** 每 tick 检查超时。**服务端超时，客户端不参与判定。** */

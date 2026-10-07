@@ -34,16 +34,11 @@ import java.util.Optional;
  */
 public final class ProvisionPhase {
 
-    /** 决策 ⑨：倒计时按剩余牌数缩放，N 张 = N×2 秒。 */
+    /** 决策 ⑨：倒计时按剩余牌数缩放，N 张 = N×2 秒。默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。 */
     public static final long MILLIS_PER_CARD = 2000L;
 
-    /** 但不少于 20 秒：只剩两三张时只有四五秒，读不完牌（用户 2026-10-07：决策窗口一律至少 20 秒）。 */
+    /** 但不少于 20 秒：只剩两三张时只有四五秒，读不完牌（用户 2026-10-07：决策窗口一律至少 20 秒）。默认值，同上。 */
     public static final long MIN_MILLIS = 20_000L;
-
-    /** 这一手 {@code cards} 张的窗口多长。服务端定时限、客户端画倒计时都用它 —— 两边各算一遍就会分家。 */
-    public static long windowMillis(int cards) {
-        return Math.max(MIN_MILLIS, Math.max(1, cards) * MILLIS_PER_CARD);
-    }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
 
@@ -206,6 +201,11 @@ public final class ProvisionPhase {
             if (who == null || !who.isDummy()) {
                 return;                   // 轮到真人了，交回给倒计时
             }
+            if (StandInMinds.thinks(component)) {
+                // 动脑 / 大模型：想好了再留（keepForStandIn），留完由 resume 接着问下一位；想不出来到点照旧认高亮
+                StandInMinds.provision(world, component);
+                return;
+            }
             keep(world, component, 0);
             if (component.session().isEmpty()) {
                 return;                   // keep 里已经走完并清了状态
@@ -214,12 +214,22 @@ public final class ProvisionPhase {
         }
     }
 
+    /** 动脑 / 大模型的替身想好了留哪一张：与真人按下「留」同一条路（{@link #keep}），之后照旧传给下一位。 */
+    static void keepForStandIn(ServerWorld world, GameComponent component, String card) {
+        Session session = component.requireSession();
+        int index = session.provisionOffer().indexOf(card);
+        // ❗不写是哪一张：箱里的牌只有持箱人看得见，开服的人往往也是玩家
+        LOGGER.info("补给箱（替身）：{} 留下一张", session.provisionHolder().map(CharacterId::value).orElse("?"));
+        keep(world, component, Math.max(0, index));
+    }
+
     private static void armDeadline(GameComponent component, int cards) {
         // 演示局里真人拿着箱子时不限时（用户 2026-10-07）；替身拿着的照旧（它不等窗口）
         boolean human = component.requireSession().provisionHolder()
                 .flatMap(component::occupantOf).map(o -> !o.isDummy()).orElse(false);
-        long window = windowMillis(cards);
-        component.setProvisionDeadline(System.currentTimeMillis() + (human ? component.humanWindow(window) : window));
+        // 这一手多长按开局快照算（ADR-0099 D8）；总长随包发给客户端画满格，客户端不再自己按张数算一遍
+        long window = component.timing().provisionWindow(cards);
+        component.openProvisionWindow(human ? component.humanWindow(window) : window);
         component.setProvisionHighlight(0);
     }
 
@@ -237,12 +247,13 @@ public final class ProvisionPhase {
         int at = session.provisionIndex();
         int remaining = session.provisionOffer().size();
         long deadline = component.provisionDeadline();
+        long window = component.provisionWindow();
 
         for (ServerPlayerEntity player : world.getServer().getPlayerManager().getPlayerList()) {
             boolean isHolder = component.seatOf(player.getUuid())
                     .map(id -> id.equals(holder.get())).orElse(false);
             ServerPlayNetworking.send(player, new ProvisionUpdateS2C(
-                    chain, at, remaining, deadline,
+                    chain, at, remaining, deadline, window,
                     isHolder ? session.provisionOffer() : List.of()));
         }
     }

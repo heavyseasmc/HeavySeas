@@ -2,6 +2,8 @@ package io.github.heavyseasmc.mod;
 
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.command.SeasCommand;
+import io.github.heavyseasmc.mod.config.ServerSettings;
+import io.github.heavyseasmc.mod.config.SettingsSync;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.game.ActionPhase;
@@ -81,6 +83,9 @@ public final class HeavySeasMod implements ModInitializer {
     @Override
     public void onInitialize() {
         LOGGER.info("规则引擎已接入：一回合 {} 个阶段", Phase.values().length);
+        // 服务端设置（ADR-0099 D2）：交给 Forge Config API Port 的 SERVER 类型，起服时加载；在客户端上改它走 SettingsSync 那两个包
+        ServerSettings.register();
+        SettingsSync.register();
         GameDataLoader.register();
         // 场景数据（航程布局，ADR-0034 §5.5）：与配平走同一条数据包重载路径，各读各的。
         SceneDataLoader.register();
@@ -151,6 +156,8 @@ public final class HeavySeasMod implements ModInitializer {
                         : net.minecraft.util.ActionResult.PASS);
         CommandRegistrationCallback.EVENT.register(
                 (dispatcher, registryAccess, environment) -> SeasCommand.register(dispatcher));
+        io.github.heavyseasmc.mod.llm.LlmHooks.register();   // 大模型替身的接入层（ADR-0096 A，开发期、默认关）：按设置菜单的「大模型」一组起服务、存了就换 · /seasllm
+        io.github.heavyseasmc.mod.game.StandInMinds.register();   // 动脑 / 大模型替身（/seas dummy smart|llm）：工作线程停服时收 · 看门狗每 tick 看一眼
 
         // 包都要在**两端**注册类型，否则一端发得出、另一端认不得，
         // 表现是安静地丢包而不是报错。客户端那一半在 HeavySeasClient。

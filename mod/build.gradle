@@ -56,6 +56,22 @@ repositories {
         name = 'Modrinth'
         url = 'https://api.modrinth.com/maven'
     }
+    // Forge Config API Port 的作者自己的仓库（ADR-0099 §2.2）。只认这一组，别的依赖不许从这里解析。
+    maven {
+        name = 'Fuzs'
+        url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/'
+        content {
+            includeGroup 'fuzs.forgeconfigapiport'
+        }
+    }
+    // Mod Menu 的仓库（ADR-0099 D5）。同样只认这一组。
+    maven {
+        name = 'TerraformersMC'
+        url = 'https://maven.terraformersmc.com/releases/'
+        content {
+            includeGroup 'com.terraformersmc'
+        }
+    }
 }
 
 dependencies {
@@ -70,6 +86,22 @@ dependencies {
     modImplementation "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
     include "org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}"
     include "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
+
+    // Forge Config API Port：设置的存储层（ADR-0099 D1 · D2）。与 CCA 一样 JIJ 进本模组（D9 (a)），玩家不必单独装。
+    // ❗它的 POM 把 fabric-api 0.116.x 与 fabric-loader 当编译依赖：不排除的话 Gradle 取高版本，开发环境的 Fabric API
+    //   被悄悄拉高到下限之上 —— 而「按下限编译」正是 gradle.properties 那两行的全部意义（用了只有新版才有的东西就当场红）。
+    //   Night Config 不排除：它打包在 FCAP 自己的 jar 里，编译期要它的类型（ModConfigSpec 的签名里有它）。
+    modImplementation("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}") {
+        exclude group: 'net.fabricmc.fabric-api'
+        exclude group: 'net.fabricmc', module: 'fabric-loader'
+    }
+    include "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}"
+
+    // Mod Menu（ADR-0099 D5）：可选。只有客户端那一个入口类（ModMenuEntry）编译期要它的 API；不打包、不进开发运行时，
+    // fabric.mod.json 里是 suggests —— 玩家没装它游戏照样起得来。transitive = false：它的 POM 带的 Fabric API 不许把开发环境拉高。
+    modClientCompileOnly("com.terraformersmc:modmenu:${modmenu_version}") {
+        transitive = false
+    }
 
     // M5 只需要 Simple Voice Chat 自带的距离衰减，不注册会改变频道/窃听规则的 API 插件。
     // 只进开发运行时：生产 metadata 用 suggests 保持真正的软依赖。
@@ -96,6 +128,7 @@ def modMetadata = [
     fabric_api_version: fabric_api_version,
     java_version      : java_version,
     cca_version       : cca_version,
+    forge_config_api_port_version: forge_config_api_port_version,
 ]
 
 processResources {

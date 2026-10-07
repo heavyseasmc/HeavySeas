@@ -214,7 +214,10 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 指定模式里「指着谁」：候选、按方向重挑（ADR-0095 F2）
         ClientTickEvents.END_CLIENT_TICK.register(DesignationAim::tick);
         // 界面主题（ADR-0037）：浅色海图桌 / 深色船舱木作。没开界面时由这里接；开着界面时按键不走按键绑定，由 GameScreen 接。
+        // 偏好存在 heavyseas-client.toml（ADR-0099 D1：交给 Forge Config API Port，老的 .properties 自动迁过去）
         ClientPrefs.load();
+        // 服务端设置的快照与存盘包（ADR-0099 D6）：设置菜单（cut 2）从这里读写
+        ServerSettingsClient.register();
         themeKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.heavyseas.theme", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F8,
                 "key.categories.heavyseas"));

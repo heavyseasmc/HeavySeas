@@ -95,6 +95,37 @@ public final class Table {
         provisionPile.addAll(shuffled);
     }
 
+    /** 副本：每一副牌、每一堆都各自复制一份（天候牌堆连它的随机流一起，见 {@link WeatherDeck#copy()}）。 */
+    private Table(Table other, NavigationDeck pile, WeatherDeck weather) {
+        this.pile = pile;
+        this.weather = weather;
+        this.provisions = other.provisions;
+        this.rowStack.addAll(other.rowStack);
+        this.rowerHand.addAll(other.rowerHand);
+        this.provisionPile.addAll(other.provisionPile);
+        this.provisionDiscard.addAll(other.provisionDiscard);
+        this.removedProvisions.addAll(other.removedProvisions);
+    }
+
+    /** 一张一模一样、互不相干的桌面（{@code Session#copy}）。 */
+    Table copy() {
+        return new Table(this, pile.copy(), weather == null ? null : weather.copy());
+    }
+
+    /** 照给定的每一堆拼一张桌面（{@code Session#rebuild}）。拼完由调用方对账。 */
+    Table(NavigationDeck pile, Provisions provisions, WeatherDeck weather, List<NavigationCard> rowStack,
+          List<NavigationCard> rowerHand, List<String> provisionPile, List<String> provisionDiscard,
+          List<String> removedProvisions) {
+        this.pile = Objects.requireNonNull(pile, "pile");
+        this.provisions = Objects.requireNonNull(provisions, "provisions");
+        this.weather = weather;
+        this.rowStack.addAll(rowStack);
+        this.rowerHand.addAll(rowerHand);
+        this.provisionPile.addAll(provisionPile);
+        this.provisionDiscard.addAll(provisionDiscard);
+        this.removedProvisions.addAll(removedProvisions);
+    }
+
     public Optional<WeatherDeck> weather() {
         return Optional.ofNullable(weather);
     }
@@ -166,6 +197,11 @@ public final class Table {
         return List.copyOf(provisionDiscard);
     }
 
+    /** 弃牌堆有几张（不复制整堆）。 */
+    public int provisionDiscardSize() {
+        return provisionDiscard.size();
+    }
+
     /**
      * 随被移出游戏的人一起离场的物资。
      *
@@ -184,6 +220,11 @@ public final class Table {
         return List.copyOf(removedProvisions);
     }
 
+    /** 随人离场的物资有几张（不复制整堆）。 */
+    public int removedProvisionCount() {
+        return removedProvisions.size();
+    }
+
     /** 物资牌一共几张（发出去的 + 还在堆里的 + 弃掉的 + 随人离场的）。对账的分母。 */
     public int provisionTotal() {
         return provisions.total();
@@ -200,6 +241,11 @@ public final class Table {
 
     public boolean rowStackIsEmpty() {
         return rowStack.isEmpty();
+    }
+
+    /** 划船堆有几张（公开信息；不复制整堆）。 */
+    public int rowStackSize() {
+        return rowStack.size();
     }
 
     void addToRowStack(NavigationCard card) {

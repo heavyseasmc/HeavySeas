@@ -13,6 +13,7 @@ import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
 import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.config.ServerSettings;
 import io.github.heavyseasmc.mod.data.GameData;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.data.VoyageLayout;
@@ -65,6 +66,7 @@ public final class GameFlow {
      *
      * <p>下一回合的补给箱可能当场弹出来，而底色 {@code 0xE4} 下聊天只剩淡影 —— 刚执行的那张牌就没人看得到了。
      * 没有真人时不停：验收脚本里没人要看。节奏参数，属 ADR-0018 §8「实现中打磨」那一列。
+     * 默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。
      */
     public static final long REVEAL_HOLD_MS = 3000L;
 
@@ -147,6 +149,11 @@ public final class GameFlow {
         component.begin(session, occupants, humans.stream().map(ServerPlayerEntity::getUuid)
                 .collect(java.util.stream.Collectors.toSet()));
         component.setGameRandom(new Random(dealt.gameSeed()));
+        // 动脑 / 大模型替身的种子：由开局种子派生，<b>不从</b>上面那条流里取（取一次就改了天意，同一个种子打出另一局）
+        component.setStandInSeed(new java.util.SplittableRandom(dealt.gameSeed() ^ 0x5A17D1CE5EEDL).nextLong());
+        // 这一局的时限：开局这一刻从服务端设置里取一份，一局之内不变（ADR-0099 D8）。取在第一次推投影之前。
+        ServerSettings.TimingRead timing = ServerSettings.gameTiming();
+        component.setTiming(timing.timing());
         DebugNext.clear();                    // 只管这一局：开成了就清，不会悄悄留到再下一局
         // ❗开局也是一次状态变化，先把投影推出去。各面的包（补给箱、划船、舵手）都在这之后发，
         //   而那几面要靠投影判「对局还在不在」—— 投影还没到就收到包的话，界面开出来又当场自己收掉。
@@ -175,6 +182,8 @@ public final class GameFlow {
                 session.state().bySeat().stream().map(CharacterId::value).toList(),
                 component.dummyAutoplay() ? "开" : "关", layout.id(), layout.dimension(),
                 seedSetting.map(s -> " · 调试种子 " + s.value()).orElse(""));
+        // 另起一行，不往上面那行里加：那一行的前半段被验收脚本盯着。这一行说清用的是哪一套时限、取自哪里（设置 / 默认）。
+        LOGGER.info("对局时限（{}）：{}", timing.source(), component.timing().describe());
         // 位次摆进世界（ADR-0024）。放在播报之后：摆船会再推一次投影，而开局那一帧已经推过了。
         Seats.place(world, component, layout, session.state().bySeat().size());
         enterWeather(world, component);
@@ -263,8 +272,9 @@ public final class GameFlow {
                 return;
             }
             boolean humanTurn = component.occupantOf(actor.get()).map(o -> !o.isDummy()).orElse(false);
-            component.openActionWindow(humanTurn ? component.humanWindow(ActionPhase.ACTION_MILLIS)
-                    : ActionPhase.ACTION_MILLIS);   // 演示局里等真人不限时（用户 2026-10-07）
+            long actionMs = component.timing().actionMs();   // 开局快照（ADR-0099 D8）
+            component.openActionWindow(humanTurn ? component.humanWindow(actionMs)
+                    : actionMs);   // 演示局里等真人不限时（用户 2026-10-07）
             // 投影要在播报与替身排程之前推出去，真人客户端才能在轮到他的第一帧拿到完整倒计时。
             sync(world);
             GameComponent.Occupant who = component.occupantOf(actor.get()).orElseThrow();
@@ -275,9 +285,15 @@ public final class GameFlow {
                     who.isDummy() ? "替身" : "真人");
             if (who.isDummy() && component.dummyAutoplay()) {
                 CharacterId dummy = actor.get();
+                if (StandInMinds.thinks(component)) {
+                    // 动脑 / 大模型：这一刻就开始想（工作线程上），做出来不早于随机替身那一拍。
+                    //   想完回到主线程时排进排程，所以照样不会在这一次调用里递归打完（ADR-0019 §1）。
+                    StandInMinds.beginTurn(world, component, dummy, System.currentTimeMillis() + StandInPlay.beat(component));
+                    return;
+                }
                 // ❗排到下一 tick，不当场做：当场做的话，全是替身的一局会在这一次调用里递归打完（ADR-0019 §1）。
                 //   随机行动开着时再停一拍（StandInPlay.beat）：替身一个接一个当场动完，真人跟不上。
-                schedule(component, component.dummyRandom() ? StandInPlay.beat(component) : 0L,
+                schedule(component, component.standInsAct() ? StandInPlay.beat(component) : 0L,
                         "替身 " + dummy.value() + (component.dummyRandom() ? " 随机行动" : " 什么也不做"),
                         () -> ActionPhase.autoPass(world, component, dummy));
             }
@@ -401,13 +417,14 @@ public final class GameFlow {
             announceOutcome(world, component);
             return;
         }
+        long revealHold = component.timing().revealHoldMs();   // 开局快照（ADR-0099 D8）
         if (session.finishNavigationResolution()) {
-            schedule(component, component.anyHumanSeated() ? REVEAL_HOLD_MS : 0L,
+            schedule(component, component.anyHumanSeated() ? revealHold : 0L,
                     "狂风额外航海牌后进入标准航海", () -> NavigationPhase.begin(world, component));
             return;
         }
         LOGGER.info("航海阶段结束：第 {} 回合（口渴已结算完）", session.state().turn());
-        long hold = component.anyHumanSeated() ? REVEAL_HOLD_MS : 0L;
+        long hold = component.anyHumanSeated() ? revealHold : 0L;
         schedule(component, hold, "航海结算后进下一回合", () -> {
             session.advancePhase();
             enterWeather(world, component);

@@ -26,6 +26,86 @@ public final class WeatherDeck {
         Collections.shuffle(this.pile, rng);
     }
 
+    private WeatherDeck(WeatherDeck other, Random rng) {
+        this.rng = rng;
+        this.pile = new ArrayList<>(other.pile);
+        this.discard.addAll(other.discard);
+        this.current = other.current;
+        this.currentOverride = other.currentOverride;
+        this.stacked = other.stacked;
+    }
+
+    /**
+     * 一副一模一样、互不相干的副本，<b>连洗牌用的随机流也是一份副本</b>：副本以后洗回弃牌堆的次序与原来那一副相同，
+     * 而在副本上洗牌不会推动原来那一副的随机流。
+     *
+     * @throws IllegalStateException 随机流复制不了（不是 {@code java.util.Random} 那种可序列化的）
+     */
+    public WeatherDeck copy() {
+        return new WeatherDeck(this, cloneRandom(rng));
+    }
+
+    /**
+     * 换一条随机流、换一个次序的副本（往前推演时用：看不见的次序与以后怎么洗，都重新抽过）。
+     *
+     * @param upcoming 牌堆里还没翻的那几张，新的次序；成员必须与原来的一样
+     */
+    public WeatherDeck copyWith(List<WeatherCard> upcoming, Random rng) {
+        WeatherDeck copy = new WeatherDeck(this, Objects.requireNonNull(rng, "rng"));
+        java.util.Map<WeatherCard, Integer> want = new java.util.HashMap<>();
+        upcoming.forEach(c -> want.merge(c, 1, Integer::sum));
+        java.util.Map<WeatherCard, Integer> have = new java.util.HashMap<>();
+        pile.forEach(c -> have.merge(c, 1, Integer::sum));
+        if (!want.equals(have)) {
+            throw new IllegalArgumentException("重排的天候牌与牌堆里的不是同一批");
+        }
+        copy.pile.clear();
+        copy.pile.addAll(upcoming);
+        return copy;
+    }
+
+    private WeatherDeck(List<WeatherCard> upcoming, List<WeatherCard> discard, WeatherCard current, Random rng) {
+        this.rng = rng;
+        this.pile = new ArrayList<>(upcoming);
+        this.discard.addAll(discard);
+        this.current = current;
+    }
+
+    /**
+     * 照给定的几样拼一副天候牌堆（推演时重拼一局用：还没翻的那几张的次序是重新抽过的）。
+     *
+     * @param upcoming 还没翻的，顶上的在前
+     * @param discard  弃牌堆，先进的在前
+     * @param current  今天这一张；还没翻过时为空
+     * @param rng      以后把弃牌堆洗回去时用的随机流
+     */
+    public static WeatherDeck of(List<WeatherCard> upcoming, List<WeatherCard> discard,
+                                 java.util.Optional<WeatherCard> current, Random rng) {
+        Objects.requireNonNull(upcoming, "upcoming");
+        Objects.requireNonNull(discard, "discard");
+        Objects.requireNonNull(current, "current");
+        if (upcoming.isEmpty() && discard.isEmpty() && current.isEmpty()) {
+            throw new IllegalArgumentException("天候牌堆不能为空");
+        }
+        return new WeatherDeck(upcoming, discard, current.orElse(null), Objects.requireNonNull(rng, "rng"));
+    }
+
+    /** {@code java.util.Random} 可序列化：照原样复制一份内部状态。 */
+    private static Random cloneRandom(Random rng) {
+        try {
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            try (java.io.ObjectOutputStream out = new java.io.ObjectOutputStream(bytes)) {
+                out.writeObject(rng);
+            }
+            try (java.io.ObjectInputStream in = new java.io.ObjectInputStream(
+                    new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
+                return (Random) in.readObject();
+            }
+        } catch (java.io.IOException | ClassNotFoundException e) {
+            throw new IllegalStateException("天候牌堆的随机流复制不了：" + rng.getClass().getName(), e);
+        }
+    }
+
     /** 翻开今天的牌；昨天的牌先进入弃牌堆。 */
     public WeatherCard draw() {
         // 开发验收覆盖只活到下一次正式抽牌。它不进入弃牌堆，也不改变牌堆顺序。

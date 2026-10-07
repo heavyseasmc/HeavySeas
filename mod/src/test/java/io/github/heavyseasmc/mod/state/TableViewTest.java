@@ -52,7 +52,7 @@ class TableViewTest {
 
     @Test
     void windowAndPrivateChoicesRoundTripWithoutShiftingFollowingFields() {
-        roundTrip(new TableView(List.of(), 14, 12000, List.of("kid"),
+        roundTrip(new TableView(List.of(), 14, 12000, 20_000, List.of("kid"),
                 List.of(new TableView.Play("life_preserver", "kid"))));
     }
 

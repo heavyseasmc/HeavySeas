@@ -9,10 +9,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Public cards plus interventions available only to the packet recipient. */
-public record TableView(List<Seat> seats, int token, long deadline, List<String> swimmers,
+/**
+ * Public cards plus interventions available only to the packet recipient.
+ *
+ * <p>{@code window}：落海这一窗本来有多长（ADR-0099 D8）。时限可配之后，客户端不能再拿编译进去的常量画满格。
+ */
+public record TableView(List<Seat> seats, int token, long deadline, long window, List<String> swimmers,
                         List<Play> plays) {
-    public static final TableView EMPTY = new TableView(List.of(), 0, 0, List.of(), List.of());
+    public static final TableView EMPTY = new TableView(List.of(), 0, 0, 0, List.of(), List.of());
 
     public TableView {
         seats = List.copyOf(seats);
@@ -36,11 +40,11 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
     }
 
     public static TableView of(Session session, Optional<CharacterId> recipient, long deadline) {
-        return of(session, recipient, deadline, id -> "");
+        return of(session, recipient, deadline, 0L, id -> "");
     }
 
     /** @param occupant 角色 → 坐在那一座的真人 UUID（字符串；替身返回空串） */
-    public static TableView of(Session session, Optional<CharacterId> recipient, long deadline,
+    public static TableView of(Session session, Optional<CharacterId> recipient, long deadline, long window,
                                java.util.function.Function<CharacterId, String> occupant) {
         if (session == null) {
             return EMPTY;
@@ -52,7 +56,7 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
         var prompt = session.overboardPending();
         List<Play> plays = deadline <= 0 ? List.of() : recipient.map(session::overboardPlays)
                 .orElse(List.of()).stream().map(p -> new Play(p.card(), p.target().value())).toList();
-        return new TableView(seats, prompt.map(Session.OverboardPrompt::token).orElse(0), deadline,
+        return new TableView(seats, prompt.map(Session.OverboardPrompt::token).orElse(0), deadline, window,
                 prompt.map(p -> p.swimmers().stream().map(CharacterId::value).toList()).orElse(List.of()), plays);
     }
 
@@ -74,6 +78,7 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
         }
         buf.writeVarInt(token);
         buf.writeVarLong(deadline);
+        buf.writeVarLong(window);
         buf.writeCollection(swimmers, PacketByteBuf::writeString);
         buf.writeVarInt(plays.size());
         for (Play play : plays) {
@@ -92,12 +97,13 @@ public record TableView(List<Seat> seats, int token, long deadline, List<String>
         }
         int token = buf.readVarInt();
         long deadline = buf.readVarLong();
+        long window = buf.readVarLong();
         List<String> swimmers = buf.readList(PacketByteBuf::readString);
         int options = buf.readVarInt();
         List<Play> plays = new ArrayList<>();
         for (int i = 0; i < options; i++) {
             plays.add(new Play(buf.readString(), buf.readString()));
         }
-        return new TableView(seats, token, deadline, swimmers, plays);
+        return new TableView(seats, token, deadline, window, swimmers, plays);
     }
 }

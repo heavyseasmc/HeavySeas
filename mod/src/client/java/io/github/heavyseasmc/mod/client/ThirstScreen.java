@@ -2,7 +2,6 @@ package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.mod.HeavySeasMod;
-import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.net.ThirstActionC2S;
 import io.github.heavyseasmc.mod.state.HudView;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -131,7 +130,7 @@ public final class ThirstScreen extends GameScreen {
                         : Text.translatable("heavyseas.thirst.drink", chosen, hurt),
                 width / 2, l.hintY(), hurt > 0 ? GuiLanguage.cinnabar() : GuiLanguage.verdigris());
         drawFootBand(context, b, List.of(keys("amount", "←", "→")), List.of(confirm("Enter")), now,
-                new Countdown(deadlineMs, ThirstPhase.CHOOSE_MILLIS, l.rowW()));
+                new Countdown(deadlineMs, view.thirstPrompt().windowMs(), l.rowW()));   // 总长取投影（ADR-0099 D8：时限可配）
     }
 
     private Layout layout(Bands b) {

@@ -18,9 +18,11 @@ import io.github.heavyseasmc.mod.game.ContestPhase;
 import io.github.heavyseasmc.mod.game.DesignationPhase;
 import io.github.heavyseasmc.mod.game.GameFlow;
 import io.github.heavyseasmc.mod.game.NavigationPhase;
+import io.github.heavyseasmc.mod.game.StandInMinds;
 import io.github.heavyseasmc.mod.game.ThirstPhase;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.state.StandInMind;
 import io.github.heavyseasmc.mod.world.Backdrop;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.MistSea;
@@ -32,6 +34,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.tree.CommandNode;
 import net.minecraft.command.argument.IdentifierArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -44,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * {@code /seas} —— M1 的全部操作入口；M2 起是开发脚手架（ADR-0017：玩家侧指令作废，GUI 是唯一路径）。
@@ -103,10 +107,17 @@ public final class SeasCommand {
     /**
      * 整棵 {@code /seas}，生产服与开发环境<b>同一棵</b>（ADR-0060 D2）：原先只在开发环境注册的 {@code /seas dev}
      * 并进了 {@code /seas debug}（{@link DebugCommand}），靠权限挡，不再靠「生产服根本没有」。
+     *
+     * <h2>权限挂在每个一级子指令上，不挂在根上（ADR-0099 D4 (a)）</h2>
+     * 设置菜单要一条人人可用的 {@code /seas config}，而根节点原先整棵要 2 级 —— 普通玩家连 {@code /seas} 都看不见。
+     * 现在每个一级子指令各自 {@code requires} 2 级（{@code debug} 里更高的几支照旧更高）；根节点只问「这个人在它下面有没有一条用得了」，
+     * 于是普通玩家在 {@code /seas} 下面看得见、也只看得见 {@code config} 这一条。
+     * ❗漏挂一个 {@code requires} 就等于把开发指令放给所有人：{@code SeasCommandRegistrationTest} 逐个核一级子指令（除白名单外都要 2 级）。
      */
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
-        dispatcher.register(CommandManager.literal("seas")
-                .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+        AtomicReference<CommandNode<ServerCommandSource>> root = new AtomicReference<>();
+        root.set(dispatcher.register(CommandManager.literal("seas")
+                .requires(source -> anyChildUsable(root.get(), source))
                 .then(CommandManager.literal("start")
                         .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .executes(guarded(context -> start(context, 6, SceneDataLoader.DEFAULT)))
@@ -124,6 +135,7 @@ public final class SeasCommand {
                         .executes(guarded(SeasCommand::end)))
                 .then(CommandManager.literal("dummy")
                         .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::dummyStatus))
                         .then(CommandManager.literal("add")
                                 .then(CommandManager.argument("character", StringArgumentType.word())
                                         .suggests(CHARACTERS)
@@ -141,23 +153,54 @@ public final class SeasCommand {
                                         .then(CommandManager.literal("fast")
                                                 .executes(guarded(context -> dummyRandom(context, true, true)))))
                                 .then(CommandManager.literal("off")
-                                        .executes(guarded(context -> dummyRandom(context, false, false))))))
-                .then(CommandManager.literal("status").executes(guarded(SeasCommand::status)))
-                .then(CommandManager.literal("pass").executes(guarded(SeasCommand::pass)))
+                                        .executes(guarded(context -> dummyRandom(context, false, false)))))
+                        // 动脑 / 大模型（StandInMinds）：与 random 同一个样子 —— on [fast] · off · 不带参数只报
+                        .then(CommandManager.literal("smart")
+                                .executes(guarded(context -> dummyMind(context, StandInMind.SMART, null, false)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.SMART, true, false)))
+                                        .then(CommandManager.literal("fast")
+                                                .executes(guarded(context -> dummyMind(context, StandInMind.SMART, true, true)))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.SMART, false, false)))))
+                        .then(CommandManager.literal("llm")
+                                .executes(guarded(context -> dummyMind(context, StandInMind.LLM, null, false)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.LLM, true, false)))
+                                        .then(CommandManager.literal("fast")
+                                                .executes(guarded(context -> dummyMind(context, StandInMind.LLM, true, true)))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.LLM, false, false))))
+                                // 只让这几座问大模型、其余动脑（逗号或空格隔开的角色 id；all = 每一座）
+                                .then(CommandManager.literal("seats")
+                                        .executes(guarded(context -> llmSeats(context, null)))
+                                        .then(CommandManager.argument("seats", StringArgumentType.greedyString())
+                                                .executes(guarded(context -> llmSeats(context,
+                                                        StringArgumentType.getString(context, "seats"))))))))
+                .then(CommandManager.literal("status")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::status)))
+                .then(CommandManager.literal("pass")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::pass)))
                 .then(CommandManager.literal("row")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .executes(guarded(context -> row(context, 0)))
                         .then(CommandManager.argument("card", IntegerArgumentType.integer(1))
                                 .executes(guarded(context -> row(context,
                                         IntegerArgumentType.getInteger(context, "card") - 1)))))
                 .then(CommandManager.literal("swap")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("character", StringArgumentType.word())
                                 .suggests(CHARACTERS)
                                 .executes(guarded(SeasCommand::swap))))
                 .then(CommandManager.literal("steal")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("character", StringArgumentType.word())
                                 .suggests(CHARACTERS)
                                 .executes(guarded(SeasCommand::steal))))
                 .then(CommandManager.literal("fight")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("character", StringArgumentType.word())
                                 .suggests(CHARACTERS)
                                 .executes(guarded(SeasCommand::fight))))
@@ -195,12 +238,14 @@ public final class SeasCommand {
                                 .executes(guarded(context -> pick(context,
                                         StringArgumentType.getString(context, "card"))))))
                 .then(CommandManager.literal("reveal")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("character", StringArgumentType.word())
                                 .suggests(CHARACTERS)
                                 .then(CommandManager.argument("card", StringArgumentType.word())
                                         .suggests(HELD_CARDS)
                                         .executes(guarded(SeasCommand::reveal)))))
                 .then(CommandManager.literal("give")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("character", StringArgumentType.word())
                                 .suggests(CHARACTERS)
                                 .then(CommandManager.argument("to", StringArgumentType.word())
@@ -209,12 +254,14 @@ public final class SeasCommand {
                                                 .suggests(HELD_CARDS)
                                                 .executes(guarded(SeasCommand::give))))))
                 .then(CommandManager.literal("drink")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("character", StringArgumentType.word())
                                 .suggests(CHARACTERS)
                                 .then(CommandManager.argument("card", StringArgumentType.word())
                                         .suggests(HELD_CARDS)
                                         .executes(guarded(SeasCommand::drink)))))
                 .then(CommandManager.literal("use")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("card", StringArgumentType.word())
                                 .suggests(HELD_CARDS)
                                 .executes(guarded(context -> use(context, null)))
@@ -223,6 +270,7 @@ public final class SeasCommand {
                                         .executes(guarded(context -> use(context,
                                                 StringArgumentType.getString(context, "target")))))))
                 .then(CommandManager.literal("water")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
                         .then(CommandManager.argument("cups", IntegerArgumentType.integer(0, 9))
                                 .executes(guarded(context -> water(context,
                                         IntegerArgumentType.getInteger(context, "cups")))))
@@ -246,7 +294,28 @@ public final class SeasCommand {
                                 .executes(guarded(context -> navigate(context,
                                         StringArgumentType.getString(context, "card"))))))
                 // 只有管理员能用的调试指令（ADR-0060）：每一个节点自己也要 2 级，见 DebugCommand
-                .then(DebugCommand.tree()));
+                .then(DebugCommand.tree())
+                // 设置菜单（ADR-0099 D4 (a)）：人人可用（判据里 OPEN_TO_EVERYONE 那一条）—— 能看谁都能看，能不能改由菜单里的快照说了算
+                .then(CommandManager.literal("config").executes(guarded(SeasCommand::openSettings)))));
+    }
+
+    /** {@code /seas config}：发一份快照，叫客户端开设置菜单。 */
+    private static int openSettings(CommandContext<ServerCommandSource> context) {
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        if (player == null) {
+            context.getSource().sendError(Text.translatable("heavyseas.settings.command.not_player"));
+            return 0;
+        }
+        if (!io.github.heavyseasmc.mod.config.SettingsSync.openFor(player)) {
+            context.getSource().sendError(Text.translatable("heavyseas.settings.command.no_client"));
+            return 0;
+        }
+        return 1;
+    }
+
+    /** 根节点用得了吗：下面至少有一条这个人用得了（见 {@link #register} 的说明）。还没建好时一律不行。 */
+    static boolean anyChildUsable(CommandNode<ServerCommandSource> node, ServerCommandSource source) {
+        return node != null && node.getChildren().stream().anyMatch(child -> child.canUse(source));
     }
 
     /** 已加载的布局 id：从场景数据现取，不在命令里维护第二张表。 */
@@ -376,6 +445,73 @@ public final class SeasCommand {
                 Text.translatable(now ? "heavyseas.command.autoplay_on" : "heavyseas.command.autoplay_off")),
                 on != null);
         return 1;
+    }
+
+    /** {@code /seas dummy}：替身此刻用哪种脑子、自动推进开没开、快慢档、大模型给哪几座。 */
+    private static int dummyStatus(CommandContext<ServerCommandSource> context) {
+        GameComponent component = standInComponent(context);
+        String line = StandInMinds.status(component);
+        context.getSource().sendFeedback(() -> Text.literal(line), false);
+        return 1;
+    }
+
+    /**
+     * 替身的脑子换成动脑 / 大模型（{@code StandInMinds}）。不带参数时只报当前值。写到雾海的组件上，理由与 {@link #dummyAuto} 同。
+     * 打开时顺带把自动推进也打开（与随机开关同一个理由）；{@code off} 只关掉这一种（换回「什么也不做」）。
+     * 开发期的开关：回话直接写字、不进 lang（与 {@code /seasllm} 同）。
+     */
+    private static int dummyMind(CommandContext<ServerCommandSource> context, StandInMind mind, Boolean on,
+                                 boolean fast) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        GameComponent component = standInComponent(context);
+        if (on != null) {
+            if (on) {
+                component.setDummyMind(mind);
+                component.setDummyFast(fast);
+                if (!component.dummyAutoplay()) {
+                    component.setDummyAutoplay(true);
+                }
+            } else if (component.dummyMind() == mind) {
+                component.setDummyMind(StandInMind.IDLE);
+                component.setDummyFast(false);
+            }
+            LOGGER.info("替身脑子：{}{}", component.dummyMind().label(), on && fast ? " · 快档" : "");
+            if (on && sea != null) {
+                GameFlow.resumeStandIn(sea, component);
+            }
+        }
+        String line = StandInMinds.status(component);
+        context.getSource().sendFeedback(() -> Text.literal(line), on != null);
+        return 1;
+    }
+
+    /** {@code /seas dummy llm seats [a,b,…|all]}：大模型只给这几座，其余替身动脑。不带参数时只报当前值。 */
+    private static int llmSeats(CommandContext<ServerCommandSource> context, String spec) {
+        GameComponent component = standInComponent(context);
+        if (spec != null) {
+            List<CharacterId> seats = new ArrayList<>();
+            if (!spec.isBlank() && !spec.trim().equals("all")) {
+                for (String part : spec.trim().split("[,\\s]+")) {
+                    CharacterId id = CharacterId.of(part);
+                    if (GameDataLoader.require().roster().characters().stream().noneMatch(s -> s.id().equals(id))) {
+                        context.getSource().sendError(Text.literal("没有这个角色：" + part));
+                        return 0;
+                    }
+                    seats.add(id);
+                }
+            }
+            component.setLlmSeats(seats);
+            LOGGER.info("大模型替身的座位：{}", seats.isEmpty() ? "每一座" : seats.stream().map(CharacterId::value).toList());
+        }
+        String line = StandInMinds.status(component);
+        context.getSource().sendFeedback(() -> Text.literal(line), spec != null);
+        return 1;
+    }
+
+    /** 替身的开关写在承载对局的雾海那一份组件上（两局之间也是），理由见 {@link #dummyAuto}。 */
+    private static GameComponent standInComponent(CommandContext<ServerCommandSource> context) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        return GameComponents.of(sea != null ? sea : context.getSource().getWorld());
     }
 
     private static int status(CommandContext<ServerCommandSource> context) {

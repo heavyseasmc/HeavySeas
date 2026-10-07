@@ -42,6 +42,47 @@ public final class NavigationDeck {
         this.total = shuffled.size();
     }
 
+    private NavigationDeck(List<NavigationCard> order, int total) {
+        pile.addAll(order);
+        this.total = total;
+    }
+
+    /** 一副次序一模一样、互不相干的副本（往前推演时用：在副本上抽牌不动原来那一副）。 */
+    public NavigationDeck copy() {
+        return new NavigationDeck(List.copyOf(pile), total);
+    }
+
+    /**
+     * 照给定的次序拼一副牌堆（推演时重拼一局用：牌堆次序是重新抽过的）。
+     *
+     * @param order 牌堆里的牌，顶上的在前
+     * @param total 这一副一共几张 —— 牌堆加上划船堆与划船者手上的（对账的分母），不小于 {@code order} 的张数
+     */
+    public static NavigationDeck ofOrder(List<NavigationCard> order, int total) {
+        Objects.requireNonNull(order, "order");
+        if (total < order.size() || total < 1) {
+            throw new IllegalArgumentException("一副共 %d 张，牌堆里却有 %d 张".formatted(total, order.size()));
+        }
+        return new NavigationDeck(List.copyOf(order), total);
+    }
+
+    /**
+     * 照给定的次序重排这一副（推演时把看不见的次序重新洗过）。张数与成员必须不变。
+     *
+     * @throws IllegalArgumentException 给的牌与牌堆里的不是同一批
+     */
+    public void reorder(List<NavigationCard> order) {
+        java.util.Map<NavigationCard, Integer> want = new java.util.HashMap<>();
+        order.forEach(c -> want.merge(c, 1, Integer::sum));
+        java.util.Map<NavigationCard, Integer> have = new java.util.HashMap<>();
+        pile.forEach(c -> have.merge(c, 1, Integer::sum));
+        if (!want.equals(have)) {
+            throw new IllegalArgumentException("重排的牌与牌堆里的不是同一批");
+        }
+        pile.clear();
+        pile.addAll(order);
+    }
+
     /** 牌堆里还剩几张（不含已经进了划船堆的）。 */
     public int size() {
         return pile.size();

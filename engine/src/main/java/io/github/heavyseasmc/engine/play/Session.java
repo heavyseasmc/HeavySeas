@@ -19,6 +19,7 @@ import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.weather.WeatherCard;
+import io.github.heavyseasmc.engine.weather.WeatherDeck;
 import io.github.heavyseasmc.engine.weather.WeatherEffect;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.state.SurvivorState;
@@ -78,6 +79,53 @@ public final class Session {
         this.table = Objects.requireNonNull(table, "table");
         this.state = table.weather().isPresent() ? GameState.startWithWeather(roster) : GameState.start(roster);
         Invariants.requireValid(state, context, "开局");
+    }
+
+    /** 副本：见 {@link #copy()}。 */
+    private Session(Session o, Table table) {
+        this.context = o.context;
+        this.table = table;
+        this.state = o.state;                                   // 不可变，共用
+        this.weatherDrawnThisTurn = o.weatherDrawnThisTurn;
+        this.healedSincePhaseStart = o.healedSincePhaseStart;
+        this.provisionChain = o.provisionChain;                 // 不可变，共用
+        this.provisionOffer.addAll(o.provisionOffer);
+        this.provisionAt = o.provisionAt;
+        this.provisionRoundsToday = o.provisionRoundsToday;
+        this.rower = o.rower;
+        this.rowing.addAll(o.rowing);                           // RowCard 不可变
+        this.contest = o.contest;                               // 不可变，共用
+        o.weaponsPlayed.forEach((who, cards) -> this.weaponsPlayed.put(who, new ArrayList<>(cards)));
+        this.lastRationHealed = o.lastRationHealed;
+        this.navigatedThisTurn = o.navigatedThisTurn;
+        this.standardNavigationTaken = o.standardNavigationTaken;
+        this.extraNavigationTaken = o.extraNavigationTaken;
+        this.resolvingExtraNavigation = o.resolvingExtraNavigation;
+        this.pendingNavigation = o.pendingNavigation == null ? null : o.pendingNavigation.copy();
+        this.lastNavigationReport = o.lastNavigationReport;     // 不可变，共用
+        this.overboardSequence = o.overboardSequence;
+        this.thirstCard = o.thirstCard;
+        this.thirstQueue.addAll(o.thirstQueue);
+        this.thirstAt = o.thirstAt;
+        this.thirstWatersSpent = o.thirstWatersSpent;
+        o.thirstSettledToday.forEach((who, sources) -> this.thirstSettledToday.put(who, new LinkedHashSet<>(sources)));
+        this.coverUsedToday.putAll(o.coverUsedToday);
+        this.sharedRum.addAll(o.sharedRum);
+        this.rowStackPrepared = o.rowStackPrepared;
+        this.deeds.addAll(o.deeds);
+        this.affinities = o.affinities;                         // 不可变，共用
+    }
+
+    /**
+     * 一局一模一样、互不相干的副本：此刻的状态、桌面上每一副牌的次序、进行到一半的每一步（补给箱、划船、这一场、
+     * 落海、口渴）都原样复制一份，之后在副本上做什么都不动原来那一局。
+     *
+     * <p>给往前推演用（{@code engine.seat}）：在副本上把一个决定做下去、推几天看结果。
+     * ❗副本里<b>什么都看得见</b>（别人的手牌、牌堆次序）—— 它不能交给席位策略；
+     * 席位策略往前推演时要的是「照我看得见的、把看不见的重抽一遍」的那一种，只从它自己的视角拼，不从这里复制。
+     */
+    public Session copy() {
+        return new Session(this, table.copy());
     }
 
     /**
@@ -143,6 +191,7 @@ public final class Session {
             sharedRum.clear();
             thirstSettledToday.clear();
             coverUsedToday.clear();
+            provisionRoundsToday = 0;
         }
         Invariants.requireValid(state, context, "阶段推进后");
     }
@@ -222,6 +271,7 @@ public final class Session {
      * @return 第一位看得到的牌；空表示本阶段无事可做
      */
     public List<String> beginProvision() {
+        provisionRoundsToday++;
         provisionChain = List.copyOf(state.consciousBySeat());
         provisionOffer.clear();
         provisionAt = 0;
@@ -230,6 +280,19 @@ public final class Session {
         }
         provisionOffer.addAll(table.drawProvisions(provisionDraws()));
         return List.copyOf(provisionOffer);
+    }
+
+    /** 今天开过几轮补给箱（礼拜天会开两轮）。换天时归零。 */
+    private int provisionRoundsToday;
+
+    /**
+     * 今天已经开过几轮补给箱。<b>公开信息</b>。
+     *
+     * <p>礼拜天要「传完一轮再来一整轮」，而「第二轮开过没有」原先只记在驱动者那一侧（模组的组件里）。
+     * 从半路接手一局的驱动者（席位策略往前推演时）就答不出这一句 —— 所以记在规则这一侧。
+     */
+    public int provisionRoundsToday() {
+        return provisionRoundsToday;
     }
 
     /** 箱子在谁手上；空表示这一轮已经传完（或根本没开始）。 */
@@ -541,6 +604,7 @@ public final class Session {
                     .formatted(context, target.value(), kindName(kind)));
         }
         boolean handOnly = kind == Contest.Kind.STEAL && stealsUncontested(actor);
+        record(kind == Contest.Kind.STEAL ? Deed.Kind.STEAL_DECLARED : Deed.Kind.SWAP_DECLARED, actor, target, 1);
         contest = new Contest(kind, actor, target, Contest.Stage.CONSENT, Optional.empty(), handOnly, Map.of(),
                 "", Set.of());
         if (handOnly || !state.canAct(target)) {
@@ -558,6 +622,9 @@ public final class Session {
         Contest c = requireStage(Contest.Stage.CONSENT, "表态");
         if (fight) {
             requireCanAct(c.target());
+            record(c.kind() == Contest.Kind.RATION ? Deed.Kind.OBJECTED : Deed.Kind.REFUSED, c.target(), c.attacker(), 1);
+        } else if (c.kind() != Contest.Kind.RATION) {
+            record(Deed.Kind.CONCEDED, c.target(), c.attacker(), 1);
         }
         if (!fight) {
             if (c.kind() == Contest.Kind.RATION) {
@@ -568,7 +635,7 @@ public final class Session {
                     contest = c.passAndAsk(c.target(), next.get());
                 } else {
                     contest = null;
-                    applyRation(c.provision());
+                    applyRation(c.attacker(), c.provision());
                 }
                 return;
             }
@@ -589,7 +656,13 @@ public final class Session {
         if (!state.canAct(who)) {
             throw new IllegalArgumentException("%s %s 不清醒，不能加入战斗（规则 §9.3）".formatted(context, who.value()));
         }
-        contest = c.withFight(c.fight().orElseThrow().join(who, side));
+        Fight fight = c.fight().orElseThrow();
+        contest = c.withFight(fight.join(who, side));
+        // 站队全船看得见（规则 §8）：记下他站在谁那边、与谁为敌。主将就是发起的人与被指的人。
+        CharacterId with = side == Fight.Side.ATTACK ? fight.attacker() : fight.defender();
+        CharacterId against = side == Fight.Side.ATTACK ? fight.defender() : fight.attacker();
+        record(Deed.Kind.SIDED_WITH, who, with, 1);
+        record(Deed.Kind.SIDED_AGAINST, who, against, 1);
     }
 
     /** 站队段结束，进挂武器段。 */
@@ -660,7 +733,7 @@ public final class Session {
             switch (c.kind()) {
                 case SWAP -> swapSeats(c.attacker(), c.target());
                 case STEAL -> enterPick(c);
-                case RATION -> applyRation(c.provision());
+                case RATION -> applyRation(c.attacker(), c.provision());
             }
         }
         return outcome;
@@ -684,6 +757,7 @@ public final class Session {
         state = state.withState(c.target(), victim.withoutCardInFront(cardId));
         state = state.withState(c.attacker(), state.stateOf(c.attacker()).withCardInFront(cardId));
         contest = null;
+        record(Deed.Kind.TOOK, c.attacker(), c.target(), 1);
         requireNoProvisionLost("抢到面前的一张之后");
     }
 
@@ -706,6 +780,7 @@ public final class Session {
         state = state.withState(c.target(), victim.withoutCard(cardId));
         state = state.withState(c.attacker(), state.stateOf(c.attacker()).withCard(cardId));
         contest = null;
+        record(Deed.Kind.TOOK, c.attacker(), c.target(), 1);
         requireNoProvisionLost("抢到手牌里的一张之后");
     }
 
@@ -776,6 +851,7 @@ public final class Session {
         int b = state.stateOf(target).seat();
         state = state.withState(actor, state.stateOf(actor).withSeat(b))
                 .withState(target, state.stateOf(target).withSeat(a));
+        record(Deed.Kind.SWAPPED, actor, target, 1);
     }
 
     /**
@@ -791,8 +867,10 @@ public final class Session {
         // 体型按满值算，并加上本回合喝过的酒（{@code buff_size}，规则 §11.2：喝下后整个大回合有效）。
         Fight.Outcome outcome = fight.resolve(this::fightingSize);
         GameState next = state;
+        CharacterId winner = outcome.winner() == Fight.Side.ATTACK ? fight.attacker() : fight.defender();
         for (CharacterId loser : outcome.losers()) {
             next = next.withState(loser, next.stateOf(loser).hurt(outcome.damagePerLoser()));
+            record(Deed.Kind.BEAT, winner, loser, outcome.damagePerLoser());
         }
         for (CharacterId c : fight.combatants()) {
             next = next.withState(c, next.stateOf(c).thirstFrom(ThirstSource.FOUGHT));
@@ -947,10 +1025,12 @@ public final class Session {
             chosen = table.pile().draw();
         } else {
             chosen = helmsmanPick;
+            int stack = table.rowStack().size();
             if (!table.removeFromRowStack(chosen)) {
                 throw new IllegalStateException(
                         "%s 舵手挑了一张不在划船堆里的牌: %s".formatted(context, chosen.id()));
             }
+            recordSteering(chosen, stack);
         }
         table.recycleRowStack();
         table.pile().bottom(chosen);
@@ -1075,6 +1155,16 @@ public final class Session {
             this.card = card;
             this.candidates = candidates;
         }
+
+        PendingNavigation copy() {
+            PendingNavigation c = new PendingNavigation(card, candidates);
+            windows.forEach(w -> c.windows.add(new ArrayList<>(w)));
+            c.selected.addAll(selected);
+            c.removed.addAll(removed);
+            c.token = token;
+            c.bait = bait;
+            return c;
+        }
     }
 
     /** Start with gulls, then pause before each independent overboard resolution. */
@@ -1179,6 +1269,15 @@ public final class Session {
                 : Optional.of(new OverboardPrompt(pendingNavigation.token, pendingNavigation.windows.getFirst()));
     }
 
+    /**
+     * 这一批落海里已经打出的血饵加了几点（没有落海在等时为 0）。<b>公开信息</b>：血饵是当着全船打的。
+     *
+     * <p>血饵不叠加（{@code stacks: false}），所以「已经有人打过」决定了再打一张是不是白扔 —— 替身要问这一句。
+     */
+    public int overboardBait() {
+        return pendingNavigation == null ? 0 : pendingNavigation.bait;
+    }
+
     public void finishOverboard() {
         if (pendingNavigation == null) {
             throw new IllegalStateException("no pending overboard window");
@@ -1221,11 +1320,20 @@ public final class Session {
             consume(from, cardId, true);
             pendingNavigation.bait = bait.stacks()
                     ? pendingNavigation.bait + bait.amount() : Math.max(pendingNavigation.bait, bait.amount());
+            // 血饵打的是这一批落海的每一个人，不只是点出来的那一个。
+            // ❗按座位次序记：这一批名单来自 Set.copyOf，遍历次序每次起 JVM 都不同，记事的先后不能跟着它变。
+            List<CharacterId> swimmers = pendingNavigation.windows.getFirst();
+            for (CharacterId id : state.bySeat()) {
+                if (swimmers.contains(id)) {
+                    record(Deed.Kind.BAITED, from, id, bait.amount());
+                }
+            }
         } else {
             SurvivorState giver = state.stateOf(from);
             state = state.withState(from, giver.hasInHand(cardId)
                     ? giver.withoutCard(cardId) : giver.withoutCardInFront(cardId));
             state = state.withState(target, state.stateOf(target).withCardInFront(cardId));
+            record(Deed.Kind.RING, from, target, 1);
         }
         requireNoProvisionLost("overboard intervention");
     }
@@ -1242,6 +1350,10 @@ public final class Session {
         cards.addAll(state.stateOf(who).front());
         List<OverboardPlay> result = new ArrayList<>();
         for (String card : new LinkedHashSet<>(cards)) {
+            ProvisionEffect kind = table.provisions().get(card).effect();
+            if (!(kind instanceof ProvisionEffect.DamageInWater || kind instanceof ProvisionEffect.PreventOverboardDamage)) {
+                continue;               // 别的牌这一刻一律打不出；不必逐个目标抛一个异常来确认（替身每一批落海都要问每个人）
+            }
             for (CharacterId target : pendingNavigation.windows.getFirst()) {
                 try {
                     ProvisionEffect effect = requireOverboardPlay(who, target, card, pendingNavigation.token);
@@ -1358,6 +1470,11 @@ public final class Session {
                         "%s %s 手上与面前都没有水".formatted(context, donor.value()));
             }
             table.discardProvision(WATER);
+        }
+        for (Map.Entry<CharacterId, Integer> entry : required.entrySet()) {
+            if (!entry.getKey().equals(prompt.who())) {
+                record(Deed.Kind.WATERED, entry.getKey(), prompt.who(), entry.getValue());
+            }
         }
         thirstWatersSpent += donors.size();
         // 这一次口渴的每个来源都有了去向（挡下 / 蹭到 / 喝水 / 挨打），今天不再算第二次。
@@ -1760,6 +1877,7 @@ public final class Session {
             throw new IllegalArgumentException(
                     "%s %s 手上与面前都没有 %s".formatted(context, from.value(), cardId));
         }
+        record(Deed.Kind.GAVE, from, to, 1);
         requireNoProvisionLost("赠送后");
     }
 
@@ -1787,6 +1905,7 @@ public final class Session {
         }
         state = state.withState(target, state.stateOf(target).heal(heal.amount()));
         healedSincePhaseStart += heal.amount();
+        record(Deed.Kind.HEALED, user, target, heal.amount());
         consume(user, cardId, heal.discardedBy(user));
         Invariants.requireValid(state, context, "治疗后");
         requireNoProvisionLost("治疗后");
@@ -1835,7 +1954,7 @@ public final class Session {
             requireNoProvisionLost("绝境等待反对时");
             return Optional.empty();
         }
-        return Optional.of(applyRation(cardId));
+        return Optional.of(applyRation(user, cardId));
     }
 
     /**
@@ -1845,7 +1964,7 @@ public final class Session {
         requireNoContest("打出绝境");
         ProvisionEffect.HealAll heal = requireRation(user, cardId);
         consume(user, cardId, heal.discardOnUse());
-        return applyRation(cardId);
+        return applyRation(user, cardId);
     }
 
     /** 昏迷不算尸体；这一条必须在弃牌之前查，失败不能吃掉玩家的牌。 */
@@ -1869,7 +1988,7 @@ public final class Session {
     }
 
     /** 牌已经消费之后让绝境生效。 */
-    private List<CharacterId> applyRation(String cardId) {
+    private List<CharacterId> applyRation(CharacterId user, String cardId) {
         ProvisionEffect effect = table.provisions().get(cardId).effect();
         if (!(effect instanceof ProvisionEffect.HealAll heal)) {
             throw new IllegalStateException("绝境待决的牌已经不是全体回血物资：" + cardId);
@@ -1882,6 +2001,7 @@ public final class Session {
             state = state.withState(id, state.stateOf(id).healIfHurt(heal.amount()));
             healedSincePhaseStart += heal.amount();
             healed.add(id);
+            record(Deed.Kind.HEALED, user, id, heal.amount());
         }
         lastRationHealed = healed.size();
         Invariants.requireValid(state, context, "绝境之后");
@@ -2183,6 +2303,258 @@ public final class Session {
                             .formatted(context, where, table.provisionsLeft(), provisionOffer.size(),
                                     inHands, inFront, table.provisionDiscard().size(),
                                     table.removedProvisions().size(), table.provisionTotal()));
+        }
+    }
+
+    // ---------------------------------------------------------------- 推演用：公开的进度，与照图纸重拼一局
+
+    /**
+     * 这一局走到哪儿了：不在 {@link GameState} 里、又全船看得见的那些进度。<b>不含任何看不见的东西。</b>
+     *
+     * <p>给往前推演用（{@code engine.seat}）：替身只拿得到自己的视角，要「照我看得见的、把看不见的重抽一遍」拼出一局，
+     * 视角里就得有这些 —— 走到半路的一局（补给箱传到一半、落海还剩一批、口渴排到谁）光靠状态与桌面拼不出来。
+     *
+     * <p>集合一律按座位排过：落海名单来自 {@code Set.copyOf}，遍历次序每次起 JVM 都不同。
+     *
+     * @param weatherDrawn          今天的天候翻过了
+     * @param provisionChain        补给箱传的次序（开箱那一刻定死）
+     * @param provisionAt           传到第几位
+     * @param provisionRoundsToday  今天开过几轮补给箱
+     * @param navigated             这一天已经执行的那张航海牌
+     * @param standardNavigation    这一天舵手那一张执行过了
+     * @param extraNavigation       狂风那一张翻过了
+     * @param resolvingExtra        正在结算的是狂风那一张
+     * @param rowStackPrepared      舵手的指南针那一张已经抽进划船堆
+     * @param overboard             正在等的那几批落海（结算完为空）
+     * @param overboardSequence     落海批次的编号到几了
+     * @param thirstCard            正在结算口渴的那张牌（结算完为空）
+     * @param thirstQueue           口渴的结算次序
+     * @param thirstAt              排到第几位
+     * @param thirstWatersSpent     这一张牌的口渴里一共喝下了几张水（陪酒女蹭水看它）
+     * @param thirstSettledToday    今天每个人已经结算过的口渴来源（狂风天第二张不再算）
+     * @param coverUsedToday        今天每个人撑开的伞已经挡过几次
+     * @param sharedRum             今天蹭到别人的酒的人
+     * @param healedSincePhaseStart 这一阶段治了几点（模拟器核对不变量用）
+     */
+    public record Progress(boolean weatherDrawn, List<CharacterId> provisionChain, int provisionAt,
+                           int provisionRoundsToday, Optional<NavigationCard> navigated, boolean standardNavigation,
+                           boolean extraNavigation, boolean resolvingExtra, boolean rowStackPrepared,
+                           Optional<OverboardBatches> overboard, int overboardSequence,
+                           Optional<NavigationCard> thirstCard, List<CharacterId> thirstQueue, int thirstAt,
+                           int thirstWatersSpent, Map<CharacterId, Set<ThirstSource>> thirstSettledToday,
+                           Map<CharacterId, Integer> coverUsedToday, Set<CharacterId> sharedRum,
+                           int healedSincePhaseStart) {
+
+        public Progress {
+            Objects.requireNonNull(navigated, "navigated");
+            Objects.requireNonNull(overboard, "overboard");
+            Objects.requireNonNull(thirstCard, "thirstCard");
+            provisionChain = List.copyOf(provisionChain);
+            thirstQueue = List.copyOf(thirstQueue);
+            Map<CharacterId, Set<ThirstSource>> settled = new LinkedHashMap<>();
+            thirstSettledToday.forEach((id, sources) -> settled.put(id, Set.copyOf(sources)));
+            thirstSettledToday = Map.copyOf(settled);
+            coverUsedToday = Map.copyOf(coverUsedToday);
+            sharedRum = Set.copyOf(sharedRum);
+        }
+    }
+
+    /**
+     * 正在结算的那张航海牌的落海：还剩几批（第一批就是此刻在等的那一批）、点到了谁、谁沉了、这一批打了几点血饵。
+     */
+    public record OverboardBatches(NavigationCard card, List<CharacterId> candidates, List<List<CharacterId>> windows,
+                                   List<CharacterId> selected, List<CharacterId> removed, int token, int bait) {
+
+        public OverboardBatches {
+            Objects.requireNonNull(card, "card");
+            candidates = List.copyOf(candidates);
+            windows = windows.stream().map(List::copyOf).toList();
+            selected = List.copyOf(selected);
+            removed = List.copyOf(removed);
+        }
+    }
+
+    /** 此刻的进度（{@link Progress}）。只有公开的东西。 */
+    public Progress progress() {
+        Optional<OverboardBatches> batches = Optional.ofNullable(pendingNavigation).map(p -> new OverboardBatches(
+                p.card, p.candidates, p.windows.stream().map(this::inSeatOrder).toList(), inSeatOrder(p.selected),
+                inSeatOrder(p.removed), p.token, p.bait));
+        Map<CharacterId, Set<ThirstSource>> settled = new LinkedHashMap<>();
+        thirstSettledToday.forEach((id, sources) -> settled.put(id, Set.copyOf(sources)));
+        return new Progress(weatherDrawnThisTurn, provisionChain, provisionAt, provisionRoundsToday,
+                Optional.ofNullable(navigatedThisTurn), standardNavigationTaken, extraNavigationTaken,
+                resolvingExtraNavigation, rowStackPrepared, batches, overboardSequence, Optional.ofNullable(thirstCard),
+                thirstQueue, thirstAt, thirstWatersSpent, settled, coverUsedToday, sharedRum, healedSincePhaseStart);
+    }
+
+    private List<CharacterId> inSeatOrder(java.util.Collection<CharacterId> ids) {
+        return state.bySeat().stream().filter(ids::contains).toList();
+    }
+
+    /**
+     * 照图纸重拼一局所需的全部：状态、每一堆牌的次序、走到半路的每一步、爱恨与记事。
+     *
+     * <p>推演用：看不见的那几样（别人的手牌、牌堆次序、别人押下的是哪一张、别人的爱恨）由调用方重新抽好再填进来 ——
+     * 见 {@code engine.seat.Worlds}。{@link #rebuild} 拼完会对账（牌一张不少、状态自洽），图纸填错了当场抛。
+     *
+     * @param navPile    航海牌堆，顶上的在前
+     * @param rowStack   划船堆
+     * @param rowerHand  划船者手上（摸了还没选的那几张）；同时也是 {@code rowing} 的那几张
+     * @param weather    天候牌堆；空表示不翻天候的三阶段局
+     * @param provisionOffer 补给箱里此刻的牌
+     * @param rower      正在划船的人
+     * @param contest    进行中的这一场（押下的暗牌已经按图纸填好）
+     */
+    public record Blueprint(String context, GameState state, Provisions provisions, List<NavigationCard> navPile,
+                            List<NavigationCard> rowStack, List<NavigationCard> rowerHand, List<String> provisionPile,
+                            List<String> provisionDiscard, List<String> removedProvisions,
+                            Optional<WeatherParts> weather, List<String> provisionOffer, Optional<CharacterId> rower,
+                            Optional<Contest> contest, Progress progress, Affinities affinities, List<Deed> deeds) {
+
+        public Blueprint {
+            Objects.requireNonNull(context, "context");
+            Objects.requireNonNull(state, "state");
+            Objects.requireNonNull(provisions, "provisions");
+            Objects.requireNonNull(weather, "weather");
+            Objects.requireNonNull(rower, "rower");
+            Objects.requireNonNull(contest, "contest");
+            Objects.requireNonNull(progress, "progress");
+            Objects.requireNonNull(affinities, "affinities");
+            navPile = List.copyOf(navPile);
+            rowStack = List.copyOf(rowStack);
+            rowerHand = List.copyOf(rowerHand);
+            provisionPile = List.copyOf(provisionPile);
+            provisionDiscard = List.copyOf(provisionDiscard);
+            removedProvisions = List.copyOf(removedProvisions);
+            provisionOffer = List.copyOf(provisionOffer);
+            deeds = List.copyOf(deeds);
+        }
+    }
+
+    /**
+     * 天候牌堆的几样：还没翻的（顶上的在前）、弃牌堆、今天这一张，以及以后洗牌用的随机流种子。
+     */
+    public record WeatherParts(List<WeatherCard> upcoming, List<WeatherCard> discard, Optional<WeatherCard> current,
+                               long seed) {
+
+        public WeatherParts {
+            upcoming = List.copyOf(upcoming);
+            discard = List.copyOf(discard);
+            Objects.requireNonNull(current, "current");
+        }
+    }
+
+    /** 拼一局用的空壳：状态照给的，其余由 {@link #rebuild} 逐项填。 */
+    private Session(String context, Table table, GameState state) {
+        this.context = Objects.requireNonNull(context, "context");
+        this.table = Objects.requireNonNull(table, "table");
+        this.state = Objects.requireNonNull(state, "state");
+    }
+
+    /**
+     * 照图纸重拼一局（{@link Blueprint}）。拼出来的一局与普通的一局没有两样：接着往下走、做副本、再拼，都可以。
+     *
+     * <p>❗它<b>不知道</b>图纸上哪些是看得见的、哪些是抽出来的 —— 那是填图纸的人的事。它只管拼对：
+     * 牌一张不少（航海牌与物资各对一次账）、状态自洽（{@link Invariants}），不对就抛。
+     *
+     * @throws IllegalStateException    对不上账，或者状态不自洽
+     * @throws IllegalArgumentException 图纸里的东西互相矛盾（比如正在划船的人没有摸到牌）
+     */
+    public static Session rebuild(Blueprint b) {
+        Objects.requireNonNull(b, "b");
+        int navTotal = b.navPile().size() + b.rowStack().size() + b.rowerHand().size();
+        WeatherDeck weather = b.weather().map(w -> WeatherDeck.of(w.upcoming(), w.discard(), w.current(),
+                new java.util.Random(w.seed()))).orElse(null);
+        Table table = new Table(io.github.heavyseasmc.engine.navigation.NavigationDeck.ofOrder(b.navPile(), navTotal),
+                b.provisions(), weather, b.rowStack(), b.rowerHand(), b.provisionPile(), b.provisionDiscard(),
+                b.removedProvisions());
+        Session s = new Session(b.context(), table, b.state());
+        Progress p = b.progress();
+        s.weatherDrawnThisTurn = p.weatherDrawn();
+        s.healedSincePhaseStart = p.healedSincePhaseStart();
+        s.provisionChain = p.provisionChain();
+        s.provisionOffer.addAll(b.provisionOffer());
+        s.provisionAt = p.provisionAt();
+        s.provisionRoundsToday = p.provisionRoundsToday();
+        if (b.rower().isPresent() != !b.rowerHand().isEmpty()) {
+            throw new IllegalArgumentException("图纸上正在划船的人与划船者手上的牌对不上");
+        }
+        s.rower = b.rower().orElse(null);
+        b.rowerHand().forEach(card -> s.rowing.add(new RowCard(card, RowFate.UNDECIDED)));
+        s.contest = b.contest().orElse(null);
+        s.navigatedThisTurn = p.navigated().orElse(null);
+        s.standardNavigationTaken = p.standardNavigation();
+        s.extraNavigationTaken = p.extraNavigation();
+        s.resolvingExtraNavigation = p.resolvingExtra();
+        s.rowStackPrepared = p.rowStackPrepared();
+        p.overboard().ifPresent(o -> {
+            PendingNavigation pending = new PendingNavigation(o.card(), o.candidates());
+            o.windows().forEach(w -> pending.windows.add(new ArrayList<>(w)));
+            pending.selected.addAll(o.selected());
+            pending.removed.addAll(o.removed());
+            pending.token = o.token();
+            pending.bait = o.bait();
+            s.pendingNavigation = pending;
+        });
+        s.overboardSequence = p.overboardSequence();
+        s.thirstCard = p.thirstCard().orElse(null);
+        s.thirstQueue.addAll(p.thirstQueue());
+        s.thirstAt = p.thirstAt();
+        s.thirstWatersSpent = p.thirstWatersSpent();
+        p.thirstSettledToday().forEach((id, sources) -> s.thirstSettledToday.put(id, new LinkedHashSet<>(sources)));
+        s.coverUsedToday.putAll(p.coverUsedToday());
+        s.sharedRum.addAll(p.sharedRum());
+        s.deeds.addAll(b.deeds());
+        b.affinities().requireCovers(b.state().roster());
+        s.affinities = b.affinities();
+        table.requireNoCardLost(s.context, "照图纸重拼之后");
+        s.requireNoProvisionLost("照图纸重拼之后");
+        Invariants.requireValid(s.state, s.context, "照图纸重拼之后");
+        return s;
+    }
+
+    // ---------------------------------------------------------------- 公开记事
+
+    /** 这一局全船看得见的事，按发生先后。只增不减（{@link Deed}）。 */
+    private final List<Deed> deeds = new ArrayList<>();
+
+    /** {@link #deeds()} 交出去的那一份；记一条新的就作废。读的次数远多于记的次数（每个决定都要读一次）。 */
+    private List<Deed> deedsSnapshot = List.of();
+
+    /**
+     * 这一局到此为止全船看得见的事（{@link Deed}），按发生先后。不可变的一份。
+     *
+     * <p>❗<b>只有公开的事</b>：拿走、送出、押下的是哪一张都不在里面。席位策略靠它「记得谁帮过我、谁害过我」，
+     * 而它只能用全船都知道的东西 —— 所以这份记事对每个人都一样，按人裁剪的只有爱恨与手牌。
+     */
+    public List<Deed> deeds() {
+        if (deedsSnapshot.size() != deeds.size()) {
+            deedsSnapshot = List.copyOf(deeds);
+        }
+        return deedsSnapshot;
+    }
+
+    private void record(Deed.Kind kind, CharacterId actor, CharacterId target, int amount) {
+        deeds.add(new Deed(state.turn(), kind, actor, target, amount));
+    }
+
+    /**
+     * 舵手挑的牌点了谁落海：每人记一条 {@link Deed.Kind#STEERED}。
+     *
+     * <p>按座位次序记，不按选择器给的集合 —— 那个集合来自 {@code Set.copyOf}，遍历次序每次起 JVM 都不同。
+     * 舵手自己不记：他把自己送下水不是对谁做了什么。
+     */
+    private void recordSteering(NavigationCard card, int stackSize) {
+        Optional<CharacterId> helmsman = state.helmsman();
+        if (helmsman.isEmpty()) {
+            return;
+        }
+        Set<CharacterId> named = card.overboard().select(new LinkedHashSet<>(state.onBoatBySeat()),
+                usedProvisionResolver());
+        for (CharacterId id : state.onBoatBySeat()) {
+            if (named.contains(id) && !id.equals(helmsman.get())) {
+                record(Deed.Kind.STEERED, helmsman.get(), id, stackSize);
+            }
         }
     }
 

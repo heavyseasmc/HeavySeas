@@ -15,6 +15,7 @@ import io.github.heavyseasmc.engine.state.SurvivorState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.FogTable;
 import io.github.heavyseasmc.mod.data.SceneDataLoader;
+import io.github.heavyseasmc.mod.game.GameTiming;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -126,6 +127,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     private HudView view = HudView.IDLE;
     private TableView tableView = TableView.EMPTY;
     private long overboardDeadline;
+    /** 落海这一窗本来有多长（ADR-0099 D8）：客户端按它画满格，不再用编译进去的常量。 */
+    private long overboardWindow;
 
     public TableView tableView() {
         return tableView;
@@ -135,8 +138,29 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return overboardDeadline;
     }
 
+    /** 只改到点时刻（提前收窗 · 收尾清零）；开窗走 {@link #openOverboardWindow}。 */
     public void setOverboardDeadline(long deadline) {
         overboardDeadline = deadline;
+    }
+
+    /** 开落海这一窗：到点时刻与总长一起设（与 {@link #openContestWindow} 同一个理由）。 */
+    public void openOverboardWindow(long millis) {
+        overboardDeadline = System.currentTimeMillis() + millis;
+        overboardWindow = millis;
+    }
+
+    /**
+     * 这一局的时限（ADR-0099 D8）：开局时由 {@code GameFlow} 从服务端设置里取一份，一局之内不变。
+     * 没开过局时是改之前写死的那一套。
+     */
+    private GameTiming timing = GameTiming.DEFAULTS;
+
+    public GameTiming timing() {
+        return timing;
+    }
+
+    public void setTiming(GameTiming timing) {
+        this.timing = Objects.requireNonNull(timing, "timing");
     }
 
     /** 客户端 HUD 的数据源。服务端上它永远是 {@link HudView#IDLE}。 */
@@ -176,13 +200,23 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     /** ❗按收件人裁剪：每个人只拿到自己那一份。手牌、划船抽到的牌、舵手看的划船堆走的都是这条路。 */
     @Override
     public void writeSyncPacket(RegistryByteBuf buf, ServerPlayerEntity recipient) {
-        writeView(buf, recipient);
-        TableView.of(session, seatOf(recipient.getUuid()), overboardDeadline,
+        writeView(buf, recipient.getUuid());
+        TableView.of(session, seatOf(recipient.getUuid()), overboardDeadline, overboardWindow,
                 id -> occupantOf(id).filter(o -> !o.isDummy()).map(o -> o.player().toString()).orElse("")).write(buf);
         buf.writeInt(SYNC_END);           // ❗必须是最后一笔，且每条分支都经过这里
     }
 
-    private void writeView(RegistryByteBuf buf, ServerPlayerEntity recipient) {
+    /** 单测用：按收件人写出 HUD 那一半投影（不含公共牌桌与收尾哨兵），不必造一个 {@code ServerPlayerEntity}。 */
+    void writeViewFor(RegistryByteBuf buf, UUID recipient) {
+        writeView(buf, recipient);
+    }
+
+    /** 单测用：读回 {@link #writeViewFor} 写出的那一半。 */
+    static HudView readViewFrom(RegistryByteBuf buf) {
+        return readView(buf);
+    }
+
+    private void writeView(RegistryByteBuf buf, UUID recipient) {
         buf.writeBoolean(session != null);
         if (session == null) {
             return;
@@ -221,6 +255,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         buf.writeVarInt(session.table().rowStack().size());
         buf.writeString(helmSeat(g).map(CharacterId::value).orElse(""));
         buf.writeVarLong(helmDeadline);
+        // 这一窗本来有多长（ADR-0099 D8）：时限可配之后，客户端不能再拿编译进去的常量画满格
+        buf.writeVarLong(helmWindow);
         Optional<NavigationCard> revealed = session.navigatedThisTurn();
         buf.writeBoolean(revealed.isPresent());
         revealed.ifPresent(card -> NavCardView.of(card).write(buf));
@@ -239,6 +275,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             buf.writeVarInt(thirstDonors.size());
             buf.writeVarInt(prompt.waterPerSource());
             buf.writeVarLong(thirstDeadline);
+            buf.writeVarLong(thirstWindow);   // 这一窗本来有多长（ADR-0099 D8）
         }
         // 终局：这一轮已经翻开的目标对全船公开；计分阶段只发合计。
         // ❗四项明细不在这里，下面只写给本人。
@@ -284,7 +321,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             writeSide(buf, session, fight.map(Fight::defendSide).orElse(Set.of()));
         }
 
-        Optional<CharacterId> seat = seatOf(recipient.getUuid());
+        Optional<CharacterId> seat = seatOf(recipient);
         buf.writeBoolean(seat.isPresent());
         if (seat.isEmpty()) {
             return;
@@ -517,11 +554,13 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         int rowStack = buf.readVarInt();
         String helmsman = buf.readString();
         long helmDeadline = buf.readVarLong();
+        long helmWindow = buf.readVarLong();
         Optional<NavCardView> revealed = buf.readBoolean() ? Optional.of(NavCardView.read(buf)) : Optional.empty();
         HudView.Thirst thirstPrompt = HudView.Thirst.NONE;
         if (buf.readBoolean()) {
             thirstPrompt = new HudView.Thirst(buf.readString(), buf.readVarInt(), buf.readVarInt(),
-                    buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarLong());
+                    buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarLong(),
+                    buf.readVarLong());
         }
         HudView.Endgame endgame = HudView.Endgame.NONE;
         if (buf.readBoolean()) {
@@ -566,7 +605,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                 : ContestView.NONE;
         if (!buf.readBoolean()) {
             return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, seats, removed, actor,
-                    new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, List.of(), List.of()),
+                    new HudView.Sea(rowStack, helmsman, helmDeadline, helmWindow, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
                     false, 0L, 0L, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
         }
@@ -626,7 +665,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     victimFront, victimHand);
         }
         return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, seats, removed, actor,
-                new HudView.Sea(rowStack, helmsman, helmDeadline, revealed, rowing, offer),
+                new HudView.Sea(rowStack, helmsman, helmDeadline, helmWindow, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
                 love, hate, yourTurn, actionDeadline, actionWindow, designating, designateUntil,
                 provisionTargetCard, provisionTargets, myDonatedWater,
@@ -675,14 +714,26 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * 超时时刻放服务端是因为它是权威：客户端自己算超时的话，改过的客户端可以永远不超时。
      */
     private long provisionDeadline;
+    /** 这一手本来有多长（ADR-0099 D8）：随补给箱的包发给客户端画满格。 */
+    private long provisionWindow;
     private int provisionHighlight;
 
     public long provisionDeadline() {
         return provisionDeadline;
     }
 
+    public long provisionWindow() {
+        return provisionWindow;
+    }
+
     public void setProvisionDeadline(long millis) {
         this.provisionDeadline = millis;
+    }
+
+    /** 开补给箱这一手：到点时刻与总长一起设。 */
+    public void openProvisionWindow(long millis) {
+        this.provisionDeadline = System.currentTimeMillis() + millis;
+        this.provisionWindow = millis;
     }
 
     /** 持有者最后一次上报的高亮下标。超时时认它（决策 ⑨：不是随机）。 */
@@ -696,6 +747,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void clearProvision() {
         this.provisionDeadline = 0L;
+        this.provisionWindow = 0L;
         this.provisionHighlight = 0;
     }
 
@@ -705,6 +757,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * <p>超时时刻为 0 表示窗口没开：没人划船时不开（当场翻顶牌），替身开着自动推进时也不开（ADR-0019）。
      */
     private long helmDeadline;
+    /** 这一窗本来有多长（ADR-0099 D8）。 */
+    private long helmWindow;
     private int helmHighlight;
     /**
      * 开窗那一刻的舵手（ADR-0051 B5，用户 2026-10-01 拍板）：窗口开了就不换人。
@@ -721,6 +775,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void setHelmDeadline(long millis) {
         this.helmDeadline = millis;
+    }
+
+    /** 开舵手挑牌这一窗：到点时刻与总长一起设。 */
+    public void openHelmWindow(long millis) {
+        this.helmDeadline = System.currentTimeMillis() + millis;
+        this.helmWindow = millis;
     }
 
     /** 开窗时记下舵手；窗口开着时 {@link #helmSeat} 认它。 */
@@ -744,6 +804,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void clearHelm() {
         this.helmDeadline = 0L;
+        this.helmWindow = 0L;
         this.helmHighlight = 0;
         this.helmOwner = null;
     }
@@ -754,6 +815,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * <p>❗<b>高亮在这里是个「几张」而不是「哪一张」</b>：手上三张水完全等价，没有编号可指。
      */
     private long thirstDeadline;
+    /** 这一窗本来有多长（ADR-0099 D8）。 */
+    private long thirstWindow;
     private int thirstHighlight;
 
     public long thirstDeadline() {
@@ -762,6 +825,12 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void setThirstDeadline(long millis) {
         this.thirstDeadline = millis;
+    }
+
+    /** 开口渴这一窗：到点时刻与总长一起设。 */
+    public void openThirstWindow(long millis) {
+        this.thirstDeadline = System.currentTimeMillis() + millis;
+        this.thirstWindow = millis;
     }
 
     /** 口渴的人最后一次上报的张数。超时时认它（与另外三面同一条规则）。 */
@@ -834,6 +903,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void clearThirst() {
         this.thirstDeadline = 0L;
+        this.thirstWindow = 0L;
         this.thirstHighlight = 0;
         this.thirstDonors.clear();
     }
@@ -859,6 +929,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      *
      * <p><b>默认开，不持久化</b> —— 重启回到开。对局本身都不持久化，开关比对局活得久没有意义。
      * 它挂在组件上而不是对局上：{@code playthrough-check.sh} 要在同一次起服里开着、关着各打一局。
+     * 起服时按服务端设置 {@code stand_ins.autoplay} 定初值（ADR-0099 D7，默认仍是开）；指令照旧能在这一次运行里改（ADR-0019）。
      */
     private boolean dummyAutoplay = true;
 
@@ -871,19 +942,75 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     /**
-     * 替身随机行动（{@code /seas dummy random on}，用户 2026-10-07）：自动推进开着时，替身不再一律「什么也不做 · 同意 ·
-     * 不加入 · 不押」，而是照模拟器的分布随机动（{@code StandInPlay}）。
+     * 替身怎么拿主意（{@code /seas dummy random|smart|llm}，用户 2026-10-07）：自动推进开着时，替身不再一律「什么也不做 · 同意 ·
+     * 不加入 · 不押」—— {@link StandInMind#RANDOM} 照模拟器的分布随机动（{@code StandInPlay}），
+     * {@link StandInMind#SMART} / {@link StandInMind#LLM} 按这一座看得见的局面想（{@code StandInMinds}）。
      *
-     * <p><b>默认关，不持久化</b>：回归脚本都按「替身什么也不做」写，开着就全红了；与 {@link #dummyAutoplay} 同一个理由挂在组件上。
+     * <p><b>默认 {@link StandInMind#IDLE}，不持久化</b>：回归脚本都按「替身什么也不做」写，开着就全红了；与 {@link #dummyAutoplay} 同一个理由挂在组件上。
+     * 起服时按服务端设置 {@code stand_ins.mind} 定初值（默认「什么也不做」，经 {@link #setDummyMind}）；这一次运行里由指令说了算。
      */
-    private boolean dummyRandom = false;
+    private StandInMind dummyMind = StandInMind.IDLE;
 
-    public boolean dummyRandom() {
-        return dummyRandom;
+    public StandInMind dummyMind() {
+        return dummyMind;
     }
 
+    public void setDummyMind(StandInMind mind) {
+        this.dummyMind = Objects.requireNonNull(mind, "mind");
+    }
+
+    /**
+     * 替身是不是在<b>随机</b>地动（{@link StandInMind#RANDOM}）—— 只给那几条「随机数怎么摇」的路问。
+     * 问「替身会不会动」（拍子、尾巴、演示局不限时）一律用 {@link #standInsAct()}。
+     */
+    public boolean dummyRandom() {
+        return dummyMind == StandInMind.RANDOM;
+    }
+
+    /**
+     * 随机开关（{@code /seas dummy random on|off}）。关掉时只关「随机」：别的脑子（动脑 · 大模型）不受这一下影响。
+     */
     public void setDummyRandom(boolean on) {
-        this.dummyRandom = on;
+        if (on) {
+            this.dummyMind = StandInMind.RANDOM;
+        } else if (dummyMind == StandInMind.RANDOM) {
+            this.dummyMind = StandInMind.IDLE;
+        }
+    }
+
+    /** 替身会自己动（脑子不是 {@link StandInMind#IDLE}）。原先问 {@code dummyRandom()} 而意思是「替身会动」的地方都问它。 */
+    public boolean standInsAct() {
+        return dummyMind.acts();
+    }
+
+    /**
+     * 「动脑」与「大模型」两种替身用的随机种子（每局一个）：开局时由开局那一串种子派生（{@code GameFlow#start}），
+     * 指定了种子的一局，动脑的替身也照样可复现。❗不从 {@link #gameRandom} 里取 —— 那条流是「天意」（抢到哪一张手牌）用的，
+     * 多取一次就改了天意，同一个种子打出的局就跟着变了。
+     */
+    private long standInSeed = new java.util.Random().nextLong();
+
+    public long standInSeed() {
+        return standInSeed;
+    }
+
+    public void setStandInSeed(long seed) {
+        this.standInSeed = seed;
+    }
+
+    /**
+     * 大模型那一种脑子只给哪几座（{@code /seas dummy llm seats}）；空 = 每一座替身都问大模型。不在里面的替身照动脑那一层走。
+     * 与 {@link #dummyMind} 一样不持久化、跨局留着（开发期的开关，不是对局的一部分）。
+     */
+    private final java.util.Set<CharacterId> llmSeats = new java.util.LinkedHashSet<>();
+
+    public java.util.Set<CharacterId> llmSeats() {
+        return java.util.Set.copyOf(llmSeats);
+    }
+
+    public void setLlmSeats(java.util.Collection<CharacterId> seats) {
+        llmSeats.clear();
+        llmSeats.addAll(seats);
     }
 
     /** 随机行动的快档（{@code /seas dummy random on fast}）：调试用，替身几乎不停顿。默认慢档（用户 2026-10-07「demo 玩家不要出牌太快」）。 */
@@ -903,9 +1030,13 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     /**
      * 演示局里真人不限时（用户 2026-10-07：「demo 局里真人不限时」）：替身随机行动开着、名单里有替身也有真人。
      * 只认随机开关开着的局 —— 回归脚本都关着它跑，那几条「超时替你选」的路照旧测得到。
+     *
+     * <p>再加一道显式的开关（ADR-0099 D7 · 服务端设置 {@code demo.untimed_humans}，开局快照进 {@link #timing}）：
+     * 默认开，与原先「四条都成立就不限时」一模一样；关掉之后随机替身的局照样限时。
+     * ❗原先正式局不会变成不限时，只靠「随机默认关、不持久化」（ADR-0097）—— 随机的默认值进了设置之后，那道闸要靠这一项。
      */
     public boolean demoNoTimeout() {
-        return dummyAutoplay && dummyRandom && anyHumanSeated()
+        return timing.untimedDemo() && dummyAutoplay && standInsAct() && anyHumanSeated()
                 && occupants.values().stream().anyMatch(Occupant::isDummy);
     }
 
@@ -1013,6 +1144,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void begin(Session started, Map<CharacterId, Occupant> seats, Set<UUID> audience) {
         overboardDeadline = 0;
+        overboardWindow = 0;
+        timing = GameTiming.DEFAULTS;         // 开局方随后按服务端设置换成这一局的快照（GameFlow.start）
         setWaterBodies(List.of(), 0);
         clearDesignation();
         clearProvisionTarget();
@@ -1036,6 +1169,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         steps.clear();
         debugEntries.clear();
         gameRandom = new java.util.Random();
+        // 开局方随后按开局种子换成可复现的那一个（GameFlow.start）。❗不从 gameRandom 里取：那条流一个数都不能多摇
+        standInSeed = new java.util.Random().nextLong();
     }
 
     // ------------------------------------------------------------------ 调试留痕（ADR-0060）
@@ -1349,6 +1484,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     public void end() {
         overboardDeadline = 0;
+        overboardWindow = 0;
         setWaterBodies(List.of(), 0);
         occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
         endedFor.addAll(activeVoyagePlayers);             // 结束那一帧只发给这一局的人（同 shouldSyncWith）

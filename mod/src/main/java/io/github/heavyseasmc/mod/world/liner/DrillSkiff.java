@@ -2,6 +2,7 @@ package io.github.heavyseasmc.mod.world.liner;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.config.ServerSettings;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
 import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.data.VoyageLayout;
@@ -199,14 +200,23 @@ public final class DrillSkiff {
         return null;
     }
 
-    /** 坐在演习艇里的人要开航（再右键艇 · 敲钟）：6–8 人就给他开阵容面板，不够 / 太多就报已入座几人。 */
+    /**
+     * 这一局开几人局：入座的人数；不到 6 人而服务端设置开了替身补位（{@code stand_ins.fill_empty_seats}，ADR-0099 §2.4）时补到 6 ——
+     * 补上的座位由开局那一步当替身坐（{@code GameFlow.start}：「没人占的座位一律是 dummy」，与 {@code /seas start} 同一条路）。
+     */
+    static int voyageSize(int seated, boolean fill) {
+        return fill && seated >= 1 && seated < 6 ? 6 : seated;
+    }
+
+    /** 坐在演习艇里的人要开航（再右键艇 · 敲钟）：6–8 人（或开了补位）就给他开阵容面板，不够 / 太多就报已入座几人。 */
     private static ActionResult openRoster(ServerPlayerEntity player, Rig rig, List<SeatEntity> seats) {
         List<ServerPlayerEntity> registered = registered(seats);
-        if (registered.size() < 6 || registered.size() > 8) {
+        int players = voyageSize(registered.size(), ServerSettings.fillEmptySeats());
+        if (players < 6 || players > 8) {
             player.sendMessage(Text.translatable("heavyseas.lobby.need_players", registered.size()), true);
             return ActionResult.FAIL;
         }
-        ServerPlayNetworking.send(player, RosterConfigS2C.from(rig.anchor().asLong(), registered.size(),
+        ServerPlayNetworking.send(player, RosterConfigS2C.from(rig.anchor().asLong(), players,
                 GameDataLoader.require().roster()));
         return ActionResult.SUCCESS;
     }
@@ -222,13 +232,14 @@ public final class DrillSkiff {
         }
         Rig rig = found.get();
         List<ServerPlayerEntity> registered = registered(ensureSeats(rig));
-        if (registered.size() < 6 || registered.size() > 8) {
+        int players = voyageSize(registered.size(), ServerSettings.fillEmptySeats());
+        if (players < 6 || players > 8) {
             player.sendMessage(Text.translatable("heavyseas.lobby.need_players", registered.size()), true);
             return;
         }
         // 被拒的几种情况各说一句按语言走的话（ADR-0095 A8）：原先抛中文异常、把异常信息直接发给玩家，英文客户端也是中文
         List<CharacterId> selected = request.characters().stream().map(CharacterId::of).toList();
-        if (selected.size() != registered.size()) {
+        if (selected.size() != players) {
             // 开着阵容面板时有人起身或坐下：面板里的人数是打开那一刻的
             player.sendMessage(Text.translatable("heavyseas.lobby.roster_mismatch", registered.size(), selected.size()), true);
             return;
@@ -241,8 +252,9 @@ public final class DrillSkiff {
         try {
             GameDataLoader.require().roster().select(selected);
             rig.world().playSound(null, BlockPos.ofFloored(rig.seats().getFirst()), SoundEvents.BLOCK_BELL_USE, SoundCategory.BLOCKS, 1f, 1f);
-            LOGGER.info("演习艇：{} 人入座，敲钟开局", registered.size());
-            MistSea.startVoyage(player.server, registered.size(), registered, Set.of(), selected);
+            LOGGER.info("演习艇：{} 人入座，敲钟开局{}", registered.size(),
+                    players > registered.size() ? " · 替身补 " + (players - registered.size()) + " 座（服务端设置 stand_ins.fill_empty_seats）" : "");
+            MistSea.startVoyage(player.server, players, registered, Set.of(), selected);
         } catch (RuntimeException failure) {
             LOGGER.warn("演习艇：开局被拒：{}", failure.getMessage());   // 异常信息留在日志里
             player.sendMessage(Text.translatable("heavyseas.lobby.start_failed"), true);

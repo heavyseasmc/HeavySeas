@@ -31,7 +31,8 @@ import java.util.Optional;
  * <h2>三条路</h2>
  * <ul>
  *   <li>划船堆空，或者没有清醒的舵手 → 当场翻顶牌。<b>舵手一面不出现</b>（ADR-0018 §7.4）；</li>
- *   <li>替身当舵手、自动推进开着 → 当场挑第一张；</li>
+ *   <li>替身当舵手、自动推进开着 → 当场挑第一张（随机行动开着时随机挑；动脑 / 大模型开着时开一扇照局里时限的窗，
+ *       它想好了就挑，{@link StandInMinds#helm}）；</li>
  *   <li>其余（真人舵手；替身舵手而开关关着）→ 开 12 秒窗口，超时认当前高亮。</li>
  * </ul>
  *
@@ -40,7 +41,7 @@ import java.util.Optional;
  */
 public final class NavigationPhase {
 
-    /** 舵手挑牌的时限（用户 2026-09-15 定 12 秒；2026-10-07 改 20 秒：决策窗口一律至少 20 秒）。 */
+    /** 舵手挑牌的时限（用户 2026-09-15 定 12 秒；2026-10-07 改 20 秒：决策窗口一律至少 20 秒）。默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。 */
     public static final long PICK_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
@@ -92,6 +93,18 @@ public final class NavigationPhase {
         int stack = session.table().rowStack().size();
         GameFlow.broadcast(world, Text.translatable("heavyseas.game.helmsman_picks",
                 GameFlow.characterName(helm), stack));
+        if (who.isDummy() && component.dummyAutoplay() && StandInMinds.thinks(component)) {
+            // 动脑 / 大模型：开一扇照局里时限的窗（不是「等真人」的那一种），它想好了就挑（resolveForStandIn）；
+            // 想不出来到点照旧认高亮（第一张）。窗开着时 begin 再被调一次也会直接返回，不会多开一扇。
+            long pickMs = component.timing().helmPickMs();
+            component.openHelmWindow(pickMs);
+            component.setHelmOwner(helm);
+            component.setHelmHighlight(0);
+            LOGGER.info("舵手（替身）：{} 在想从划船堆 {} 张里挑哪一张", helm.value(), stack);
+            GameComponents.sync(world);
+            StandInMinds.helm(world, component, helm);
+            return;
+        }
         if (who.isDummy() && component.dummyAutoplay()) {
             // 随机行动开着时随机挑（StandInPlay，用户 2026-10-07），关着时挑第 1 张（回归脚本按这个写）
             int pick = component.dummyRandom() && stack > 1 ? component.gameRandom().nextInt(stack) : 0;
@@ -99,11 +112,12 @@ public final class NavigationPhase {
             resolve(world, component, pick);
             return;
         }
-        component.setHelmDeadline(System.currentTimeMillis() + component.humanWindow(PICK_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
+        long pickMs = component.timing().helmPickMs();   // 开局快照（ADR-0099 D8）
+        component.openHelmWindow(component.humanWindow(pickMs));   // 演示局里等真人不限时（用户 2026-10-07）
         component.setHelmOwner(helm);         // 窗口开了就不换人（ADR-0051 B5）：之后掉线 / 重连都认这一位
         component.setHelmHighlight(0);        // 高亮一进界面就在第一张：它是「你的默认答案」
         LOGGER.info("舵手挑牌：{}（{}）· 划船堆 {} 张 · {} 秒", helm.value(), who.isDummy() ? "替身" : "真人",
-                stack, PICK_MILLIS / 1000);
+                stack, pickMs / 1000);
         GameComponents.sync(world);           // 划船堆的牌只进舵手那一包；其余人拿到的是张数与倒计时
     }
 
@@ -168,6 +182,13 @@ public final class NavigationPhase {
                 .map(GameComponent.Occupant::player)
                 .map(uuid -> world.getServer().getPlayerManager().getPlayer(uuid))
                 .ifPresent(player -> ServerPlayNetworking.send(player, new HelmAutoPickS2C(index)));
+    }
+
+    /** 动脑 / 大模型的替身舵手想好了：与界面那条路同一个收尾（{@link #resolve}）。 */
+    static void resolveForStandIn(ServerWorld world, GameComponent component, int index) {
+        CharacterId helm = component.helmSeat(component.requireSession().state()).orElseThrow();
+        LOGGER.info("舵手（替身）：{} 挑了第 {} 张", helm.value(), index + 1);
+        resolve(world, component, index);
     }
 
     private static void resolve(ServerWorld world, GameComponent component, int index) {

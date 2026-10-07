@@ -1,7 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.engine.state.Phase;
-import io.github.heavyseasmc.mod.game.OverboardPhase;
 import io.github.heavyseasmc.mod.net.CardActionC2S;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.state.TableView;
@@ -147,8 +146,9 @@ public final class CardChoiceScreen extends GameScreen {
                         x, y, w, h);
             }
         });
-        Countdown countdown = token > 0 ? new Countdown(GameComponents.of(client.world).tableView().deadline(),
-                OverboardPhase.CHOOSE_MILLIS, 0) : null;
+        // 总长取投影（ADR-0099 D8：时限可配，不再用编译进去的常量）
+        TableView table = GameComponents.of(client.world).tableView();
+        Countdown countdown = token > 0 ? new Countdown(table.deadline(), table.window(), 0) : null;
         // 落海那一窗：Esc 只收起（金签上按 G 回来），「不用」是那一排最后一格；赠送：Esc 取消
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
                 hasPass() ? List.of(confirm("Enter")) : List.of(confirm("Enter"), keys("cancel", "Esc")),

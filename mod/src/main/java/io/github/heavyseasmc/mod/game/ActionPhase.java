@@ -43,14 +43,15 @@ import java.util.Optional;
  *
  * <h2>替身</h2>
  * 自动推进开着时，轮到替身由 {@link #autoPass} 替它「什么也不做」（ADR-0019）；关着时照旧由 {@code /seas} 驱动 ——
- * 出口验收（{@code playthrough-check.sh}）关着开关打的那一局靠的就是它。
+ * 出口验收（{@code playthrough-check.sh}）关着开关打的那一局靠的就是它。替身的脑子换成随机 / 动脑 / 大模型时，
+ * 它走的也是下面这几个「…ForStandIn」—— 与真人那条路同一套播报、窗口与收尾（{@link StandInPlay} · {@link StandInMinds}）。
  */
 public final class ActionPhase {
 
-    /** 行动主界面：留一分钟谈判，超时按 Pass。 */
+    /** 行动主界面：留一分钟谈判，超时按 Pass。默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。 */
     public static final long ACTION_MILLIS = 60_000L;
 
-    /** 划船选一张：牌已经看见，只给较短的保底窗口。 */
+    /** 划船选一张：牌已经看见，只给较短的保底窗口。默认值，同上。 */
     public static final long ROW_MILLIS = 20_000L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
@@ -294,7 +295,7 @@ public final class ActionPhase {
             Session session = component.requireSession();
             List<NavigationCard> drawn = session.beginRow(who);
             if (session.rower().isPresent()) {
-                component.openActionWindow(component.humanWindow(ROW_MILLIS));   // 演示局里等真人不限时（用户 2026-10-07）
+                component.openActionWindow(component.humanWindow(component.timing().rowMs()));   // 演示局里等真人不限时（用户 2026-10-07）
             }
             GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
             if (session.rower().isEmpty()) {
@@ -413,7 +414,50 @@ public final class ActionPhase {
             StandInPlay.takeTurn(world, component, dummy);   // 演示局：随机做一件事（用户 2026-10-07）
             return;
         }
+        if (StandInMinds.thinks(component)) {
+            // 动脑 / 大模型：通常轮到它那一刻就开始想了（GameFlow.announceTurn）；走到这里的是开关刚打开时补排的那一位
+            StandInMinds.beginTurn(world, component, dummy, System.currentTimeMillis());
+            return;
+        }
         passForStandIn(world, component, dummy);
+    }
+
+    /** 替身喝一口酒（动脑 / 大模型）：与手牌一面「打出」一瓶酒同一个调用（{@link #onUseProvision}），之后推一次投影。 */
+    static void drinkForStandIn(ServerWorld world, GameComponent component, CharacterId who, String cardId) {
+        component.requireSession().drinkRum(who, cardId);
+        LOGGER.info("喝酒（替身）：{} 喝了 {}", who.value(), cardId);
+        GameComponents.sync(world);
+    }
+
+    /**
+     * 替身划船第一步（动脑 / 大模型）：抽 2 张，开划船那一扇窗，等它想好留哪一张（{@link #chooseRowForStandIn}）。
+     * 与界面那条路（{@link #beginRow}）同一套播报与收尾；窗口按局里的划船时限开（不是「等真人」的那一种）——
+     * 想不出来到点照旧整组塞回牌堆底。
+     *
+     * @return 还在等它挑（牌堆空到一张都抽不出来时，引擎当场结束这次划船，这里已经收尾，返回 {@code false}）
+     */
+    static boolean beginRowForStandIn(ServerWorld world, GameComponent component, CharacterId who) {
+        Session session = component.requireSession();
+        List<NavigationCard> drawn = session.beginRow(who);
+        if (session.rower().isPresent()) {
+            component.openActionWindow(component.timing().rowMs());
+        }
+        GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
+        if (session.rower().isEmpty()) {
+            finishRow(world, component, who);
+            return false;
+        }
+        LOGGER.info("划船（替身）：{} 抽了 {} 张，在想留哪一张", who.value(), drawn.size());
+        GameComponents.sync(world);
+        return true;
+    }
+
+    /** 替身划船第二步：留第 {@code index} 张，其余塞回牌堆底，这次行动随即结束。与界面那条路（{@link #onRowDecision}）同一套。 */
+    static void chooseRowForStandIn(ServerWorld world, GameComponent component, CharacterId who, int index) {
+        Session session = component.requireSession();
+        int returned = session.chooseRow(index);
+        LOGGER.info("划船（替身）：{} 选第 {} 张留进划船堆，其余 {} 张塞回牌堆底", who.value(), index + 1, returned);
+        finishRow(world, component, who);
     }
 
     /** 替身「什么也不做」：自动推进的默认，也是随机行动里那一格与被拒之后的退路。 */
@@ -463,6 +507,45 @@ public final class ActionPhase {
         }
         if (effect instanceof ProvisionEffect.PreventThirst && g.stateOf(actor).isOpen(cardId)) {
             return false;                     // 已经撑开了，再撑一次只是白花一个行动
+        }
+        if (effect instanceof ProvisionEffect.HealAll heal && heal.requiresCorpse()
+                && g.onBoatBySeat().stream().noneMatch(id -> g.conditionOf(id) == Condition.DEAD)) {
+            return false;
+        }
+        useUntargeted(world, component, actor, cardId, effect);
+        return true;
+    }
+
+    /**
+     * 动脑 / 大模型的替身打一张特殊行动牌：医疗箱治<b>它挑的</b>那个人（{@code Legal#actions} 给的每一种用法各一项），
+     * 其余与 {@link #playForStandIn(ServerWorld, GameComponent, CharacterId, String)} 同一套处理器。
+     * 随机替身那一条不动（它照模拟器治第一个受了伤的人）。
+     *
+     * @return 前提满足、真的打出去了吗（目标已不能治 · 伞已撑开 · 绝境没有尸体，都返回 {@code false} 且什么都没动）
+     */
+    static boolean playForStandIn(ServerWorld world, GameComponent component, CharacterId actor, String cardId,
+                                  Optional<CharacterId> target) {
+        Session session = component.requireSession();
+        var g = session.state();
+        ProvisionEffect effect = session.provisions().get(cardId).effect();
+        if (effect instanceof ProvisionEffect.Heal) {
+            if (target.isEmpty()) {
+                return false;
+            }
+            CharacterId t = target.get();
+            if (!g.bySeat().contains(t) || g.isRemoved(t) || g.conditionOf(t) == Condition.DEAD
+                    || g.stateOf(t).damage() <= 0) {
+                return false;
+            }
+            session.useMedicalKit(actor, t, cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.healed",
+                    GameFlow.characterName(actor), GameFlow.characterName(t)));
+            LOGGER.info("特殊物资（替身）：{} 用 {} 治了 {}", actor.value(), cardId, t.value());
+            GameFlow.finishAction(world, component, actor);
+            return true;
+        }
+        if (effect instanceof ProvisionEffect.PreventThirst && g.stateOf(actor).isOpen(cardId)) {
+            return false;
         }
         if (effect instanceof ProvisionEffect.HealAll heal && heal.requiresCorpse()
                 && g.onBoatBySeat().stream().noneMatch(id -> g.conditionOf(id) == Condition.DEAD)) {

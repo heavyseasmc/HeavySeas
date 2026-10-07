@@ -1,7 +1,6 @@
 package io.github.heavyseasmc.mod.client;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
-import io.github.heavyseasmc.mod.game.ProvisionPhase;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
 import io.github.heavyseasmc.mod.state.HudView;
@@ -325,8 +324,7 @@ public final class ProvisionScreen extends GameScreen {
             drawTip(context, l, offer.get(highlight));
         }
         drawFootBand(context, b, List.of(keys("swap_card", "←", "→")), inspectHints("keep"), now,
-                new Countdown(data.deadlineMs(),
-                        ProvisionPhase.windowMillis(data.offer().size()), l.rowW()));
+                new Countdown(data.deadlineMs(), data.windowMs(), l.rowW()));   // 总长随包来（ADR-0099 D8：时限可配）
     }
 
     /**
