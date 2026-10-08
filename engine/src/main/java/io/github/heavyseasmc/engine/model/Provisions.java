@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.engine.model;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,10 @@ public final class Provisions {
         if (map.isEmpty()) {
             throw new IllegalArgumentException("物资目录不能为空");
         }
-        this.byId = Map.copyOf(map);
+        // 保序（审查 2026-10-08 Q4）：原先是 Map.copyOf，all() / ids() 的次序带着每次起 JVM 都不同的盐，
+        // 与「按目录顺序」的注释对不上。现有的使用方都与次序无关（取最大、求和、查有没有），
+        // 改了只让报错次序与发给客户端的目录次序固定下来。
+        this.byId = Collections.unmodifiableMap(map);
         this.deck = List.copyOf(expanded);
     }
 
@@ -58,7 +62,7 @@ public final class Provisions {
         return byId.containsKey(id);
     }
 
-    /** id 全集。 */
+    /** id 全集，按目录顺序。 */
     public Set<String> ids() {
         return byId.keySet();
     }

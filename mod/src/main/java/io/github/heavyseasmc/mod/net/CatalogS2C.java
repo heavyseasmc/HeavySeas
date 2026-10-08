@@ -166,17 +166,36 @@ public record CatalogS2C(List<Provisions> provisions, List<Characters> character
         }
     }
 
+    /** 一个包里最多几种物资 / 几个角色 / 几种天候。角色的上限阵容面板那个包（{@link RosterConfigS2C}）也用它。 */
+    public static final int MAX_PROVISIONS = 64;
+    public static final int MAX_CHARACTERS = 32;
+    public static final int MAX_WEATHERS = 64;
+
     public static final Id<CatalogS2C> ID = new Id<>(Identifier.of(HeavySeasMod.MOD_ID, "catalog"));
     public static final PacketCodec<RegistryByteBuf, CatalogS2C> CODEC = PacketCodec.tuple(
-            Provisions.CODEC.collect(PacketCodecs.toList(64)), CatalogS2C::provisions,
-            Characters.CODEC.collect(PacketCodecs.toList(32)), CatalogS2C::characters,
-            Weathers.CODEC.collect(PacketCodecs.toList(64)), CatalogS2C::weathers,
+            Provisions.CODEC.collect(PacketCodecs.toList(MAX_PROVISIONS)), CatalogS2C::provisions,
+            Characters.CODEC.collect(PacketCodecs.toList(MAX_CHARACTERS)), CatalogS2C::characters,
+            Weathers.CODEC.collect(PacketCodecs.toList(MAX_WEATHERS)), CatalogS2C::weathers,
             CatalogS2C::new);
 
+    /**
+     * ❗超上限在造包这一刻就拒（审查 2026-10-07 U8）：编码在网络线程上异步做，造好的包到那时才编码失败，调用方接不住，
+     * 收包的人被踢下线。在这里抛，调用方（进服那一下）的 try 才接得住。
+     */
     public CatalogS2C {
         provisions = List.copyOf(provisions);
         characters = List.copyOf(characters);
         weathers = List.copyOf(weathers);
+        requireAtMost("物资", provisions.size(), MAX_PROVISIONS);
+        requireAtMost("角色", characters.size(), MAX_CHARACTERS);
+        requireAtMost("天候", weathers.size(), MAX_WEATHERS);
+    }
+
+    /** 一份列表的张数不超过包能装的上限。{@link RosterConfigS2C} 也用。 */
+    static void requireAtMost(String what, int size, int max) {
+        if (size > max) {
+            throw new IllegalArgumentException("数据包里的%s有 %d 个，超过一个包能装的 %d 个".formatted(what, size, max));
+        }
     }
 
     /** 从正式数据构造。类别名用小写的枚举名 —— 客户端拿它拼 {@code heavyseas.category.<类别>}。 */

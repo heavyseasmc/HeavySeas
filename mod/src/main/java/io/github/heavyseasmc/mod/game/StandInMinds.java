@@ -235,6 +235,11 @@ public final class StandInMinds {
             public long now() {
                 return System.currentTimeMillis();
             }
+
+            @Override
+            public void fail(String what, RuntimeException error) {
+                GameFlow.abort(world, component, what, error);   // 与排程里的一步出错同一条（审查 2026-10-07 Q4）
+            }
         };
     }
 
@@ -262,7 +267,13 @@ public final class StandInMinds {
         StandInThinker.Spec<T> spec = new StandInThinker.Spec<>(host(p.world(), component), session, p.key(),
                 p.seat().value(), mind, p.what(), opened, p.applyNotBefore(), budget + THINK_SLACK_MS, p.open(),
                 p.stillLegal(), () -> thinks(component), p.apply(), p.idle(), p.describe());
-        return StandInThinker.decide(spec, () -> think(p, policy, seat.rng(), snap, names, llm, askBy));
+        boolean started = StandInThinker.decide(spec, () -> think(p, policy, seat.rng(), snap, names, llm, askBy));
+        if (!started) {
+            // 审查 2026-10-07 Q4：同一个决定已经在想（名字撞上了）—— 原先只有补给箱那一处接了返回值，别处静默；
+            //   接力在这里断掉时，日志里至少有这一行说清是哪一个
+            LOGGER.info("替身决定：{} 的「{}」这个决定已经在想了，不再开一次（{}）", p.seat().value(), p.what(), p.key());
+        }
+        return started;
     }
 
     /**
@@ -351,8 +362,9 @@ public final class StandInMinds {
         return all.size();
     }
 
+    /** 还是这一局，而且还没进终局（调试靠岸时站队 · 落海那几扇窗刚被收掉，在路上的那一手不能再落到已经算完分的局面上，审查 R7）。 */
     private static boolean sameGame(GameComponent component, Session session) {
-        return component.session().map(s -> s == session).orElse(false);
+        return component.session().map(s -> s == session).orElse(false) && component.endgame().isEmpty();
     }
 
     private static boolean isDummy(GameComponent component, CharacterId who) {
@@ -480,7 +492,7 @@ public final class StandInMinds {
                     row(t);
                 }
             }
-            case ActionChoice.Declare d -> ContestPhase.declare(t.world(), t.component(), t.dummy(), d.kind(), d.target());
+            case ActionChoice.Declare d -> StandInDesignation.begin(t.world(), t.component(), t.dummy(), d.kind(), d.target());
             case ActionChoice.Play play -> {
                 if (!ActionPhase.playForStandIn(t.world(), t.component(), t.dummy(), play.card(), play.target())) {
                     ActionPhase.passForStandIn(t.world(), t.component(), t.dummy());
@@ -746,6 +758,9 @@ public final class StandInMinds {
 
     /** 挑牌的默认（与超时同一个）：他手里有牌就随机摸一张，没有就拿面前第一张。 */
     private static void defaultPick(ServerWorld world, GameComponent component, Session session) {
+        if (ContestPhase.endPickIfNothingToTake(world, component)) {
+            return;                                   // 被抢方身上已经没有能挑的（审查 C1 的兜底，见那个方法）
+        }
         Contest c = session.contest().orElseThrow();
         if (!session.state().stateOf(c.target()).hand().isEmpty()) {
             ContestPhase.pickFromHand(world, component);
@@ -819,11 +834,31 @@ public final class StandInMinds {
         }
     }
 
-    /** 这一轮口渴还是问到这个人这一步（而且没有给真人开的窗口）。 */
-    private static boolean samePrompt(GameComponent component, Session session, Session.ThirstPrompt prompt, int turn) {
-        return sameGame(component, session) && session.state().turn() == turn && component.thirstDeadline() <= 0
-                && session.thirstPending().map(p -> p.who().equals(prompt.who()) && p.remaining() == prompt.remaining()
-                && p.waterPerSource() == prompt.waterPerSource()).orElse(false);
+    /**
+     * 「问到的是哪一轮口渴」：第几天 · 结算哪一张航海牌（狂风天一天两张）· 问到谁 · 每次几张水。
+     *
+     * <p>❗审查 2026-10-07 K2：原先拿「还要化解几次」当身份 —— 替身在想时别人喝了一口酒，陪酒女被带上酒后口渴，
+     * 这个数一变，这一手就被当成「决定已经不在了」作废；而这一段没开窗、没有超时，也没人再往下推，整局停住。
+     * 「还要化解几次」是这一轮的<b>账</b>，不是这一轮的<b>身份</b>：账变了照这一刻的账算（{@link #donors} 现取），身份不变。
+     */
+    record ThirstKey(int turn, Optional<NavigationCard> card, CharacterId who, int waterPerSource) {
+    }
+
+    static ThirstKey thirstKey(Session session, Session.ThirstPrompt prompt) {
+        return new ThirstKey(session.state().turn(), session.navigatedThisTurn(), prompt.who(), prompt.waterPerSource());
+    }
+
+    /**
+     * 这一轮口渴还是问到这个人这一步。
+     *
+     * @param window {@code false} = 替身自己接力的那一段（没有给真人开的窗口）；{@code true} = 真人的口渴窗口开着，替身在窗口里递水（R4）
+     */
+    static boolean samePrompt(GameComponent component, Session session, ThirstKey key, boolean window) {
+        return sameGame(component, session) && session.state().turn() == key.turn()
+                && (window ? component.thirstDeadline() > 0 : component.thirstDeadline() <= 0)
+                && session.navigatedThisTurn().equals(key.card())
+                && session.thirstPending().map(p -> p.who().equals(key.who())
+                && p.waterPerSource() == key.waterPerSource()).orElse(false);
     }
 
     /** 船上有没有还拿得出一次水的替身（本人除外），可以替他递。 */
@@ -840,25 +875,27 @@ public final class StandInMinds {
      */
     static void thirst(ServerWorld world, GameComponent component, Session.ThirstPrompt prompt, boolean askDrinker) {
         Session session = component.requireSession();
-        int turn = session.state().turn();
+        ThirstKey key = thirstKey(session, prompt);
         CharacterId who = prompt.who();
         int per = prompt.waterPerSource();
         if (!askDrinker) {
-            donors(world, component, session, prompt, turn, new ThirstRound(0, false, new LinkedHashMap<>()));
+            donors(world, component, session, key, new ThirstRound(0, false, new LinkedHashMap<>()));
             return;
         }
         int ownUnits = Legal.ownWaterUnits(session, who, per);
         int maxOwn = Math.min(ownUnits, prompt.remaining());
-        decide(new Point<Integer, WaterPlan>(world, component, who, "口渴", "thirst:" + turn + ":" + who.value(),
+        decide(new Point<Integer, WaterPlan>(world, component, who, "口渴", "thirst:" + key.turn() + ":" + who.value(),
                 DecisionKind.THIRST, now(), 0L, ownUnits, (p, v, l, r) -> p.drinkWater(v, l, r),
                 (v, l, n) -> askThirst(v, Math.min(l, v.thirst().map(SeatView.ThirstInfo::remaining).orElse(l)), n),
-                () -> samePrompt(component, session, prompt, turn),
-                plan -> plan != null && plan.units() >= 0 && plan.units() <= maxOwn,
-                plan -> donors(world, component, session, prompt, turn,
+                () -> samePrompt(component, session, key, false),
+                // 自己的水够几次就最多喝几次；这一轮的账变了（别人喝酒带上口渴）也照这一刻的账结算，多出来的由结算那一下夹掉
+                plan -> plan != null && plan.units() >= 0 && plan.units() <= ownUnits,
+                plan -> donors(world, component, session, key,
                         new ThirstRound(plan.units(), plan.askHelp(), new LinkedHashMap<>())),
                 // 「什么也不做」那一档：喝够（替身原先就这样，界面上的高亮默认也是它）
-                () -> donors(world, component, session, prompt, turn,
-                        new ThirstRound(maxOwn, false, new LinkedHashMap<>())),
+                () -> donors(world, component, session, key,
+                        new ThirstRound(Math.min(ownUnits, session.thirstPending().map(Session.ThirstPrompt::remaining)
+                                .orElse(maxOwn)), false, new LinkedHashMap<>())),
                 plan -> "化解 " + plan.units() + " 次"
                         + (plan.units() < prompt.remaining() && plan.askHelp() ? "，开口要水" : "")));
     }
@@ -873,7 +910,15 @@ public final class StandInMinds {
 
     /** 依座位问还有水的替身递不递（每次只问还差的那几次），问完一起结算。 */
     private static void donors(ServerWorld world, GameComponent component, Session session,
-                               Session.ThirstPrompt prompt, int turn, ThirstRound round) {
+                               ThirstKey key, ThirstRound round) {
+        // 账按这一刻的算（K2）：想的那几秒里有人喝了酒、陪酒女多渴了一次，还差几次就跟着变
+        Session.ThirstPrompt prompt = samePrompt(component, session, key, false)
+                ? session.thirstPending().orElse(null) : null;
+        if (prompt == null) {
+            LOGGER.info("口渴（替身）：{} 这一轮已经被别的路结算了（指令 · 收场），接力停在这里", key.who().value());
+            return;
+        }
+        int turn = key.turn();
         CharacterId who = prompt.who();
         int per = prompt.waterPerSource();
         int shortUnits = prompt.remaining() - round.ownUnits() - round.donatedUnits();
@@ -888,7 +933,7 @@ public final class StandInMinds {
             }
         }
         if (giver == null) {
-            settleThirst(world, component, session, prompt, turn, round);
+            settleThirst(world, component, session, key, round);
             return;
         }
         CharacterId donor = giver;
@@ -899,31 +944,98 @@ public final class StandInMinds {
                 "donate:" + turn + ":" + who.value() + ":" + donor.value(), DecisionKind.GIVE_WATER, now(), 0L, max,
                 (p, v, l, r) -> p.donateWater(v, who, shortUnits, myUnits, round.askHelp(), donatedSoFar, r),
                 (v, l, n) -> SeatQuestions.donate(v, who, l, n),
-                () -> samePrompt(component, session, prompt, turn),
+                () -> samePrompt(component, session, key, false),
                 units -> units != null && units >= 0 && units <= Math.min(session.watersOf(donor) / per, shortUnits),
                 units -> {
                     round.donated().put(donor, units);
-                    donors(world, component, session, prompt, turn, round);
+                    donors(world, component, session, key, round);
                 },
                 () -> {
                     round.donated().put(donor, 0);
-                    donors(world, component, session, prompt, turn, round);
+                    donors(world, component, session, key, round);
                 },
                 units -> units == 0 ? "不递" : "递 " + units * per + " 张给 " + who.value()));
     }
 
     private static void settleThirst(ServerWorld world, GameComponent component, Session session,
-                                     Session.ThirstPrompt prompt, int turn, ThirstRound round) {
-        if (!samePrompt(component, session, prompt, turn)) {
+                                     ThirstKey key, ThirstRound round) {
+        if (!samePrompt(component, session, key, false)) {
+            LOGGER.info("口渴（替身）：{} 这一轮已经被别的路结算了，替身那一轮不再结一次", key.who().value());
             return;
         }
-        int per = prompt.waterPerSource();
+        int per = key.waterPerSource();
         round.donated().forEach((donor, units) -> {
             for (int i = 0; i < units * per; i++) {
                 ThirstPhase.donateForStandIn(world, component, donor);
             }
         });
         ThirstPhase.resolveForStandIn(world, component, round.ownUnits() * per);
+    }
+
+    /**
+     * 真人的口渴窗口开着（口渴的是真人，或是自己定不了、但有真人能递水的替身）：船上有水的动脑 / 大模型替身也依座位各想一次递不递
+     * （审查 2026-10-07 R4，用户报过：替身从不在真人的递水窗口里递水）。递的水与真人在递水一面上按「给」同一条路攒进这一轮的承诺
+     * （{@link ThirstPhase#donate}，够了就当场结算）；问完一圈不收窗 —— 窗口照旧由真人答完或到点收。
+     */
+    static void windowDonors(ServerWorld world, GameComponent component, Session.ThirstPrompt prompt) {
+        Session session = component.requireSession();
+        ThirstKey key = thirstKey(session, prompt);
+        component.setStandInsThirst(true);   // 只给旁人打水的那一窗：真人都表过态也先别收，等替身这一圈问完
+        windowDonor(world, component, session, key, new java.util.LinkedHashSet<>(), 0);
+    }
+
+    private static void windowDonor(ServerWorld world, GameComponent component, Session session, ThirstKey key,
+                                    java.util.Set<CharacterId> asked, int donatedUnits) {
+        if (!samePrompt(component, session, key, true)) {
+            return;                                   // 窗口已经结了（真人答完 · 到点 · 递够了）：clearThirst 也清了「替身还在想」
+        }
+        Session.ThirstPrompt prompt = session.thirstPending().orElseThrow();
+        CharacterId who = prompt.who();
+        int per = prompt.waterPerSource();
+        // 他自己定得了（手上有水、清醒）就当他会先喝自己的：替身只补他自己补不上的那几次，不白扔水
+        boolean helpAsked = !ThirstPhase.canDecide(session, prompt);
+        int shortUnits = prompt.remaining() - component.thirstDonors().size() / per
+                - (helpAsked ? 0 : Legal.ownWaterUnits(session, who, per));
+        CharacterId donor = null;
+        if (shortUnits > 0) {
+            for (CharacterId other : session.state().bySeat()) {
+                if (!other.equals(who) && !asked.contains(other) && isDummy(component, other)
+                        && session.state().canAct(other)
+                        && ThirstPhase.availableDonationWater(session, component, other) / per > 0) {
+                    donor = other;
+                    break;
+                }
+            }
+        }
+        if (donor == null) {
+            component.setStandInsThirst(false);
+            ThirstPhase.settleIfReady(world, component);   // 只给旁人打水的那一窗：能打水的真人若都表过态了，照到时那样结算
+            return;
+        }
+        CharacterId giver = donor;
+        asked.add(giver);
+        int myUnits = ThirstPhase.availableDonationWater(session, component, giver) / per;
+        int max = Math.min(myUnits, shortUnits);
+        int shortNow = shortUnits;
+        boolean started = decide(new Point<Integer, Integer>(world, component, giver, "递水（真人窗口里）",
+                "donate-window:" + key.turn() + ":" + who.value() + ":" + giver.value(), DecisionKind.GIVE_WATER,
+                now() + StandInPlay.step(component), component.thirstDeadline(), max,
+                (p, v, l, r) -> p.donateWater(v, who, shortNow, myUnits, helpAsked, donatedUnits, r),
+                (v, l, n) -> SeatQuestions.donate(v, who, l, n),
+                () -> samePrompt(component, session, key, true),
+                units -> units != null && units >= 0
+                        && units <= ThirstPhase.availableDonationWater(session, component, giver) / per,
+                units -> {
+                    for (int i = 0; i < units * per; i++) {
+                        ThirstPhase.donate(world, component, giver);   // 递够了它会当场结算，之后的几张自然打不出去
+                    }
+                    windowDonor(world, component, session, key, asked, donatedUnits + units);
+                },
+                () -> windowDonor(world, component, session, key, asked, donatedUnits),
+                units -> units == 0 ? "不递" : "递 " + units * per + " 张给 " + who.value()));
+        if (!started) {
+            windowDonor(world, component, session, key, asked, donatedUnits);
+        }
     }
 
     // ================================================================ 落海那一刻
@@ -941,6 +1053,8 @@ public final class StandInMinds {
     static void overboard(ServerWorld world, GameComponent component) {
         Session session = component.requireSession();
         int token = session.overboardPending().orElseThrow().token();
+        // 替身开始想：真人那一侧先说完也不收窗，等这一串问完（审查 2026-10-07 R3，CardActions.overboardSettled）
+        component.setStandInsOverboard(true);
         overboardRound(world, component, session, token, 0);
     }
 
@@ -962,16 +1076,19 @@ public final class StandInMinds {
         BooleanSupplier open = () -> sameGame(component, session) && component.overboardDeadline() > 0
                 && session.overboardPending().map(p -> p.token() == token).orElse(false);
         if (!open.getAsBoolean()) {
-            return;
+            return;                                   // 这一窗已经收了（到点 · 指令）：那一侧也清了「替身还在想」
         }
         if (at >= players.size()) {
             if (played) {
                 overboardRound(world, component, session, token, round + 1);
                 return;
             }
-            if (!CardActions.humanStillChoosing(session, component)) {
+            component.setStandInsOverboard(false);
+            if (CardActions.overboardSettled(session, component)) {
                 LOGGER.info("落海：替身都选过了、没有真人还在选，收这一窗");
                 component.setOverboardDeadline(now());
+            } else {
+                LOGGER.info("落海：替身都选过了，还有真人在选，接着等");
             }
             return;
         }

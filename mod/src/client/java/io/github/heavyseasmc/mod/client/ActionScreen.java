@@ -167,7 +167,7 @@ public final class ActionScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         // 用哪个键开的，就用哪个键收起来（理由同手牌一面：写死的键，玩家改了键位就收不起来）。
         if (HeavySeasClient.actKey().matchesKey(keyCode, scanCode)) {
             close();
@@ -186,7 +186,7 @@ public final class ActionScreen extends GameScreen {
         if (cards.keyPressed(keyCode, this::confirm)) {
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.onKey(keyCode, scanCode, modifiers);
     }
 
     /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */

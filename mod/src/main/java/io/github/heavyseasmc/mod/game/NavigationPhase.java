@@ -10,7 +10,6 @@ import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -155,25 +154,22 @@ public final class NavigationPhase {
         resolve(world, component, index);
     }
 
-    /** 每 tick 检查超时。**服务端超时，客户端不参与判定。** */
-    public static void tick(MinecraftServer server) {
-        for (ServerWorld world : server.getWorlds()) {
-            GameComponent component = GameComponents.of(world);
-            long deadline = component.helmDeadline();
-            if (component.session().isEmpty() || deadline <= 0 || System.currentTimeMillis() < deadline) {
-                continue;
-            }
-            Session session = component.requireSession();
-            // 超时认当前高亮（不是随机）；舵手一次都没上报过（替身、离线）时就是第一张。
-            int index = Math.min(component.helmHighlight(), Math.max(0, session.table().rowStack().size() - 1));
-            // 窗口开着时认开窗那一刻的舵手（ADR-0051 B5）：他掉线了，这里就是「替掉线的舵手按默认挑」
-            CharacterId helm = component.helmSeat(session.state()).orElseThrow();
-            LOGGER.info("舵手超时：替 {} 挑了第 {} 张（当前高亮）", helm.value(), index + 1);
-            // ❗先告诉舵手「这张是替你挑的」，再结算。顺序不能反：结算那一刻就推投影，投影里没了划船堆，
-            //   客户端就要关界面了 —— 通知落在它后面，就没有界面来播这一下「顿」（与补给箱同一个坑）。
-            notifyAutoPick(world, component, helm, index);
-            resolve(world, component, index);
+    /** 每 tick 检查超时。**服务端超时，客户端不参与判定。** 经 {@link GameFlow#guarded} 挂上：出错只结束这一局。 */
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        long deadline = component.helmDeadline();
+        if (component.session().isEmpty() || deadline <= 0 || now < deadline) {
+            return;
         }
+        Session session = component.requireSession();
+        // 超时认当前高亮（不是随机）；舵手一次都没上报过（替身、离线）时就是第一张。
+        int index = Math.min(component.helmHighlight(), Math.max(0, session.table().rowStack().size() - 1));
+        // 窗口开着时认开窗那一刻的舵手（ADR-0051 B5）：他掉线了，这里就是「替掉线的舵手按默认挑」
+        CharacterId helm = component.helmSeat(session.state()).orElseThrow();
+        LOGGER.info("舵手超时：替 {} 挑了第 {} 张（当前高亮）", helm.value(), index + 1);
+        // ❗先告诉舵手「这张是替你挑的」，再结算。顺序不能反：结算那一刻就推投影，投影里没了划船堆，
+        //   客户端就要关界面了 —— 通知落在它后面，就没有界面来播这一下「顿」（与补给箱同一个坑）。
+        notifyAutoPick(world, component, helm, index);
+        resolve(world, component, index);
     }
 
     /** 只发给舵手本人，而且只在他是在线的真人时发：替身没有界面，离线的人也没有。 */
@@ -181,7 +177,7 @@ public final class NavigationPhase {
         component.occupantOf(helm)
                 .map(GameComponent.Occupant::player)
                 .map(uuid -> world.getServer().getPlayerManager().getPlayer(uuid))
-                .ifPresent(player -> ServerPlayNetworking.send(player, new HelmAutoPickS2C(index)));
+                .ifPresent(player -> GameComponents.send(world, player, new HelmAutoPickS2C(index)));
     }
 
     /** 动脑 / 大模型的替身舵手想好了：与界面那条路同一个收尾（{@link #resolve}）。 */

@@ -101,10 +101,15 @@ public record RosterData(List<Survivor> characters, Map<Integer, List<CharacterI
         }
         List<Survivor> chosen = new ArrayList<>(ids.size());
         ids.forEach(id -> chosen.add(get(id)));
-        return new Roster(List.copyOf(chosen));
+        return new Roster(List.copyOf(chosen), Roster.doublersOf(characters));
     }
 
-    /** 房主自定义阵容。必须恰为 6–8 个已知且不重复的角色，最终仍按固定座位排序。 */
+    /**
+     * 房主自定义阵容。必须恰为 6–8 个已知且不重复的角色，最终仍按固定座位排序。
+     *
+     * <p>可以不含船长或收藏家：现金与美术品靠整张角色表分类（{@link Roster#doublers()}），
+     * 不靠这一局有没有那个人（审查 2026-10-08 C2）。没上场的人只是不加倍。
+     */
     public Roster select(List<CharacterId> ids) {
         Objects.requireNonNull(ids, "ids");
         if (ids.size() < 6 || ids.size() > 8) {
@@ -117,6 +122,6 @@ public record RosterData(List<Survivor> characters, Map<Integer, List<CharacterI
         List<Survivor> chosen = new ArrayList<>(ids.size());
         unique.forEach(id -> chosen.add(get(id)));
         chosen.sort(java.util.Comparator.comparingInt(Survivor::seat));
-        return new Roster(List.copyOf(chosen));
+        return new Roster(List.copyOf(chosen), Roster.doublersOf(characters));
     }
 }

@@ -9,7 +9,6 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.net.ContestActionC2S;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -138,9 +137,22 @@ public final class ContestPhase {
                         ? "heavyseas.contest.side_attack" : "heavyseas.contest.side_defend")));
         component.markDecided(who);
         if (!endIfAllDecided(world, component)) {
-            component.openContestWindow(component.humanWindow(component.timing().stanceBumpMs()));
+            bump(component, component.humanWindow(component.timing().stanceBumpMs()), System.currentTimeMillis());
         }
         GameComponents.sync(world);
+    }
+
+    /**
+     * 有人加入 / 押下之后的软倒计时：<b>只延不缩</b> —— 剩下的比追加时长短才补到追加时长，长的照旧。
+     *
+     * <p>❗审查 2026-10-07 R11：原先一律重设成追加时长（站队 8 秒 · 押武器 6 秒）。替身会在窗口里陆续站出来之后，
+     * 替身 1.5 秒一加入，真人那 20 秒就被砍到 8 秒，与「决策窗口一律至少 20 秒」（用户 2026-10-07）相悖。
+     * 没开窗的那一段（只有替身，{@code contestDeadline = 0}）照旧开一扇追加时长的窗，与原先一样。
+     */
+    static void bump(GameComponent component, long bumpMs, long now) {
+        if (component.contestDeadline() - now < bumpMs) {
+            component.openContestWindow(bumpMs);
+        }
     }
 
     /**
@@ -154,7 +166,7 @@ public final class ContestPhase {
         GameFlow.broadcast(world, Text.translatable("heavyseas.contest.weapon_committed",
                 GameFlow.characterName(who)).formatted(Formatting.GRAY));
         if (!endIfAllDecided(world, component)) {
-            component.openContestWindow(component.humanWindow(component.timing().weaponBumpMs()));
+            bump(component, component.humanWindow(component.timing().weaponBumpMs()), System.currentTimeMillis());
         }
         GameComponents.sync(world);
     }
@@ -290,36 +302,33 @@ public final class ContestPhase {
      *
      * <p>四段各有各的默认答案：表态默认同意 · 站队到点就结束 · 挂武器到点就结算 · 挑牌默认手牌随机一张。
      */
-    public static void tick(MinecraftServer server) {
-        for (ServerWorld world : server.getWorlds()) {
-            GameComponent component = GameComponents.of(world);
-            long deadline = component.contestDeadline();
-            if (component.session().isEmpty() || deadline <= 0 || System.currentTimeMillis() < deadline) {
-                continue;
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        long deadline = component.contestDeadline();
+        if (component.session().isEmpty() || deadline <= 0 || now < deadline) {
+            return;
+        }
+        Optional<Contest> contest = component.requireSession().contest();
+        if (contest.isEmpty()) {
+            component.clearContest();          // 这一场已经收场了，窗口是残影
+            return;
+        }
+        component.clearContest();
+        switch (contest.get().stage()) {
+            case CONSENT -> {
+                LOGGER.info("表态超时：{} 按同意算", contest.get().target().value());
+                consent(world, component, false);
             }
-            Optional<Contest> contest = component.requireSession().contest();
-            if (contest.isEmpty()) {
-                component.clearContest();          // 这一场已经收场了，窗口是残影
-                continue;
+            case STANCES -> {
+                LOGGER.info("站队段结束（超时）");
+                closeStances(world, component);
             }
-            component.clearContest();
-            switch (contest.get().stage()) {
-                case CONSENT -> {
-                    LOGGER.info("表态超时：{} 按同意算", contest.get().target().value());
-                    consent(world, component, false);
-                }
-                case STANCES -> {
-                    LOGGER.info("站队段结束（超时）");
-                    closeStances(world, component);
-                }
-                case WEAPONS -> {
-                    LOGGER.info("挂武器段结束（超时）");
-                    resolve(world, component);
-                }
-                case PICK -> {
-                    LOGGER.info("挑牌超时：按手牌随机一张算");
-                    autoPick(world, component, contest.get());
-                }
+            case WEAPONS -> {
+                LOGGER.info("挂武器段结束（超时）");
+                resolve(world, component);
+            }
+            case PICK -> {
+                LOGGER.info("挑牌超时：按手牌随机一张算");
+                autoPick(world, component, contest.get());
             }
         }
     }
@@ -390,7 +399,9 @@ public final class ContestPhase {
             }
             case STAND_ASIDE -> {
                 // 站队一面选「旁观」（ADR-0095 D1）：原先不发包，窗口只能空等到时
-                if (contest.stage() != Contest.Stage.STANCES || !canJoin(session, contest, who)) {
+                // ❗已经表过态的再发一次就当作没按（审查 2026-10-07 L5）：原先每一包都记一行、给全船推一次投影，没有上限
+                if (contest.stage() != Contest.Stage.STANCES || !canJoin(session, contest, who)
+                        || component.hasDecided(who)) {
                     return;
                 }
                 LOGGER.info("站队（界面）：{} 旁观", who.value());
@@ -400,8 +411,9 @@ public final class ContestPhase {
             }
             case WEAPONS_DONE -> {
                 if (contest.stage() != Contest.Stage.WEAPONS
-                        || !contest.fight().map(f -> f.combatants().contains(who)).orElse(false)) {
-                    return;
+                        || !contest.fight().map(f -> f.combatants().contains(who)).orElse(false)
+                        || component.hasDecided(who)) {
+                    return;                   // 已经说过「押完了」：同上（审查 L5）
                 }
                 LOGGER.info("挂武器（界面）：{} 押完了", who.value());
                 component.markDecided(who);
@@ -555,9 +567,34 @@ public final class ContestPhase {
         }
     }
 
+    /**
+     * 默认挑牌之前先问一句（审查 2026-10-08 C1 的兜底）：被抢方身上此刻已经一张能挑的都没有了，就照「没牌可挑」收尾。
+     *
+     * <p>按规则走不到这里 —— 挑牌那一刻被抢方亮牌、喝酒都拦着（引擎 {@code Session#reveal} · {@code #drinkRum}）。
+     * 原先没有这一问：被抢方喝掉手里唯一那瓶酒之后，默认挑牌去拿面前那瓶，引擎抛「偷窃只能拿手牌」，
+     * 这一下在服务端 tick 里没人接住 —— 服务端崩溃。万一哪天又多出一条把牌挪走的路，这一场照样收得了。
+     *
+     * @return 收了场为 true（调用方不必再挑）
+     */
+    static boolean endPickIfNothingToTake(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        Contest contest = session.contest().orElseThrow();
+        if (!session.endPickIfNothingToTake()) {
+            return false;
+        }
+        LOGGER.warn("抢夺：{} 挑牌时 {} 身上已经没有能挑的牌，这一场照「没牌可挑」收场",
+                contest.attacker().value(), contest.target().value());
+        announceTaken(world, contest, session);
+        after(world, component, contest.attacker());
+        return true;
+    }
+
     /** 默认的挑牌：手上有就随机一张，手上没有就取面前第一张。 */
     private static void autoPick(ServerWorld world, GameComponent component, Contest contest) {
         Session session = component.requireSession();
+        if (endPickIfNothingToTake(world, component)) {
+            return;
+        }
         if (randomStandIns(component)) {
             String front = StandInPlay.pickFront(session, contest, component.gameRandom());
             if (front != null) {
@@ -622,7 +659,11 @@ public final class ContestPhase {
             component.clearContest();
             GameFlow.schedule(component, 0L, "connection changed during contest",
                     () -> advanceWithoutHumans(world, component));
+            return;
         }
+        // 还有真人要等，但掉线的那一位也许正是最后一个没表态的（审查 2026-10-07 K1）：演示局里这一段不限时，
+        //   掉线这条路原先没人问「该答的都答了没有」，窗口就一直开着
+        endIfAllDecided(world, component);
     }
 
     /** 挂武器段只开放给参战者 —— 参战的全是替身时不必开窗口。 */

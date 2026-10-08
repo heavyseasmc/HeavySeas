@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,12 +59,23 @@ final class SettingsMenuStateTest {
         }
 
         @Override
-        public void secret(String key, String value) {
+        public void secret(String key, String value, String scope) {
             secrets.add(key + (value.isEmpty() ? " 清" : " 设"));
             lastSecretValue = value;
+            lastScope = scope;
+        }
+
+        /** 服务端下一份快照带来的「被拒了」：测试塞进去，菜单取走一次。 */
+        @Override
+        public Optional<String> takeRejection() {
+            String why = rejection;
+            rejection = null;
+            return Optional.ofNullable(why);
         }
 
         String lastSecretValue;
+        String lastScope;
+        String rejection;
     }
 
     private final FakeLocal local = new FakeLocal();
@@ -203,6 +215,73 @@ final class SettingsMenuStateTest {
         assertEquals(SettingsMenuState.SecretState.PENDING_CLEAR, s.secretState(def));
         s.save();
         assertEquals(List.of(SECRET_KEY + " 设", SECRET_KEY + " 清"), outbox.secrets);
+    }
+
+    @Test
+    @DisplayName("❗被拒的存盘不说「已保存」：服务端回话说拒了，就记下理由；一次存盘两包、先到的说成了后到的说拒了，以拒了为准（审查 2026-10-07 U2）")
+    void rejectedSaveIsNotReportedAsSaved() {
+        SettingsMenuState s = state(true, true);
+        select(s, SettingsCategory.WINDOWS, ServerSettingsTable.HELM);
+        assertTrue(s.step(+1, true));
+        assertEquals(SettingsMenuState.SaveResult.SENT, s.save());
+        outbox.rejection = "「大模型」一组合不起来：reasoningEffort …";
+        s.snapshot(true, true, serverDefaults(), Set.of());           // 服务端拒了：值还是原来的
+        assertTrue(s.notice() != SettingsMenuState.Notice.SAVED, "被拒的存盘显示成了「已保存」");
+        assertEquals(Optional.of("「大模型」一组合不起来：reasoningEffort …"), s.rejection());
+        assertEquals("20", s.display(s.focused()).orElseThrow(), "被拒之后显示的是服务端此刻的值");
+
+        // 一次存盘两包：改动那一包成了（先到、说成了），密钥那一包被拒（后到）
+        assertTrue(s.step(+1, true));
+        select(s, SettingsCategory.LLM, SECRET_KEY);
+        assertTrue(s.activate());
+        s.paste(TYPED);
+        assertTrue(s.commitEdit());
+        assertEquals(SettingsMenuState.SaveResult.SENT, s.save());
+        assertEquals(Optional.empty(), s.rejection(), "再存一次时上一次的理由要清掉");
+        Map<String, String> after = serverDefaults();
+        after.put(ServerSettingsTable.HELM, "30");
+        s.snapshot(true, true, after, Set.of());
+        assertEquals(SettingsMenuState.Notice.SAVED, s.notice(), "正向对照：没被拒就是「已保存」");
+        outbox.rejection = "接口地址没存上，密钥没设";
+        s.snapshot(true, true, after, Set.of());
+        assertTrue(s.notice() != SettingsMenuState.Notice.SAVED, "后到的那一包被拒了，却还说「已保存」");
+        assertEquals(Optional.of("接口地址没存上，密钥没设"), s.rejection());
+
+        // 菜单刚开时取到的是上一回留下的回话：不算（不是这一次存盘的）
+        outbox.rejection = "上一回的";
+        SettingsMenuState fresh = state(true, true);
+        assertEquals(Optional.empty(), fresh.rejection());
+        assertEquals(SettingsMenuState.Notice.NONE, fresh.notice());
+    }
+
+    @Test
+    @DisplayName("❗密钥包带上它绑的那个地址：同一次存盘里改了地址，带的是改后的（服务端拿它核密钥给哪个地址，审查 2026-10-07 L1）")
+    void secretPacketCarriesTheEndpointItIsFor() {
+        Map<String, String> server = serverDefaults();
+        server.put(ServerSettingsTable.LLM_BASE_URL, "http://127.0.0.1:8317/v1");
+        SettingsMenuState s = new SettingsMenuState(defs(), local, outbox);
+        s.snapshot(true, true, server, Set.of());
+        select(s, SettingsCategory.LLM, SECRET_KEY);
+        assertTrue(s.activate());
+        s.paste(TYPED);
+        assertTrue(s.commitEdit());
+        s.save();
+        assertEquals("http://127.0.0.1:8317/v1", outbox.lastScope, "没改地址：带服务端此刻的地址");
+
+        select(s, SettingsCategory.LLM, ServerSettingsTable.LLM_BASE_URL);
+        assertTrue(s.activate());
+        while (!s.editText().isEmpty()) {
+            s.backspace();
+        }
+        s.paste("https://api.example.com/v1");
+        assertTrue(s.commitEdit());
+        select(s, SettingsCategory.LLM, SECRET_KEY);
+        assertTrue(s.activate());
+        s.paste(TYPED);
+        assertTrue(s.commitEdit());
+        s.save();
+        assertEquals(Map.of(ServerSettingsTable.LLM_BASE_URL, "https://api.example.com/v1"), outbox.saves.getLast());
+        assertEquals("https://api.example.com/v1", outbox.lastScope, "同一次存盘改了地址：密钥要带改后的那个");
     }
 
     @Test

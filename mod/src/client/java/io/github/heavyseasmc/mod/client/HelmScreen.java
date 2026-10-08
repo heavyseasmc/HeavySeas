@@ -250,12 +250,12 @@ public final class HelmScreen extends GameScreen {
 
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (inspectKey(keyCode)) {
             return true;              // 底栏一直写着「查看」，这一面此前却没接这个键（ADR-0043 §7.0）
         }
         if (decided()) {
-            return super.keyPressed(keyCode, scanCode, modifiers);
+            return super.onKey(keyCode, scanCode, modifiers);
         }
         switch (keyCode) {
             case GLFW.GLFW_KEY_LEFT -> {
@@ -271,7 +271,7 @@ public final class HelmScreen extends GameScreen {
                 return true;
             }
             default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.onKey(keyCode, scanCode, modifiers);
             }
         }
     }

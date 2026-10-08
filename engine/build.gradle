@@ -75,8 +75,34 @@ tasks.named('compileJava') {
 
 // 数值数据不打进 jar，由调用方（M1 的 mod 模块 / 测试）显式指定路径载入，
 // 以保持 data/ 目录的权属边界清晰（见 data/README.md）。
+//
+// 测试读的那个目录必须是任务的输入（审查 2026-10-07 G2）：原先只把路径当系统属性传，Gradle 只比那串字、不看目录里的内容 ——
+//   只改 data/ 里的数值，:engine:test 是 UP-TO-DATE（本地）/ FROM-CACHE（CI 恢复构建缓存），新数值从没被单测与随机对局跑过。
+//   现在路径经一个带 @InputDirectory 的参数提供者传：目录内容按相对路径记指纹（换个克隆目录不算变，构建缓存照样能命中），
+//   路径本身不再是输入。做成任务属性 ext.dataDir：红测要能把它指向一份副本、在副本里改一个数
+//   （docs/tools/build-redtests.sh 的 engine-data-*：改之前第二遍必须 UP-TO-DATE，改之后必须真的执行）。
+class DataDirArgument implements CommandLineArgumentProvider {
+    private final DirectoryProperty dir
+
+    DataDirArgument(DirectoryProperty dir) {
+        this.dir = dir
+    }
+
+    @InputDirectory
+    @PathSensitive(PathSensitivity.RELATIVE)
+    DirectoryProperty getDir() {
+        return dir
+    }
+
+    @Override
+    Iterable<String> asArguments() {
+        return ['-Dheavyseas.data.dir=' + dir.get().asFile.absolutePath]
+    }
+}
+
 tasks.named('test') {
-    systemProperty 'heavyseas.data.dir', rootProject.file('data').absolutePath
+    ext.dataDir = objects.directoryProperty().fileValue(rootProject.file('data'))
+    jvmArgumentProviders.add(new DataDirArgument(ext.dataDir))
 
     // ❗O1 的测量台把分布表打在标准输出上，不打开这个就看不见 ——
     // 它是「只打印不判定」的，判定写进断言就成了拿被检查对象证明自己。

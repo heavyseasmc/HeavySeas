@@ -25,6 +25,24 @@ public interface SecretStore {
      */
     void put(String key, String value);
 
+    /**
+     * 一次设几项（空串 = 清掉）：密钥与它绑的地址要一起落盘（审查 2026-10-07 L1），不能只落一半。
+     * 默认逐项 {@link #put}；存在文件里的那一种覆写成一次原子写。
+     */
+    default void putAll(Map<String, String> entries) {
+        entries.forEach(this::put);
+    }
+
+    /**
+     * 存储读坏了（文件在、读不出来），这一次运行里不写它（审查 2026-10-07 C3：写回去会把原文件整份盖掉，
+     * 而它多半只是被人用记事本加了一行备注）。{@link #put} 抛这个；消息里只有路径，没有值。
+     */
+    final class Unreadable extends IllegalStateException {
+        public Unreadable(String message) {
+            super(message);
+        }
+    }
+
     /** 只在内存里的那种：单测与「文件开不了」时用。 */
     static SecretStore inMemory() {
         Map<String, String> values = new ConcurrentHashMap<>();

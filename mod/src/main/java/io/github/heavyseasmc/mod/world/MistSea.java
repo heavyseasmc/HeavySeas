@@ -61,24 +61,23 @@ public final class MistSea {
      * Crosses the only authoritative boundary into a match: escrow, empty inventory, teleport, then begin rules.
      * If any later step fails, every successfully escrowed player is restored before the exception escapes.
      */
-    public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
-                                   Set<CharacterId> reservedForDummies) {
-        startVoyage(server, players, humans, reservedForDummies, null, SceneDataLoader.DEFAULT);
-    }
-
+    /** 演习艇敲钟开航（{@code DrillSkiff}）：房主定的阵容、默认布局；不是演示局（审查 2026-10-07 R5）。 */
     public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
                                    Set<CharacterId> reservedForDummies, List<CharacterId> selectedRoster) {
-        startVoyage(server, players, humans, reservedForDummies, selectedRoster, SceneDataLoader.DEFAULT);
+        startVoyage(server, players, humans, reservedForDummies, selectedRoster, SceneDataLoader.DEFAULT, false);
     }
 
     /**
      * @param selectedRoster 房主定的阵容；{@code null} 用预设
      * @param layoutId       用哪份航程布局（{@code /seas start [players] [layout]}）
+     * @param viaCommand     是 {@code /seas start} 开的：有替身的这种局是演示局（{@code GameComponent#isDemo}，审查 R5）
      */
     public static void startVoyage(MinecraftServer server, int players, List<ServerPlayerEntity> humans,
                                    Set<CharacterId> reservedForDummies, List<CharacterId> selectedRoster,
-                                   Identifier layoutId) {
+                                   Identifier layoutId, boolean viaCommand) {
         VoyageLayout layout = SceneDataLoader.require(layoutId);
+        // 布局与雾表整份快照进这一局（审查 2026-10-07 C6）：之后 /reload 拿掉它，这一局照旧用开局那一份
+        FogTable fog = SceneDataLoader.fogTableOf(layout);
         ServerWorld sea = server.getWorld(layout.dimensionKey());
         if (sea == null) {
             throw new IllegalStateException("布局 %s 的 dimension：维度 %s 未加载 —— 服务端没有这个维度，或数据包没装"
@@ -94,11 +93,13 @@ public final class MistSea {
             throw new IllegalStateException("布局 %s 的 arrival.slide_from：%d 格超过服务端 view-distance %d chunk = %d 格，布景送不到客户端"
                     .formatted(layout.id(), layout.arrival().slideFrom(), server.getPlayerManager().getViewDistance(), viewBlocks));
         }
-        prepareScene(sea, component, layout);
         List<ServerPlayerEntity> crossed = new ArrayList<>();
         // 过魔镜时就托管过的人（ADR-0083：穿越即托管，ADR-0054 D12 第 3 条）：开局不再托管一次，散局回北辰号
         List<ServerPlayerEntity> boarded = new ArrayList<>();
         try {
+            // ❗摆场景也在 try 里（审查 2026-10-07 U9）：放船抛了（模板不在 · 锚点下没水），走廊已经强加载、脚印已经记下 ——
+            //   原先它在 try 外，没人调 cleanupScene，走廊一直强加载到下一次开局或重启
+            prepareScene(sea, component, layout);
             for (ServerPlayerEntity player : humans) {
                 if (mirrorEscrow(player).isPresent()) {
                     boarded.add(player);
@@ -108,24 +109,27 @@ public final class MistSea {
                 crossed.add(player);
             }
             if (!crossed.isEmpty()) {
-                checkpoint(server, "进入雾海前的物品托管");
+                checkpoint(sea, true, "进入雾海前的物品托管");
             }
             Vec3d bow = layout.boat().bow();
             for (ServerPlayerEntity player : humans) {
                 player.stopRiding();
                 player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
             }
-            component.setLayoutId(layout.id());
+            component.setLayout(layout, fog);
             if (selectedRoster == null) {
-                GameFlow.start(sea, players, humans, reservedForDummies, layout);
+                GameFlow.start(sea, players, humans, reservedForDummies, layout, viaCommand);
             } else {
-                GameFlow.start(sea, players, humans, reservedForDummies, layout, selectedRoster);
+                GameFlow.start(sea, players, humans, reservedForDummies, layout, selectedRoster, viaCommand);
             }
             LOGGER.info("雾海：{} 名玩家已托管物品并进入 {}（布局 {}）", crossed.size(), layout.dimension(), layout.id());
         } catch (RuntimeException failure) {
             Gulls.clear(sea, component);
             Backdrop.clear(sea, component);
             Seats.clear(sea, component);
+            // 名牌队伍在开局那一次同步里就建好了（审查 2026-10-07 U9）：不收的话，下一局他分到别的角色时
+            //   mayJoin 不许换队，整局名牌挂着上一局的角色名和数值
+            Nameplates.clear(sea);
             if (component.session().isPresent()) {
                 component.end();
                 GameComponents.sync(sea);
@@ -203,7 +207,7 @@ public final class MistSea {
     public static void escrowAtMirror(ServerWorld liner, ServerPlayerEntity player, GameComponent.MirrorAt mirror, Vec3d back, float yaw) {
         requireNoEscrow(player);
         put(GameComponents.of(liner), player, back, yaw, 0f, Optional.of(mirror));
-        checkpoint(player.server, "过魔镜时的物品托管");
+        checkpoint(liner, true, "过魔镜时的物品托管");
     }
 
     private static void requireNoEscrow(ServerPlayerEntity player) {
@@ -288,7 +292,7 @@ public final class MistSea {
             }
             TeleportTarget redirect = elsewhere;
             if (restore(component, player, redirect)) {
-                checkpoint(player.server, "从魔镜回家的物品恢复");
+                checkpoint(world, false, "从魔镜回家的物品恢复");
                 return home;
             }
             throw new IllegalStateException("回家失败：" + player.getGameProfile().getName() + " 的托管没能还回来（日志里有原因），托管照旧留着");
@@ -325,7 +329,7 @@ public final class MistSea {
         }
         cleanupScene(sea, component);
         if (restored > 0) {
-            checkpoint(sea.getServer(), "雾海结束后的物品恢复");
+            checkpoint(sea, false, "雾海结束后的物品恢复");
         }
     }
 
@@ -353,8 +357,7 @@ public final class MistSea {
                 continue;
             }
             if (component.belongsToActiveVoyage(player.getUuid())) {
-                VoyageLayout layout = component.layoutId().map(SceneDataLoader::require)
-                        .orElseGet(SceneDataLoader::defaultLayout);
+                VoyageLayout layout = component.layout().orElseGet(SceneDataLoader::defaultLayout);   // 开局快照（审查 C6）
                 if (!player.getWorld().getRegistryKey().equals(sea.getRegistryKey())) {
                     Vec3d bow = layout.boat().bow();
                     player.teleport(sea, bow.x, bow.y + 1.0, bow.z, layout.ridersFacing(), 0f);
@@ -368,7 +371,7 @@ public final class MistSea {
                     LOGGER.info("雾海恢复：{} 过了魔镜、不在对局里，送回北辰号", player.getGameProfile().getName());
                 }
             } else if (restore(component, player)) {
-                checkpoint(player.server, "雾海异常中断恢复");
+                checkpoint(sea, false, "雾海异常中断恢复");
                 player.sendMessage(Text.translatable("heavyseas.mist_sea.recovered"), true);
                 LOGGER.info("雾海恢复：{} 的物品与返回位置已恢复", player.getGameProfile().getName());
             }
@@ -426,18 +429,36 @@ public final class MistSea {
      * 不再拨主世界的钟。雾本身也不在这里：客户端按投影里的 {@code HudView.Fog} 渲染（§5.1.2）。
      */
     public static void applyWeather(ServerWorld world, GameComponent component, String weatherId) {
-        FogTable.Entry entry = SceneDataLoader.fogFor(component.layoutId().orElse(SceneDataLoader.DEFAULT), weatherId);
+        FogTable.Entry entry = component.fogFor(weatherId);   // 开局快照（审查 C6）
         // 与语言无关的一行（脚本按「天候到世界：<id>」认今天是什么天）。❗它只是参数回显：
         // 画没画成要看客户端那一行「天色：收到 …」与截图（sky_test.py），不看这里。
         LOGGER.info("天候到世界：{} · 雨 {} · 雷 {} · 时刻 {} · 雾 {}/{} · 按人画天色（主世界的钟不动）", weatherId,
                 entry.rain(), entry.thunder(), entry.time(), entry.start(), entry.end());
     }
 
-    static void checkpoint(MinecraftServer server, String reason) {
-        if (!server.save(false, true, false)) {
-            LOGGER.warn("雾海存档检查点未报告成功：{}", reason);
-        } else {
+    /**
+     * 托管的存档检查点：托管记录所在那个世界的持久状态（对局组件在里面）+ 全部玩家的存档，按方向排先后（审查 2026-10-07 P1）。
+     *
+     * <p>❗原先是 {@code server.save(false, true, false)}：主线程上把<b>所有维度</b>全量刷盘、等写完（北辰号那一维 32 万格，
+     * 每过一次魔镜全服卡一下）—— 而且<b>不存玩家</b>：物品还回去、托管删了，玩家文件里还是空背包，下一次自动存档之前崩服就丢背包。
+     * 现在只写这两样，区块不刷。
+     *
+     * @param escrowing {@code true} = 托管（背包清空、记录写进世界）：先存世界再存玩家 —— 两次之间崩了，记录在、背包也在，恢复时照记录覆盖，不丢不重；
+     *                  {@code false} = 归还（背包还回、记录删掉）：先存玩家再存世界 —— 反过来的话，两次之间崩了，记录已删、玩家文件里还是空背包
+     */
+    static void checkpoint(ServerWorld escrowWorld, boolean escrowing, String reason) {
+        MinecraftServer server = escrowWorld.getServer();
+        try {
+            if (escrowing) {
+                escrowWorld.getPersistentStateManager().save();
+                server.getPlayerManager().saveAllPlayerData();
+            } else {
+                server.getPlayerManager().saveAllPlayerData();
+                escrowWorld.getPersistentStateManager().save();
+            }
             LOGGER.info("雾海存档检查点：{}", reason);
+        } catch (RuntimeException failure) {
+            LOGGER.warn("雾海存档检查点没写成：{}（下一次自动存档会再写）", reason, failure);
         }
     }
 }

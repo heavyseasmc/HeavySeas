@@ -74,6 +74,37 @@ public final class ProvisionScreen extends GameScreen {
         apply(data);
     }
 
+    /** 收起时还没定的那一箱与当时高亮的是第几张（审查 2026-10-07 K3）：按 G 重开时接着那一张，不从第 1 张重来。 */
+    private static ProvisionUpdateS2C shelved;
+    private static int shelvedHighlight;
+
+    /**
+     * 重开同一箱（聊天框关上后补开 · 收起后按 G，{@code HeavySeasClient#pollProvision}）。
+     * 高亮回到收起时那一张 —— 超时认的是服务端最后收到的高亮，重开不该把它悄悄改回第 1 张。
+     */
+    static ProvisionScreen reopen(ProvisionUpdateS2C data) {
+        ProvisionScreen screen = new ProvisionScreen(data);
+        if (data == shelved) {
+            screen.setHighlight(shelvedHighlight);
+        }
+        shelved = null;
+        return screen;
+    }
+
+    @Override
+    public void removed() {
+        super.removed();
+        if (data == null) {
+            return;
+        }
+        if (decided()) {
+            HeavySeasClient.provisionSettled(data);   // 留完了：这一包不必再重开
+        } else {
+            shelved = data;
+            shelvedHighlight = highlight;
+        }
+    }
+
     /** 收到新的一包：换牌并重新发一次。 */
     public void apply(ProvisionUpdateS2C next) {
         boolean newOffer = this.data == null || !this.data.offer().equals(next.offer());
@@ -548,9 +579,9 @@ public final class ProvisionScreen extends GameScreen {
 
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (data == null || data.offer().isEmpty() || decided()) {
-            return super.keyPressed(keyCode, scanCode, modifiers);
+            return super.onKey(keyCode, scanCode, modifiers);
         }
         if (inspectKey(keyCode)) {
             return true;
@@ -571,7 +602,7 @@ public final class ProvisionScreen extends GameScreen {
                 return true;
             }
             default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.onKey(keyCode, scanCode, modifiers);
             }
         }
     }

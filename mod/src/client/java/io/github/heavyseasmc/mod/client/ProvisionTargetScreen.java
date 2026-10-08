@@ -92,7 +92,7 @@ public final class ProvisionTargetScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_ESCAPE || HeavySeasClient.actKey().matchesKey(keyCode, scanCode)) {
             ClientPlayNetworking.send(UseProvisionC2S.cancel());
             LOGGER.info("特殊物资：取消挑目标");
@@ -107,7 +107,7 @@ public final class ProvisionTargetScreen extends GameScreen {
                 return true;
             }
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.onKey(keyCode, scanCode, modifiers);
     }
 
     private void commit() {

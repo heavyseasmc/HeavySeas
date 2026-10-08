@@ -91,13 +91,13 @@ class SimulatorTest {
          * （模拟器与模组共用同一份）。那次搬迁**不该改变任何一局的走向**，当时用 900 局
          * 逐字节对照验过 —— 但那是个一次性脚本，会话一结束就没了。
          *
-         * <p>❗<b>一次性的对照等于没有对照。</b> 所以把它压成这张表：四局全灭、四局靠岸，
+         * <p>❗<b>一次性的对照等于没有对照。</b> 所以把它压成这张表：同时覆盖全灭与靠岸，
          * 回合数与打架次数都不同，任何一处改动都会让某一行对不上，且失败信息直接点名是哪个种子。
          *
          * <p>规则**有意**改动时，这张表当然会红 —— 那时照新值更新它，但必须是个明确的动作。
          */
         @Test
-        @DisplayName("❗八个种子的走向钉死：规则搬家不得改变任何一局")
+        @DisplayName("❗八个种子的走向钉死：每座独立随机流的回归基线")
         void pinnedSeeds() {
             record Pinned(long seed, int turns, int alive, int fights, GameState.Outcome outcome) {
             }
@@ -110,28 +110,31 @@ class SimulatorTest {
             //   三次都是「每一局必然不同」，这张表全红说明不了任何事 —— 所以看分布（DistributionDumpTest），
             //   再照新行为重钉。第二次顺势把靠岸的种子换成四个（全灭四个 · 靠岸四个，两种终局各占一半）；
             //   第三次靠岸的四个种子全部改掉了 —— 合成牌堆下原先那四个都不再靠岸（真实数据那一侧反而是靠岸变多）。
+            // 2026-10-09 Q4：每座独立随机流，保留同样八个种子、重建全部字段。
+            // 归因对照只恢复共享随机流：旧表八行全过、SeatRandomIsolationTest 两例全红；
+            // 恢复隔离后两例回绿。不是删掉规则断言来接受未知差异；旧表留在 Git 历史。
             List<Pinned> expected = List.of(
-                    new Pinned(0L, 5, 0, 4, GameState.Outcome.ALL_DEAD),
-                    new Pinned(1L, 11, 0, 2, GameState.Outcome.ALL_DEAD),
-                    new Pinned(2L, 16, 0, 5, GameState.Outcome.ALL_DEAD),
-                    new Pinned(3L, 16, 0, 6, GameState.Outcome.ALL_DEAD),
-                    new Pinned(6L, 8, 1, 6, GameState.Outcome.LANDED),
-                    new Pinned(13L, 9, 2, 3, GameState.Outcome.LANDED),
-                    new Pinned(22L, 24, 1, 5, GameState.Outcome.LANDED),
-                    new Pinned(24L, 18, 1, 6, GameState.Outcome.LANDED));
+                    new Pinned(0L, 15, 0, 3, GameState.Outcome.ALL_DEAD),
+                    new Pinned(1L, 12, 0, 9, GameState.Outcome.ALL_DEAD),
+                    new Pinned(2L, 29, 1, 3, GameState.Outcome.LANDED),
+                    new Pinned(3L, 6, 0, 2, GameState.Outcome.ALL_DEAD),
+                    new Pinned(6L, 11, 1, 5, GameState.Outcome.LANDED),
+                    new Pinned(13L, 16, 0, 3, GameState.Outcome.ALL_DEAD),
+                    new Pinned(22L, 8, 0, 4, GameState.Outcome.ALL_DEAD),
+                    new Pinned(24L, 9, 0, 7, GameState.Outcome.ALL_DEAD));
 
             // 正向对照：两种终局都得在表里，否则这张表只钉住了一条路。
             assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.LANDED));
             assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.ALL_DEAD));
 
             Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
-            for (Pinned e : expected) {
+            var results = expected.stream().map(e -> {
                 Simulator.Result r = sim.run(e.seed());
-                assertEquals(e.outcome(), r.outcome(), "seed=" + e.seed() + " 终局变了");
-                assertEquals(e.turns(), r.turns(), "seed=" + e.seed() + " 回合数变了");
-                assertEquals(e.alive(), r.alive(), "seed=" + e.seed() + " 终局存活数变了");
-                assertEquals(e.fights(), r.fights(), "seed=" + e.seed() + " 打架次数变了");
-            }
+                return new Pinned(e.seed(), r.turns(), r.alive(), r.fights(), r.outcome());
+            }).toList();
+            results.forEach(System.out::println);
+            org.junit.jupiter.api.Assertions.assertAll(java.util.stream.IntStream.range(0, expected.size())
+                    .mapToObj(i -> () -> assertEquals(expected.get(i), results.get(i), "seed=" + expected.get(i).seed())));
         }
 
         @Test
@@ -348,6 +351,39 @@ class SimulatorTest {
         }
 
         @Test
+        @DisplayName("❗自保遇到同分时均匀地挑：三张同分各约三分之一（原先最后一张拿一半，审查 Q4）；两张同分与原先逐次相同（对照）")
+        void tiesArePickedUniformly() {
+            NavigationPolicy.SelfInterested policy =
+                    (NavigationPolicy.SelfInterested) NavigationPolicy.SELF_INTERESTED;
+            GameState g = GameState.start(solo());
+            List<NavigationCard> three = List.of(
+                    new NavigationCard("a", 0, new Selector.Nobody(), new Selector.Nobody(), false, false),
+                    new NavigationCard("b", 0, new Selector.Nobody(), new Selector.Nobody(), false, false),
+                    new NavigationCard("c", 0, new Selector.Nobody(), new Selector.Nobody(), false, false));
+            int[] rowed = new int[3];
+            int[] steered = new int[3];
+            int games = 6000;
+            java.util.Random rowRng = new java.util.Random(7);
+            java.util.Random steerRng = new java.util.Random(8);
+            for (int i = 0; i < games; i++) {
+                rowed[policy.chooseWhenRowing(three, g, KID, rowRng)]++;
+                steered[three.indexOf(policy.pick(three, g, KID, steerRng))]++;
+            }
+            for (int i = 0; i < 3; i++) {
+                double r = rowed[i] / (double) games;
+                double s = steered[i] / (double) games;
+                assertTrue(r > 0.30 && r < 0.37, "划船留第 %d 张的比例 %.3f，应当约 1/3".formatted(i + 1, r));
+                assertTrue(s > 0.30 && s < 0.37, "舵手挑第 %d 张的比例 %.3f，应当约 1/3".formatted(i + 1, s));
+            }
+            // 对照：两张同分时与原先「同分抛一次硬币」逐次相同 —— 钉死的摘要里只有三张以上同分的局会变
+            List<NavigationCard> two = three.subList(0, 2);
+            for (int seed = 0; seed < 200; seed++) {
+                int coin = new java.util.Random(seed).nextBoolean() ? 1 : 0;
+                assertEquals(coin, policy.chooseWhenRowing(two, g, KID, new java.util.Random(seed)), "seed=" + seed);
+            }
+        }
+
+        @Test
         @DisplayName("划船的人自己背划船标记，所以带船桨图示的牌对他更糟")
         void rowerDislikesOarCards() {
             NavigationPolicy.SelfInterested policy =
@@ -403,19 +439,24 @@ class SimulatorTest {
         }
 
         @Test
-        @DisplayName("分母只数活着的回合：体型 3 的角色在第 3 次落海时淹死，分母就停在 3")
+        @DisplayName("单人局：体型 3 的角色第 3 次落海就淹死；口渴的分母比落海少一次（「死后不再计入分母」看下一条双人局）")
         void deadStopAccruing() {
             // 每回合必落海、不点口渴、没有海鸥。
             // ❗在水里伤害 3 = 体型、没有救生圈就是淹死（ADR-0022）—— 船上那只是昏迷。
             //   这条原先写的是「第 4 次落海才死」：那是 M1 起一直没接上的水中判定，不是规则。
+            //
+            // ❗这一条证不了「死了就不再计入分母」（审查 2026-10-08 N1）：单人局里他一死局就完了，分母停不停都一样。
+            //   原先的「命中数等于机会数」也是同义反复 —— 只有他一个人可点，每一张牌都必然点到他。那一条已删掉；
+            //   「死后分母停住」由下一条双人局证（变异测试实证：去掉「死者不计」，这一条照样绿，那一条当场红）。
+            //   这里留下的只是它真正量得出的两件事：第几次落海淹死（水中判定）、死在落海那一步时口渴还没轮到。
             Simulator sim = new Simulator(solo(KID, 3),
                     oneCard(0, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
             Simulator.Result r = sim.run(0);
 
             assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
+            assertEquals(3, r.turns(), "第 3 回合的落海把他淹死 —— 水里伤害正好等于体型、又没有救生圈");
             Exposure kid = r.exposure().get(KID);
-            assertEquals(3, kid.overboardTurns(), "第 3 次落海把他淹死，之后不该再有机会数");
-            assertEquals(3, kid.overboards(), "每一回合都被点到，命中数应当等于机会数");
+            assertEquals(3, kid.overboardTurns(), "三回合，三次落海");
 
             // ❗口渴的分母比落海少一次：第 3 回合他死在落海那一步，口渴结算根本没轮到。
             //   两个分母分开数，正是为了让这种「死在半途」不被算成「口渴过但没被点」。

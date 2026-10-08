@@ -17,7 +17,7 @@ import java.util.Optional;
 
 /**
  * 只属于这台客户端的偏好：界面主题（ADR-0037：浅色海图桌 / 深色船舱木作），
- * 以及对局中 Minecraft 自带 HUD 的那几条要不要露出来（{@link #vanillaHudInVoyage}，ADR-0046）。
+ * 以及可见热栏要不要采用 Minecraft 自带样式（{@link #vanillaHudInVoyage}）。
  *
  * <p>存在 {@code config/heavyseas-client.toml}，交给 Forge Config API Port 的 CLIENT 类型管（ADR-0099 D1）：
  * 改值一律经它自己的对象（{@code set} + {@code save}），不手写文件。<b>只在物理客户端上登记</b>（TLM 教训 A3：
@@ -35,9 +35,7 @@ public final class ClientPrefs {
     static final ModConfigSpec SPEC;
     private static final ModConfigSpec.EnumValue<GuiLanguage.Theme> THEME;
     /**
-     * 对局中 Minecraft 自带的心 · 饥饿 · 护甲 · 氧气 · 经验要不要露出来、热栏要不要保持 Minecraft 自带的样子。默认不露、热栏照样张。
-     * 改成 {@code true} 就回到 Minecraft 自带的样子 —— 功能一个没删，只是样张那一态里没有它们（用户 2026-09-30：
-     * 「不要直接删除这些功能，优先检查是否已有显示开关」）。
+     * 可见热栏的样式偏好。保留旧配置键，但不再覆盖雾海维度的隐藏规则（用户 2026-10-09）。
      */
     private static final ModConfigSpec.BooleanValue VANILLA_HUD;
     /**
@@ -58,7 +56,7 @@ public final class ClientPrefs {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         THEME = builder.comment("Interface theme: LIGHT (chart table) or DARK (cabin wood). F8 switches it.")
                 .defineEnum("theme", GuiLanguage.Theme.LIGHT);
-        VANILLA_HUD = builder.comment("Show Minecraft's own hearts, hunger and hotbar during a game.")
+        VANILLA_HUD = builder.comment("Use Minecraft's hotbar style when visible. Mist sea hides bars except in creative and spectator modes.")
                 .define("show_vanilla_hud", false);
         LEGEND = builder.comment("Show the icon legend under the status plate. H switches it.")
                 .define("show_legend", true);
@@ -81,7 +79,7 @@ public final class ClientPrefs {
         Optional<ClientPrefsMigration.Prefs> legacy = Optional.empty();
         try {
             legacy = ClientPrefsMigration.readLegacy(dir, FILE);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {          // 读坏了的旧偏好不值得让客户端起不来（审查 2026-10-07 C3）
             LOGGER.warn("客户端偏好：旧文件 {} 读不出来，不迁了，用默认值：{}", ClientPrefsMigration.LEGACY_FILE, e.toString());
         }
         try {
@@ -98,7 +96,7 @@ public final class ClientPrefs {
                 MinecraftClient.getInstance().execute(() -> GuiLanguage.setTheme(theme()));
             }
         });
-        LOGGER.info("对局中 Minecraft 自带 HUD：{}", vanillaHudInVoyage() ? "露出（show_vanilla_hud）" : "按样张收起");
+        LOGGER.info("可见热栏样式：{}", vanillaHudInVoyage() ? "Minecraft" : "对局样式");
         if (motionSlow() > 1) {
             LOGGER.info("动效放慢 {} 倍（motion_slow，评审用）", motionSlow());
         }
@@ -143,7 +141,7 @@ public final class ClientPrefs {
         return loaded() ? MOTION_SLOW.get() : 1;
     }
 
-    /** 对局中要不要照 Minecraft 自带的样子画心 · 饥饿 · 经验与热栏（默认不要，照样张 b-1）。 */
+    /** 可见热栏是否采用 Minecraft 自带样式；不控制雾海中的可见性。 */
     static boolean vanillaHudInVoyage() {
         return loaded() ? VANILLA_HUD.get() : vanillaHudFallback;
     }
@@ -192,9 +190,9 @@ public final class ClientPrefs {
         }
     }
 
-    /** 对局中露不露 Minecraft 自带的 HUD，并存盘（设置菜单「本机」那一组）。 */
+    /** 可见热栏的样式偏好，并存盘（设置菜单「本机」那一组）。 */
     public static void setVanillaHud(boolean show) {
-        LOGGER.info("对局中 Minecraft 自带 HUD：{}", show ? "露出（show_vanilla_hud）" : "按样张收起");
+        LOGGER.info("可见热栏样式：{}", show ? "Minecraft" : "对局样式");
         if (loaded()) {
             VANILLA_HUD.set(show);
             RuntimeException failed = trySave();

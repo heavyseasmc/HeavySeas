@@ -1,0 +1,4 @@
+accessWidener v2 named
+# Keep Minecraft's pixel blending while owning each allocated mip image before filling it.
+accessible method net/minecraft/client/texture/MipmapHelper blend (IIIIZ)I
+accessible method net/minecraft/client/texture/MipmapHelper hasAlpha (Lnet/minecraft/client/texture/NativeImage;)Z

@@ -61,6 +61,9 @@ public final class LlmCommand {
         List<String> lines = new ArrayList<>();
         lines.add("大模型替身：" + (s.enabled() ? "开着" : "关着（" + s.disabledWhy() + "）"));
         lines.add("设置：设置菜单的「大模型」一组（heavyseas-server.toml 的 [llm] 段；密钥另存）· 密钥取自：" + LlmHooks.keySource());
+        if (LlmHooks.keyWithheld() != null) {
+            lines.add("密钥没带：" + LlmHooks.keyWithheld());     // 审查 2026-10-07 L1：密钥只发往设它时的那个地址
+        }
         if (Files.exists(legacy)) {
             lines.add("旧的 " + legacy + " 还在：下次起服迁进设置");
         }

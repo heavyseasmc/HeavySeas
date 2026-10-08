@@ -38,6 +38,14 @@ public final class TestSettings implements AutoCloseable {
         return file.config.get(java.util.List.of(key.split("\\.")));
     }
 
+    /**
+     * 不经菜单、直接改「文件」里的一项 —— 模拟有人手改了 toml、FCAP 的文件监视读到了它（这条路不过 {@link ServerSettings#save}
+     * 的整批核对）。审查 2026-10-07 R8 之后「大模型」一组合不起来的值存不进去了，要造那种局面只能走这里。
+     */
+    public void setRaw(String key, Object value) {
+        file.config.set(java.util.List.of(key.split("\\.")), value);
+    }
+
     /** 整份配置写成的字（找密钥用）。 */
     public String dump() {
         return file.config.toString();

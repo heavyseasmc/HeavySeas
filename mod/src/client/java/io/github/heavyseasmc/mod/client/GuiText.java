@@ -182,8 +182,7 @@ final class GuiText {
             }
             return w;
         }
-        TextFit.Result fit = TextFit.fit(text, boxPx, 1, candidates(bold, sizePx),
-                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.SHRINK_FIRST);
+        TextFit.Result fit = fitCached(renderer, text, boxPx, 1, bold, sizePx, TextFit.Policy.SHRINK_FIRST);
         if (fit.lines().isEmpty()) {
             return 0;
         }
@@ -203,8 +202,7 @@ final class GuiText {
     static int paragraphPx(DrawContext context, String text, int x, int top, int boxPx, int sizePx, boolean bold,
                            int color, int maxLines, int lineStepPx) {
         TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
-        TextFit.Result fit = TextFit.fit(text, boxPx, maxLines, candidates(bold, sizePx),
-                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.WRAP_FIRST);
+        TextFit.Result fit = fitCached(renderer, text, boxPx, maxLines, bold, sizePx, TextFit.Policy.WRAP_FIRST);
         int lead = (lineStepPx - linePx(fit.size())) / 2;
         for (int i = 0; i < fit.lines().size(); i++) {
             TextFit.Line l = fit.lines().get(i);
@@ -224,8 +222,7 @@ final class GuiText {
     static int paragraphRunsPx(DrawContext context, String text, int[] colors, int x, int top, int boxPx, int sizePx,
                                boolean bold, int maxLines, int lineStepPx) {
         TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
-        TextFit.Result fit = TextFit.fit(text, boxPx, maxLines, candidates(bold, sizePx),
-                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.WRAP_FIRST);
+        TextFit.Result fit = fitCached(renderer, text, boxPx, maxLines, bold, sizePx, TextFit.Policy.WRAP_FIRST);
         int lead = (lineStepPx - linePx(fit.size())) / 2;
         List<String> lines = fit.lines().stream().map(TextFit.Line::text).toList();
         int[][] perLine = lineColors(text, colors, lines);
@@ -278,8 +275,8 @@ final class GuiText {
     /** 这段字在 {@link #paragraphPx} 里会排成几行（先量后铺底用）。 */
     static int paragraphLines(String text, int boxPx, int sizePx, boolean bold, int maxLines) {
         TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
-        return Math.max(1, TextFit.fit(text, boxPx, maxLines, candidates(bold, sizePx),
-                (s, px) -> renderer.getWidth(styled(s, bold, px)), TextFit.Policy.WRAP_FIRST).lines().size());
+        return Math.max(1, fitCached(renderer, text, boxPx, maxLines, bold, sizePx, TextFit.Policy.WRAP_FIRST)
+                .lines().size());
     }
 
     /** 物理像素字号下一行字多宽（带字距）。 */
@@ -326,9 +323,31 @@ final class GuiText {
                                       int maxLines, int scale) {
         // 只许一行的是标签：只能缩。许多行的是段落：先折行，折不下才缩 —— 先缩的话长句会变成一行小字，
         // 同一栏里字号忽大忽小（航海日志实拍过）。
-        return TextFit.fit(text, boxW * scale, maxLines, candidates(bold, wantedPx),
-                (s, px) -> renderer.getWidth(styled(s, bold, px)),
+        return fitCached(renderer, text, boxW * scale, maxLines, bold, wantedPx,
                 maxLines > 1 ? TextFit.Policy.WRAP_FIRST : TextFit.Policy.SHRINK_FIRST);
+    }
+
+    /**
+     * 量字、折行的结果存起来（审查 2026-10-07 P4）：已经到手、不会再变的字（航海日志几十条、按钮、说明签）原先每帧都重新折行、
+     * 一个字一个字地量宽 —— 日志拉伸时英文每帧约 831 次量宽。结果只取决于下面这几样，键里一样不少；字体换了（资源重载 · 换语言）
+     * 由 {@link #forgetMeasurements} 整个作废。只在渲染线程上用。
+     */
+    private static final FitCache<FitKey, TextFit.Result> FITS = new FitCache<>(1024);
+
+    /** 一次量字的全部输入：字 · 框宽（物理像素）· 最多几行 · 粗细 · 梯子上最大的那一级 · 先折还是先缩。 */
+    private record FitKey(String text, int box, int maxLines, boolean bold, int top, TextFit.Policy policy) {
+    }
+
+    private static TextFit.Result fitCached(TextRenderer renderer, String text, int boxPx, int maxLines, boolean bold,
+                                            int wantPx, TextFit.Policy policy) {
+        int[] sizes = candidates(bold, wantPx);
+        return FITS.get(new FitKey(text, boxPx, maxLines, bold, sizes[0], policy), key ->
+                TextFit.fit(text, boxPx, maxLines, sizes, (s, px) -> renderer.getWidth(styled(s, bold, px)), policy));
+    }
+
+    /** 字体可能换了（资源重载、换语言）：存着的量字结果全作废。 */
+    static void forgetMeasurements() {
+        FITS.clear();
     }
 
     /** 这个字号的一行有多高，GUI 单位。版面按它排。 */

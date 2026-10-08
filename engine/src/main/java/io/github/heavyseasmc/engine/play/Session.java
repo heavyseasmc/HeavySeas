@@ -108,6 +108,8 @@ public final class Session {
         this.thirstQueue.addAll(o.thirstQueue);
         this.thirstAt = o.thirstAt;
         this.thirstWatersSpent = o.thirstWatersSpent;
+        this.thirstWatersByRecipient.putAll(o.thirstWatersByRecipient);
+        this.sharedWaterUsed.putAll(o.sharedWaterUsed);
         o.thirstSettledToday.forEach((who, sources) -> this.thirstSettledToday.put(who, new LinkedHashSet<>(sources)));
         this.coverUsedToday.putAll(o.coverUsedToday);
         this.sharedRum.addAll(o.sharedRum);
@@ -184,6 +186,12 @@ public final class Session {
         extraNavigationTaken = false;
         resolvingExtraNavigation = false;
         rowStackPrepared = false;
+        thirstCard = null;
+        thirstQueue.clear();
+        thirstAt = 0;
+        thirstWatersSpent = 0;
+        thirstWatersByRecipient.clear();
+        sharedWaterUsed.clear();
         weaponsPlayed.clear();
         healedSincePhaseStart = 0;
         if (state.turn() != was) {
@@ -797,9 +805,35 @@ public final class Session {
 
     /** 进挑牌；被抢方身上（小孩的偷窃：手上）一张能挑的都没有时，这一场直接收场。 */
     private void enterPick(Contest c) {
+        contest = somethingToPick(c) ? c.advance(Contest.Stage.PICK, Optional.empty()) : null;
+    }
+
+    /**
+     * 挑牌那一刻，被抢方身上已经一张能挑的都没有了，就照 {@link #enterPick} 的「直接收场」收掉这一场。
+     *
+     * <p>❗<b>兜底，不是正路</b>（审查 2026-10-08 C1）：被抢方在挑牌那一刻本来什么都动不了（亮牌、喝酒都拦着，
+     * 见 {@link #reveal}、{@link #drinkRum}），所以按规则走不到这里。留着它是给驱动者的超时默认挑牌先问一句：
+     * 万一哪天又多出一条把牌挪走的路，这一场也收得了，而不是在 {@link #pickFromFront} 里抛、整局卡在挑牌上。
+     *
+     * @return 收了场为 true；现在不在挑牌、或者还有能挑的牌时什么也不做，为 false
+     */
+    public boolean endPickIfNothingToTake() {
+        if (contest == null || contest.stage() != Contest.Stage.PICK || somethingToPick(contest)) {
+            return false;
+        }
+        contest = null;
+        return true;
+    }
+
+    /** 这一场的抢夺此刻还有没有能挑的：手牌，外加（不是小孩的偷窃时）面前的牌。 */
+    private boolean somethingToPick(Contest c) {
         SurvivorState victim = state.stateOf(c.target());
-        boolean anything = !victim.hand().isEmpty() || (!c.handOnly() && !victim.front().isEmpty());
-        contest = anything ? c.advance(Contest.Stage.PICK, Optional.empty()) : null;
+        return !victim.hand().isEmpty() || (!c.handOnly() && !victim.front().isEmpty());
+    }
+
+    /** 他正在挨抢、到了挑牌那一刻：这一刻他身上的牌不许动（规则书第五章：被抢的人到了挑牌那一刻不能再亮牌）。 */
+    private boolean beingPickedFrom(CharacterId who) {
+        return contest != null && contest.stage() == Contest.Stage.PICK && contest.target().equals(who);
     }
 
     private Contest requireStage(Contest.Stage stage, String what) {
@@ -902,14 +936,14 @@ public final class Session {
     public int fightingSize(CharacterId id) {
         int size = state.roster().get(id).size();
         SurvivorState s = state.stateOf(id);
-        for (String cardId : new LinkedHashSet<>(s.front())) {
-            if (!s.usedThisTurn(cardId)) {
-                continue;
-            }
+        // ❗按他今天喝过什么算，不按面前有什么算（审查 2026-10-08 R2）：规则书「这一边每个人的体型 + 今天喝的朗姆酒」，
+        //   喝下去就是这一天的事，瓶子送人、被抢、被浪卷走都不收回。原先只数面前还在的那几瓶，瓶子一走 +3 就没了。
+        for (String cardId : s.usedThisTurn()) {
             Provision card = table.provisions().get(cardId);
             if (card.effect() instanceof ProvisionEffect.BuffSize buff) {
-                // stacks=false：同一张牌喝两瓶也只算一次。面前有几瓶不影响，集合已经去重。
-                size += buff.stacks() ? buff.amount() * countInFront(s, cardId) : buff.amount();
+                // stacks=false：同一种喝两瓶也只算一次（集合已经去重）。
+                // stacks=true 的数据目前没有；照旧按面前的瓶数乘，瓶子不在了至少还是喝下去的那一份。
+                size += buff.stacks() ? buff.amount() * Math.max(1, countInFront(s, cardId)) : buff.amount();
             }
         }
         return size + sharedRumBonus(id);
@@ -1171,6 +1205,9 @@ public final class Session {
     public void beginNavigation(NavigationCard card) {
         Objects.requireNonNull(card, "card");
         requireNoThirstInProgress("再结算一张航海牌");
+        thirstCard = null;
+        thirstQueue.clear();
+        thirstAt = 0;
         lastNavigationReport = null;
         // a) 海鸥。浓雾让本回合所有海鸥图示失效。
         int gull = currentWeatherEffect() == WeatherEffect.IGNORE_GULLS ? 0 : card.gull();
@@ -1243,6 +1280,8 @@ public final class Session {
         // 没有可做的决定就不该弹窗，8 人局的航海阶段本来就够长了。
         thirstCard = card;
         thirstWatersSpent = 0;
+        thirstWatersByRecipient.clear();
+        sharedWaterUsed.clear();
         thirstQueue.clear();
         thirstAt = 0;
         for (Survivor survivor : ThirstResolver.resolutionOrder(state.roster())) {
@@ -1251,9 +1290,7 @@ public final class Session {
                 thirstQueue.add(id);
             }
         }
-        if (thirstQueue.isEmpty()) {
-            thirstCard = null;
-        }
+        // 留住这一张的上下文到换阶段/下一张牌；队列为空之后晚喝酒仍需补算。
         return new NavigationReport(card, false, overboardCandidates, overboardSelected,
                 thirstCandidates, thirstSelected, removedNow);
     }
@@ -1321,7 +1358,8 @@ public final class Session {
             pendingNavigation.bait = bait.stacks()
                     ? pendingNavigation.bait + bait.amount() : Math.max(pendingNavigation.bait, bait.amount());
             // 血饵打的是这一批落海的每一个人，不只是点出来的那一个。
-            // ❗按座位次序记：这一批名单来自 Set.copyOf，遍历次序每次起 JVM 都不同，记事的先后不能跟着它变。
+            // ❗按座位次序记，不依赖这一批名单自己的次序：名单曾经来自 Set.copyOf，遍历次序每次起 JVM 都不同
+            //   （审查 Z3 之后选择器按座位给了，这里照旧自己排一遍）。
             List<CharacterId> swimmers = pendingNavigation.windows.getFirst();
             for (CharacterId id : state.bySeat()) {
                 if (swimmers.contains(id)) {
@@ -1477,6 +1515,8 @@ public final class Session {
             }
         }
         thirstWatersSpent += donors.size();
+        thirstWatersByRecipient.merge(prompt.who(), donors.size(), Integer::sum);
+        sharedWaterUsed.merge(prompt.who(), prompt.shared() * prompt.waterPerSource(), Integer::sum);
         // 这一次口渴的每个来源都有了去向（挡下 / 蹭到 / 喝水 / 挨打），今天不再算第二次。
         thirstSettledToday.computeIfAbsent(prompt.who(), k -> new LinkedHashSet<>())
                 .addAll(prompt.effective().sources());
@@ -1486,9 +1526,6 @@ public final class Session {
             state = state.withState(prompt.who(), state.stateOf(prompt.who()).hurt(damage));
         }
         thirstAt = at + 1;
-        if (nextThirstIndex() < 0) {
-            thirstCard = null;
-        }
         requireNoProvisionLost("口渴结算后");
         Invariants.requireValid(state, context, "口渴结算后");
     }
@@ -1532,6 +1569,37 @@ public final class Session {
     private final List<CharacterId> thirstQueue = new ArrayList<>();
     private int thirstAt;
     private int thirstWatersSpent;
+    /** 这一张牌各人喝下的水；不能在补算时让陪酒女蹭到自己之前喝的水。 */
+    private final Map<CharacterId, Integer> thirstWatersByRecipient = new LinkedHashMap<>();
+    /** 这一张牌已经用于蹭水化解的水量，补算不能重复使用。 */
+    private final Map<CharacterId, Integer> sharedWaterUsed = new LinkedHashMap<>();
+
+    /** 晚喝只补尚未结算的来源。当前窗口不换人，后续按规则次序排，已结的来源不会再进队。 */
+    private void queueNewThirst() {
+        if (thirstCard == null || pendingNavigation != null || state.phase() != Phase.NAVIGATION || state.isOver()) {
+            return;
+        }
+        int at = nextThirstIndex();
+        CharacterId current = at < 0 ? null : thirstQueue.get(at);
+        List<CharacterId> waiting = new ArrayList<>();
+        if (current != null) {
+            waiting.add(current);
+        }
+        for (Survivor survivor : ThirstResolver.resolutionOrder(state.roster())) {
+            CharacterId id = survivor.id();
+            if (!id.equals(current) && state.conditionOf(id).suffersThirst()
+                    && !effectiveThirst(id, thirstCard).isEmpty()) {
+                waiting.add(id);
+            }
+        }
+        thirstQueue.clear();
+        thirstQueue.addAll(waiting);
+        thirstAt = 0;
+        if (current == null && !waiting.isEmpty()) {
+            // 狂风额外牌后的停顿可能已经消费过 finishNavigationResolution；补算后仍须进入标准牌。
+            resolvingExtraNavigation = extraNavigationTaken && !standardNavigationTaken;
+        }
+    }
 
     /**
      * 今天已经结算过的口渴来源，每人一份；换回合时清。
@@ -1655,7 +1723,9 @@ public final class Session {
         if (share.requiresConscious() && state.conditionOf(id) != Condition.CONSCIOUS) {
             return 0;
         }
-        return Boolean.TRUE.equals(share.stacking().get(WATER)) ? thirstWatersSpent : Math.min(1, thirstWatersSpent);
+        int otherWater = Math.max(0, thirstWatersSpent - thirstWatersByRecipient.getOrDefault(id, 0));
+        int available = Boolean.TRUE.equals(share.stacking().get(WATER)) ? otherWater : Math.min(1, otherWater);
+        return Math.max(0, available - sharedWaterUsed.getOrDefault(id, 0));
     }
 
     private void requireNoThirstInProgress(String what) {
@@ -1804,7 +1874,7 @@ public final class Session {
      */
     public void reveal(CharacterId who, String cardId) {
         requireCanAct(who);
-        if (contest != null && contest.stage() == Contest.Stage.PICK && contest.target().equals(who)) {
+        if (beingPickedFrom(who)) {
             // 被抢方在战斗里照常能亮牌，但不能在抢夺结算那一刻把手牌亮出来躲掉这一抢（规则 §5 抢夺）。
             throw new IllegalStateException("%s %s 正在挨抢，挑牌那一刻不能亮牌".formatted(context, who.value()));
         }
@@ -1916,6 +1986,8 @@ public final class Session {
      *
      * <p>亮出与撑开是两件事：亮出不占行动、只是防偷；撑开占一个行动才开始挡太阳。
      * 手上那张会先亮出来再撑开 —— 撑着的伞不可能还在手里。
+     *
+     * @throws IllegalStateException 这把伞已经撑开了
      */
     public void openParasol(CharacterId who, String cardId) {
         requireNoContest("撑伞");
@@ -1925,6 +1997,11 @@ public final class Session {
             throw new IllegalArgumentException("%s 不是要撑开才生效的物资".formatted(cardId));
         }
         SurvivorState s = state.stateOf(who);
+        if (s.isOpen(cardId)) {
+            // 审查 2026-10-08 C9：原先不拦，SurvivorState.open 遇到已撑开的直接原样返回 —— 什么也没变，行动却白花了。
+            //   界面与合法清单（Legal.plays 的 !isOpen）早就不给这一项，只有 /seas use 这条指令能走到；判据与 Legal 同一条。
+            throw new IllegalStateException("%s %s 的 %s 已经撑开了".formatted(context, who.value(), cardId));
+        }
         if (s.hasInHand(cardId)) {
             s = s.reveal(cardId);
         } else if (!s.hasInFront(cardId)) {
@@ -2046,10 +2123,21 @@ public final class Session {
      * <p>不占行动（数据里没有 {@code costs_action}）。酒留在面前，下一回合还能再喝。
      * 手上那瓶会先亮出来 —— 喝过的酒不可能还在手里。
      *
-     * @throws IllegalStateException 这一回合已经喝过了
+     * <p>「这一回合喝过」记在<b>人</b>身上（{@link SurvivorState#usedThisTurn}）：规则书「每人每天一次」。
+     * 瓶子送给今天还没喝过的人，他照样能喝；喝过的人拿回瓶子也不能再喝（审查 2026-10-08 R2）。
+     *
+     * @throws IllegalStateException 这一回合已经喝过了，或者他正在挨抢、到了挑牌那一刻
      */
     public void drinkRum(CharacterId who, String cardId) {
         requireCanAct(who);
+        if (beingPickedFrom(who)) {
+            // ❗与亮牌同一道门（审查 2026-10-08 C1）：喝酒会把手里那瓶亮到面前，等于在挑牌那一刻亮牌。
+            //   小孩只偷手牌，手里只剩这一瓶时一喝就一张能挑的都没有了 —— 这一场再也收不了场，
+            //   模组的超时默认挑牌去拿面前那瓶，在 pickFromFront 里抛（服务端 tick 里没人接住）。
+            //   从面前喝不挪牌，本身无害；但到了挑牌这一刻，这一场的打架（如果有）已经结算完，酒的 +3 只对今天之后的
+            //   打架有用，挑完再喝不吃亏 —— 所以整个拦下，与 Legal.drinks 同一个口径，不分手里面前。
+            throw new IllegalStateException("%s %s 正在挨抢，挑牌那一刻不能喝酒".formatted(context, who.value()));
+        }
         Provision card = table.provisions().get(cardId);
         if (!(card.effect() instanceof ProvisionEffect.BuffSize buff)) {
             throw new IllegalArgumentException("%s 不是能喝的加体型物资".formatted(cardId));
@@ -2080,13 +2168,15 @@ public final class Session {
                 continue;
             }
             // ❗她蹭到的是效果，不是那张牌 —— 牌仍然只有一张，所以这里<b>不</b>把牌放到她面前。
-            //   而「本回合用过」是挂在牌 id 上的标记，她面前没有那张牌就挂不上去。
-            //   所以蹭酒记在这里，见 sharedRumBonus。
+            //   「今天喝过」（usedThisTurn，审查 R2 起按人记）也<b>不</b>给她记：蹭酒算不算「喝过」
+            //   （nav_04 点不点她、她当天还能不能自己喝一瓶）待用户裁定（审查 2026-10-08 R2(c)），先维持原样。
+            //   所以蹭酒另记在这里，见 sharedRumBonus。
             sharedRum.add(other);
             if (buff.causesThirst()) {
                 state = state.withState(other, guest.thirstFrom(ThirstSource.DRANK_RUM));
             }
         }
+        queueNewThirst();
         requireNoProvisionLost("喝酒后");
     }
 
@@ -2223,22 +2313,25 @@ public final class Session {
      * <p>❗两者在数据里同为 {@code score_flat}，唯一的区别是<b>谁让它翻倍</b>
      * （现金 → 船长，美术品 → 收藏家），而那正是 {@code Ability.ScoreMultiplier.target} 的取值。
      * 所以判据取自角色那一份，不是在这里写死 id。
+     *
+     * <p>❗查的是<b>整张角色表</b>（{@link Roster#doublers()}），不是这一局上场的人（审查 2026-10-08 C2）：
+     * 原先在阵容里找加倍者，而「三个加倍者在每一套预设里都在场」只对预设成立 —— 房主自选阵容剔掉船长或收藏家之后，
+     * 牌堆里照样有现金与美术品，终局一计分就抛（无船长 200 局里 151 局）。
      */
     private boolean isCash(Provision card) {
         if (!(card.effect() instanceof ProvisionEffect.ScoreFlat flat)) {
             return false;
         }
-        for (Survivor s : state.roster().survivors()) {
-            if (s.id().value().equals(flat.doubledBy())
-                    && s.ability() instanceof Ability.ScoreMultiplier mult) {
-                return mult.target() == io.github.heavyseasmc.engine.model.TreasureKind.CASH;
-            }
+        Optional<io.github.heavyseasmc.engine.model.TreasureKind> kind =
+                state.roster().treasureDoubledBy(CharacterId.of(flat.doubledBy()));
+        if (kind.isPresent()) {
+            return kind.get() == io.github.heavyseasmc.engine.model.TreasureKind.CASH;
         }
-        // ❗分不出来就抛，不猜。三个加倍者在每一套预设里都在场（6/7/8 人局都含船长与收藏家），
-        //   所以走到这里只可能是数据被改成了自相矛盾的样子 —— 而「猜一个」会让某个人的财宝分安静地少掉一半。
-        //   DataConsistency 在加载期就守着同一条，这里是它的运行期对照。
+        // ❗分不出来就抛，不猜。从数据拼出来的阵容带着整张角色表，走到这里只可能是数据自相矛盾
+        //   （DataConsistency 在加载期守着同一条，这里是它的运行期对照），或者是手搭的合成阵容里没有那个加倍者。
+        //   「猜一个」会让某个人的财宝分安静地少掉一半。
         throw new IllegalStateException(
-                "%s 分不出 %s 属于哪一类财宝：它写着由 %s 加倍，而阵容里没有这个角色或他没有加倍技能"
+                "%s 分不出 %s 属于哪一类财宝：它写着由 %s 加倍，而角色表里没有这个角色或他没有加倍技能"
                         .formatted(context, card.id(), flat.doubledBy()));
     }
 
@@ -2314,7 +2407,8 @@ public final class Session {
      * <p>给往前推演用（{@code engine.seat}）：替身只拿得到自己的视角，要「照我看得见的、把看不见的重抽一遍」拼出一局，
      * 视角里就得有这些 —— 走到半路的一局（补给箱传到一半、落海还剩一批、口渴排到谁）光靠状态与桌面拼不出来。
      *
-     * <p>集合一律按座位排过：落海名单来自 {@code Set.copyOf}，遍历次序每次起 JVM 都不同。
+     * <p>集合一律按座位排过，不依赖落海名单自己的次序（它曾经来自 {@code Set.copyOf}，遍历次序每次起 JVM 都不同；
+     * 审查 Z3 之后选择器已按座位给）。
      *
      * @param weatherDrawn          今天的天候翻过了
      * @param provisionChain        补给箱传的次序（开箱那一刻定死）
@@ -2327,10 +2421,12 @@ public final class Session {
      * @param rowStackPrepared      舵手的指南针那一张已经抽进划船堆
      * @param overboard             正在等的那几批落海（结算完为空）
      * @param overboardSequence     落海批次的编号到几了
-     * @param thirstCard            正在结算口渴的那张牌（结算完为空）
+     * @param thirstCard            最近开始结算口渴的牌（换阶段/开始下一张时清，供晚喝补算）
      * @param thirstQueue           口渴的结算次序
      * @param thirstAt              排到第几位
      * @param thirstWatersSpent     这一张牌的口渴里一共喝下了几张水（陪酒女蹭水看它）
+     * @param thirstWatersByRecipient 这一张牌各人已经喝下的水
+     * @param sharedWaterUsed       这一张牌各人已经用来蹭水化解的水量
      * @param thirstSettledToday    今天每个人已经结算过的口渴来源（狂风天第二张不再算）
      * @param coverUsedToday        今天每个人撑开的伞已经挡过几次
      * @param sharedRum             今天蹭到别人的酒的人
@@ -2341,7 +2437,8 @@ public final class Session {
                            boolean extraNavigation, boolean resolvingExtra, boolean rowStackPrepared,
                            Optional<OverboardBatches> overboard, int overboardSequence,
                            Optional<NavigationCard> thirstCard, List<CharacterId> thirstQueue, int thirstAt,
-                           int thirstWatersSpent, Map<CharacterId, Set<ThirstSource>> thirstSettledToday,
+                           int thirstWatersSpent, Map<CharacterId, Integer> thirstWatersByRecipient,
+                           Map<CharacterId, Integer> sharedWaterUsed, Map<CharacterId, Set<ThirstSource>> thirstSettledToday,
                            Map<CharacterId, Integer> coverUsedToday, Set<CharacterId> sharedRum,
                            int healedSincePhaseStart) {
 
@@ -2351,6 +2448,8 @@ public final class Session {
             Objects.requireNonNull(thirstCard, "thirstCard");
             provisionChain = List.copyOf(provisionChain);
             thirstQueue = List.copyOf(thirstQueue);
+            thirstWatersByRecipient = Map.copyOf(thirstWatersByRecipient);
+            sharedWaterUsed = Map.copyOf(sharedWaterUsed);
             Map<CharacterId, Set<ThirstSource>> settled = new LinkedHashMap<>();
             thirstSettledToday.forEach((id, sources) -> settled.put(id, Set.copyOf(sources)));
             thirstSettledToday = Map.copyOf(settled);
@@ -2384,7 +2483,8 @@ public final class Session {
         return new Progress(weatherDrawnThisTurn, provisionChain, provisionAt, provisionRoundsToday,
                 Optional.ofNullable(navigatedThisTurn), standardNavigationTaken, extraNavigationTaken,
                 resolvingExtraNavigation, rowStackPrepared, batches, overboardSequence, Optional.ofNullable(thirstCard),
-                thirstQueue, thirstAt, thirstWatersSpent, settled, coverUsedToday, sharedRum, healedSincePhaseStart);
+                thirstQueue, thirstAt, thirstWatersSpent, thirstWatersByRecipient, sharedWaterUsed,
+                settled, coverUsedToday, sharedRum, healedSincePhaseStart);
     }
 
     private List<CharacterId> inSeatOrder(java.util.Collection<CharacterId> ids) {
@@ -2501,6 +2601,8 @@ public final class Session {
         s.thirstQueue.addAll(p.thirstQueue());
         s.thirstAt = p.thirstAt();
         s.thirstWatersSpent = p.thirstWatersSpent();
+        s.thirstWatersByRecipient.putAll(p.thirstWatersByRecipient());
+        s.sharedWaterUsed.putAll(p.sharedWaterUsed());
         p.thirstSettledToday().forEach((id, sources) -> s.thirstSettledToday.put(id, new LinkedHashSet<>(sources)));
         s.coverUsedToday.putAll(p.coverUsedToday());
         s.sharedRum.addAll(p.sharedRum());
@@ -2541,7 +2643,8 @@ public final class Session {
     /**
      * 舵手挑的牌点了谁落海：每人记一条 {@link Deed.Kind#STEERED}。
      *
-     * <p>按座位次序记，不按选择器给的集合 —— 那个集合来自 {@code Set.copyOf}，遍历次序每次起 JVM 都不同。
+     * <p>按座位次序记，不按选择器给的集合 —— 那个集合曾经来自 {@code Set.copyOf}，遍历次序每次起 JVM 都不同
+     * （审查 Z3 之后它已按候选次序给，这里照旧按座位走一遍，不依赖它）。
      * 舵手自己不记：他把自己送下水不是对谁做了什么。
      */
     private void recordSteering(NavigationCard card, int stackSize) {

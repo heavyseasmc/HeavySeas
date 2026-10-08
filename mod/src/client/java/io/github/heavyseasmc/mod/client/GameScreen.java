@@ -183,7 +183,14 @@ public abstract class GameScreen extends Screen {
     private record SeatHit(Box box, String character) {
     }
 
-    private record DetailHit(Box box, Text text) {
+    private record DetailHit(Box box, java.util.function.Supplier<Text> source) {
+        private DetailHit(Box box, Text text) {
+            this(box, () -> text);
+        }
+
+        Text text() {
+            return source.get();
+        }
     }
 
     protected GameScreen(Text title) {
@@ -201,11 +208,11 @@ public abstract class GameScreen extends Screen {
      */
     @Override
     protected void init() {
-        // Fabric 的 AFTER_INIT 要等整个子类 init 返回才发生。先在公共 init 里收窄，
-        // 以后某一面即使在 super.init() 之后创建原生 Widget，也会直接拿到内容区宽度。
-        // 取窗口宽而不是当前字段：clearAndInit 时 width 可能已经收窄，不能再减一遍。
-        reserveNotificationSidebar(client == null ? width : client.getWindow().getScaledWidth());
         mouseSeen = false;
+        // 确认键的闸：第一次显示起算宽限；每次显示都重新看哪些确认键此刻按着（ConfirmGate 的类注释）
+        long windowHandle = client == null ? 0L : client.getWindow().getHandle();
+        confirmGate.shown(System.currentTimeMillis(),
+                key -> windowHandle != 0L && net.minecraft.client.util.InputUtil.isKeyPressed(windowHandle, key));
         if (!announced) {
             announced = true;
             LOGGER.info("界面：打开 {}", getClass().getSimpleName());
@@ -233,16 +240,6 @@ public abstract class GameScreen extends Screen {
     /** 当前世界的对局投影；没有世界时是 {@link HudView#IDLE}。 */
     protected HudView projection() {
         return client == null || client.world == null ? HudView.IDLE : GameComponents.of(client.world).hudView();
-    }
-
-    /**
-     * 把 Screen 的横向布局宽度收进通知栏左边；所有子类现有的 {@code width} 计算会一起重排，
-     * 鼠标命中也继续使用同一份坐标，不需要让十四个界面各自记一套侧栏规则。
-     *
-     * <p>调用方每帧传完整窗口宽度，不能拿已经缩过的 {@link #width} 再减一次。
-     */
-    final void reserveNotificationSidebar(int screenWidth) {
-        width = GameHud.sidebarLayout(screenWidth, projection()).contentWidth();
     }
 
     /**
@@ -295,12 +292,47 @@ public abstract class GameScreen extends Screen {
         return dt;
     }
 
-    /** 界面开着时按键不经按键绑定的轮询，所以换主题在这里接一次；各面的 keyPressed 最后都会落到 super。 */
+    /**
+     * 键盘只在这里先拦一道，再分派给各面的 {@link #onKey}（审查 2026-10-07 U7 · U1；与 {@link #mouseClicked} 同一个办法）。
+     *
+     * <p>❗<b>{@code final}</b>：「正在合上」的拦截原先只在这里，而各面是先自己处理、最后才调 super ——
+     * 合上那 200 ms 里按键照样生效：阵容面板开航后连按回车发出第二个开航包，设置菜单关的那一下按 R 又生出一条改动。
+     * 确认键的闸（{@link ConfirmGate}：弹出后 300 ms 内 · 弹出前就按着的 · 按住的系统重复）也必须在各面之前。
+     * {@code GuiConsistencyTest} 守「子类不许覆写 keyPressed」。
+     */
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public final boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (closingAt > 0L) {
             return true;                     // 正在合上：这一面已经说了再见，按键不再算数
         }
+        if (!confirmGate.press(keyCode, System.currentTimeMillis())) {
+            return true;                     // 刚弹出来 / 弹出前就按着 / 按住的重复：这一下不替玩家确认任何事
+        }
+        return onKey(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        confirmGate.release(keyCode);
+        return super.keyReleased(keyCode, scanCode, modifiers);
+    }
+
+    /** 确认键的闸（{@link ConfirmGate}），每一面一份。 */
+    private final ConfirmGate confirmGate = new ConfirmGate();
+
+    /**
+     * 窗口小于支持尺寸时（各面只画「窗口太小」）按下的 Esc（审查 2026-10-07 K3 · Z6）。
+     *
+     * <p>原先 {@code GameScreenSidebar} 把它直接接成 {@link #close()}，不问这一面关不关得：补给箱（不许 Esc 关）一按就关、
+     * 再也找不回来；医疗箱选目标那一面不发取消包，下一 tick 又被弹回来。现在照这一面自己按 Esc 时的样子走一遍 ——
+     * 关得掉的关，关不掉的不关，Esc 另有用处的（取消挑目标）照它的用处。设置菜单另有覆写（看不见「存不存」那一问）。
+     */
+    void escapeInSmallWindow() {
+        keyPressed(GLFW.GLFW_KEY_ESCAPE, 0, 0);
+    }
+
+    /** 界面开着时按键不经按键绑定的轮询，所以换主题在这里接一次；各面的 onKey 最后都会落到 super。 */
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && detail != null) {
             detail = null;
             return true;
@@ -358,6 +390,9 @@ public abstract class GameScreen extends Screen {
             for (DetailHit hit : detailHits) {
                 if (hit.box().contains((int) mouseX, (int) mouseY)) {
                     detail = hit.text();
+                    if (detail == null) {
+                        continue;
+                    }
                     detailX = (int) mouseX;
                     detailY = (int) mouseY;
                     return true;
@@ -396,6 +431,9 @@ public abstract class GameScreen extends Screen {
             for (DetailHit hit : detailHits) {
                 if (hit.box().contains(mouseX, mouseY)) {
                     shown = hit.text();
+                    if (shown == null) {
+                        continue;
+                    }
                     x = mouseX;
                     y = mouseY;
                     break;
@@ -432,6 +470,11 @@ public abstract class GameScreen extends Screen {
 
     /** 这一帧在 {@code box} 上停着就显示 {@code text}（悬停说明签）。各面在 {@code drawChrome} 之后调；每帧随 drawChrome 清空。 */
     protected void addDetail(Box box, Text text) {
+        detailHits.add(new DetailHit(box, text));
+    }
+
+    /** 只在悬停/查看命中时构造签文，座位未被指到时不做规则书拼接和翻译。 */
+    protected void addDetail(Box box, java.util.function.Supplier<Text> text) {
         detailHits.add(new DetailHit(box, text));
     }
 
@@ -904,7 +947,7 @@ public abstract class GameScreen extends Screen {
         SheetLayout l = sheet();
         Box hit = unitBox(l.seatCell(i, n));
         seatHits.add(new SeatHit(hit, characterId));
-        seatDetail(characterId).ifPresent(t -> detailHits.add(new DetailHit(hit, t)));
+        addDetail(hit, () -> seatDetail(characterId).orElse(null));
         pxBegin(context);
         Rect t = l.seatToken(i, n);
         var seat = SeatMarks.seat(characterId);
@@ -1222,7 +1265,7 @@ public abstract class GameScreen extends Screen {
     protected int drawSeat(DrawContext context, String characterId, int x, int y, int cell, Bands b,
                            int mark, boolean faded, int nameColor, int lineColor) {
         seatHits.add(new SeatHit(new Box(x, y, cell, b.railH()), characterId));
-        seatDetail(characterId).ifPresent(t -> detailHits.add(new DetailHit(new Box(x, y, cell, b.railH()), t)));
+        addDetail(new Box(x, y, cell, b.railH()), () -> seatDetail(characterId).orElse(null));
         int full = b.avatar();
         if (full > 0) {
             int m = GuiMaterial.ringMargin(full);
@@ -1939,7 +1982,7 @@ public abstract class GameScreen extends Screen {
             if (on) {
                 GuiMaterial.hudPart(context, HudPart.PHASE_ON, ph.x(), ph.y(), ph.w(), ph.h(), l.k());
             }
-            GuiMaterial.hudIcon(context, PHASE_ICONS[i], ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
+            GuiMaterial.hudIcon(context, io.github.heavyseasmc.mod.ui.GameLabels.phaseIcon(i), ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
                     icon, icon, on ? GuiLanguage.Hud.PHASE_ON_ICON : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.PHASE_OFF_ALPHA),
                     l.k());
         }
@@ -1962,7 +2005,6 @@ public abstract class GameScreen extends Screen {
     }
 
     /** 上带四格阶段的图标（样张 b-3：天候 · 补给 · 行动 · 航海，与 {@link Phase} 的顺序一致）。 */
-    private static final HudPart[] PHASE_ICONS = {HudPart.IC_SUN, HudPart.IC_CRATE, HudPart.IC_FIST, HudPart.IC_BOAT};
 
     /**
      * 这一面此刻要你做什么：一句不超过 8 个字的动词短语，画在上带左头（ADR-0043 D3 (b)）。
@@ -1983,19 +2025,10 @@ public abstract class GameScreen extends Screen {
 
     // 下面两个用 switch 而不是拼字符串：拼出来的 lang 键静态扫不到，漏了也不报错。
     protected static Text conditionName(Condition condition) {
-        return Text.translatable(switch (condition) {
-            case CONSCIOUS -> "heavyseas.condition.conscious";
-            case UNCONSCIOUS -> "heavyseas.condition.unconscious";
-            case DEAD -> "heavyseas.condition.dead";
-        });
+        return io.github.heavyseasmc.mod.ui.GameLabels.conditionName(condition);
     }
 
     protected static Text phaseName(Phase phase) {
-        return Text.translatable(switch (phase) {
-            case WEATHER -> "heavyseas.phase.weather";
-            case PROVISION -> "heavyseas.phase.provision";
-            case ACTION -> "heavyseas.phase.action";
-            case NAVIGATION -> "heavyseas.phase.navigation";
-        });
+        return io.github.heavyseasmc.mod.ui.GameLabels.phaseName(phase);
     }
 }

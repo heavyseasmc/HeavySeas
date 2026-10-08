@@ -166,7 +166,7 @@ public final class RevealScreen extends GameScreen {
      *
      * @return 条的下沿
      */
-    /** 座位轨是<b>翻到谁</b>，不是座位序 —— 所以覆写它。 */
+    /** 座位轨按揭示进度排；尚未点名的位置只画问号，客户端拿不到其角色身份。 */
     @Override
     protected void drawRailBand(DrawContext context, HudView unused, Bands b) {
         long now = System.currentTimeMillis();
@@ -178,6 +178,10 @@ public final class RevealScreen extends GameScreen {
         int left = (width - entries.size() * cell) / 2;
         for (int i = 0; i < entries.size(); i++) {
             HudView.Endgame.Entry en = entries.get(i);
+            if (en.who().isEmpty()) {
+                drawLineIn(context, Text.literal("?"), left + i * cell, b.railY(), cell, GuiLanguage.dim());
+                continue;
+            }
             boolean midFlip = i == stageWho && stageRevealed && !showsFront(now, en);
             boolean done = !en.target().isEmpty() && !midFlip;
             boolean here = i == stageWho && !done;
@@ -288,13 +292,13 @@ public final class RevealScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         // 用哪个键开的，就用哪个键收起来（理由同行动一面：写死的键，玩家改了键位就收不起来）。
         if (HeavySeasClient.actKey().matchesKey(keyCode, scanCode)) {
             close();
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.onKey(keyCode, scanCode, modifiers);
     }
 
     /** 名字放不下一格时截短 —— 八人局、英文、窄窗口时相邻两格会叠成一团，截短至少还认得出是谁。 */

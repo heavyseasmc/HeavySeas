@@ -29,7 +29,9 @@ final class LlmHooksSettingsTest {
 
     private static final String MENU_KEY = "sk-menu-0123456789-not-real";
     private static final String ENV_KEY = "sk-env-9876543210-not-real";
-    private static final Function<String, String> ENV = Map.of(LlmConfig.KEY_ENV, ENV_KEY)::get;
+    private static final String URL = "https://llm.example/v1";
+    /** 环境变量里的密钥要配一个写明发往哪里的变量才带（审查 2026-10-07 L1）。 */
+    private static final Function<String, String> ENV = Map.of(LlmConfig.KEY_ENV, ENV_KEY, LlmConfig.KEY_ORIGIN_ENV, URL)::get;
 
     @AfterEach
     void stop() {
@@ -39,7 +41,7 @@ final class LlmHooksSettingsTest {
     private static void enable(TestSettings t) {
         Map<String, String> changes = new LinkedHashMap<>();
         changes.put(ServerSettingsTable.LLM_ENABLED, "true");
-        changes.put(ServerSettingsTable.LLM_BASE_URL, "https://llm.example/v1");
+        changes.put(ServerSettingsTable.LLM_BASE_URL, URL);
         changes.put(ServerSettingsTable.LLM_MODEL, "test-model");
         assertTrue(t.settings().save(true, changes).accepted());
     }
@@ -51,7 +53,7 @@ final class LlmHooksSettingsTest {
         try (LogCapture logs = new LogCapture(); TestSettings t = TestSettings.defaults();
              AutoCloseable use = ServerSettings.useForTests(t.settings())) {
             enable(t);
-            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, MENU_KEY).accepted());
+            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, MENU_KEY, URL).accepted());
             said.add(LlmHooks.reload(ENV));
             assertTrue(LlmHooks.service().enabled(), said.toString());
             assertEquals(MENU_KEY, LlmHooks.service().config().apiKey(), "正向对照：接入层拿到的是设置菜单存的那一份");
@@ -61,7 +63,7 @@ final class LlmHooksSettingsTest {
             said.addAll(status);
 
             // 清掉菜单里的：退回环境变量
-            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, "").accepted());
+            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, "", URL).accepted());
             said.add(LlmHooks.reload(ENV));
             assertEquals(ENV_KEY, LlmHooks.service().config().apiKey());
             assertEquals(LlmConfig.KEY_SOURCE_ENV, LlmHooks.keySource());
@@ -102,13 +104,15 @@ final class LlmHooksSettingsTest {
             assertFalse(first.enabled(), "旧的那个没关");
 
             LlmService second = LlmHooks.service();
-            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, MENU_KEY).accepted());
+            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, MENU_KEY, URL).accepted());
             assertTrue(LlmHooks.reloadIfChanged(ServerSettings.llmConfig(ENV)), "换了密钥没换服务");
             assertNotSame(second, LlmHooks.service());
             assertEquals(LlmConfig.KEY_SOURCE_STORE, LlmHooks.keySource());
 
-            // 合不起来（开着却没写地址）：关着，status 照样说得出密钥取自哪里
-            assertTrue(t.settings().save(true, Map.of(ServerSettingsTable.LLM_BASE_URL, "")).accepted());
+            // 合不起来（开着却没写模型）：菜单存不进去了（审查 2026-10-07 R8），手改文件才走得到 —— 关着，status 照样说得出密钥取自哪里
+            // （用模型名而不用地址造：地址空了，密钥绑不上任何地方，那是「没带」，见 LlmKeyBindingTest）
+            assertFalse(t.settings().save(true, Map.of(ServerSettingsTable.LLM_MODEL, "")).accepted(), "菜单该拒");
+            t.setRaw(ServerSettingsTable.LLM_MODEL, "");
             String result = LlmHooks.reload(ENV);
             assertFalse(LlmHooks.service().enabled());
             assertTrue(result.contains("合不起来"), result);

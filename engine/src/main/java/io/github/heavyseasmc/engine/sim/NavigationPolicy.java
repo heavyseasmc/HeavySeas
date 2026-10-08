@@ -107,11 +107,15 @@ public interface NavigationPolicy {
         public int chooseWhenRowing(List<NavigationCard> cards, GameState state, CharacterId rower, Random rng) {
             int best = 0;
             int bestScore = Integer.MIN_VALUE;
+            int ties = 0;
             for (int i = 0; i < cards.size(); i++) {
                 int score = score(cards.get(i), state, rower);
-                if (score > bestScore || (score == bestScore && rng.nextBoolean())) {
+                if (score > bestScore) {
                     best = i;
                     bestScore = score;
+                    ties = 1;
+                } else if (score == bestScore && takesTie(++ties, rng)) {
+                    best = i;
                 }
             }
             return best;
@@ -121,15 +125,30 @@ public interface NavigationPolicy {
         public NavigationCard pick(List<NavigationCard> rowStack, GameState state, CharacterId helmsman, Random rng) {
             NavigationCard best = null;
             int bestScore = Integer.MIN_VALUE;
+            int ties = 0;
             for (NavigationCard card : rowStack) {
                 int score = score(card, state, helmsman);
                 // 同分时随机取一张，否则牌堆顺序会变成暗中的第二个策略。
-                if (score > bestScore || (score == bestScore && rng.nextBoolean())) {
+                if (score > bestScore) {
                     best = card;
                     bestScore = score;
+                    ties = 1;
+                } else if (score == bestScore && takesTie(++ties, rng)) {
+                    best = card;
                 }
             }
             return Objects.requireNonNull(best);
+        }
+
+        /**
+         * 同分里的第 {@code ties} 张要不要换上来：以 1 / ties 的概率换（蓄水池抽样），整组同分的每一张被挑中的机会一样。
+         *
+         * <p>❗原先是「同分就抛一次硬币」：三张同分时第一张 1/4、第二张 1/4、最后一张 1/2（审查 2026-10-08 Q4）。
+         * 「换」取 {@code nextInt(ties) == ties - 1}：两张同分时它与原先的 {@code nextBoolean()} 读的是同一位，
+         * 结果逐局相同 —— 只有三张以上同分的那几局会变。
+         */
+        private static boolean takesTie(int ties, Random rng) {
+            return rng.nextInt(ties) == ties - 1;
         }
 
         @Override

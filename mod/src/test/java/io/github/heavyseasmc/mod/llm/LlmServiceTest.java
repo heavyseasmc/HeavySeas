@@ -441,6 +441,39 @@ class LlmServiceTest {
     }
 
     @Test
+    @DisplayName("❗先回 200、再慢慢吐空白：单次上限照样管到读完回包（经过 timeout→ok），不是一直等到截止（审查 2026-10-07 U12）")
+    void trickledBodyIsCutPerAttempt() throws Exception {
+        long deadlineMs = 6_000;
+        try (FakeChatServer server = new FakeChatServer((n, body) -> n == 1 ? Reply.answer("1").trickle(10_000) : Reply.answer("2"));
+             LlmService service = cfg(server).timeout(800).attempts(3).start()) {
+            long t0 = System.nanoTime();
+            ChoiceOutcome o = await(service.choose(request(3, deadlineMs)));
+            long took = msSince(t0);
+            // 判据本体：修之前这里是 TIMEOUT（经过 cut）—— 响应头一到，HttpRequest 的 timeout 就不再计，第一次一直吊到截止
+            assertTrue(o.chosen(), "响应头到了之后单次上限失效，第一次吊到了截止：" + o);
+            assertEquals(1, o.index());
+            assertEquals("timeout→ok", o.trailText());
+            assertEquals(2, server.requests(), "第一次该在 800 ms 上被切开、再发一次");
+            assertTrue(took < 3_000, "单次 800 ms 切开之后很快就有答案，实际 " + took + " ms");
+        }
+    }
+
+    @Test
+    @DisplayName("❗回包大得离谱 → 丢掉、按 BAD_RESPONSE 收场，不重试（审查 2026-10-07 U12：回包没有大小上限）")
+    void oversizedReplyIsDropped() throws Exception {
+        // 一个合法的回答，只是前面垫了 200 KB 空白：不设上限的读法会整份读进内存、照样认出「2」
+        String padded = Reply.answer(" ".repeat(200_000) + "2").body();
+        try (FakeChatServer server = new FakeChatServer((n, body) -> Reply.raw(200, padded));
+             LlmService service = cfg(server).attempts(3).start()) {
+            ChoiceOutcome o = await(service.choose(request(3, 10_000)));
+            assertFalse(o.chosen(), "200 KB 的回包被整份读进来了：" + o.trailText());
+            assertEquals(Fallback.BAD_RESPONSE, o.fallback(), o.toString());
+            assertEquals("big", o.trailText());
+            assertEquals(1, server.requests(), "回包过大不重试：同一个请求再发一次多半还是这么大");
+        }
+    }
+
+    @Test
     @DisplayName("预算切分的公式：不是最后一次只给 0.55·R；最后一次或那一份不到地板，给全部；都不超过单次上限")
     void attemptTimeoutFormula() throws Exception {
         try (FakeChatServer server = new FakeChatServer((n, body) -> Reply.answer("1"))) {

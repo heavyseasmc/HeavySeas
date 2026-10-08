@@ -174,9 +174,13 @@ public final class SettingsScreen extends GameScreen {
         int px = layout.len(SettingsLayout.NOTE_PX);
         Rect s = layout.status();
         SettingsMenuState.Notice notice = state.notice();
-        Text text = noticeText(notice);
+        // 服务端拒了这一次存盘：说没存上、为什么（审查 2026-10-07 U2：原先被拒的存盘照样显示「已保存」）
+        boolean rejected = notice == SettingsMenuState.Notice.NONE && state.rejection().isPresent();
+        Text text = rejected
+                ? Text.translatable("heavyseas.settings.notice.rejected", state.rejection().get())
+                : noticeText(notice);
         if (text != null) {
-            int color = switch (notice) {
+            int color = rejected ? GuiLanguage.cinnabar() : switch (notice) {
                 case CONFIRM_DISCARD -> GuiLanguage.cinnabar();
                 case SENT, SAVED -> GuiLanguage.verdigris();
                 default -> GuiLanguage.muted();
@@ -447,7 +451,7 @@ public final class SettingsScreen extends GameScreen {
     // ------------------------------------------------------------------ 按键与鼠标
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
         if (state.editing().isPresent()) {
             // 输字的时候：Enter 收下、Esc 不要、退格、Ctrl+V 粘贴；别的键一律吞掉 —— E（背包键）不许把界面关了，R · S 不许当成快捷键
@@ -483,7 +487,7 @@ public final class SettingsScreen extends GameScreen {
                 }
             }
             default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.onKey(keyCode, scanCode, modifiers);
             }
         }
         return true;
@@ -512,6 +516,23 @@ public final class SettingsScreen extends GameScreen {
             return;
         }
         super.close();
+    }
+
+    /**
+     * 窗口小于支持尺寸时按 Esc（审查 2026-10-07 Z6）：整面换成「窗口太小」，右栏顶上那一问「S 存 · Esc 不存」看不见、S 也被拦下 ——
+     * 原先第一下 Esc 进了看不见的「问存不存」，第二下就把改动静默扔掉。改成<b>留草稿再关</b>：不经 {@link #requestClose}，
+     * 没存的服务端改动由 {@link #removed} 留成草稿（与被决策面顶掉同一条路），放大窗口再开设置会接回来。
+     */
+    @Override
+    void escapeInSmallWindow() {
+        if (state.editing().isPresent()) {
+            state.cancelEdit();               // 输到一半的字不留（与被顶掉时一样）；已经收下的改动照留
+        }
+        if (returnTo != null && client != null) {
+            client.setScreen(returnTo);
+            return;
+        }
+        super.close();                        // GameScreen#close：合上再收，removed() 里留草稿
     }
 
     private int visibleRows() {

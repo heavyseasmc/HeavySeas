@@ -73,6 +73,12 @@ final class CardComposite {
     private static String language = "";
     /** 这一次运行里合成过几张。只增不减 —— 它回答的是「合成这条路到底有没有走通」。 */
     private static int composed;
+    /**
+     * 合成失败过的牌（缓存键）：之后一律走老路，不再排队（审查 2026-10-07 C7）。原先失败的那张在 {@link #of} 里每帧重新排队、
+     * 每 tick 再合成一次，每一次都多压一层模型视图栈、漏一块帧缓冲 —— 约 15 次后 Minecraft 自己的 push 抛「max stack size」，客户端崩。
+     * 换语言 · 资源重载（{@link #forget}）时清空：那时值得再试一次。
+     */
+    private static final java.util.Set<String> FAILED = new java.util.HashSet<>();
 
     private CardComposite() {
     }
@@ -95,6 +101,9 @@ final class CardComposite {
         Baked baked = READY.get(key);
         if (baked != null) {
             return baked.id();
+        }
+        if (FAILED.contains(key)) {
+            return null;                      // 合成过一次失败了：这张一律走老路，不再每 tick 重试（审查 2026-10-07 C7）
         }
         for (Job queued : QUEUE) {
             if (queued.key().equals(key)) {
@@ -128,7 +137,9 @@ final class CardComposite {
                 }
             } catch (RuntimeException e) {
                 // 合成不出来不是致命的：老路还在。但要说一声，否则「一直是老样子」没人知道为什么。
-                LOGGER.warn("牌面合成失败（{}），这张牌继续走老路画：{}", job.key(), e.toString());
+                // 有退路的地方必须说走的是哪条：这张从此直接画（老路），不再合成、不再重试。
+                FAILED.add(job.key());
+                LOGGER.warn("牌面合成失败（{}），这张牌以后一律走老路（直接画），不再重试：{}", job.key(), e.toString());
             }
             while (READY.size() > MAX_CACHED) {
                 String oldest = READY.keySet().iterator().next();
@@ -150,61 +161,94 @@ final class CardComposite {
         }
         READY.clear();
         QUEUE.clear();
+        FAILED.clear();
     }
 
+    /**
+     * 合成一张。
+     *
+     * <p>❗中途抛异常时，它改过的全局渲染状态<b>一样不落地还原</b>，帧缓冲删掉（审查 2026-10-07 C7）：原先没有 finally ——
+     * 模型视图栈多压一层（1.21.1 的栈只有 16 层）、投影停在离屏用的正交矩阵、写入目标停在这块帧缓冲、剔除关着，
+     * 每次还漏约 2 MB 显存；失败的牌又每 tick 重试一次，十几次后 Minecraft 任何一次 push 都抛「max stack size」，客户端崩。
+     */
     private static Baked compose(MinecraftClient client, Job job) {
         RenderSystem.assertOnRenderThread();
         SimpleFramebuffer fb = new SimpleFramebuffer(job.texW(), job.texH(), false, false);
-        fb.setClearColor(0f, 0f, 0f, 0f);
-        fb.clear(false);
-        fb.beginWrite(true);
+        boolean done = false;
+        try {
+            int centerAlpha = paintInto(client, job, fb);
 
+            // 多级纹理：帧缓冲只给了第 0 级，缩小时会闪。自己生成，并把过滤改成线性 + 多级。
+            GlStateManager._bindTexture(fb.getColorAttachment());
+            GlStateManager._texParameter(GlConst.GL_TEXTURE_2D, GlConst.GL_TEXTURE_MIN_FILTER, GlConst.GL_LINEAR_MIPMAP_LINEAR);
+            GlStateManager._texParameter(GlConst.GL_TEXTURE_2D, GlConst.GL_TEXTURE_MAG_FILTER, GlConst.GL_LINEAR);
+            GL30.glGenerateMipmap(GlConst.GL_TEXTURE_2D);
+            GlStateManager._bindTexture(0);
+
+            Identifier id = Identifier.of(HeavySeasMod.MOD_ID, "composite/" + job.key().toLowerCase(java.util.Locale.ROOT));
+            client.getTextureManager().registerTexture(id, new FboTexture(fb));
+            done = true;
+            return new Baked(id, fb, centerAlpha);
+        } finally {
+            if (!done) {
+                fb.delete();                  // 没交出去的帧缓冲当场删：失败一次漏一块约 2 MB 显存
+            }
+        }
+    }
+
+    /** 往 {@code fb} 里画这张牌，返回牌中心的不透明度。改过的全局状态在 finally 里全部还原，抛不抛都一样。 */
+    private static int paintInto(MinecraftClient client, Job job, SimpleFramebuffer fb) {
         Matrix4f previous = RenderSystem.getProjectionMatrix();
         VertexSorter sorter = RenderSystem.getVertexSorting();
-        // ❗上下是对调的（`0, texH` 而不是 Minecraft 画 GUI 时的 `texH, 0`）：
-        //   帧缓冲的第 0 行在**下**，而 drawTexture 取样时把第 0 行当**上** —— 两边差一个翻转。
-        //   不对调的话合成出来的牌整张上下颠倒、字也是反的（2026-09-24 第一次实拍就是这样）。
-        RenderSystem.setProjectionMatrix(
-                new Matrix4f().setOrtho(0f, job.texW(), 0f, job.texH(), NEAR, FAR), VertexSorter.BY_Z);
         Matrix4fStack stack = RenderSystem.getModelViewStack();
-        stack.pushMatrix();
-        stack.translation(0f, 0f, DEPTH);
-        RenderSystem.applyModelViewMatrix();
+        boolean pushed = false;
+        try {
+            fb.setClearColor(0f, 0f, 0f, 0f);
+            fb.clear(false);
+            fb.beginWrite(true);
+            // ❗上下是对调的（`0, texH` 而不是 Minecraft 画 GUI 时的 `texH, 0`）：
+            //   帧缓冲的第 0 行在**下**，而 drawTexture 取样时把第 0 行当**上** —— 两边差一个翻转。
+            //   不对调的话合成出来的牌整张上下颠倒、字也是反的（2026-09-24 第一次实拍就是这样）。
+            RenderSystem.setProjectionMatrix(
+                    new Matrix4f().setOrtho(0f, job.texW(), 0f, job.texH(), NEAR, FAR), VertexSorter.BY_Z);
+            stack.pushMatrix();
+            pushed = true;
+            stack.translation(0f, 0f, DEPTH);
+            RenderSystem.applyModelViewMatrix();
 
-        DrawContext context = new DrawContext(client, client.getBufferBuilders().getEntityVertexConsumers());
-        // ❗关剔除：上面把投影上下对调了，三角形的绕向跟着反过来，而这段代码跑在客户端 tick 里 ——
-        //   那时 GL 的剔除是上一次世界渲染留下的「开」。不关的话整张牌被剔掉，
-        //   屏幕上是**一张空白牌**（2026-09-24 第二次实拍就是这样：只剩金框）。
-        RenderSystem.disableCull();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        // ❗在**贴图自己的像素空间**里画：倍率固定给 1，与窗口多大、界面尺寸设成几无关。
-        //   档位由调用方按屏幕上的大小定好了 —— 合成只改采样时机，不改版式。
-        CardPainter.paint(context, job.face(), job.tier(), 0, 0, job.texW(), job.texH(), 1);
-        context.draw();
-        // 正向对照：读回牌中心那一个像素的不透明度（边框层在那里是满纸）。「合成出来了」不等于「合成对了」。
-        java.nio.ByteBuffer center = org.lwjgl.BufferUtils.createByteBuffer(4);
-        org.lwjgl.opengl.GL11.glReadPixels(job.texW() / 2, job.texH() / 2, 1, 1, org.lwjgl.opengl.GL11.GL_RGBA,
-                org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, center);
-        int centerAlpha = center.get(3) & 0xFF;
-
-        RenderSystem.enableCull();
-        stack.popMatrix();
-        RenderSystem.applyModelViewMatrix();
-        RenderSystem.setProjectionMatrix(previous, sorter);
-        client.getFramebuffer().beginWrite(true);
-
-        // 多级纹理：帧缓冲只给了第 0 级，缩小时会闪。自己生成，并把过滤改成线性 + 多级。
-        GlStateManager._bindTexture(fb.getColorAttachment());
-        GlStateManager._texParameter(GlConst.GL_TEXTURE_2D, GlConst.GL_TEXTURE_MIN_FILTER, GlConst.GL_LINEAR_MIPMAP_LINEAR);
-        GlStateManager._texParameter(GlConst.GL_TEXTURE_2D, GlConst.GL_TEXTURE_MAG_FILTER, GlConst.GL_LINEAR);
-        GL30.glGenerateMipmap(GlConst.GL_TEXTURE_2D);
-        GlStateManager._bindTexture(0);
-
-        Identifier id = Identifier.of(HeavySeasMod.MOD_ID, "composite/" + job.key().toLowerCase(java.util.Locale.ROOT));
-        client.getTextureManager().registerTexture(id, new FboTexture(fb));
-        return new Baked(id, fb, centerAlpha);
+            DrawContext context = new DrawContext(client, client.getBufferBuilders().getEntityVertexConsumers());
+            // ❗关剔除：上面把投影上下对调了，三角形的绕向跟着反过来，而这段代码跑在客户端 tick 里 ——
+            //   那时 GL 的剔除是上一次世界渲染留下的「开」。不关的话整张牌被剔掉，
+            //   屏幕上是**一张空白牌**（2026-09-24 第二次实拍就是这样：只剩金框）。
+            RenderSystem.disableCull();
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            try {
+                // ❗在**贴图自己的像素空间**里画：倍率固定给 1，与窗口多大、界面尺寸设成几无关。
+                //   档位由调用方按屏幕上的大小定好了 —— 合成只改采样时机，不改版式。
+                CardPainter.paint(context, job.face(), job.tier(), 0, 0, job.texW(), job.texH(), 1);
+            } finally {
+                // 画到一半抛了也要把已经排进共享缓冲的那一截冲掉 —— 冲进这块（要丢掉的）帧缓冲，不留给下一次世界渲染
+                context.draw();
+            }
+            // 正向对照：读回牌中心那一个像素的不透明度（边框层在那里是满纸）。「合成出来了」不等于「合成对了」。
+            java.nio.ByteBuffer center = org.lwjgl.BufferUtils.createByteBuffer(4);
+            org.lwjgl.opengl.GL11.glReadPixels(job.texW() / 2, job.texH() / 2, 1, 1, org.lwjgl.opengl.GL11.GL_RGBA,
+                    org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, center);
+            return center.get(3) & 0xFF;
+        } finally {
+            // 着色色与混合：CardPainter 画到一半抛的话可能停在「划掉」那一层的半透明与分开写的透明度上（正常走完时它自己还原，这两行是空操作）
+            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            RenderSystem.defaultBlendFunc();
+            RenderSystem.enableCull();
+            if (pushed) {
+                stack.popMatrix();
+            }
+            RenderSystem.applyModelViewMatrix();
+            RenderSystem.setProjectionMatrix(previous, sorter);
+            client.getFramebuffer().beginWrite(true);
+        }
     }
 
     /**

@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.function.BiConsumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -47,11 +48,12 @@ import java.util.function.Supplier;
  *
  * <h2>可复现、有预算、看不见的碰不到</h2>
  * <ul>
- *   <li>推演的随机数只从<b>自己那一条</b>拿（构造时按种子造），不碰对局的随机流；
+ *   <li>推演的随机数只从<b>自己</b>的种子派生（每个决定一条，见 {@link #decisionSeed}），不碰对局的随机流；
  *       推演不加温度（逐轮减半最后只剩一个）。不推演的那几个决定照第一层答，温度不为 0 时照第一层用对局的随机流；</li>
  *   <li>预算：每个决定最多推演 {@link SeatPolicySettings#rollouts() rollouts} 局，墙上时间最多
  *       {@link SeatPolicySettings#millisPerDecision() millisPerDecision} 毫秒。
- *       ❗限时会让结果取决于机器快慢 —— 要可复现就设 0，让局数先用完；</li>
+ *       ❗限时会让<b>被截断的那一个决定</b>取决于机器快慢 —— 要整局可复现就设 0，让局数先用完。
+ *       截断不会再连累这一位之后的决定（每个决定的种子各自派生，审查 2026-10-08 R12）；</li>
  *   <li>它只从视角抽局，碰不到真的那一局：两局只差看不见的东西时，同一个种子下的决定一模一样
  *       （{@code SearchSeatPolicyTest} 钉着）。</li>
  * </ul>
@@ -90,7 +92,12 @@ public final class SearchSeatPolicy implements SeatPolicy {
     private final Objective objective;
     /** 剪枝、不推演的那几个决定、推演里全船（包括我自己）的每一步，都是这一份第一层。无状态，可以共用。 */
     private final HeuristicSeatPolicy layer1;
-    private final Random rng;
+    /** 这一位自己的种子。每个推演的决定由它与「第几个决定」派生一条随机流（{@link #decisionSeed}）。 */
+    private final long seed;
+    /** 推演过几个决定了 —— 派生下一个决定的种子用。只随决定的个数走，不随墙上时间走。 */
+    private int decisions;
+    /** 墙上时间（纳秒）。测试可以换成假的钟，把「到点」放在想要的那一局之后。 */
+    private final LongSupplier clock;
     private final List<Long> nanos = new ArrayList<>();
     private long rollouts;
     private int failures;
@@ -108,11 +115,30 @@ public final class SearchSeatPolicy implements SeatPolicy {
     }
 
     SearchSeatPolicy(SeatPolicySettings settings, TreasureScoring scoring, long seed, Objective objective) {
+        this(settings, scoring, seed, objective, System::nanoTime);
+    }
+
+    SearchSeatPolicy(SeatPolicySettings settings, TreasureScoring scoring, long seed, Objective objective,
+                     LongSupplier clock) {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.scoring = scoring;
         this.objective = Objects.requireNonNull(objective, "objective");
         this.layer1 = new HeuristicSeatPolicy(settings);
-        this.rng = new Random(seed);
+        this.seed = seed;
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /**
+     * 第 {@code decision} 个推演的决定用的种子：由这一位的种子与「第几个决定」混出来（splitmix64 的收尾那一步）。
+     *
+     * <p>❗原先是一条随机流从头用到尾，每一批推演从里面取一个数（审查 2026-10-08 R12）：限时一到，这一个决定少取了几个数，
+     * 这一位此后的每一个决定都跟着错位 —— 同一个种子在快机器与慢机器上打出两局。派生之后，限时只影响被截断的那一个决定。
+     */
+    static long decisionSeed(long seatSeed, int decision) {
+        long z = seatSeed + (decision + 1L) * 0x9E3779B97F4A7C15L;
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
     }
 
     /**
@@ -311,23 +337,28 @@ public final class SearchSeatPolicy implements SeatPolicy {
         if (alive.size() == 1) {
             return options.get(alive.getFirst());
         }
-        long start = System.nanoTime();
+        long start = clock.getAsLong();
+        Random rng = new Random(decisionSeed(seed, decisions++));
         try {
-            return options.get(halve(view, options, scores, alive, apply));
+            return options.get(halve(view, options, scores, alive, apply, rng));
         } catch (RuntimeException e) {
             failures++;
             lastFailure = "%s 第 %d 天 %s 推演出错：%s".formatted(view.phase(), view.turn(), view.self().value(), e);
             return options.get(alive.getFirst());
         } finally {
-            nanos.add(System.nanoTime() - start);
+            nanos.add(clock.getAsLong() - start);
         }
     }
 
-    /** 逐轮减半，交回最后留下的那一个的下标。 */
+    /**
+     * 逐轮减半，交回最后留下的那一个的下标。
+     *
+     * @param rng 这一个决定自己的随机流（{@link #decisionSeed}）：每一批推演从里面取一个种子，到点截断也只截断这一条
+     */
     private <T> int halve(SeatView view, List<T> options, double[] prior, List<Integer> candidates,
-                          BiConsumer<SeatDriver, T> apply) {
+                          BiConsumer<SeatDriver, T> apply, Random rng) {
         long deadline = settings.millisPerDecision() > 0
-                ? System.nanoTime() + settings.millisPerDecision() * 1_000_000L : Long.MAX_VALUE;
+                ? clock.getAsLong() + settings.millisPerDecision() * 1_000_000L : Long.MAX_VALUE;
         Map<CharacterId, Double> regard = regard(view);
         double[] sum = new double[options.size()];
         int[] count = new int[options.size()];
@@ -341,10 +372,10 @@ public final class SearchSeatPolicy implements SeatPolicy {
             for (int i = 0; i < per && budget >= alive.size() && !outOfTime; i++) {
                 // 一批：每个候选各推演一局，用同一局抽出来的局面、同一条随机流。
                 // 时间在每局之后都查；到点时这一批没做完就整批不算 —— 只算了一半的那一批，比的就不是同一局了
-                long seed = rng.nextLong();
+                long batchSeed = rng.nextLong();
                 for (int c : alive) {
-                    batch[c] = rollout(view, options.get(c), apply, seed, regard);
-                    if (System.nanoTime() > deadline) {
+                    batch[c] = rollout(view, options.get(c), apply, batchSeed, regard);
+                    if (clock.getAsLong() > deadline) {
                         outOfTime = true;
                         break;
                     }

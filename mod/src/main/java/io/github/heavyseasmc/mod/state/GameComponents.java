@@ -1,13 +1,16 @@
 package io.github.heavyseasmc.mod.state;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
-import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.world.Crate;
 import io.github.heavyseasmc.mod.world.Nameplates;
 import io.github.heavyseasmc.mod.world.Seats;
 import io.github.heavyseasmc.mod.world.Gulls;
 
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.network.packet.CustomPayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.ladysnake.cca.api.v3.component.ComponentKey;
@@ -26,6 +29,7 @@ import org.slf4j.LoggerFactory;
 public final class GameComponents implements WorldComponentInitializer {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+    private static final SyncBatcher<ServerWorld> PENDING = new SyncBatcher<>();
 
     /** 对局状态。一个世界一局。 */
     public static final ComponentKey<GameComponent> GAME =
@@ -54,7 +58,7 @@ public final class GameComponents implements WorldComponentInitializer {
     }
 
     /**
-     * 把组件推给该收到的玩家。同上，走注入进 World 的那个接口。
+     * 登记投影变化，同一 tick 的请求合并。发专用包前由 send 提前 flush，其余在 tick 末尾统一发。
      *
      * <p>顺带把世界里的位次也摆对（ADR-0024）：**座位上的位置和 HUD 一样是投影**，
      * 事实源永远是引擎的 {@code bySeat()}。放在这里是因为这里正是「投影该更新了」那一刻 ——
@@ -62,14 +66,34 @@ public final class GameComponents implements WorldComponentInitializer {
      * {@code Seats#refresh} 对已经坐对的人什么都不做，所以每帧走一遍是便宜的。
      */
     public static void sync(World world) {
-        world.syncComponent(GAME);
         if (world instanceof ServerWorld server) {
-            GameComponent component = of(world);
+            PENDING.mark(server);
+        } else {
+            world.syncComponent(GAME);
+        }
+    }
+
+    /** 一 tick 末尾发一次；若之前已为专用包发过且状态没再变，就什么也不做。 */
+    public static void flush(ServerWorld world) {
+        PENDING.flush(world, server -> {
+            server.syncComponent(GAME);
+            GameComponent component = of(server);
             Seats.refresh(server, component);
             Gulls.refresh(server, component);
-            Nameplates.refresh(server, component);   // 头顶信息条同理：投影，不是状态（决策 ⑥）
+            Nameplates.refresh(server, component);
             // 补给箱实物同理（ADR-0034 §5.4）：照引擎说的持有人滑过去。
-            component.layoutId().ifPresent(id -> Crate.refresh(server, component, SceneDataLoader.require(id)));
-        }
+            // 布局用开局快照（审查 2026-10-07 C6）：对局中 /reload 拿掉它，这里原先每一次同步都抛
+            component.layout().ifPresent(layout -> Crate.refresh(server, component, layout));
+        });
+    }
+
+    /** 保持投影先到，专用包后到；自动选择的通知仍由调用方放在真正改变状态之前。 */
+    public static void send(ServerWorld world, ServerPlayerEntity player, CustomPayload payload) {
+        flush(world);
+        ServerPlayNetworking.send(player, payload);
+    }
+
+    public static void serverStopped(MinecraftServer server) {
+        PENDING.forget(world -> world.getServer() == server);
     }
 }

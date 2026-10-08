@@ -3,7 +3,6 @@ package io.github.heavyseasmc.mod.game;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.world.PlayerBodies;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 
@@ -44,20 +43,19 @@ public final class OverboardPhase {
         }
     }
 
-    public static void tick(MinecraftServer server) {
-        for (ServerWorld world : server.getWorlds()) {
-            GameComponent component = GameComponents.of(world);
-            long deadline = component.overboardDeadline();
-            if (component.session().isEmpty() || deadline <= 0 || System.currentTimeMillis() < deadline) {
-                continue;
-            }
-            component.setOverboardDeadline(0);
-            var swimmers = component.requireSession().overboardPending().orElseThrow().swimmers();
-            PlayerBodies.fall(world, component, swimmers);
-            component.requireSession().finishOverboard();
-            GameComponents.sync(world);
-            GameFlow.schedule(component, component.anyHumanSeated() ? PlayerBodies.FALL_MILLIS : 0,
-                    "overboard bodies return", () -> begin(world, component));
+    /** 每 tick 检查超时。经 {@link GameFlow#guarded} 挂上：出错只结束这一局。 */
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        long deadline = component.overboardDeadline();
+        if (component.session().isEmpty() || deadline <= 0 || now < deadline) {
+            return;
         }
+        component.setOverboardDeadline(0);
+        component.setStandInsOverboard(false);   // 这一窗结了：还在想的替身那一手落地时会核对窗口、作废
+        var swimmers = component.requireSession().overboardPending().orElseThrow().swimmers();
+        PlayerBodies.fall(world, component, swimmers);
+        component.requireSession().finishOverboard();
+        GameComponents.sync(world);
+        GameFlow.schedule(component, component.anyHumanSeated() ? PlayerBodies.FALL_MILLIS : 0,
+                "overboard bodies return", () -> begin(world, component));
     }
 }

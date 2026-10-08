@@ -34,7 +34,8 @@ import java.util.Set;
  * @param front       亮在面前的牌（物资 id，可重复）。<b>公开信息</b>
  * @param opened      面前哪些牌已经「打开」并持续生效 —— 目前只有撑开的阳伞。
  *                    <b>持续到被冲走</b>，不随回合清
- * @param usedThisTurn 面前哪些牌本回合用过了 —— 目前只有喝过的酒（{@code once_per_turn}）。
+ * @param usedThisTurn 他今天用过哪些物资（按物资 id）—— 目前只有喝过的酒（{@code once_per_turn}）。
+ *                    <b>记在人身上，不记在牌上</b>：瓶子送人、被抢、被浪卷走，他今天照样喝过（审查 2026-10-08 R2）。
  *                    <b>回合结束清空</b>；航海牌 nav_04 的 {@code used_rum} 问的就是它
  */
 public record SurvivorState(
@@ -179,7 +180,7 @@ public record SurvivorState(
     }
 
     /**
-     * 从面前去掉一张（用掉、被夺走、被冲走）。同时收掉它的「已打开」与「本回合用过」标记。
+     * 从面前去掉一张（用掉、被夺走、被冲走）。同时收掉它的「已打开」标记（「今天用过」记在人身上，不收）。
      *
      * @throws IllegalArgumentException 面前没有这张
      */
@@ -227,7 +228,7 @@ public record SurvivorState(
         return opened.contains(cardId);
     }
 
-    /** 记下这张牌本回合用过了（喝过的酒）。回合结束时清空。 */
+    /** 记下他今天用过这种物资了（喝过的酒）。回合结束时清空；牌离开他面前时<b>不</b>清。 */
     public SurvivorState markUsedThisTurn(String cardId) {
         if (usedThisTurn.contains(cardId)) {
             return this;
@@ -237,7 +238,7 @@ public record SurvivorState(
         return new SurvivorState(id, seat, damage, thirst, actedThisTurn, hand, front, opened, next);
     }
 
-    /** 这张牌本回合用过了没有。nav_04 的 {@code used_rum} 问的就是它。 */
+    /** 他今天用过这种物资没有（喝过酒没有）。nav_04 的 {@code used_rum} 问的就是它。 */
     public boolean usedThisTurn(String cardId) {
         return usedThisTurn.contains(cardId);
     }
@@ -281,12 +282,17 @@ public record SurvivorState(
         return new SurvivorState(id, seat, damage, thirst, actedThisTurn, nextHand, front, opened, usedThisTurn);
     }
 
-    /** 换掉整个「面前」，并把已经不在面前的标记一起收掉。 */
+    /**
+     * 换掉整个「面前」，并把已经不在面前的牌的「已打开」标记一起收掉。
+     *
+     * <p>❗「今天用过」<b>不</b>跟着收（审查 2026-10-08 R2）：它原先也按面前的牌裁剪，于是喝完把瓶子送人、被抢、
+     * 被浪卷走，喝酒的人当天的 +3 就没了，「醉者落海」也点不到他，拿回瓶子的他当天还能再喝一次。
+     * 规则书写的是「喝朗姆酒：每人每天一次」「今天喝过朗姆酒的人」「今天喝的朗姆酒」—— 都按人算，
+     * 所以那瓶酒本身不带「今天喝过」：拿到它而今天还没喝过的人照样能喝（规则基线 §11.2「每大轮最多喝一次」说的是人不叠加）。
+     */
     public SurvivorState withFront(List<String> nextFront) {
         Set<String> keptOpen = new LinkedHashSet<>(opened);
         keptOpen.retainAll(nextFront);
-        Set<String> keptUsed = new LinkedHashSet<>(usedThisTurn);
-        keptUsed.retainAll(nextFront);
-        return new SurvivorState(id, seat, damage, thirst, actedThisTurn, hand, nextFront, keptOpen, keptUsed);
+        return new SurvivorState(id, seat, damage, thirst, actedThisTurn, hand, nextFront, keptOpen, usedThisTurn);
     }
 }

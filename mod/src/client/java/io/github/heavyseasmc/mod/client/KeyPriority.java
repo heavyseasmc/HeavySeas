@@ -9,6 +9,9 @@ import net.minecraft.client.util.InputUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 对局进行中，本模组的按键先接（用户 2026-09-25；ADR-0042）。
  *
@@ -28,13 +31,34 @@ public final class KeyPriority {
     private KeyPriority() {
     }
 
-    /** 这个键此刻该不该由本模组接：对局进行中，且它是本模组某个绑定的键。是就返回那个绑定，否则 null。 */
+    /**
+     * 这个键此刻交给谁（判据在 {@link KeyRoute}）：对局进行中本模组的键先接；日志翻页那三个（↑ ↓ End）撞了键就让给别的绑定
+     * —— 对局里外都让（审查 2026-10-07 U4：把移动绑在方向键上的玩家按 ↑ 原先走不动）。{@code null} = 照 Minecraft 自己的办法。
+     */
     public static KeyBinding claim(InputUtil.Key key) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.world == null || !GameComponents.of(client.world).hudView().active()) {
+        if (client == null || client.options == null) {
             return null;
         }
-        return ours(key);
+        boolean live = client.world != null && GameComponents.of(client.world).hudView().active();
+        List<KeyBinding> own = HeavySeasClient.ownKeys();
+        List<KeyBinding> yielding = HeavySeasClient.yieldingKeys();
+        return KeyRoute.route(boundTo(key), own::contains, yielding::contains, live);
+    }
+
+    /** 绑在这个键上的全部绑定（Minecraft 自带的、别的模组的、本模组的），按控制设置里的次序。 */
+    public static List<KeyBinding> boundTo(InputUtil.Key key) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.options == null) {
+            return List.of();
+        }
+        List<KeyBinding> out = new ArrayList<>();
+        for (KeyBinding binding : client.options.allKeys) {
+            if (!binding.isUnbound() && key.equals(KeyBindingHelper.getBoundKeyOf(binding))) {
+                out.add(binding);
+            }
+        }
+        return out;
     }
 
     /** 本模组绑在这个键上的那个绑定（不看对局）；没有就是 null。 */
@@ -52,8 +76,14 @@ public final class KeyPriority {
      * 回归脚本（keys_test.py）读这一行与「航海日志：钉住」两件事：前者说「接走了」，后者说「接走之后真的生效了」。
      */
     public static void noteTakeover(InputUtil.Key key, KeyBinding ours, KeyBinding wouldHaveGone) {
-        if (wouldHaveGone != null && wouldHaveGone != ours) {
+        if (wouldHaveGone == null || wouldHaveGone == ours) {
+            return;
+        }
+        if (HeavySeasClient.ownKeys().contains(ours)) {
             LOGGER.info("按键：对局中 {} 归本模组 {}（原本会给 {}）",
+                    key.getTranslationKey(), ours.getTranslationKey(), wouldHaveGone.getTranslationKey());
+        } else {
+            LOGGER.info("按键：{} 让给 {}（原本会给本模组 {}）",
                     key.getTranslationKey(), ours.getTranslationKey(), wouldHaveGone.getTranslationKey());
         }
     }

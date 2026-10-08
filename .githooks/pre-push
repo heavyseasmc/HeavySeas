@@ -7,26 +7,16 @@
 #   提交是本地的、可以重来；**推送是不可逆的**——推上去的东西即使随后强推覆盖，
 #   也已经离开了这台机器。所以重的检查放在这里，提交保持快。
 #
+# 去哪里找维护者的检查脚本、找不到怎么办，见同目录 private-check.sh。
+#
 # 绕过：git push --no-verify（请三思：上一次跳过检查的代价是重建整个仓库历史）
 
 set -eu
 
-root="$(git rev-parse --show-toplevel)"
-private_root="${HEAVYSEAS_WIKI:-$root/docs}"
-if [ ! -f "$private_root/tools/prepush.sh" ]; then
-  sibling="$(cd "$root/.." && pwd)/VibeCodingWiki"
-  if [ -f "$sibling/tools/prepush.sh" ]; then
-    private_root="$sibling"
-  fi
-fi
-check="$private_root/tools/prepush.sh"
+. "$(dirname "$0")/private-check.sh"
 
-if [ -f "$check" ]; then
-  "${BASH:-bash}" "$check" "$@" || {
-    echo
-    echo "推送已中止。确需绕过时：git push --no-verify（请三思）"
-    exit 1
-  }
-else
-  echo "提示：未找到维护者本地检查脚本，跳过推送前检查（普通克隆里属正常）。"
-fi
+run_private_check prepush.sh "$@" || {
+  echo
+  echo "推送已中止。确需绕过时：git push --no-verify（请三思）"
+  exit 1
+}

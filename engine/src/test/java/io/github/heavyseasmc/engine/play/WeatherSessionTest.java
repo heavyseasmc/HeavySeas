@@ -32,6 +32,40 @@ class WeatherSessionTest {
     private static final NavigationCard QUIET = card("quiet", 0, new Selector.Nobody(), false, false);
 
     @Test
+    void lateRumRespectsRainAndDoubleWater() {
+        for (WeatherEffect weather : List.of(WeatherEffect.IGNORE_THIRST, WeatherEffect.DOUBLE_WATER)) {
+            Session s = atAction(weather, List.of(QUIET));
+            CharacterId who = s.state().bySeat().getFirst();
+            deal(s, who, "rum");
+            s.advancePhase();
+            s.beginNavigate(QUIET);
+            s.drinkRum(who, "rum");
+            if (weather == WeatherEffect.IGNORE_THIRST) {
+                assertTrue(s.thirstPending().isEmpty());
+            } else {
+                assertEquals(2, s.thirstPending().orElseThrow().waterNeeded());
+            }
+        }
+    }
+
+    @Test
+    void lateRumAfterExtraResolutionKeepsTheStandardCardPendingAndChargesOnce() {
+        Session s = atAction(WeatherEffect.EXTRA_NAVIGATION, List.of(QUIET, card("second", 0, new Selector.Nobody(), false, false)));
+        CharacterId who = s.state().bySeat().getFirst();
+        deal(s, who, "rum");
+        s.advancePhase();
+        s.beginNavigate(s.takeWeatherNavigationCard());
+        assertTrue(s.finishNavigationResolution());
+        s.drinkRum(who, "rum");
+        assertEquals(1, drainThirst(s, who));
+        assertTrue(s.finishNavigationResolution(), "补算完仍要执行标准航海牌");
+        s.prepareRowStack();
+        s.beginNavigate(s.takeCardForNavigation(null));
+        assertEquals(0, drainThirst(s, who), "同一天第二张不再重复酒的来源");
+        assertFalse(s.finishNavigationResolution());
+    }
+
+    @Test
     void rainSuppressesEveryThirstSource() {
         Session session = atAction(WeatherEffect.IGNORE_THIRST, List.of(QUIET));
         CharacterId actor = session.state().bySeat().getFirst();

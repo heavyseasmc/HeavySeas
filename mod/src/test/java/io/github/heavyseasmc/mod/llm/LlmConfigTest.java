@@ -125,6 +125,9 @@ class LlmConfigTest {
         assertThrows(IllegalArgumentException.class, () -> with("baseUrl", "ftp://h/v1"));
         assertThrows(IllegalArgumentException.class, () -> with("baseUrl", "http://h/v1/chat/completions"));
         assertThrows(IllegalArgumentException.class, () -> with("baseUrl", "http://h/v1?key=1"));
+        // 审查 2026-10-07 L1：地址里带用户名密码 —— 它会随设置同步给客户端，也是另一种把凭据送到别处的写法
+        assertThrows(IllegalArgumentException.class, () -> with("baseUrl", "http://user:pass@h/v1"), "地址里带 user:pass@");
+        assertThrows(IllegalArgumentException.class, () -> with("baseUrl", "https://token@h/v1"), "地址里带 user@");
         assertEquals("http://h:1/v1", with("baseUrl", " http://h:1/v1/// ").baseUrl(), "首尾空白与末尾的 / 去掉");
         LlmConfig off = LlmConfig.off();
         assertFalse(off.enabled());

@@ -74,12 +74,16 @@ public final class SceneDataLoader implements SimpleSynchronousResourceReloadLis
 
     /** 某份布局在某种天候那一天的雾表条目（ADR-0034 §5.1.4）。 */
     public static FogTable.Entry fogFor(Identifier layoutId, String weatherId) {
-        VoyageLayout layout = require(layoutId);
+        return fogTableOf(require(layoutId)).entryFor(weatherId);
+    }
+
+    /** 某份布局指的那张雾表（开局时连同布局一起快照进这一局，审查 2026-10-07 C6）。 */
+    public static FogTable fogTableOf(VoyageLayout layout) {
         FogTable table = loaded().fogTables().get(layout.fog());
         if (table == null) {
-            throw new IllegalStateException("布局 %s 指的雾表 %s 不在（加载期核过，不该走到这里）".formatted(layoutId, layout.fog()));
+            throw new IllegalStateException("布局 %s 指的雾表 %s 不在（加载期核过，不该走到这里）".formatted(layout.id(), layout.fog()));
         }
-        return table.entryFor(weatherId);
+        return table;
     }
 
     /**
@@ -95,11 +99,8 @@ public final class SceneDataLoader implements SimpleSynchronousResourceReloadLis
         }
         for (ServerWorld world : server.getWorlds()) {
             GameComponent component = GameComponents.of(world);
-            if (component.session().isPresent() && component.layoutId().isPresent()) {
-                VoyageLayout layout = current.layouts().get(component.layoutId().get());
-                if (layout != null) {
-                    return layout;
-                }
+            if (component.session().isPresent() && component.layout().isPresent()) {
+                return component.layout().get();   // 这一局开局时的快照：/reload 拿掉它也照旧（审查 2026-10-07 C6）
             }
         }
         return current.layouts().get(DEFAULT);

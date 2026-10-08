@@ -95,6 +95,14 @@ final class StandInThinker {
         void schedule(long dueMs, String what, Runnable task);
 
         long now();
+
+        /**
+         * 看门狗那一跳出了错（照答案做 / 按默认做时抛了）：照排程那条路的规矩收（{@code GameFlow#abort}，出错就结束这一局）。
+         * 默认原样抛出 —— 单测里的假主线程不覆写它时，行为与没有这一层一样。
+         */
+        default void fail(String what, RuntimeException error) {
+            throw error;
+        }
     }
 
     /**
@@ -253,7 +261,18 @@ final class StandInThinker {
             }
         }
         for (Run<?> run : due) {
-            watchdog(run);
+            // ❗看门狗在每 tick 的事件里直接做 finish：排程那条路出了错只结束这一局，这里原先没接，同一个错就冒到主循环、崩服
+            //   （审查 2026-10-07 Q4 · C1 替身那一路：答案不再合法 → 默认挑牌抛）。一个决定出错，不耽误这一 tick 里别的决定。
+            try {
+                watchdog(run);
+            } catch (RuntimeException e) {
+                if (run.spec.host().epoch() != run.spec.epoch()) {
+                    // 不是这一局的决定了：结束「这一局」就收错了人，只记下来
+                    LOGGER.error("替身看门狗：座位={} 窗={} 出错，那一局已经不在了", run.spec.seat(), run.spec.what(), e);
+                    continue;
+                }
+                run.spec.host().fail("替身看门狗：" + run.spec.seat() + " " + run.spec.what(), e);
+            }
         }
     }
 

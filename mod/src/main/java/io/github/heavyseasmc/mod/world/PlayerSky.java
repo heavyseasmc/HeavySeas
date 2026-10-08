@@ -2,7 +2,6 @@ package io.github.heavyseasmc.mod.world;
 
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.FogTable;
-import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.net.SkyS2C;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
@@ -109,7 +108,7 @@ public final class PlayerSky {
             return null;
         }
         String weather = component.requireSession().currentWeather().map(card -> card.id()).orElse("");
-        return SceneDataLoader.fogFor(component.layoutId().get(), weather);
+        return component.fogFor(weather);   // 开局快照（审查 2026-10-07 C6）：/reload 拿掉布局，这里原先每秒抛一次
     }
 
     private static String describe(SkyS2C sky, boolean inVoyage, boolean forced) {

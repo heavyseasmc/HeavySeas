@@ -13,7 +13,9 @@ import java.util.regex.Pattern;
  *
  * <ul>
  *   <li>先做 NFKC：全角的「３」「（３）」与半角一样认。</li>
- *   <li>去掉 {@code <think>…</think>}（有的本地模型把思考直接写进回答；没收尾的那一段整个丢掉）。</li>
+ *   <li>去掉 {@code <think>…</think>}（有的本地模型把思考直接写进回答；没收尾的那一段整个丢掉）。
+ *       只有收尾标签的（开标签在服务端的提示词模板里，回答里只剩「思考……{@code </think>}答案」）：取最后一个 {@code </think>} 之后的文字
+ *       （审查 2026-10-07 U12：原先这种回答一律认不出，每个决定都退回动脑）。</li>
  *   <li>负号算数字的一部分：「-1」是越界，不是「1」。</li>
  * </ul>
  */
@@ -31,6 +33,7 @@ public final class ChoiceParser {
     private static final String WRAP = "[\\s\"'`*_#()\\[\\]{}<>.,:;!?。、「」『』【】〈〉《》‘’“”]*";
     private static final Pattern BARE = Pattern.compile("^" + WRAP + "(-?\\d+)" + WRAP + "$");
     private static final Pattern THINK = Pattern.compile("(?s)<think>.*?</think>");
+    private static final String THINK_END = "</think>";
 
     /** 回答里真正要认的那一截：去掉思考、去掉首尾空白。 */
     public static String visible(String answer) {
@@ -38,6 +41,10 @@ public final class ChoiceParser {
             return "";
         }
         String text = THINK.matcher(answer).replaceAll("");
+        int close = text.lastIndexOf(THINK_END);
+        if (close >= 0) {
+            text = text.substring(close + THINK_END.length());   // 只剩收尾标签：它前面全是思考
+        }
         int open = text.indexOf("<think>");
         if (open >= 0) {
             text = text.substring(0, open);       // 思考没写完就被 max_tokens 截断了：后面全是思考

@@ -88,7 +88,7 @@ final class StandInSettingsTest {
             changes.put(ServerSettingsTable.LLM_MODEL, "test-model");
             changes.put(ServerSettingsTable.SMART_ROLLOUTS, "64");
             assertTrue(t.settings().save(true, changes).accepted());
-            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, KEY).accepted());
+            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, KEY, "https://llm.example/v1").accepted());
             LlmHooks.reload();                         // 设置菜单存的密钥压过环境变量：与这台机器的环境无关
             line = StandInMinds.status(component);
         } finally {

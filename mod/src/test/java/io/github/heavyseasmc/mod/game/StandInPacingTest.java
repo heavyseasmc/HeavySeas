@@ -118,6 +118,7 @@ class StandInPacingTest {
     void untimedDemoFollowsActingMinds() {
         GameComponent c = new GameComponent(null);
         c.begin(standing(), occupants(true));
+        c.setDemo(true);                      // /seas start 开的、有替身的局（开局时由 GameFlow.start 定，审查 R5）
         c.setDummyMind(StandInMind.IDLE);
         assertFalse(c.demoNoTimeout(), "什么也不做的替身局也成了不限时");
         for (StandInMind mind : List.of(StandInMind.RANDOM, StandInMind.SMART, StandInMind.LLM)) {

@@ -68,6 +68,14 @@ class StandInThinkerTest {
             return now;
         }
 
+        /** 看门狗交回来的错（模组里是「出错就结束这一局」）。 */
+        final List<String> failures = new ArrayList<>();
+
+        @Override
+        public void fail(String what, RuntimeException error) {
+            failures.add(what + "：" + error.getMessage());
+        }
+
         /** 等工作线程把结果交回主线程（5 秒内），做掉那一跳，再把已经到点的排程做掉。 */
         void land() throws InterruptedException {
             landOnly();
@@ -245,6 +253,27 @@ class StandInThinkerTest {
         host.advance(1);
         assertTrue(out.applied.isEmpty(), "看门狗收掉之后，迟到的答案又照做了一次");
         assertEquals(1, out.idled);
+    }
+
+    @Test
+    @DisplayName("看门狗那一跳按默认做时抛了：交给主线程那一侧收（出错就结束这一局），不往每 tick 的事件外面抛")
+    void watchdogFailureIsHandedToTheHost() {
+        FakeHost host = new FakeHost();
+        CompletableFuture<StandInThinker.Thought<String>> never = new CompletableFuture<>();
+        long cap = 1_000;
+        long opened = host.now;
+        // 审查 2026-10-07 C1 替身那一路：答案不再合法 → 默认挑牌 → 引擎抛「偷窃只能拿手牌」
+        StandInThinker.Spec<String> spec = new StandInThinker.Spec<>(host, host.epoch, "boom", "kid", StandInMind.SMART,
+                "挑牌", opened, opened, cap, () -> true, c -> true, () -> true, c -> { },
+                () -> {
+                    throw new IllegalStateException("偷窃只能拿手牌");
+                }, c -> c);
+        StandInThinker.decide(spec, () -> never);
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                () -> StandInThinker.sweep(opened + cap + StandInThinker.WATCHDOG_SLACK_MS),
+                "看门狗在每 tick 的事件里直接抛：原先冒到服务端主循环，崩服");
+        assertEquals(1, host.failures.size(), "错没有交给主线程那一侧（排程那条路会结束这一局，这一路也该一样）");
+        assertTrue(host.failures.getFirst().contains("挑牌"), host.failures.toString());
     }
 
     @Test

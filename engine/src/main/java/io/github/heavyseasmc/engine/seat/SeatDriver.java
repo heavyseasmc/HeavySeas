@@ -29,7 +29,7 @@ import java.util.Random;
  * 模组不用它 —— 模组的每一步要等真人、要计时、要播报，是异步的；它问替身用的是同一套 {@link SeatPolicy}。
  *
  * <h2>❗问的次序与次数是钉死的</h2>
- * 随机席位照搬搬家前模拟器的随机分布，它消费随机数的次序就是这里提问的次序：
+ * 随机席位保留各个选项的分布，每座使用独立的随机流。提问次序是：
  * 亮牌 → 喝酒 → 行动；表态 → 依座位问站队 → 依参战次序问押武器 → 挑牌；口渴依结算次序，先问本人再依座位问递水的人。
  * 没有可选项的问题也照样问（「喝不喝」在没有酒时也问）—— 原模拟器在那里摇过一次骰子。
  *
@@ -52,7 +52,8 @@ public final class SeatDriver {
 
     private final Session session;
     private final Map<CharacterId, SeatPolicy> policies;
-    private final Random rng;
+    private final Random gameRandom;
+    private final Map<CharacterId, Random> policyRandom = new HashMap<>();
     private final Listener listener;
     private int fights;
     private int fallbacks;
@@ -62,18 +63,51 @@ public final class SeatDriver {
 
     /**
      * @param policies 每个座位的策略，必须一个不落
-     * @param rng      这一局的随机流：天意（摸哪张手牌）与随机席位都从它拿
+     * @param rng      这一局的随机流：引擎摸暗牌使用它；构造时只取一次种子派生各席位的独立流
      */
     public SeatDriver(Session session, Map<CharacterId, SeatPolicy> policies, Random rng, Listener listener) {
+        this(session, policies, rng, listener, null);
+    }
+
+    private SeatDriver(Session session, Map<CharacterId, SeatPolicy> policies, Random rng, Listener listener,
+                       Map<CharacterId, Random> restored) {
         this.session = Objects.requireNonNull(session, "session");
         this.policies = Map.copyOf(Objects.requireNonNull(policies, "policies"));
-        this.rng = Objects.requireNonNull(rng, "rng");
+        this.gameRandom = Objects.requireNonNull(rng, "rng");
         this.listener = Objects.requireNonNull(listener, "listener");
         for (CharacterId id : session.state().bySeat()) {
             if (!this.policies.containsKey(id)) {
                 throw new IllegalArgumentException("座位 " + id + " 没有策略");
             }
         }
+        if (restored == null) {
+            var seeds = new java.util.SplittableRandom(gameRandom.nextLong());
+            for (CharacterId id : session.state().bySeat()) {
+                policyRandom.put(id, new Random(seeds.nextLong()));
+            }
+        } else {
+            if (!restored.keySet().containsAll(session.state().bySeat())) {
+                throw new IllegalArgumentException("Random snapshot is missing a seat");
+            }
+            policyRandom.putAll(restored);
+        }
+    }
+
+    /** 引擎内部重放用的全部随机流；不交给席位策略，也不混进 SeatView。 */
+    record RandomState(Random game, Map<CharacterId, Random> seats) {
+        RandomState {
+            seats = Map.copyOf(seats);
+        }
+    }
+
+    RandomState snapshotRandoms(java.util.function.UnaryOperator<Random> copy) {
+        Map<CharacterId, Random> seats = new HashMap<>();
+        policyRandom.forEach((id, random) -> seats.put(id, copy.apply(random)));
+        return new RandomState(copy.apply(gameRandom), seats);
+    }
+
+    SeatDriver(Session session, Map<CharacterId, SeatPolicy> policies, RandomState state) {
+        this(session, policies, state.game(), new Listener() { }, state.seats());
     }
 
     public SeatDriver(Session session, Map<CharacterId, SeatPolicy> policies, Random rng) {
@@ -83,6 +117,10 @@ public final class SeatDriver {
 
     public Session session() {
         return session;
+    }
+
+    private Random randomFor(CharacterId id) {
+        return Objects.requireNonNull(policyRandom.get(id), "missing seat random");
     }
 
     /** 打了几架（走到站队那一步就算一架）。 */
@@ -174,7 +212,7 @@ public final class SeatDriver {
     private void keepOne() {
         CharacterId holder = session.provisionHolder().orElseThrow();
         List<String> offer = session.provisionOffer();
-        String keep = policy(holder).keepProvision(view(holder), offer, rng);
+        String keep = policy(holder).keepProvision(view(holder), offer, randomFor(holder));
         if (keep == null || !offer.contains(keep)) {
             keep = fallback(holder, "补给箱留牌", keep, offer.getFirst());
         }
@@ -187,6 +225,12 @@ public final class SeatDriver {
         finishTurnInProgress();
         int guard = 0;
         while (true) {
+            if (session.state().isOver()) {
+                // ❗信号枪在行动阶段凑满海鸥，这一局当场结束：后面没轮到的人不再行动（审查 2026-10-08 R1）。
+                //   原先不查，靠岸之后照样抢、换座、划船，终局分被改（3000 局里 63 局有人靠岸后还在行动、9 局改了分）；
+                //   模组那一侧 GameFlow.finishAction 记下行动之后就查 isOver，两边对不上 —— 推演替身估「打信号枪」也跟着估错。
+                return;
+            }
             Optional<CharacterId> next = session.nextActor();
             if (next.isEmpty()) {
                 return;                       // ❗没人能行动是合法状态，不是死锁
@@ -221,7 +265,7 @@ public final class SeatDriver {
         SeatPolicy p = policy(actor);
         SeatView v = view(actor);
         List<String> revealable = Legal.reveals(session, actor);
-        Optional<String> reveal = p.reveal(v, revealable, rng);
+        Optional<String> reveal = p.reveal(v, revealable, randomFor(actor));
         if (reveal.isPresent()) {
             if (revealable.contains(reveal.get())) {
                 session.reveal(actor, reveal.get());
@@ -231,7 +275,7 @@ public final class SeatDriver {
             }
         }
         List<String> drinkable = Legal.drinks(session, actor);
-        Optional<String> drink = p.drink(v, drinkable, rng);
+        Optional<String> drink = p.drink(v, drinkable, randomFor(actor));
         if (drink.isPresent()) {
             if (drinkable.contains(drink.get())) {
                 session.drinkRum(actor, drink.get());
@@ -244,7 +288,7 @@ public final class SeatDriver {
             v = view(actor);
         }
         List<ActionChoice> legal = Legal.actions(session, actor);
-        ActionChoice choice = p.act(v, legal, rng);
+        ActionChoice choice = p.act(v, legal, randomFor(actor));
         if (choice == null || !legal.contains(choice)) {
             choice = fallback(actor, "行动", choice, ActionChoice.PASS);
         }
@@ -267,7 +311,7 @@ public final class SeatDriver {
             if (gifts.isEmpty()) {
                 return gave;
             }
-            Optional<Gift> gift = policy(from).give(v, gifts, rng);
+            Optional<Gift> gift = policy(from).give(v, gifts, randomFor(from));
             if (gift.isEmpty()) {
                 return gave;
             }
@@ -308,7 +352,7 @@ public final class SeatDriver {
     }
 
     private void keepRowCard(CharacterId rower, List<NavigationCard> drawn) {
-        int index = policy(rower).keepRowCard(view(rower), drawn, rng);
+        int index = policy(rower).keepRowCard(view(rower), drawn, randomFor(rower));
         if (index < 0 || index >= drawn.size()) {
             index = fallback(rower, "划船留牌", index, 0);
         }
@@ -358,7 +402,7 @@ public final class SeatDriver {
 
     private void consent(Contest c) {
         CharacterId who = c.target();
-        boolean refuse = policy(who).refuse(view(who), rng);
+        boolean refuse = policy(who).refuse(view(who), randomFor(who));
         if (refuse && !session.state().canAct(who)) {
             refuse = fallback(who, "表态", true, false);
         }
@@ -381,7 +425,7 @@ public final class SeatDriver {
             if (opened.combatants().contains(helper)) {
                 continue;
             }
-            Optional<Fight.Side> side = policy(helper).joinStance(view(helper), rng);
+            Optional<Fight.Side> side = policy(helper).joinStance(view(helper), randomFor(helper));
             side.ifPresent(s -> session.join(helper, s));
         }
         session.closeStances();
@@ -404,7 +448,7 @@ public final class SeatDriver {
                 if (drinkable.isEmpty()) {
                     continue;
                 }
-                Optional<String> d = policy(who).drinkForFight(view(who), drinkable, rng);
+                Optional<String> d = policy(who).drinkForFight(view(who), drinkable, randomFor(who));
                 if (d.isPresent()) {
                     if (drinkable.contains(d.get())) {
                         session.drinkRum(who, d.get());
@@ -421,7 +465,7 @@ public final class SeatDriver {
                 continue;
             }
             List<String> weapons = Legal.weapons(session, who);
-            List<String> chosen = policy(who).commitWeapons(view(who), weapons, rng);
+            List<String> chosen = policy(who).commitWeapons(view(who), weapons, randomFor(who));
             if (chosen == null || !subMultiset(chosen, weapons)) {
                 chosen = fallback(who, "押武器", chosen, List.of());
             }
@@ -433,9 +477,14 @@ public final class SeatDriver {
     }
 
     private void pick(Contest c) {
+        // 兜底（审查 2026-10-08 C1）：被抢方身上已经一张能挑的都没有了，就照「进挑牌时没牌可挑」那样收场 ——
+        // 不然下面的合法清单是空的，默认挑牌会在空清单上取第一项。正路上走不到这里（挑牌那一刻被抢方动不了牌）。
+        if (session.endPickIfNothingToTake()) {
+            return;
+        }
         CharacterId attacker = c.attacker();
         List<PickChoice> legal = Legal.picks(session);
-        PickChoice choice = policy(attacker).pick(view(attacker), legal, rng);
+        PickChoice choice = policy(attacker).pick(view(attacker), legal, randomFor(attacker));
         if (choice == null || !legal.contains(choice)) {
             // 规则第七章的超时默认：从他手里随机摸一张；他手里没牌，就拿他面前的第一张
             choice = fallback(attacker, "挑牌", choice,
@@ -449,7 +498,7 @@ public final class SeatDriver {
             session.pickFromFront(front.card());
         } else {
             // 摸哪一张是天意，不是挑牌的人能定的：用这一局的随机流
-            session.pickFromHand(rng.nextInt(session.state().stateOf(c.target()).hand().size()));
+            session.pickFromHand(gameRandom.nextInt(session.state().stateOf(c.target()).hand().size()));
         }
     }
 
@@ -485,7 +534,7 @@ public final class SeatDriver {
         if (session.helmsmanMayPick()) {
             CharacterId helm = session.state().helmsman().orElseThrow();
             List<NavigationCard> stack = session.table().rowStack();
-            pick = policy(helm).steer(view(helm), stack, rng);
+            pick = policy(helm).steer(view(helm), stack, randomFor(helm));
             if (pick == null || !stack.contains(pick)) {
                 pick = fallback(helm, "舵手挑牌", pick, stack.getFirst());
             }
@@ -541,7 +590,7 @@ public final class SeatDriver {
                 if (plays.isEmpty()) {
                     continue;
                 }
-                Optional<Session.OverboardPlay> play = policy(who).overboard(view(who), plays, rng);
+                Optional<Session.OverboardPlay> play = policy(who).overboard(view(who), plays, randomFor(who));
                 if (play.isEmpty()) {
                     continue;
                 }
@@ -564,7 +613,7 @@ public final class SeatDriver {
         viewCache.prompt = prompt;
         WaterPlan plan;
         try {
-            plan = policy(who).drinkWater(view(who), ownUnits, rng);
+            plan = policy(who).drinkWater(view(who), ownUnits, randomFor(who));
         } finally {
             viewCache.prompt = null;
         }
@@ -607,7 +656,7 @@ public final class SeatDriver {
                     continue;
                 }
                 int give = policy(other).donateWater(view(other), who, shortUnits, myUnits, plan.askHelp(),
-                        donated, rng);
+                        donated, randomFor(other));
                 if (give < 0 || give > Math.min(myUnits, shortUnits)) {
                     give = fallback(other, "递水", give, 0);
                 }

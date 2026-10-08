@@ -59,6 +59,9 @@ public final class DecorHammer extends Item {
             return ActionResult.PASS;
         }
         BlockPos pos = hit.getBlockPos();
+        if (!mayEdit(player, world, pos)) {
+            return ActionResult.PASS;         // 冒险 / 旁观 / 出生点保护里：锤子不改船（审查 2026-10-07 U10）
+        }
         BlockState state = world.getBlockState(pos);
         if (player.isSneaking()) {
             return lock(player, world, pos, state);
@@ -77,6 +80,18 @@ public final class DecorHammer extends Item {
             player.sendMessage(change.label, true);
         }
         return ActionResult.success(world.isClient);
+    }
+
+    /**
+     * 这个人此刻能不能拿工具改这一格（锤子 · 剪刀揭地毯共用）：不是旁观者、能改世界（冒险模式不能，{@code canModifyBlocks}）、
+     * 这一格不在他改不了的地方（服务端上还查出生点保护与世界边界，{@code canModifyAt}）—— 与 Minecraft 自己拿物品改方块那条路
+     * （{@code ItemStack#useOnBlock} 认 {@code allowModifyWorld}）同一套判据。
+     *
+     * <p>❗审查 2026-10-07 U10：原先只看手里拿的是不是锤子。Fabric 的「右键方块」事件挂在旁观者那道检查之前，
+     * 冒险模式又照样走到这里 —— 船上的冒险模式玩家、甚至旁观者，拿着锤子就能改北辰号。
+     */
+    static boolean mayEdit(PlayerEntity player, World world, BlockPos pos) {
+        return !player.isSpectator() && player.canModifyBlocks() && player.canModifyAt(world, pos);
     }
 
     /** 潜行右键：舷窗锁成单格 ↔ 自动拼（ADR-0093 B12，{@link LinerHull#toggleLock}）；别的方块放行。 */

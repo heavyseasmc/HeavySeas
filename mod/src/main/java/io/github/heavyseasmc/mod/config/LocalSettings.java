@@ -21,7 +21,7 @@ public final class LocalSettings {
             SettingDef.choice(SettingsCategory.LOCAL, THEME, THEME_LIGHT, List.of(THEME_LIGHT, THEME_DARK),
                     SettingDef.When.IMMEDIATE, "Interface theme (F8)."),
             SettingDef.flag(SettingsCategory.LOCAL, VANILLA_HUD, false, SettingDef.When.IMMEDIATE,
-                    "Minecraft's own hearts, hunger and hotbar during a game."),
+                    "Minecraft's hotbar style when visible; does not override dimension visibility."),
             SettingDef.flag(SettingsCategory.LOCAL, LEGEND, true, SettingDef.When.IMMEDIATE,
                     "Icon legend under the status plate (H)."));
 

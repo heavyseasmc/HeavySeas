@@ -4,7 +4,6 @@ import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
-import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.net.ProvisionActionC2S;
 import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
 import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
@@ -12,7 +11,6 @@ import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import io.github.heavyseasmc.mod.world.Crate;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import org.slf4j.Logger;
@@ -86,33 +84,30 @@ public final class ProvisionPhase {
         }
     }
 
-    /** 每 tick 检查超时。**服务端超时，客户端不参与判定。** */
-    public static void tick(MinecraftServer server) {
-        for (ServerWorld world : server.getWorlds()) {
-            GameComponent component = GameComponents.of(world);
-            if (component.session().isEmpty()) {
-                continue;
-            }
-            Session session = component.requireSession();
-            if (!session.provisionInProgress()) {
-                continue;
-            }
-            long deadline = component.provisionDeadline();
-            if (deadline > 0 && System.currentTimeMillis() >= deadline) {
-                // 决策 ⑨：超时自动选**当前高亮**那张，不是随机。
-                // 客户端一次都没上报过高亮（比如离线）时取第一张 —— 决策 ⑧ 要求局面不能卡住。
-                int index = Math.min(component.provisionHighlight(),
-                        Math.max(0, session.provisionOffer().size() - 1));
-                // 与语言无关的一行（与「舵手超时」同一对）：验收要分得开「他自己按的」与「等超时」——
-                // 两者在对局推进上完全一样，而界面没弹出来时也会走到这里。
-                LOGGER.info("补给箱超时：替 {} 选了第 {} 张（当前高亮）",
-                        session.provisionHolder().map(CharacterId::value).orElse("?"), index + 1);
-                // ❗先告诉持有者「这张是替你选的」，再真的留牌。
-                //   顺序不能反：keep 里紧接着就 broadcast，那一包会让客户端关掉界面 ——
-                //   通知落在它后面，就没有界面来播这一下「顿」了。
-                notifyAutoPick(world, component, index);
-                keep(world, component, index);
-            }
+    /** 每 tick 检查超时。**服务端超时，客户端不参与判定。** 经 {@link GameFlow#guarded} 挂上：出错只结束这一局。 */
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        if (component.session().isEmpty()) {
+            return;
+        }
+        Session session = component.requireSession();
+        if (!session.provisionInProgress()) {
+            return;
+        }
+        long deadline = component.provisionDeadline();
+        if (deadline > 0 && now >= deadline) {
+            // 决策 ⑨：超时自动选**当前高亮**那张，不是随机。
+            // 客户端一次都没上报过高亮（比如离线）时取第一张 —— 决策 ⑧ 要求局面不能卡住。
+            int index = Math.min(component.provisionHighlight(),
+                    Math.max(0, session.provisionOffer().size() - 1));
+            // 与语言无关的一行（与「舵手超时」同一对）：验收要分得开「他自己按的」与「等超时」——
+            // 两者在对局推进上完全一样，而界面没弹出来时也会走到这里。
+            LOGGER.info("补给箱超时：替 {} 选了第 {} 张（当前高亮）",
+                    session.provisionHolder().map(CharacterId::value).orElse("?"), index + 1);
+            // ❗先告诉持有者「这张是替你选的」，再真的留牌。
+            //   顺序不能反：keep 里紧接着就 broadcast，那一包会让客户端关掉界面 ——
+            //   通知落在它后面，就没有界面来播这一下「顿」了。
+            notifyAutoPick(world, component, index);
+            keep(world, component, index);
         }
     }
 
@@ -131,7 +126,7 @@ public final class ProvisionPhase {
                 .flatMap(component::occupantOf)
                 .map(GameComponent.Occupant::player)
                 .map(uuid -> world.getServer().getPlayerManager().getPlayer(uuid))
-                .ifPresent(player -> ServerPlayNetworking.send(player, new ProvisionAutoPickS2C(index)));
+                .ifPresent(player -> GameComponents.send(world, player, new ProvisionAutoPickS2C(index)));
     }
 
     private static void keep(ServerWorld world, GameComponent component, int index) {
@@ -235,10 +230,11 @@ public final class ProvisionPhase {
 
     /** 按收件人裁剪后逐个发。**offer 只进持有者那一包。** */
     private static void broadcast(ServerWorld world, GameComponent component) {
+        GameComponents.sync(world);
         Session session = component.requireSession();
         Optional<CharacterId> holder = session.provisionHolder();
         // 补给箱实物跟着每一次传递滑（ADR-0034 §5.4）：只靠投影同步的话，替身连传几手之间没有同步，箱子会跳着走。
-        component.layoutId().ifPresent(id -> Crate.refresh(world, component, SceneDataLoader.require(id)));
+        component.layout().ifPresent(layout -> Crate.refresh(world, component, layout));   // 开局快照（审查 C6）
         if (holder.isEmpty()) {
             broadcastFinished(world);
             return;
@@ -252,15 +248,16 @@ public final class ProvisionPhase {
         for (ServerPlayerEntity player : world.getServer().getPlayerManager().getPlayerList()) {
             boolean isHolder = component.seatOf(player.getUuid())
                     .map(id -> id.equals(holder.get())).orElse(false);
-            ServerPlayNetworking.send(player, new ProvisionUpdateS2C(
+            GameComponents.send(world, player, new ProvisionUpdateS2C(
                     chain, at, remaining, deadline, window,
                     isHolder ? session.provisionOffer() : List.of()));
         }
     }
 
     private static void broadcastFinished(ServerWorld world) {
+        GameComponents.sync(world);
         for (ServerPlayerEntity player : world.getServer().getPlayerManager().getPlayerList()) {
-            ServerPlayNetworking.send(player, ProvisionUpdateS2C.finished());
+            GameComponents.send(world, player, ProvisionUpdateS2C.finished());
         }
     }
 }

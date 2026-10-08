@@ -15,6 +15,7 @@ loom {
     // 客户端专用的代码（HUD、渲染）只能写在 src/client：main 里引用客户端类，专用服务端上一加载就崩，
     // 而开发环境与单人游戏都测不出。拆开之后这件事在编译期就失败 —— 拆之前实测，main 能直接编译过那种引用。
     splitEnvironmentSourceSets()
+    accessWidenerPath = file('src/main/resources/heavyseas.accesswidener')
 }
 
 // 批量生成工具（ADR-0053 §5 · ADR-0056）：救生艇方块的方块状态文件与带贴图的模型，按方块的属性展开。
@@ -116,6 +117,7 @@ dependencies {
 
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation "net.fabricmc:fabric-loader-junit:${loader_version}"
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -169,6 +171,17 @@ def checkBundledData = tasks.register('checkBundledData') {
 
 tasks.named('classes') {
     dependsOn checkBundledData
+}
+
+// 模组测试按写死的相对路径直接读这几处（审查 2026-10-07 G2）：仓库根的 data/ 与 art/cards、本模组源码的文本、build.gradle 本身。
+//   不声明成输入时，Gradle 只看编进类路径的那一份 —— 卡面 SVG、源码里编译后不留痕的改动（注释）、不进 jar 的数据文件改了，
+//   :mod:test 照样 UP-TO-DATE（本地）/ FROM-CACHE（CI），读它们的那几条用例从没重跑。按相对路径记指纹：换个克隆目录不算变。
+//   红测：build-redtests.sh 的 mod-test-inputs（直接问 Gradle 这几个文件在不在 :mod:test 的输入里，外加一个必须答「不在」的对照）。
+tasks.named('test') {
+    inputs.dir(rootProject.file('data')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('repoData')
+    inputs.dir(rootProject.file('art/cards')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('cardMasters')
+    inputs.dir(file('src')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('modSourceText')
+    inputs.file(file('build.gradle')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('modBuildScript')
 }
 
 // 规则书网页版（ADR-0087 §2「网页版同源」）：与游戏里那本是同一份源文件、同一串块，
@@ -374,37 +387,47 @@ tasks.named('check') {
     dependsOn checkItemCatalog
 }
 
+// Java 源码去掉注释（行注释与块注释）再交给源码判据（审查 2026-10-07 G4）：判据问「源码里有没有这一行」，
+//   注释掉的那一行也算「有」—— 接线被注释掉，代码照样编译，闸门照样绿。字符串、文本块与字符字面量里的 // 与 /* 原样保留；
+//   注释换成等长的空白、换行留着，行号不变。
+def stripJavaComments = { String src ->
+    src.replaceAll(~/(?s)"""(?:[^\\]|\\.)*?"""|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|\/\/[^\n]*|\/\*.*?\*\//) { String m ->
+        m.startsWith('/') ? m.replaceAll(/[^\n]/, ' ') : m
+    }
+}
+
 // 通知侧栏有两条容易“看起来代码都在、实机却完全看不见”的约束：
 //   ① HudRenderCallback 比 Screen 先画，GameScreen 打开的那一帧必须改由 afterRender 画；
-//   ② GameScreen 的 width 必须在绘制和输入前收窄，否则牌与按钮仍会钻进侧栏下面。
-// 这两条是 Fabric/Minecraft 回调接线，普通 JVM 单测触不到；几何由 NotificationSidebarLayoutTest 测，
+//   ② 日志现在覆盖在纸板之上，GameScreen 保留完整窗口宽度，不再预留常驻侧栏。
+// 这两条是 Fabric/Minecraft 回调接线，普通 JVM 单测触不到；
 // 这里把接线本身做成源码闸门，防止以后“整理回调”时安静地退回错误层级。
 def checkNotificationSidebarIntegration = tasks.register('checkNotificationSidebarIntegration') {
     group = 'verification'
-    description = 'GameScreen 必须先为通知侧栏留宽度，并在 Screen 完成后才绘制侧栏'
-    def entryFile = file('src/client/java/io/github/heavyseasmc/mod/client/HeavySeasClient.java')
-    def hookFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreenSidebar.java')
-    def hudFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameHud.java')
-    def screenFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreen.java')
+    description = 'GameScreen 保留全宽，并在 Screen 完成后才绘制通知浮层'
+    // 任务属性而不是局部变量：红测要能把它们指向造坏的副本（docs/tools/build-redtests.sh 的 sidebar-*）
+    ext.entryFile = file('src/client/java/io/github/heavyseasmc/mod/client/HeavySeasClient.java')
+    ext.hookFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreenSidebar.java')
+    ext.hudFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameHud.java')
+    ext.screenFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreen.java')
+    ext.materialFile = file('src/client/java/io/github/heavyseasmc/mod/client/GuiMaterial.java')
     def gameScreenSources = fileTree('src/client/java/io/github/heavyseasmc/mod/client') {
         include '*Screen.java'
     }
-    inputs.files(entryFile, hookFile, hudFile, screenFile, gameScreenSources)
-    doLast {
-        def entry = entryFile.getText('UTF-8')
-        def hook = hookFile.getText('UTF-8')
-        def hud = hudFile.getText('UTF-8')
-        def screen = screenFile.getText('UTF-8')
+    inputs.files(ext.entryFile, ext.hookFile, ext.hudFile, ext.screenFile, ext.materialFile, gameScreenSources)
+    doLast { Task t ->
+        // 先去掉注释再查：注释掉的接线也是「源码里有这一行」（审查 2026-10-07 G4，红测 build-redtests.sh 的 sidebar-*）
+        def entry = stripJavaComments(t.ext.entryFile.getText('UTF-8'))
+        def hook = stripJavaComments(t.ext.hookFile.getText('UTF-8'))
+        def hud = stripJavaComments(t.ext.hudFile.getText('UTF-8'))
+        def screen = stripJavaComments(t.ext.screenFile.getText('UTF-8'))
         def problems = []
 
         if (!entry.contains('GameScreenSidebar.register();')) {
             problems << '客户端入口没有注册 GameScreenSidebar'
         }
-        if (!hook.contains('ScreenEvents.beforeRender(screen).register')) {
-            problems << 'GameScreen 绘制前没有刷新内容区宽度'
-        }
-        if (!hook.contains('gameScreen.reserveNotificationSidebar(context.getScaledWindowWidth())')) {
-            problems << 'beforeRender 没有按完整窗口宽度预留侧栏（可能会逐帧越减越窄）'
+        if ([hook, hud, screen].any { it.contains('reserveNotificationSidebar') || it.contains('sidebarLayout(') }
+                || java.util.regex.Pattern.compile('(?m)^\\s*width\\s*[-+*/]?=').matcher(screen).find()) {
+            problems << 'GameScreen 不得为通知浮层改写完整窗口宽度'
         }
         if (!hook.contains('ScreenEvents.afterRender(screen).register')
                 || !hook.contains('GameHud.renderSidebar(context, client)')) {
@@ -416,25 +439,19 @@ def checkNotificationSidebarIntegration = tasks.register('checkNotificationSideb
         if (!skipsHudLayer) {
             problems << '普通 HudRenderCallback 没有跳过 GameScreen，会在错误层级重复绘制'
         }
-        if (!screen.contains('width = GameHud.sidebarLayout(screenWidth, projection()).contentWidth();')) {
-            problems << 'GameScreen 没有把所有子类共用的 width 收进侧栏左边'
-        }
-        if (!screen.contains('reserveNotificationSidebar(client == null ? width : client.getWindow().getScaledWidth());')) {
-            problems << 'GameScreen.init 没有在子类创建控件前预留侧栏'
-        }
         // 「整窗压暗」自 ADR-0037 起归 GuiMaterial.dimWorld：铺底要调它，而它铺的必须是整个窗口 ——
-        // 材质板只铺在收窄后的舞台上，侧栏那一侧靠的就是这一层，少了它侧栏下半截会露出比左边亮的世界。
-        def material = file('src/client/java/io/github/heavyseasmc/mod/client/GuiMaterial.java').getText('UTF-8')
+        // 纸板外的浮层也需要一致的底色。
+        def material = stripJavaComments(t.ext.materialFile.getText('UTF-8'))
         // 2026-09-30 起那一层是样张的 .dimmer（ADR-0047）：按帧缓冲的全宽全高画，照样是整个窗口。
         if (!screen.contains('GuiMaterial.dimWorld(context);')
                 || !material.contains('hudPart(context, HudPart.DIMMER, 0, 0, window.getFramebufferWidth(), window.getFramebufferHeight(),')) {
-            problems << 'GameScreen 主内容收窄后，公共底色没有继续覆盖完整窗口'
+            problems << 'GameScreen 公共底色没有覆盖完整窗口'
         }
 
         int subclasses = 0
         int initOverrides = 0
         gameScreenSources.each { source ->
-            def text = source.getText('UTF-8')
+            def text = stripJavaComments(source.getText('UTF-8'))
             if (!text.contains('extends GameScreen')) {
                 return
             }
@@ -445,7 +462,7 @@ def checkNotificationSidebarIntegration = tasks.register('checkNotificationSideb
                         'protected void init\\(\\) \\{\\s*super\\.init\\(\\);',
                         java.util.regex.Pattern.DOTALL).matcher(text).find()
                 if (!superFirst) {
-                    problems << "${source.name} 的 init 没有先调用 super.init()，控件可能按完整宽度缓存"
+                    problems << "${source.name} 的 init 没有先调用 super.init()，公共输入状态未初始化"
                 }
             }
         }
@@ -458,7 +475,7 @@ def checkNotificationSidebarIntegration = tasks.register('checkNotificationSideb
                     + problems.collect { '  - ' + it }).join(System.lineSeparator()))
         }
         logger.lifecycle("通知侧栏接线核对通过：${subclasses} 个 GameScreen 子类（${initOverrides} 个覆写 init）" +
-                '先预留内容区，afterRender 绘制侧栏，HUD 层不重复画')
+                '保留完整宽度，afterRender 绘制侧栏，HUD 层不重复画（注释去掉之后查的）')
     }
 }
 
@@ -912,11 +929,22 @@ def checkSceneAssets = tasks.register('checkSceneAssets') {
             }
         }
         // 音频（§8.2）：每个 ogg 都要在 NOTICE 里有同名条目。判据与素材正交 —— 文件在、条目不在就红。
+        //   连子目录一起扫：交付布局是 sounds/<类别>/<id>.ogg（audio_gen.py deliver），只扫顶层时一个都扫不到、照样绿（审查 2026-10-07 G6）。
+        //   按整词比、不按子串：NOTICE 里一条以「<id>.ogg」（或 sounds/ 下的相对路径）打头 —— 子串匹配时 huge_wave.ogg
+        //   会被 vo_weather_huge_wave.ogg 那一条顺带放行。
         def sounds = new File(ext.assetsDir, 'sounds')
-        def oggs = sounds.isDirectory() ? sounds.listFiles({ File f -> f.name.endsWith('.ogg') } as FileFilter).sort { it.name } : []
+        def oggs = []
+        if (sounds.isDirectory()) {
+            sounds.eachFileRecurse(groovy.io.FileType.FILES) { File f -> if (f.name.endsWith('.ogg')) { oggs << f } }
+        }
+        oggs.sort { rel(it) }
         def notice = ext.noticeFile.isFile() ? ext.noticeFile.getText('UTF-8') : ''
+        def noticed = notice.readLines().collect { it.trim().split(/\s+/)[0] }.findAll { it.endsWith('.ogg') } as Set
         oggs.each { File f ->
-            if (!notice.contains(f.name)) { problems << "${rel(f)}：NOTICE 里没有同名条目（音频必须登记出处与许可）" }
+            def underSounds = sounds.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+            if (!noticed.contains(f.name) && !noticed.contains(underSounds)) {
+                problems << "${rel(f)}：NOTICE 里没有同名条目（按整词比，一条以「${f.name}」打头；音频必须登记出处与许可）"
+            }
         }
         if (problems) {
             throw new GradleException((['场景资源核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
@@ -997,6 +1025,21 @@ def checkDecorBlocks = { Task task, Map fam ->
         def variants = [:]
         def checkedVariants = 0
         def usedModels = [] as Set
+        // 「组合齐全」比集合，不比条数（审查 2026-10-07 G5）：一项写成了另一项的副本时条数不变 ——
+        //   缺的那一种被重复的那一种掩盖，只数条数的判据照样绿。各属性出现过的取值做笛卡尔积，与写出来的组合求差，
+        //   重复的与缺的各自点名（属性按名字排序拼成键：Minecraft 认的是属性与取值，不认键里的先后）。
+        def comboKey = { Map c -> c.keySet().collect { it.toString() }.sort().collect { "${it}=${c[it]}" }.join(',') }
+        def combosOf = { List<Map> combos ->
+            def vals = [:].withDefault { [] as Set }
+            combos.each { Map c -> c.each { k, v -> vals[k.toString()] << v.toString() } }
+            def seen = [:]
+            combos.each { Map c -> def k = comboKey(c); seen[k] = (seen[k] ?: 0) + 1 }
+            def all = [[:]]
+            vals.keySet().sort().each { String k -> all = all.collectMany { Map partial -> vals[k].sort().collect { v -> partial + [(k): v] } } }
+            [product: all.size(), dups: seen.findAll { k, n -> n > 1 }.keySet().sort(), missing: all.collect { comboKey(it) }.findAll { !seen.containsKey(it) }.sort()]
+        }
+        def sample = { List xs -> xs.size() <= 3 ? xs.toString() : "${xs.take(3)} 等 ${xs.size()} 种".toString() }
+        def comboDetail = { Map r -> "重复 ${r.dups.size()} 种、缺 ${r.missing.size()} 种" + (r.dups ? " —— 重复的 ${sample(r.dups)}" : '') + (r.missing ? " —— 缺的 ${sample(r.missing)}" : '') }
         bsFiles.each { File f ->
             def json = slurper.parse(f, 'UTF-8') as Map
             if (json.multipart != null) {
@@ -1010,27 +1053,24 @@ def checkDecorBlocks = { Task task, Map fam ->
                     applies.each { usedModels << it.model.toString() }
                 }
                 layers.each { String props, List whens ->
-                    def vals = [:].withDefault { [] as Set }
-                    whens.each { Map w -> w.each { k, v -> vals[k.toString()] << v.toString() } }
-                    def product = vals.values().inject(1L) { acc, vs -> acc * vs.size() }
-                    if (whens.size() != product) {
-                        problems << "${rel(f)}：多部件模型按 ${props} 分的那一层 ${whens.size()} 项，不是各属性取值个数之积 ${product}（漏了哪一种组合，那几格就少画一层）"
+                    def r = combosOf(whens)
+                    if (r.dups || r.missing) {
+                        problems << "${rel(f)}：多部件模型按 ${props} 分的那一层 ${whens.size()} 项（各属性取值个数之积 ${r.product}），${comboDetail(r)}（漏了哪一种组合，那几格就少画一层）"
                     }
                 }
                 checkedVariants += (json.multipart as List).size()
                 return
             }
-            variants[(f.name - '.json').toString()] = (json.variants as Map).keySet().collect { it.toString() } as Set
             (json.variants as Map).each { k, v -> usedModels << v.model.toString() }
-            // ADR-0062：变体数 = 各属性取值个数之积。判据只取文件自己的键：哪一个属性出现过哪几个值，乘起来就该是变体数
-            def values = [:].withDefault { [] as Set }
-            (json.variants as Map).keySet().each { String key ->
-                if (key) { key.split(',').each { kv -> def p = kv.split('=', 2); values[p[0]] << p[1] } }
+            // ADR-0062：变体是各属性取值的全部组合。判据只取文件自己的键：哪一个属性出现过哪几个值，它们的每一种组合都要恰好出现一次
+            def combos = (json.variants as Map).keySet().collect { String key ->
+                key ? key.split(',').collectEntries { kv -> def p = kv.split('=', 2); [(p[0]): p[1]] } : [:]
             }
-            def product = values.values().inject(1L) { acc, vs -> acc * vs.size() }
-            def count = (json.variants as Map).size()
-            if (count != product) {
-                problems << "${rel(f)}：方块状态的变体 ${count} 个，不是各属性取值个数之积 ${product}（漏了哪一种组合，游戏里那一格就是紫黑格子）"
+            variants[(f.name - '.json').toString()] = combos.collect { comboKey(it) } as Set
+            def count = combos.size()
+            def r = combosOf(combos)
+            if (r.dups || r.missing) {
+                problems << "${rel(f)}：方块状态的变体 ${count} 个（各属性取值个数之积 ${r.product}），${comboDetail(r)}（漏了哪一种组合，游戏里那一格就是紫黑格子）"
             }
             checkedVariants += count
         }
@@ -1557,57 +1597,184 @@ tasks.named('check') {
 // 为什么要一道闸：开发客户端直接按 yarn 名注入，mixin 写错了 refmap、或 Loom 没翻注解，开发环境**一点都看不出来**；
 // 生产客户端上要么启动即崩（defaultRequire 1），要么 —— 若目标碰巧解析到了别处 —— 安静地没雾。
 // 判据与被测对象正交：不问 Loom 的配置，直接读 remapJar 产物里的类文件与 mixins.json。
+//
+// 「残留的开发环境名字」怎么认（审查 2026-10-07 C8）：第一版是一张手抄的目标名名单，后加的三个 mixin
+//   （物品提示 · 右键 / 描边 · 滚轮）没人补进去，它们翻没翻对这道闸门看不见；InGameHudMixin 的七个目标也不在名单里，
+//   只是碰巧被「类名」那一条拦着。现在从 mixin 源码自己读：注解里的 method = … · @At 的 target = … ·
+//   @Shadow 的成员名 · @Accessor / @Invoker 写明的名字，逐个要求不出现在生产类的常量池里（按整条常量比，不按子串）；
+//   常量池里出现的 Minecraft 类一律要是 net/minecraft/class_…。哪几个类：jar 里 fabric.mod.json 登记的每一份 mixin 配置
+//   列出的全部，不再只扫 client/mixin/ 一个包。
+//   ⚠️某个局部变量恰好与目标同名时会误报 —— 改名即可；误报是红，不会放行。用了 remap = false、或 @Accessor 不写名字的，
+//   判据分不清哪几个名字该留着，当场判失败（现在一个都没有），先改判据再用。
 def checkMixinRemapped = tasks.register('checkMixinRemapped') {
     group = 'verification'
-    description = '生产 jar 里的 mixin 类必须引用中间名、不得残留 yarn 名；mixins.json 不得指向不存在的 refmap'
+    description = '生产 jar 里登记的每个 mixin 类：源码里写的目标名一个都不剩、只引用中间名的类；mixins.json 不得指向不存在的 refmap'
     def jarFile = tasks.named('remapJar').flatMap { it.archiveFile }
     inputs.file(jarFile)
-    doLast {
-        def zip = new java.util.zip.ZipFile(jarFile.get().asFile)
+    inputs.files(sourceSets.main.allJava, sourceSets.client.allJava)
+    // 任务属性：红测要能把它们指向造坏的 jar 副本 / 不存在的源码目录（docs/tools/build-redtests.sh 的 mixin-*）
+    ext.jarFile = null
+    ext.sourceDirs = (sourceSets.main.java.srcDirs + sourceSets.client.java.srcDirs) as List
+    doLast { Task t ->
+        File jar = t.ext.jarFile ?: jarFile.get().asFile
+        def slurper = new groovy.json.JsonSlurper()
+
+        // 类文件常量池里的 UTF8 常量：类名、成员名、描述符、注解里的字符串值都在这里
+        def utf8Of = { byte[] bytes ->
+            def din = new DataInputStream(new ByteArrayInputStream(bytes))
+            if ((din.readInt() & 0xFFFFFFFFL) != 0xCAFEBABEL) {
+                return null
+            }
+            din.readUnsignedShort()
+            din.readUnsignedShort()
+            int count = din.readUnsignedShort()
+            def strings = [] as Set
+            for (int i = 1; i < count; i++) {
+                int tag = din.readUnsignedByte()
+                switch (tag) {
+                    case 1: strings << din.readUTF(); break
+                    case 3: case 4: din.skipBytes(4); break
+                    case 5: case 6: din.skipBytes(8); i++; break     // long / double 占两格
+                    case 7: case 8: case 16: case 19: case 20: din.skipBytes(2); break
+                    case 9: case 10: case 11: case 12: case 17: case 18: din.skipBytes(4); break
+                    case 15: din.skipBytes(3); break
+                    default: throw new GradleException("类文件里有不认识的常量标签 ${tag}")
+                }
+            }
+            return strings
+        }
+
+        // 一个 mixin 的源码对 Minecraft 说了哪些名字（开发环境的 yarn 名）。注释先去掉：注释里写的方法名不算
+        def memberOf = { String v -> v.replaceFirst(/^L[^;]+;/, '').replaceFirst(/[(:].*$/, '') }
+        def namesOf = { String text ->
+            def src = stripJavaComments(text)
+            def strings = { String block -> (block =~ /"([^"]*)"/).collect { it[1].toString() } }
+            def r = [names: [] as Set, targets: [] as Set, counts: [method: 0, target: 0, shadow: 0, accessor: 0], unsupported: []]
+            (src =~ /\bmethod\s*=\s*(\{[^}]*\}|"[^"]*")/).each { m ->
+                strings(m[1]).each { v ->
+                    def name = memberOf(v)
+                    if (name && !name.startsWith('<') && !name.contains('*')) {
+                        r.names << name
+                        r.counts.method++
+                    }
+                }
+            }
+            (src =~ /\btarget\s*=\s*"([^"]*)"/).each { m ->
+                def v = m[1].toString()
+                r.targets << v
+                r.counts.target++
+                def name = memberOf(v)
+                if (name && !name.startsWith('<')) {
+                    r.names << name
+                }
+            }
+            (src =~ /@Shadow\b(\s*\([^)]*\))?([^;({=]*)/).each { m ->
+                def decl = m[2].toString().replaceAll(/@\w+/, ' ').trim()
+                def last = (decl =~ /(\w+)$/)
+                if (last.find()) {
+                    def prefix = m[1] ? (m[1] =~ /prefix\s*=\s*"([^"]*)"/) : null
+                    def name = last.group(1)
+                    if (prefix != null && prefix.find() && name.startsWith(prefix.group(1))) {
+                        name = name.substring(prefix.group(1).length())
+                    } else if (name.startsWith('shadow$')) {
+                        name = name.substring('shadow$'.length())
+                    }
+                    r.names << name
+                    r.counts.shadow++
+                }
+            }
+            (src =~ /@(?:Accessor|Invoker)\s*\(\s*(?:value\s*=\s*)?"([^"]+)"/).each { m ->
+                r.names << memberOf(m[1].toString())
+                r.counts.accessor++
+            }
+            if (src =~ /@(?:Accessor|Invoker)\b(?!\s*\(\s*(?:value\s*=\s*)?")/) {
+                r.unsupported << '@Accessor / @Invoker 没写名字（判据不会从方法名推）'
+            }
+            if (src =~ /\bremap\s*=\s*false/) {
+                r.unsupported << 'remap = false（判据分不清哪几个名字该留着不翻）'
+            }
+            return r
+        }
+
+        // Minecraft 的类在生产 jar 里一律是 net/minecraft/class_<数字>；别的写法就是开发环境的 yarn 类名
+        def yarnClass = java.util.regex.Pattern.compile('net/minecraft/(?!class_\\d)[\\w/$]+')
+        def zip = new java.util.zip.ZipFile(jar)
         try {
             def problems = []
-            int scanned = 0
-            for (entry in java.util.Collections.list(zip.entries())) {
-                if (!entry.name.startsWith('io/github/heavyseasmc/mod/client/mixin/') || !entry.name.endsWith('.class')) {
-                    continue
-                }
-                scanned++
-                // 常量池里的 UTF8 常量是明文，按字节当 Latin-1 读出来做子串检查就够了。
-                def text = new String(zip.getInputStream(entry).bytes, 'ISO-8859-1')
-                if (!text.contains('net/minecraft/class_')) {
-                    problems << "${entry.name}：没有引用任何中间名 —— remapJar 没把 mixin 的目标翻过来"
-                }
-                // 每个 mixin 的目标方法名都列在这里：漏列一个，那个 mixin 翻没翻对这道闸门就看不见。
-                def yarnTargets = ['applyFog', 'getGlyph', 'getProvidedGlyphs', 'makeGlyphBitmapSubpixel',
-                                   'findCrosshairTarget', 'onKeyPressed', 'setKeyPressed', 'KEY_TO_BINDINGS',
-                                   'timesPressed', 'getTimeOfDay', 'getLevelProperties', 'getRainGradient',
-                                   'getThunderGradient', 'renderWithTooltip']
-                def leftover = yarnTargets.findAll { text.contains(it) }
-                if (text.contains('net/minecraft/client/') || !leftover.isEmpty()) {
-                    problems << "${entry.name}：残留 yarn 名（net/minecraft/client/… 或 ${leftover}），生产客户端上找不到目标"
-                }
+            def modJson = zip.getEntry('fabric.mod.json')
+            if (modJson == null) {
+                throw new GradleException("没在查：${jar.name} 里没有 fabric.mod.json")
             }
-            // 正向对照：一个 mixin 类都没扫到时，「全翻对了」与「没在扫」输出一样。
-            if (scanned == 0) {
-                throw new GradleException('生产 jar 里一个 mixin 类都没扫到 —— 判据坏了，不是干净')
+            def configs = (((slurper.parse(zip.getInputStream(modJson), 'UTF-8') as Map).mixins ?: []) as List)
+                    .collect { (it instanceof Map ? it.config : it).toString() }
+            // 正向对照：一份配置都没读到时，「全翻对了」与「没在查」输出一样
+            if (configs.isEmpty()) {
+                throw new GradleException('没在查：jar 里的 fabric.mod.json 一份 mixin 配置都没登记 —— 判据坏了，不是干净')
             }
-            def config = zip.getEntry('heavyseas.client.mixins.json')
-            if (config == null) {
-                problems << 'jar 里没有 heavyseas.client.mixins.json（client 源码集的资源没打进去）'
-            } else {
-                def json = new groovy.json.JsonSlurper().parse(zip.getInputStream(config), 'UTF-8')
+            int classes = 0
+            def counts = [method: 0, target: 0, shadow: 0, accessor: 0]
+            configs.each { String cfg ->
+                def entry = zip.getEntry(cfg)
+                if (entry == null) {
+                    problems << "fabric.mod.json 登记了 ${cfg}，jar 里没有这个文件"
+                    return
+                }
+                def json = slurper.parse(zip.getInputStream(entry), 'UTF-8') as Map
                 if (json.refmap) {
-                    problems << "mixins.json 指向 refmap ${json.refmap}，而这一版 Loom 不生成 refmap —— 那个文件不在 jar 里"
+                    problems << "${cfg} 指向 refmap ${json.refmap}，而这一版 Loom 不生成 refmap —— 那个文件不在 jar 里"
                 }
-                if (!json.client || json.client.isEmpty()) {
-                    problems << 'mixins.json 的 client 列表是空的'
+                def listed = (((json.mixins ?: []) + (json.client ?: []) + (json.server ?: [])) as List).collect { it.toString() }
+                if (listed.isEmpty()) {
+                    problems << "${cfg} 的 mixin 列表是空的"
+                    return
+                }
+                def pkg = json.package.toString().replace('.', '/')
+                listed.each { String name ->
+                    def rel = "${pkg}/${name.replace('.', '/')}".toString()
+                    def cls = zip.getEntry(rel + '.class')
+                    if (cls == null) {
+                        problems << "${cfg} 登记了 ${name}，jar 里没有 ${rel}.class"
+                        return
+                    }
+                    def source = t.ext.sourceDirs.collect { new File(it as File, rel + '.java') }.find { it.isFile() }
+                    if (source == null) {
+                        throw new GradleException("没在读：找不到 mixin 的源码 ${rel}.java（在 ${t.ext.sourceDirs.join('、')} 里找）—— " +
+                                '目标名从源码读，读不到就等于没在查')
+                    }
+                    classes++
+                    def pool = utf8Of(zip.getInputStream(cls).bytes)
+                    if (pool == null) {
+                        problems << "${rel}.class 不是类文件"
+                        return
+                    }
+                    def read = namesOf(source.getText('UTF-8'))
+                    read.unsupported.each { problems << "${source.name}：用了 ${it} —— 先改判据" }
+                    if (read.names.isEmpty() && read.targets.isEmpty()) {
+                        problems << "${source.name}：源码里一个目标名都没读出来 —— 判据的读法不认得它的写法，不是没有目标"
+                        return
+                    }
+                    read.counts.each { k, v -> counts[k] += v }
+                    if (!pool.any { it.contains('net/minecraft/class_') }) {
+                        problems << "${rel}.class：没有引用任何中间名 —— remapJar 没把 mixin 的目标翻过来"
+                    }
+                    def leftNames = (read.names + read.targets).findAll { pool.contains(it) }.sort()
+                    def leftClasses = (pool.collectMany { s -> (s =~ yarnClass).collect { it.toString() } } as Set).sort()
+                    if (leftNames || leftClasses) {
+                        def parts = []
+                        if (leftNames) { parts << "残留开发环境的名字 ${leftNames}" }
+                        if (leftClasses) { parts << "没翻的类 ${leftClasses.take(3)}${leftClasses.size() > 3 ? " 等 ${leftClasses.size()} 个" : ''}" }
+                        problems << "${rel}.class：${parts.join('，')} —— 生产客户端上找不到目标"
+                    }
                 }
             }
             if (problems) {
                 throw new GradleException((['生产 jar 的 mixin 核对失败：'] + problems.collect { '  - ' + it })
                         .join(System.lineSeparator()))
             }
-            logger.lifecycle("生产 jar 的 mixin 核对通过：${scanned} 个类都已翻成中间名，mixins.json 不指向 refmap")
+            int names = counts.values().sum() as int
+            logger.lifecycle("生产 jar 的 mixin 核对通过：${configs.size()} 份配置 · ${classes} 个类，引用的 Minecraft 类都是中间名；" +
+                    "从源码读出 ${names} 个目标名（method = ${counts.method} · @At target = ${counts.target} · @Shadow ${counts.shadow}" +
+                    " · @Accessor/@Invoker ${counts.accessor}），生产类里一个都不剩；mixins.json 不指向 refmap")
         } finally {
             zip.close()
         }
@@ -1616,6 +1783,95 @@ def checkMixinRemapped = tasks.register('checkMixinRemapped') {
 
 tasks.named('check') {
     dependsOn checkMixinRemapped
+    dependsOn 'validateAccessWidener'
+    dependsOn 'checkNestedJars'
+}
+
+// 发布物的直接内嵌清单独立于 include 配置。删 include 不应同时缩短期望清单。
+tasks.register('checkNestedJars') {
+    group = 'verification'
+    description = '最终 jar 的直接内嵌依赖：声明、文件、身份和版本完整且唯一'
+    def produced = tasks.named('remapJar').flatMap { it.archiveFile }
+    dependsOn tasks.named('remapJar')
+    ext.jarFile = null // 红测只切换到坏副本，真实产物不改写。
+    def expected = [
+            'cardinal-components-base': cca_version.toString(),
+            'cardinal-components-world': cca_version.toString(),
+            'io_github_heavyseasmc_engine': project.version.toString(),
+            'forgeconfigapiport': forge_config_api_port_version.toString(),
+    ]
+    inputs.property('expectedNestedMods', expected)
+    inputs.file(provider { ext.jarFile ?: produced.get().asFile })
+    doLast { Task t ->
+        File target = t.ext.jarFile ?: produced.get().asFile
+        def problems = []
+        def slurper = new groovy.json.JsonSlurper()
+        def outer = new java.util.zip.ZipFile(target)
+        try {
+            def metadataEntry = outer.getEntry('fabric.mod.json')
+            if (metadataEntry == null) {
+                throw new GradleException('内嵌依赖核对失败：主包没有 fabric.mod.json')
+            }
+            def metadata = outer.getInputStream(metadataEntry).withCloseable { slurper.parse(it, 'UTF-8') }
+            def declared = (metadata.jars ?: []).collect { it.file?.toString() }
+            def nestedFiles = outer.entries().findAll {
+                !it.directory && it.name.startsWith('META-INF/jars/') && it.name.endsWith('.jar')
+            }.collect { it.name }
+            if (declared.size() != declared.toSet().size()) {
+                problems << '重复的内嵌路径声明'
+            }
+            if (nestedFiles.size() != nestedFiles.toSet().size()) {
+                problems << '重复的内嵌文件路径'
+            }
+            (nestedFiles.toSet() - declared.toSet()).each { problems << "未声明的内嵌文件：${it}" }
+            def identities = [:]
+            declared.toSet().each { String path ->
+                if (path == null || !path.startsWith('META-INF/jars/') || path.contains('..') || !path.endsWith('.jar')) {
+                    problems << "无效的内嵌路径：${path}"
+                    return
+                }
+                def entry = outer.getEntry(path)
+                if (entry == null) {
+                    problems << "缺少声明的内嵌文件：${path}"
+                    return
+                }
+                def manifests = []
+                outer.getInputStream(entry).withCloseable { input ->
+                    new java.util.zip.ZipInputStream(input).withCloseable { nested ->
+                        java.util.zip.ZipEntry member
+                        while ((member = nested.nextEntry) != null) {
+                            if (member.name == 'fabric.mod.json') {
+                                manifests << slurper.parseText(new String(nested.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
+                            }
+                            nested.closeEntry()
+                        }
+                    }
+                }
+                if (manifests.size() != 1) {
+                    problems << "${path} 应含一份 fabric.mod.json，实际 ${manifests.size()}"
+                    return
+                }
+                String id = manifests[0].id?.toString()
+                String version = manifests[0].version?.toString()
+                if (identities.containsKey(id)) {
+                    problems << "重复的内嵌身份：${id}"
+                }
+                identities[id] = version
+                if (!expected.containsKey(id)) {
+                    problems << "非预期内嵌身份：${id}"
+                } else if (version != expected[id]) {
+                    problems << "内嵌版本不符：${id} 需要 ${expected[id]}，实际 ${version}"
+                }
+            }
+            (expected.keySet() - identities.keySet()).each { problems << "缺少必需内嵌依赖：${it}" }
+            if (problems) {
+                throw new GradleException('内嵌依赖核对失败：\n' + problems.collect { '  - ' + it }.join('\n'))
+            }
+            logger.lifecycle("内嵌依赖核对通过：${identities.size()} 个直接依赖，声明与文件一致，身份与版本完整")
+        } finally {
+            outer.close()
+        }
+    }
 }
 
 // ❗引擎的运行时依赖不嵌进本模组的 jar，靠 Minecraft 自带的那一份。于是必须同时成立两条：

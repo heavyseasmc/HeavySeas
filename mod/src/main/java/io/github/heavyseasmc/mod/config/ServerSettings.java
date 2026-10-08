@@ -164,13 +164,30 @@ public final class ServerSettings {
         return table.def(key).filter(SettingDef::secret).flatMap(def -> secrets.get(key));
     }
 
+    /** 密钥绑的地址在密钥文件里的键：{@code <密钥的键>.origin}。不是表里的一项，快照里没有它。 */
+    static final String ORIGIN_SUFFIX = ".origin";
+
+    /**
+     * 这项密钥设的时候绑的地址（{@link LlmConfig#origin} 的写法；审查 2026-10-07 L1）。没绑（旧版本存的、或者这项不绑）是空。
+     * 只给服务端自己比对用。
+     */
+    public Optional<String> secretOrigin(String key) {
+        return table.def(key).filter(SettingDef::secret).flatMap(def -> secrets.get(key + ORIGIN_SUFFIX));
+    }
+
     /**
      * 客户端设一项密钥（ADR-0099 D6 · 只写不读）：再查权限 → 必须是表里登记的密钥 → 按这一项的规矩核 → 存。
      * 空串 = 清掉。<b>结果里没有值</b>；调用方的日志也只许写「谁设了 / 清了哪一项」。
      *
+     * <h2>❗绑地址（审查 2026-10-07 L1）</h2>
+     * 绑地址的那项密钥（{@link ServerSettingsTable#secretScope}）连同服务端<b>此刻</b>的地址一起存，大模型那一层只把它发往这个地址
+     * （{@link LlmConfig#fromSettings}）。{@code scope} 是发包的人在菜单里看到的地址：同一次存盘里先发改地址的那一批、再发密钥，
+     * 那一批若被拒，服务端此刻的地址还是旧的 —— 照旧绑上去，就把给新地址的密钥送到了旧地址。所以两边的「协议 + 主机 + 端口」对不上就拒。
+     *
      * @param canEdit 发包的人此刻能不能改（{@link SettingsSync#canEdit}）
+     * @param scope   这项密钥绑的那一项设置，发包的人以为的值（不绑的密钥不看它）
      */
-    public Outcome setSecret(boolean canEdit, String key, String value) {
+    public Outcome setSecret(boolean canEdit, String key, String value, String scope) {
         if (!canEdit) {
             return Outcome.rejected("没有权限");
         }
@@ -183,8 +200,64 @@ public final class ServerSettings {
             // ❗理由里不带值：SettingDef 的理由只在数值类型里回显输入，文字类型只说哪一条规矩不合
             return Outcome.rejected("不合规矩（" + def.get().kind() + "）");
         }
+        String newValue = (String) parsed.value();
+        Optional<SettingDef> bound = ServerSettingsTable.secretScope(key).flatMap(table::def);
+        String origin = null;
+        if (bound.isPresent() && !newValue.isEmpty()) {
+            origin = LlmConfig.origin(String.valueOf(current(bound.get())));
+            if (origin == null) {
+                return Outcome.rejected("先存好接口地址（" + bound.get().key() + "）再设密钥：密钥只发往设它时的那个地址");
+            }
+            if (!origin.equals(LlmConfig.origin(scope))) {
+                return Outcome.rejected("接口地址没存上，密钥没设（服务端此刻的地址是 " + origin + "）");
+            }
+        }
+        return storeSecret(key, newValue, bound.isPresent(), origin);
+    }
+
+    /**
+     * 迁移用（{@link SettingsMigration}）：不经菜单、不查权限，绑到给定的地址（旧文件自己写的那个，不是此刻设置里的 ——
+     * 存档自带的 {@code serverconfig/} 可以把此刻的地址改成任何地方）。
+     */
+    Outcome importSecret(String key, String value, String origin) {
+        Optional<SettingDef> def = table.def(key).filter(SettingDef::secret);
+        if (def.isEmpty() || value == null || value.isEmpty() || !def.get().parse(value).ok()) {
+            return Outcome.rejected("不是登记过的密钥，或者不合规矩");
+        }
+        boolean bound = ServerSettingsTable.secretScope(key).flatMap(table::def).isPresent();
+        if (bound && origin == null) {
+            return Outcome.rejected("没有可绑的地址");
+        }
+        return storeSecret(key, value, bound, origin);
+    }
+
+    /** 旧密钥被菜单/环境变量覆盖时仍保留一份恢复值；它不登记为设置，也永远不用于发请求。 */
+    Outcome preserveLegacyKey(String value, String origin) {
+        String recovery = "legacy_recovery.llm_api_key";
         try {
-            secrets.put(key, (String) parsed.value());
+            Optional<String> previous = secrets.get(recovery);
+            if (previous.isPresent() && !previous.get().equals(value)) {
+                return Outcome.rejected("密钥文件里已有不同的旧密钥恢复项，未覆盖；请先核对旧文件");
+            }
+            secrets.putAll(Map.of(recovery, value, recovery + ORIGIN_SUFFIX, origin == null ? "" : origin));
+            return Outcome.accepted(List.of(recovery));
+        } catch (RuntimeException failure) {
+            LOGGER.warn("旧密钥恢复项没有存成：{}", failure.getClass().getSimpleName());
+            return Outcome.rejected("旧密钥恢复项写盘失败，旧文件留在原地");
+        }
+    }
+
+    private Outcome storeSecret(String key, String value, boolean bound, String origin) {
+        Map<String, String> entries = new LinkedHashMap<>();
+        entries.put(key, value);
+        if (bound) {
+            entries.put(key + ORIGIN_SUFFIX, value.isEmpty() ? "" : origin);   // 清掉密钥时连绑的地址一起清
+        }
+        try {
+            secrets.putAll(entries);
+        } catch (SecretStore.Unreadable unreadable) {
+            LOGGER.error("密钥 {} 没存：密钥文件读不出来，这一次运行里不写它（见起服时那一行）", key);
+            return Outcome.rejected("密钥文件读坏了，没写（见服务端日志）");
         } catch (RuntimeException failure) {
             LOGGER.error("密钥 {} 没存上：{}", key, failure.getClass().getSimpleName());
             return Outcome.rejected("写盘失败");
@@ -223,6 +296,16 @@ public final class ServerSettings {
         ServerSettingsTable.Batch batch = table.validate(changes);
         if (!batch.ok()) {
             return Outcome.rejected(batch.rejection());
+        }
+        // 审查 2026-10-07 R8：碰了「大模型」一组的一批，按改后的值整组合一遍；大模型那一层不收就整批拒、把理由回给菜单
+        boolean touchesLlm = batch.values().keySet().stream()
+                .anyMatch(k -> table.def(k).map(d -> d.category() == SettingsCategory.LLM).orElse(false));
+        if (touchesLlm) {
+            String problem = table.llmProblem(def -> batch.values().containsKey(def.key())
+                    ? batch.values().get(def.key()) : current(def));
+            if (problem != null) {
+                return Outcome.rejected("「大模型」一组合不起来：" + problem);
+            }
         }
         Map<String, Object> before = new LinkedHashMap<>();
         for (String key : batch.values().keySet()) {
@@ -457,6 +540,7 @@ public final class ServerSettings {
     /**
      * 大模型接入层的那一份设置：「大模型」一组的值，密钥先取设置菜单存的（服务端的密钥文件），没有再看环境变量。
      * <b>结果里的密钥只给接入层发请求用</b>；{@link LlmConfig.Loaded#keySource()} 只说取自哪里。
+     * 密钥只在地址对得上时才带（审查 2026-10-07 L1，见 {@link LlmConfig#fromSettings}）。
      *
      * @param env 查环境变量（服务端传 {@code System::getenv}，单测传一张表）
      */
@@ -467,7 +551,7 @@ public final class ServerSettings {
                     LlmConfig.KEY_SOURCE_NONE);
         }
         return LlmConfig.fromSettings(s.table.llmDraft(s::current, s.secret(ServerSettingsTable.LLM_API_KEY).orElse(null)),
-                env);
+                s.secretOrigin(ServerSettingsTable.LLM_API_KEY).orElse(null), env);
     }
 
     /** 开局时取的时限，连同它取自哪里（进开局那一行日志：「改了设置」与「没改」要分得开）。 */

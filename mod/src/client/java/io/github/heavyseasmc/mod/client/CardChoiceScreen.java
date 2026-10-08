@@ -186,7 +186,7 @@ public final class CardChoiceScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int key, int scan, int modifiers) {
+    protected boolean onKey(int key, int scan, int modifiers) {
         // Esc（与背包键）只收起，不替你做决定（用户 2026-10-07：「esc 是关闭页面」）—— 落海那一窗的「不用」是最后那一格
         if (pick.keyPressed(key, rowSize())) {
             return true;
@@ -195,7 +195,7 @@ public final class CardChoiceScreen extends GameScreen {
             commit();
             return true;
         }
-        return super.keyPressed(key, scan, modifiers);
+        return super.onKey(key, scan, modifiers);
     }
 
     /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */

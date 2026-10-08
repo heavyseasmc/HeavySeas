@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -335,6 +336,54 @@ class EndgameTest {
             Map<CharacterId, ScoreSheet> scores = s.scores(STANDARD);
             assertEquals(new ScoreSheet(0, 0, 8, 0), scores.get(KID), "现金随人离场；所爱珠宝商活着照拿 8");
             assertEquals(3, scores.get(JEWELER).hated(), "憎恨看事件：他死了就给分，不问尸体在不在");
+        }
+
+        @Test
+        @DisplayName("❗自选阵容不含船长或收藏家：现金与美术品照整张角色表分类，终局计分不抛（审查 C2）")
+        void customRosterWithoutDoublers() {
+            // 原先在这一局的阵容里找「谁加倍这张」：房主把船长或收藏家剔掉之后，牌堆里照样有现金与美术品，
+            // 一计分就抛（无船长 200 局里 151 局）。分类改取整张角色表，没上场的人只是不加倍。
+            Roster noCaptain = LocalData.roster().select(ids("jeweler", "collector", "mate", "hostess", "sailor",
+                    "doctor", "kid"));
+            Roster noCollector = LocalData.roster().select(ids("jeweler", "captain", "mate", "hostess", "sailor",
+                    "kid"));
+            Session a = realGame(noCaptain);
+            a.dealFromPile(MATE, "cash");
+            a.dealFromPile(MATE, "fine_art_3a");
+            io.github.heavyseasmc.engine.scoring.Treasures ta = assertDoesNotThrow(() -> a.treasuresOf(MATE),
+                    "阵容里没有船长，现金照样分得出");
+            assertEquals(1, ta.cash(), "现金按张数算");
+            assertEquals(3, ta.fineArtFaceValue(), "美术品按面值算");
+
+            Session b = realGame(noCollector);
+            b.dealFromPile(MATE, "fine_art_2");
+            b.dealFromPile(MATE, "cash");
+            io.github.heavyseasmc.engine.scoring.Treasures tb = assertDoesNotThrow(() -> b.treasuresOf(MATE),
+                    "阵容里没有收藏家，美术品照样分得出");
+            assertEquals(1, tb.cash());
+            assertEquals(2, tb.fineArtFaceValue());
+
+            // 整局跑到终局再计分：两种阵容各 60 局，一局都不许抛
+            TreasureScoring scoring = LocalData.roster().treasureScoring();
+            for (Roster roster : List.of(noCaptain, noCollector)) {
+                io.github.heavyseasmc.engine.sim.Simulator sim = new io.github.heavyseasmc.engine.sim.Simulator(roster,
+                        LocalData.navigationDeck(), LocalData.provisions(),
+                        io.github.heavyseasmc.engine.sim.NavigationPolicy.INDIFFERENT, scoring);
+                for (long seed = 0; seed < 60; seed++) {
+                    long sd = seed;
+                    assertFalse(assertDoesNotThrow(() -> sim.run(sd), "seed=" + sd + " " + roster.survivors().size()
+                            + " 人局计分抛了").scores().isEmpty(), "计分真的算了");
+                }
+            }
+        }
+
+        private List<CharacterId> ids(String... ids) {
+            return java.util.Arrays.stream(ids).map(CharacterId::of).toList();
+        }
+
+        private Session realGame(Roster roster) {
+            return new Session("test", roster, new Table(new NavigationDeck(LocalData.navigationDeck(), new Random(1)),
+                    LocalData.provisions(), new Random(1)));
         }
 
         @Test

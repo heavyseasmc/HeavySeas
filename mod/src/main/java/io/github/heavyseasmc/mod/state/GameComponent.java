@@ -16,6 +16,7 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.FogTable;
 import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.game.GameTiming;
+import io.github.heavyseasmc.mod.ui.NotificationHistory;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
@@ -77,10 +78,20 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     private Session session;
 
-    /** 系统事件改画在 HUD 侧边栏，不再写入玩家聊天记录。 */
-    private static final int MAX_NOTIFICATIONS = 8;
+    /**
+     * 系统事件画在 HUD 侧边栏。两端保留最新 400 条，正常同步按收件人只发新条目。
+     *
+     * <p>客户端在每包应用时合并，不等下一帧绘制；重连发保留的历史，对局 UUID 区分重新从 0 开始的序号。
+     * 超出保留范围有缺口计数与日志，不把截断误报为完整历史。
+     */
+    private static final int MAX_NOTIFICATIONS = NotificationHistory.LIMIT;
     private final ArrayDeque<Text> notifications = new ArrayDeque<>();
-    private List<String> notificationJsonCache;
+    /** 这一局一共播了几条（开局从 0 数，只增不减）：客户端拿两次之差数新到了几条（{@code NotificationArrivals}）。 */
+    private long notificationSeq;
+    private final Map<Long, String> notificationJsonCache = new LinkedHashMap<>();
+    private final Map<UUID, Long> notificationSent = new LinkedHashMap<>();
+    private UUID notificationEpoch = UUID.randomUUID();
+    private NotificationHistory<Text> receivedNotifications = new NotificationHistory<>();
     private boolean extraProvisionPending;
 
     public GameComponent(World owner) {
@@ -147,6 +158,23 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     public void openOverboardWindow(long millis) {
         overboardDeadline = System.currentTimeMillis() + millis;
         overboardWindow = millis;
+        standInsOverboard = false;
+    }
+
+    /**
+     * 落海这一窗里，动脑 / 大模型的替身还在一个个想要不要出牌（审查 2026-10-07 R3）。
+     *
+     * <p>❗原先真人先说完「不用」就当场收窗 —— 替身那一手还在路上，落地时这一窗已经结了，记成「作废」。
+     * 真人那一侧收窗前要先问它：它还亮着就不收，等替身的接力走完由那一侧收（接力有看门狗兜底，不会一直亮着）。
+     */
+    private boolean standInsOverboard;
+
+    public boolean standInsOverboard() {
+        return standInsOverboard;
+    }
+
+    public void setStandInsOverboard(boolean thinking) {
+        this.standInsOverboard = thinking;
     }
 
     /**
@@ -200,23 +228,32 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     /** ❗按收件人裁剪：每个人只拿到自己那一份。手牌、划船抽到的牌、舵手看的划船堆走的都是这条路。 */
     @Override
     public void writeSyncPacket(RegistryByteBuf buf, ServerPlayerEntity recipient) {
-        writeView(buf, recipient.getUuid());
+        writeView(buf, recipient.getUuid(), notificationSent.getOrDefault(recipient.getUuid(), 0L));
         TableView.of(session, seatOf(recipient.getUuid()), overboardDeadline, overboardWindow,
                 id -> occupantOf(id).filter(o -> !o.isDummy()).map(o -> o.player().toString()).orElse("")).write(buf);
         buf.writeInt(SYNC_END);           // ❗必须是最后一笔，且每条分支都经过这里
+        notificationSent.put(recipient.getUuid(), notificationSeq);
     }
 
     /** 单测用：按收件人写出 HUD 那一半投影（不含公共牌桌与收尾哨兵），不必造一个 {@code ServerPlayerEntity}。 */
     void writeViewFor(RegistryByteBuf buf, UUID recipient) {
-        writeView(buf, recipient);
+        writeView(buf, recipient, 0L);
+    }
+
+    void writeViewSince(RegistryByteBuf buf, UUID recipient, long lastReceived) {
+        writeView(buf, recipient, lastReceived);
     }
 
     /** 单测用：读回 {@link #writeViewFor} 写出的那一半。 */
     static HudView readViewFrom(RegistryByteBuf buf) {
-        return readView(buf);
+        return readView(buf, new NotificationHistory<>());
     }
 
-    private void writeView(RegistryByteBuf buf, UUID recipient) {
+    static HudView readViewFrom(RegistryByteBuf buf, NotificationHistory<Text> history) {
+        return readView(buf, history);
+    }
+
+    private void writeView(RegistryByteBuf buf, UUID recipient, long lastReceived) {
         buf.writeBoolean(session != null);
         if (session == null) {
             return;
@@ -234,8 +271,14 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         HudView.Fog fog = currentFog();
         buf.writeVarInt(fog.start());
         buf.writeVarInt(fog.end());
-        buf.writeVarInt(notifications.size());
-        for (String notification : notificationJson(buf.getRegistryManager())) {
+        long firstNotification = Math.max(notificationSeq - notifications.size() + 1,
+                Math.min(notificationSeq, Math.max(0, lastReceived)) + 1);
+        buf.writeUuid(notificationEpoch);
+        buf.writeVarLong(firstNotification);
+        buf.writeVarLong(notificationSeq);
+        List<String> newNotifications = notificationJson(buf.getRegistryManager(), firstNotification);
+        buf.writeVarInt(newNotifications.size());
+        for (String notification : newNotifications) {
             buf.writeString(notification);
         }
         // 座位轨：谁坐哪、轮到谁。**公开信息**，每人一份照发 —— 等别人行动时全船看的就是它。
@@ -289,15 +332,22 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             boolean scoring = endgame.stage() == EndgameProgress.Stage.SCORES;
             boolean revealing = endgame.stage() == EndgameProgress.Stage.HATE
                     || endgame.stage() == EndgameProgress.Stage.LOVE;
-            buf.writeVarInt(endgame.order().size());
-            for (int i = 0; i < endgame.order().size(); i++) {
-                CharacterId who = endgame.order().get(i);
-                buf.writeString(who.value());
+            // ❗审查 2026-10-07 L4：翻牌次序就是总分从低到高，胜者旗标就是名次 —— 原先从靠岸那一幕（ARRIVAL）起整张表连同旗标
+            //   就发给所有人，改过的客户端在船靠岸时就知道结果。现在：靠岸那一幕一行都不发（客户端那一幕不开翻牌面，用不着）；
+            //   翻牌只公开已翻与当前点名的身份；后续位置用空身份占位，不把完整名次藏在列表顺序里；
+            //   胜者旗标只给已翻开的牌，保留那一下较慢的翻牌节奏；
+            //   计分阶段才全给。
+            List<CharacterId> order = endgame.stage() == EndgameProgress.Stage.ARRIVAL ? List.of() : endgame.order();
+            buf.writeVarInt(order.size());
+            for (int i = 0; i < order.size(); i++) {
+                CharacterId who = order.get(i);
+                boolean named = scoring || (revealing && i <= endgame.flipped());
+                buf.writeString(named ? who.value() : "");
                 boolean open = revealing && i < endgame.flipped();
                 CharacterId target = endgame.stage() == EndgameProgress.Stage.HATE ? aff.hateOf(who) : aff.loveOf(who);
                 buf.writeString(open ? target.value() : "");
                 buf.writeVarInt(scoring ? endgame.scores().get(who).total() : -1);
-                buf.writeBoolean(endgame.isWinner(who));
+                buf.writeBoolean((scoring || open) && endgame.isWinner(who));
             }
             // 计分面板上那枚章：这一局有几处调试改动（ADR-0060 D3）。公开 —— 用了调试，全船都该知道。
             buf.writeVarInt(debugChanges());
@@ -441,8 +491,21 @@ public final class GameComponent implements Component, AutoSyncedComponent {
             return HudView.Fog.NONE;
         }
         String weather = session.currentWeather().map(card -> card.id()).orElse("");
-        FogTable.Entry entry = SceneDataLoader.fogFor(layoutId == null ? SceneDataLoader.DEFAULT : layoutId, weather);
+        FogTable.Entry entry = fogFor(weather);
         return entry.vanilla() ? HudView.Fog.NONE : new HudView.Fog(entry.start(), entry.end());
+    }
+
+    /**
+     * 这一局某种天候那一天的雾表条目：有开局快照（{@link #setLayout}）就查快照，没有（没开过局）才去问当前的场景数据。
+     *
+     * <p>❗审查 2026-10-07 C6：原先每次都按布局 id 去 {@code SceneDataLoader} 里现取 —— 对局中 {@code /reload}
+     * 把这一局用的布局拿掉，好几处每 tick 的计时就各抛一次，冒到服务端主循环，崩服。一局之内布局不变，与时限同一条（ADR-0099 D8）。
+     */
+    public FogTable.Entry fogFor(String weather) {
+        if (fogTable != null) {
+            return fogTable.entryFor(weather);
+        }
+        return SceneDataLoader.fogFor(layoutId == null ? SceneDataLoader.DEFAULT : layoutId, weather);
     }
 
     /**
@@ -511,7 +574,8 @@ public final class GameComponent implements Component, AutoSyncedComponent {
 
     @Override
     public void applySyncPacket(RegistryByteBuf buf) {
-        HudView next = readView(buf);
+        NotificationHistory<Text> nextNotifications = receivedNotifications.copy();
+        HudView next = readView(buf, nextNotifications);
         TableView nextTable = TableView.read(buf);
         int mark = buf.readInt();
         if (mark != SYNC_END) {
@@ -520,12 +584,18 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     "对局投影的收尾标记对不上（读到 0x%08X）—— 两端的字段表不一致，八成是改了一侧忘了改另一侧"
                             .formatted(mark));
         }
+        if (nextNotifications.missing() > receivedNotifications.missing()) {
+            LOGGER.warn("通知历史：{} 条较早的播报已超出保留范围", nextNotifications.missing());
+        }
+        receivedNotifications = nextNotifications;
+        notificationEpoch = nextNotifications.epoch();
         view = next;
         tableView = nextTable;
     }
 
-    private static HudView readView(RegistryByteBuf buf) {
+    private static HudView readView(RegistryByteBuf buf, NotificationHistory<Text> history) {
         if (!buf.readBoolean()) {
+            history.clear();
             return HudView.IDLE;
         }
         int turn = buf.readVarInt();
@@ -534,12 +604,20 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         String weather = buf.readString();
         boolean canRow = buf.readBoolean();
         HudView.Fog fog = new HudView.Fog(buf.readVarInt(), buf.readVarInt());
+        UUID notificationEpoch = buf.readUuid();
+        long firstNotification = buf.readVarLong();
+        long notificationSeq = buf.readVarLong();
         int notificationCount = buf.readVarInt();
-        List<Text> notifications = new ArrayList<>(notificationCount);
+        if (notificationCount < 0 || notificationCount > MAX_NOTIFICATIONS) {
+            throw new IllegalArgumentException("Invalid notification count: " + notificationCount);
+        }
+        List<Text> incomingNotifications = new ArrayList<>(notificationCount);
         for (int i = 0; i < notificationCount; i++) {
             Text message = Text.Serialization.fromJson(buf.readString(), buf.getRegistryManager());
-            notifications.add(Objects.requireNonNull(message, "通知文本不能是 null"));
+            incomingNotifications.add(Objects.requireNonNull(message, "通知文本不能是 null"));
         }
+        history.accept(notificationEpoch, firstNotification, notificationSeq, incomingNotifications);
+        List<Text> notifications = history.entries();
         int seatCount = buf.readVarInt();
         List<String> seats = new ArrayList<>(seatCount);
         for (int i = 0; i < seatCount; i++) {
@@ -604,7 +682,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                         attackSide, defendSide, attackPower, defendPower, List.of(), 0, List.of(), 0)
                 : ContestView.NONE;
         if (!buf.readBoolean()) {
-            return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, seats, removed, actor,
+            return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, notificationSeq, seats, removed, actor,
                     new HudView.Sea(rowStack, helmsman, helmDeadline, helmWindow, revealed, List.of(), List.of()),
                     thirstPrompt, endgame, publicContest, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "",
                     false, 0L, 0L, false, 0L, "", List.of(), 0, List.of(), List.of(), HudView.Score.NONE);
@@ -664,7 +742,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
                     attackSide, defendSide, attackPower, defendPower, myWeapons, myCommitted,
                     victimFront, victimHand);
         }
-        return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, seats, removed, actor,
+        return new HudView(true, turn, phase, gulls, weather, canRow, fog, notifications, notificationSeq, seats, removed, actor,
                 new HudView.Sea(rowStack, helmsman, helmDeadline, helmWindow, revealed, rowing, offer),
                 thirstPrompt, endgame, contest, true, character, health, maxHealth, condition, thirst,
                 love, hate, yourTurn, actionDeadline, actionWindow, designating, designateUntil,
@@ -906,6 +984,21 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         this.thirstWindow = 0L;
         this.thirstHighlight = 0;
         this.thirstDonors.clear();
+        this.standInsThirst = false;
+    }
+
+    /**
+     * 真人的口渴窗口开着时，动脑 / 大模型的替身还在一个个想递不递水（审查 2026-10-07 R4）。
+     * 与落海那一窗的 {@link #standInsOverboard} 同一个用法：「能打水的真人都表过态了」那一下先问它，亮着就不提前收。
+     */
+    private boolean standInsThirst;
+
+    public boolean standInsThirst() {
+        return standInsThirst;
+    }
+
+    public void setStandInsThirst(boolean thinking) {
+        this.standInsThirst = thinking;
     }
 
     /**
@@ -1028,7 +1121,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     public static final long UNLIMITED_MS = 365L * 24 * 3600 * 1000;
 
     /**
-     * 演示局里真人不限时（用户 2026-10-07：「demo 局里真人不限时」）：替身随机行动开着、名单里有替身也有真人。
+     * 演示局里真人不限时（用户 2026-10-07：「demo 局里真人不限时」）：这一局是演示局（{@link #isDemo}）、替身会自己动、有真人坐着。
      * 只认随机开关开着的局 —— 回归脚本都关着它跑，那几条「超时替你选」的路照旧测得到。
      *
      * <p>再加一道显式的开关（ADR-0099 D7 · 服务端设置 {@code demo.untimed_humans}，开局快照进 {@link #timing}）：
@@ -1036,8 +1129,24 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      * ❗原先正式局不会变成不限时，只靠「随机默认关、不持久化」（ADR-0097）—— 随机的默认值进了设置之后，那道闸要靠这一项。
      */
     public boolean demoNoTimeout() {
-        return timing.untimedDemo() && dummyAutoplay && standInsAct() && anyHumanSeated()
-                && occupants.values().stream().anyMatch(Occupant::isDummy);
+        return timing.untimedDemo() && demo && dummyAutoplay && standInsAct() && anyHumanSeated();
+    }
+
+    /**
+     * 这一局是不是演示局：开局时定死（{@code GameFlow#start}）—— {@code /seas start} 开的、名单里有替身的局。
+     *
+     * <p>❗审查 2026-10-07 R5：原先有两份定义 —— {@code Seats} 认「名单里有替身就算演示局（不钉人）」，
+     * 不限时那一侧认上面那五项。服务端设置 {@code stand_ins.fill_empty_seats} 加进来以后，演习艇开的正式局也会补替身，
+     * 于是被 {@code Seats} 当成演示局、人不再钉在座位上。两处现在都问这一个标志。按倾向定（用户可推翻）：演习艇开航的局算正式局。
+     */
+    private boolean demo;
+
+    public boolean isDemo() {
+        return demo;
+    }
+
+    public void setDemo(boolean demo) {
+        this.demo = demo;
     }
 
     /** 等真人的那一扇窗口开多长：演示局不限时，否则照给的毫秒数。只给「在等真人」的窗口用。 */
@@ -1145,6 +1254,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     public void begin(Session started, Map<CharacterId, Occupant> seats, Set<UUID> audience) {
         overboardDeadline = 0;
         overboardWindow = 0;
+        standInsOverboard = false;
+        standInsThirst = false;
+        demo = false;                         // 开局方随后按这一局怎么开的定（GameFlow.start，审查 R5）
         timing = GameTiming.DEFAULTS;         // 开局方随后按服务端设置换成这一局的快照（GameFlow.start）
         setWaterBodies(List.of(), 0);
         clearDesignation();
@@ -1163,6 +1275,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearHelm();
         clearThirst();
         notifications.clear();
+        notificationSeq = 0;
+        notificationJsonCache.clear();
+        notificationSent.clear();
+        notificationEpoch = UUID.randomUUID();
         extraProvisionPending = false;
         endgame = null;
         fogCleared = false;
@@ -1344,16 +1460,30 @@ public final class GameComponent implements Component, AutoSyncedComponent {
      */
     private SceneLeftover sceneLeftover;
 
+    /** 这一局用的那份布局与它的雾表：开局时整份快照进来（审查 2026-10-07 C6），{@code /reload} 换掉数据也不影响这一局。 */
+    private io.github.heavyseasmc.mod.data.VoyageLayout layout;
+    private FogTable fogTable;
+
     public Optional<Identifier> layoutId() {
         return Optional.ofNullable(layoutId);
     }
 
-    public void setLayoutId(Identifier id) {
-        this.layoutId = Objects.requireNonNull(id, "layoutId");
+    /** 这一局的布局快照；没开过局（或场景已收）时为空。 */
+    public Optional<io.github.heavyseasmc.mod.data.VoyageLayout> layout() {
+        return Optional.ofNullable(layout);
+    }
+
+    /** 开局时记下这一局的布局与雾表（整份快照，不是 id）。 */
+    public void setLayout(io.github.heavyseasmc.mod.data.VoyageLayout layout, FogTable fog) {
+        this.layout = Objects.requireNonNull(layout, "layout");
+        this.fogTable = Objects.requireNonNull(fog, "fog");
+        this.layoutId = layout.id();
     }
 
     public void clearLayoutId() {
         this.layoutId = null;
+        this.layout = null;
+        this.fogTable = null;
     }
 
     public Optional<SceneLeftover> sceneLeftover() {
@@ -1432,6 +1562,7 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     private CharacterId designating;
     private Contest.Kind designationKind;
     private long designationDeadline;
+    private long designationSerial;
 
     public Optional<CharacterId> designating() {
         return Optional.ofNullable(designating);
@@ -1445,13 +1576,19 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return designationDeadline;
     }
 
+    public long designationSerial() {
+        return designationSerial;
+    }
+
     public void beginDesignation(CharacterId who, Contest.Kind kind, long millis) {
+        designationSerial++;
         this.designating = who;
         this.designationKind = kind;
         this.designationDeadline = System.currentTimeMillis() + millis;
     }
 
     public void clearDesignation() {
+        designationSerial++;
         this.designating = null;
         this.designationKind = null;
         this.designationDeadline = 0L;
@@ -1485,6 +1622,10 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     public void end() {
         overboardDeadline = 0;
         overboardWindow = 0;
+        standInsOverboard = false;
+        standInsThirst = false;
+        clearContest();                       // 原先不清（审查 2026-10-07 原稿第 2 块 #8）：每扇窗开时都会重设，目前无害，收场时一并归零
+        clearDecided();
         setWaterBodies(List.of(), 0);
         occupants.values().stream().filter(o -> !o.isDummy()).map(Occupant::player).forEach(endedFor::add);
         endedFor.addAll(activeVoyagePlayers);             // 结束那一帧只发给这一局的人（同 shouldSyncWith）
@@ -1500,7 +1641,9 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         clearHelm();
         clearThirst();
         notifications.clear();
-        notificationJsonCache = null;
+        notificationSeq = 0;
+        notificationJsonCache.clear();
+        notificationSent.clear();
         extraProvisionPending = false;
         endgame = null;
         seatIds = List.of();
@@ -1514,11 +1657,17 @@ public final class GameComponent implements Component, AutoSyncedComponent {
     }
 
     public void notify(Text message) {
-        notifications.addLast(Objects.requireNonNull(message, "message"));
+        notifications.addLast(Objects.requireNonNull(message, "message").copy());
+        notificationSeq++;
         while (notifications.size() > MAX_NOTIFICATIONS) {
+            notificationJsonCache.remove(notificationSeq - notifications.size() + 1);
             notifications.removeFirst();
         }
-        notificationJsonCache = null;
+    }
+
+    /** 这一局一共播了几条（见 {@link #notificationSeq} 字段）。 */
+    public long notificationSeq() {
+        return notificationSeq;
     }
 
     /** 右栏此刻的那几条（最多 {@value #MAX_NOTIFICATIONS} 条，旧的在前）。只读的一份拷贝：调试导出用（ADR-0060）。 */
@@ -1526,13 +1675,26 @@ public final class GameComponent implements Component, AutoSyncedComponent {
         return List.copyOf(notifications);
     }
 
-    private List<String> notificationJson(RegistryWrapper.WrapperLookup registry) {
-        if (notificationJsonCache == null) {
-            notificationJsonCache = notifications.stream()
-                    .map(notification -> Text.Serialization.toJsonString(notification, registry))
-                    .toList();
+    private List<String> notificationJson(RegistryWrapper.WrapperLookup registry, long first) {
+        List<String> result = new ArrayList<>();
+        long sequence = notificationSeq - notifications.size() + 1;
+        for (Text notification : notifications) {
+            if (sequence >= first) {
+                result.add(notificationJsonCache.computeIfAbsent(sequence,
+                        ignored -> Text.Serialization.toJsonString(notification, registry)));
+            }
+            sequence++;
         }
-        return notificationJsonCache;
+        return result;
+    }
+
+    public UUID notificationEpoch() {
+        return notificationEpoch;
+    }
+
+    /** 重连需要完整的保留历史；也不让旁观者 UUID 留在上一条连接的投递表里。 */
+    public void forgetNotificationRecipient(UUID player) {
+        notificationSent.remove(player);
     }
 
     public void setExtraProvisionPending(boolean pending) {

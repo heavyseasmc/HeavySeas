@@ -199,7 +199,10 @@ public final class SkiffBlocks {
 
     /**
      * 物品放下去、物品栏里画出来的那个状态：默认状态里有几样是「看不见」或「熄着」的（帆收着时是空模型、
-     * 提灯默认没油、横桁默认卷着帆）—— 拿来搭东西的人要的是看得见的那一版。
+     * 提灯默认没油）—— 拿来搭东西的人要的是看得见的那一版。
+     *
+     * <p>布尔属性默认一律 false 之后（{@link #add}），原先靠默认值碰巧是 true 才看得见的两样在这里写明：灯与救生圈挂着、桨架插着桨 ——
+     * 与改之前的图标与摆法一样。唯一变了的是桨与桨架不再停在「扫到一半」那一帧（审查 2026-10-07 U11）。
      */
     public static BlockState displayState(SkiffBlock block) {
         BlockState s = block.getDefaultState();
@@ -211,6 +214,12 @@ public final class SkiffBlocks {
         }
         if (s.contains(FURLED)) {
             s = s.with(FURLED, false);
+        }
+        if (s.contains(HANGING)) {
+            s = s.with(HANGING, true);
+        }
+        if (s.contains(OAR)) {
+            s = s.with(OAR, true);
         }
         return s;
     }
@@ -241,6 +250,14 @@ public final class SkiffBlocks {
         BlockState state = block.getStateManager().getDefaultState();
         if (state.contains(FACING)) {
             state = state.with(FACING, net.minecraft.util.math.Direction.SOUTH);
+        }
+        // 布尔属性一律默认 false（审查 2026-10-07 U11，与 LinerBlocks.add 2026-10-07 那一课同一条）：游戏给布尔属性的默认值是 true ——
+        //   桨与桨架默认停在「扫到一半」的那一帧（物品图标也是），不带属性 /setblock 一个舵就是带水的、悬在半空漏水。
+        //   要画给人看的那一版（灯挂着 · 桨架插着桨 · 帆升着）在 displayState 里写明，不靠默认值碰巧是 true
+        for (Property<?> p : state.getProperties()) {
+            if (p instanceof BooleanProperty b) {
+                state = state.with(b, false);
+            }
         }
         block.defaultTo(state);
         BLOCKS.put(name, block);

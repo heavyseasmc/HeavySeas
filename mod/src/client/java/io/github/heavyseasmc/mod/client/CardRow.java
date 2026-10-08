@@ -21,7 +21,7 @@ import java.util.Map;
  *   <li><b>张数一变就滑过去</b>：按「哪一张」认，不按下标 —— 中间少了一张，后面的不该先跳一格再滑。</li>
  * </ul>
  *
- * <p>❗样图（{@code evidence/2026-10-01-demo/tip-mock/}）是 144 宽、提 30；游戏里补给箱的牌宽<b>按剩下的空间算</b>：
+ * <p>❗样图（2026-10-01 演示时用户看过的那一版）是 144 宽、提 30；游戏里补给箱的牌宽<b>按剩下的空间算</b>：
  * 超时那一下「顿」还要再往上弹一截，样图没给它留地方，照搬会压上座位轨的名字（snap_test 的判据）。
  */
 final class CardRow {
@@ -235,4 +235,20 @@ final class CardRow {
 
     /** 满箱几张（8 人局）。 */
     private static final int N_FULL = 8;
+
+    /**
+     * 手牌一面那两排牌（手牌 · 面前）的顶，GUI 单位（审查 2026-10-07 U3）。
+     *
+     * <p>照样张 b-4 锚在板顶 408；但样张这一面没有倒计时，而 ADR-0095 B3 让它轮到你时画行动的倒计时 ——
+     * 锚在板底 −112 的横杠正好压在牌底那一成上（1280×720 叠 14 px，1920×1080 叠 23 px）。牌底一律让到
+     * 「倒计时外圈之上再留 {@link #BAR_CLEAR}」（与补给箱那一排同一个留法，{@link #provision}）；
+     * <b>不论这一帧画不画倒计时都这样排</b> —— 轮到你的那一下版面不跳。窗口够高（比 16:9 高）时样张的锚点本来就放得下，不动。
+     *
+     * @param anchoredTop 照样张算出来的顶（GUI 单位）
+     * @param cardH       小牌的高（GUI 单位）
+     */
+    static int handRowTop(SheetLayout l, int guiScale, int anchoredTop, int cardH) {
+        int floor = (int) Math.floor((l.countBar().y() - (BAR_RIM + BAR_CLEAR) * l.k()) / guiScale);
+        return Math.min(anchoredTop, floor - cardH);
+    }
 }

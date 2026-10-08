@@ -100,7 +100,9 @@ public final class MagicMirror {
         try {
             home = MistSea.goHome(player);
         } catch (IllegalStateException failed) {
-            player.sendMessage(Text.literal(failed.getMessage()).formatted(Formatting.RED), true);
+            // 异常信息是给日志看的（中文、带玩家名）：给玩家一句按语言走的话（审查 2026-10-07 Q4，与 ADR-0095 A8 同一条）
+            LOGGER.warn("魔镜：{} 回家没成：{}", player.getGameProfile().getName(), failed.getMessage());
+            player.sendMessage(Text.translatable("heavyseas.mirror.home_failed").formatted(Formatting.RED), true);
             return ActionResult.FAIL;
         }
         switch (home) {

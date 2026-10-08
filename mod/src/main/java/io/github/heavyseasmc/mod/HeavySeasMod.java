@@ -1,5 +1,7 @@
 package io.github.heavyseasmc.mod;
 
+import io.github.heavyseasmc.mod.state.GameComponents;
+
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.mod.command.SeasCommand;
 import io.github.heavyseasmc.mod.config.ServerSettings;
@@ -121,6 +123,8 @@ public final class HeavySeasMod implements ModInitializer {
         // 调试指令给「下一局」定的东西与指定的天色（ADR-0060）只活一次运行：单人游戏同一个进程里再开一个世界，不能带过去。
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             DebugNext.clear();
+            io.github.heavyseasmc.mod.world.skiff.SkiffProps.reset();
+            GameComponents.serverStopped(server);
             PlayerSky.resetForced();
             LinerShip.onServerStopped();
             io.github.heavyseasmc.mod.world.liner.ChartTable.forget();
@@ -129,10 +133,15 @@ public final class HeavySeasMod implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 server.execute(() -> {
                     MistSea.recover(handler.player);
+                    server.getWorlds().forEach(world -> GameComponents.of(world)
+                            .forgetNotificationRecipient(handler.player.getUuid()));
                     ConnectionPhase.connected(handler.player, true);
+                    GameComponents.sync(handler.player.getServerWorld());
                     // 牌的目录（类别 · 张数 · 角标上的数）：这些是牌自己的属性，数据包说了算 ——
                     // 客户端的提示签与牌面角标要写它们，而在这个包之前根本拿不到数据。
                     // ❗发失败不是致命的：提示签少两栏、角标空着，牌照样能玩。所以只记一句，不打断进服。
+                    //   ❗接得住的只有「包还没造出来就不对」的那一种（CatalogS2C.of 先核张数上限）：编码在网络线程上异步做，
+                    //   造好的包编码失败接不住、会把人踢下线（审查 2026-10-07 U8）—— 所以超上限要在造包这一刻就拒。
                     try {
                         var data = GameDataLoader.require();
                         ServerPlayNetworking.send(handler.player,
@@ -141,10 +150,23 @@ public final class HeavySeasMod implements ModInitializer {
                         LOGGER.warn("牌目录没发出去（提示签上会少「类别 · 共几张」、角标空着）：{}", e.toString());
                     }
                 }));
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+        // ❗断线回调在网络线程上来（Fabric 在 ClientConnection.channelInactive 开头触发，客户端直接关掉时先于主线程那一侧）：
+        //   原先就在那条线程上改对局、排步骤、摆座位，与主线程的每 tick 同时碰同一份状态（审查 2026-10-07 C4）。
+        //   与上面 JOIN 同一个写法：整段交回服务端线程。
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> server.execute(() -> {
+            io.github.heavyseasmc.mod.world.skiff.SkiffProps.forget(handler.player.getUuid());
+            server.getWorlds().forEach(world -> GameComponents.of(world)
+                    .forgetNotificationRecipient(handler.player.getUuid()));
             ConnectionPhase.connected(handler.player, false);
             PlayerSky.forget(handler.player);
-        });
+        }));
+        // 换维度会重建客户端的 World 组件，返回同一世界时也需要完整的通知历史。
+        net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD
+                .register((player, origin, destination) -> {
+                    GameComponents.of(origin).forgetNotificationRecipient(player.getUuid());
+                    GameComponents.of(destination).forgetNotificationRecipient(player.getUuid());
+                    GameComponents.sync(destination);
+                });
         // 指定模式（ADR-0025）：世界里右键一个人就是「我要对他动手」。
         // ❗只在指定模式里才作数，其余一律放行 —— 吃掉别人的右键会让人觉得「右键偶尔失灵」。
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) ->
@@ -228,16 +250,19 @@ public final class HeavySeasMod implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(io.github.heavyseasmc.mod.world.liner.ChartTable::tick);   // 海图桌的浮字与小铜船（ADR-0086 §2 第 5 条）
         ServerTickEvents.END_SERVER_TICK.register(PlayerSky::tick);
         ServerTickEvents.END_SERVER_TICK.register(PlayerBodies::tick);
-        ServerTickEvents.END_SERVER_TICK.register(ProvisionPhase::tick);
-        ServerTickEvents.END_SERVER_TICK.register(ActionPhase::tick);
-        ServerTickEvents.END_SERVER_TICK.register(NavigationPhase::tick);
-        ServerTickEvents.END_SERVER_TICK.register(OverboardPhase::tick);
-        ServerTickEvents.END_SERVER_TICK.register(ThirstPhase::tick);
-        ServerTickEvents.END_SERVER_TICK.register(ContestPhase::tick);
-        ServerTickEvents.END_SERVER_TICK.register(DesignationPhase::tick);
+        // 各阶段的计时一律经 GameFlow.guarded 挂：出错只结束这一局，不让异常冒到主循环崩服（审查 2026-10-07 C1）。
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("补给箱计时", ProvisionPhase::tick));
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("行动 / 划船计时", ActionPhase::tick));
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("舵手计时", NavigationPhase::tick));
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("落海计时", OverboardPhase::tick));
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("口渴计时", ThirstPhase::tick));
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("这一场的计时", ContestPhase::tick));
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("指定模式计时", DesignationPhase::tick));
         // 排程：替身的一步、航海结算后的停顿（ADR-0019）。
-        ServerTickEvents.END_SERVER_TICK.register(GameFlow::tick);
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("排程", GameFlow::tick));
         ServerTickEvents.END_SERVER_TICK.register(Gulls::tick);
         ServerTickEvents.END_SERVER_TICK.register(LinerShip::tick);
+        ServerTickEvents.END_SERVER_TICK.register(GameFlow.guarded("投影同步",
+                (world, component, now) -> GameComponents.flush(world)));
     }
 }

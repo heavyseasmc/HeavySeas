@@ -238,7 +238,24 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
     @Override
     protected BlockState getStateForNeighborUpdate(BlockState state, Direction direction, BlockState neighborState,
                                                    WorldAccess world, BlockPos pos, BlockPos neighborPos) {
-        return connect(state, world, pos);
+        return readsNeighbor(state, direction) ? connect(state, world, pos) : state;
+    }
+
+    /** 只响应实际读取的方向；批量摆放的六次回调不必每次都扫描同一圈邻居。 */
+    private boolean readsNeighbor(BlockState state, Direction changed) {
+        Direction facing = state.contains(FACING) ? state.get(FACING) : Direction.NORTH;
+        boolean sideways = changed == LinerConnect.viewerLeft(facing) || changed == LinerConnect.viewerRight(facing);
+        return switch (kind) {
+            case FRAME -> changed.getAxis().isVertical() || sideways;
+            case WAINSCOT -> changed == Direction.UP;
+            case CAPPING, CASING -> sideways;
+            case RUN, CARPET -> changed.getAxis().isHorizontal();
+            case WALL_PIECE, PILASTER_SIDE -> state.contains(BASE)
+                    && (sideways || changed == Direction.DOWN || (state.contains(CAPITAL) && changed == Direction.UP));
+            case TRELLIS -> changed != facing.getOpposite();
+            case ARCH -> sideways || changed == Direction.UP;
+            default -> false;
+        };
     }
 
     /** 按邻居重算「看邻居」的那几样；别的方块原样返回。 */
@@ -402,7 +419,8 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
     @Override
     protected ItemActionResult onUseWithItem(ItemStack stack, BlockState state, World world, BlockPos pos, PlayerEntity player,
                                              Hand hand, BlockHitResult hit) {
-        if (kind == Kind.CARPET && stack.isOf(Items.SHEARS)) {
+        // 剪刀也是改船：与装修锤同一道（冒险 / 旁观 / 出生点保护里不揭，审查 2026-10-07 U10）
+        if (kind == Kind.CARPET && stack.isOf(Items.SHEARS) && DecorHammer.mayEdit(player, world, pos)) {
             // 剪刀揭掉地毯（ADR-0093 B3）：还原成底下那层柚木，板的走向照 axis
             if (!world.isClient) {
                 world.setBlockState(pos, LinerBlocks.TEAK_DECK.getDefaultState().with(AXIS, state.get(AXIS)), Block.NOTIFY_ALL);

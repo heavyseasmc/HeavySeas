@@ -177,6 +177,7 @@ public final class WeaponScreen extends GameScreen {
             // 「什么也不做」= 不押了（ADR-0095 D1）：该押的人都说完了，这一段就提前结算
             ClientPlayNetworking.send(ContestActionC2S.of(ContestActionC2S.Kind.WEAPONS_DONE));
             LOGGER.info("挂武器：不押了");
+            HeavySeasClient.answeredContest(view);   // 服务端随即把这一段收短，那不是一扇新窗（U14）
             close();
             return;
         }
@@ -217,7 +218,7 @@ public final class WeaponScreen extends GameScreen {
 
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (inspectKey(keyCode)) {
             return true;
         }
@@ -236,7 +237,7 @@ public final class WeaponScreen extends GameScreen {
                 return true;
             }
             default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.onKey(keyCode, scanCode, modifiers);
             }
         }
     }

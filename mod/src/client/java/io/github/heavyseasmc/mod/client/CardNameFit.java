@@ -131,6 +131,7 @@ final class CardNameFit {
                 LOGGER.warn("牌名核对：{} 只读到 {} 个牌名 —— 没在查，不是都放得下", lang, all.size());
             }
             Map<String, Map<String, Double>> units = measure(lang);
+            UNITS.put(lang, units);
             for (String kind : units.keySet()) {
                 double[] t = layout.thresholds(kind, units.get(kind));
                 LOGGER.info("牌名界线：{} {} L0 ≥ {} px · L1 ≥ {} px", lang, kind, Math.round(t[0]), Math.round(t[1]));

@@ -152,6 +152,44 @@ final class ServerSettingsTest {
     }
 
     @Test
+    @DisplayName("❗「大模型」一组：每一项单看都合法、合起来大模型那一层不收的一批，整批拒并说理由（不是存下去、再静默关掉大模型）")
+    void llmBatchMustMakeAWholeConfig() {
+        // 审查 2026-10-07 R8：菜单原先只逐项核对，存了显示「已保存」，然后 LlmConfig 不收、整个大模型层关掉，只在服务端日志留一行
+        Loaded file = new Loaded();
+        settings = loaded(ServerSettingsTable.DEFAULT, file);
+        Map<String, String> before = settings.snapshot();
+
+        ServerSettings.Outcome effort = settings.save(true, Map.of(ServerSettingsTable.LLM_REASONING_EFFORT, "High"));
+        assertFalse(effort.accepted(), "reasoning_effort 写成「High」（LlmConfig 只认小写字母）却存进去了");
+        assertTrue(effort.rejection().contains("reasoningEffort"), effort.rejection());
+
+        Map<String, String> backoff = new LinkedHashMap<>();
+        backoff.put(ServerSettingsTable.LLM_BACKOFF_BASE, "5000");
+        backoff.put(ServerSettingsTable.LLM_BACKOFF_MAX, "3000");
+        ServerSettings.Outcome b = settings.save(true, backoff);
+        assertFalse(b.accepted(), "退避底数大于上限却存进去了");
+        assertTrue(b.rejection().contains("backoffMaxMs"), b.rejection());
+
+        Map<String, String> noScheme = new LinkedHashMap<>();
+        noScheme.put(ServerSettingsTable.LLM_ENABLED, "true");
+        noScheme.put(ServerSettingsTable.LLM_BASE_URL, "127.0.0.1:11434/v1");
+        noScheme.put(ServerSettingsTable.LLM_MODEL, "m");
+        assertFalse(settings.save(true, noScheme).accepted(), "地址没写 http:// 却存进去了");
+
+        assertEquals(before, settings.snapshot(), "被拒的几批动了值");
+        assertEquals(0, file.saves);
+
+        // 正向对照：合得起来的一批照常存
+        Map<String, String> good = new LinkedHashMap<>(noScheme);
+        good.put(ServerSettingsTable.LLM_BASE_URL, "http://127.0.0.1:11434/v1");
+        good.put(ServerSettingsTable.LLM_REASONING_EFFORT, "high");
+        ServerSettings.Outcome ok = settings.save(true, good);
+        assertTrue(ok.accepted(), String.valueOf(ok.rejection()));
+        // 不碰「大模型」一组的批不受它牵连
+        assertTrue(settings.save(true, Map.of(ServerSettingsTable.ACTION, "30")).accepted());
+    }
+
+    @Test
     @DisplayName("写盘失败：内存里的值退回原样，不留「改了一半」")
     void failedWriteRollsBack() {
         Loaded file = new Loaded();

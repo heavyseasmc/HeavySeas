@@ -123,7 +123,8 @@ public final class RosterScreen extends GameScreen {
         boxes = all;
         // 停在头像上看这个人的本事（用户 2026-10-07：「全靠脑子记记不住」）—— 挑阵容时最要紧
         for (int i = 0; i < n; i++) {
-            addDetail(chips.get(i), characterDetail(config.characters().get(i)));
+            String character = config.characters().get(i);
+            addDetail(chips.get(i), () -> characterDetail(character));
         }
 
         // 鼠标真的动了才把焦点带过去（停着的指针不算指向，见 GameScreen#mouseActuallyMoved）。
@@ -242,7 +243,7 @@ public final class RosterScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         int last = Math.max(0, boxes.size() - 1);
         switch (keyCode) {
             case GLFW.GLFW_KEY_LEFT -> {
@@ -267,7 +268,7 @@ public final class RosterScreen extends GameScreen {
                 return true;
             }
             default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.onKey(keyCode, scanCode, modifiers);
             }
         }
     }

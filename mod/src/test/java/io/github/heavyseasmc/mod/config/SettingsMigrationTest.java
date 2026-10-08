@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -29,6 +28,73 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 两件都要幂等，{@code llm.json} 改名不删、不覆盖，密钥不进日志、不进会同步的那份文件。
  */
 final class SettingsMigrationTest {
+
+    @Test
+    void renameFailureCannotImportValuesAgainAfterTheyWereReset(@TempDir Path dir) throws Exception {
+        Path file = llmJson(dir, "{\"maxQueued\": 8}");
+        Files.createFile(dir.resolve("llm.json.migrated"));
+        for (int i = 1; i <= 1000; i++) {
+            Files.createFile(dir.resolve("llm.json.migrated." + i));
+        }
+        try (TestSettings t = TestSettings.defaults()) {
+            var settings = t.settings();
+            var def = settings.table().def(ServerSettingsTable.LLM_MAX_QUEUED).orElseThrow();
+            Object fallback = def.fallback();
+            org.junit.jupiter.api.Assertions.assertNotEquals(8, fallback, "夹具必须真的改变一个默认值");
+            var first = SettingsMigration.importLlmJson(file, settings, NO_ENV);
+            assertNotNull(first.problem(), "前提：改名失败");
+            assertEquals(8, settings.current(def));
+            assertTrue(settings.save(true, Map.of(def.key(), def.format(fallback))).accepted());
+            SettingsMigration.importLlmJson(file, settings, NO_ENV);
+            assertEquals(fallback, settings.current(def), "再次起服只补归档，不能把用户改回的默认值重新覆盖");
+        }
+    }
+
+    @Test
+    void skippedLegacyKeyIsPreservedPrivatelyAndRemovedFromTheArchive(@TempDir Path dir) throws Exception {
+        SecretStore secrets = SecretStore.inMemory();
+        try (TestSettings t = TestSettings.of(ServerSettingsTable.DEFAULT, secrets)) {
+            var result = SettingsMigration.importLlmJson(llmJson(dir, FULL_JSON), t.settings(),
+                    key -> key.equals(LlmConfig.KEY_ENV) ? "active-env-key" : null);
+            assertNull(result.problem(), result.problem());
+            assertTrue(t.settings().secret(ServerSettingsTable.LLM_API_KEY).isEmpty(), "不覆盖环境变量优先级");
+            assertEquals(Optional.of(KEY), secrets.get("legacy_recovery.llm_api_key"));
+            assertFalse(Files.readString(result.renamedTo()).contains(KEY));
+            assertFalse(t.dump().contains(KEY));
+            assertFalse(result.toString().contains(KEY));
+        }
+    }
+
+    @Test
+    void aDifferentRecoveryKeyIsNeverOverwritten(@TempDir Path dir) throws Exception {
+        SecretStore secrets = SecretStore.inMemory();
+        secrets.put("legacy_recovery.llm_api_key", "previous-recovery-key");
+        Path source = llmJson(dir, FULL_JSON);
+        try (TestSettings t = TestSettings.of(ServerSettingsTable.DEFAULT, secrets)) {
+            var result = SettingsMigration.importLlmJson(source, t.settings(),
+                    key -> key.equals(LlmConfig.KEY_ENV) ? "active-env-key" : null);
+            assertNotNull(result.problem());
+            assertTrue(Files.readString(source).contains(KEY), "恢复值没保存之前不删除唯一的旧值");
+            assertEquals(Optional.of("previous-recovery-key"), secrets.get("legacy_recovery.llm_api_key"));
+            assertNull(result.renamedTo());
+        }
+    }
+
+    @Test
+    void anInterruptedValuesImportIsReportedBeforeWritingAnything(@TempDir Path dir) throws Exception {
+        Path source = llmJson(dir, "{\"maxQueued\": 8}");
+        Files.writeString(dir.resolve("llm.json.values-importing"), "settings-imported-v1\n");
+        try (TestSettings t = TestSettings.defaults()) {
+            var before = t.settings().snapshot();
+            int saves = t.saves();
+            var result = SettingsMigration.importLlmJson(source, t.settings(), NO_ENV);
+            assertNotNull(result.problem());
+            assertTrue(result.problem().contains("中断"));
+            assertEquals(before, t.settings().snapshot());
+            assertEquals(saves, t.saves());
+            assertTrue(Files.exists(source));
+        }
+    }
 
     private static final String KEY = "sk-file-0123456789-not-real";
     private static final Function<String, String> NO_ENV = k -> null;
@@ -157,10 +223,17 @@ final class SettingsMigrationTest {
             assertEquals("en_us", now.get(ServerSettingsTable.LLM_LANGUAGE));
             assertEquals(Optional.of(KEY), s.secret(ServerSettingsTable.LLM_API_KEY), "密钥没进密钥文件");
             assertTrue(result.keyNote().contains("迁进了"), result.keyNote());
+            // 审查 2026-10-07 L1：密钥绑 llm.json 自己写的地址（原先它也只发往那里）
+            assertEquals(Optional.of("https://llm.example:443"), s.secretOrigin(ServerSettingsTable.LLM_API_KEY));
 
             assertFalse(Files.exists(file), "原文件还在原地");
             assertEquals(dir.resolve("llm.json" + SettingsMigration.MIGRATED_SUFFIX), result.renamedTo());
-            assertArrayEquals(original, Files.readAllBytes(result.renamedTo()), "改名之后内容变了");
+            // 改名之后：除了抹掉的密钥（审查 2026-10-07 R10），每一项都原样留着
+            com.google.gson.JsonObject before = com.google.gson.JsonParser.parseString(
+                    new String(original, StandardCharsets.UTF_8)).getAsJsonObject();
+            before.remove("apiKey");
+            assertEquals(before, com.google.gson.JsonParser.parseString(
+                    Files.readString(result.renamedTo(), StandardCharsets.UTF_8)), "改名之后除了密钥还动了别的");
 
             // ❗密钥只在密钥文件里：不在会同步的那份配置里、不在快照里
             assertFalse(t.dump().contains(KEY), "密钥进了 heavyseas-server.toml");
@@ -190,10 +263,54 @@ final class SettingsMigrationTest {
         Files.deleteIfExists(dir.resolve("llm.json" + SettingsMigration.MIGRATED_SUFFIX));
         try (TestSettings t = TestSettings.defaults()) {
             ServerSettings s = t.settings();
-            assertTrue(s.setSecret(true, ServerSettingsTable.LLM_API_KEY, "menu-key").accepted());
+            assertTrue(s.save(true, Map.of(ServerSettingsTable.LLM_BASE_URL, "https://menu.example/v1")).accepted());
+            assertTrue(s.setSecret(true, ServerSettingsTable.LLM_API_KEY, "menu-key", "https://menu.example/v1").accepted());
             SettingsMigration.LlmImport stored = SettingsMigration.importLlmJson(llmJson(dir, FULL_JSON), s, NO_ENV);
             assertTrue(stored.keyNote().contains("已经设了"), stored.keyNote());
             assertEquals(Optional.of("menu-key"), s.secret(ServerSettingsTable.LLM_API_KEY), "设置菜单设的密钥被 llm.json 盖掉了");
+        }
+    }
+
+    @Test
+    @DisplayName("❗密钥迁进了密钥文件：留下的 llm.json.migrated 里没有密钥（别的项照样留着）（审查 2026-10-07 R10）")
+    void migratedCopyCarriesNoKey(@TempDir Path dir) throws Exception {
+        Path file = llmJson(dir, FULL_JSON);
+        try (TestSettings t = TestSettings.defaults()) {
+            SettingsMigration.LlmImport result = SettingsMigration.importLlmJson(file, t.settings(), NO_ENV);
+            assertNull(result.problem(), result.problem());
+            assertEquals(Optional.of(KEY), t.settings().secret(ServerSettingsTable.LLM_API_KEY), "前提：密钥迁进了密钥文件");
+            String left = Files.readString(result.renamedTo(), StandardCharsets.UTF_8);
+            assertFalse(left.contains(KEY), "迁完之后 .migrated 里还躺着明文密钥");
+            assertTrue(left.contains("file-model") && left.contains("https://llm.example/v1"), "别的项该原样留着：" + left);
+        }
+    }
+
+    @Test
+    @DisplayName("密钥没迁成（密钥文件写不进去）：llm.json 不改名，留着下次起服再迁（审查 2026-10-07 R10）")
+    void failedKeyImportKeepsTheFile(@TempDir Path dir) throws Exception {
+        SecretStore full = new SecretStore() {
+            @Override
+            public boolean isSet(String key) {
+                return false;
+            }
+
+            @Override
+            public Optional<String> get(String key) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void put(String key, String value) {
+                throw new IllegalStateException("磁盘满了（测试）");
+            }
+        };
+        Path file = llmJson(dir, FULL_JSON);
+        try (TestSettings t = TestSettings.of(ServerSettingsTable.DEFAULT, full)) {
+            SettingsMigration.LlmImport result = SettingsMigration.importLlmJson(file, t.settings(), NO_ENV);
+            assertTrue(Files.exists(file), "密钥没迁成，llm.json 却被挪走了：密钥从此只剩在 .migrated 里，也不会再迁");
+            assertNull(result.renamedTo());
+            assertNotNull(result.problem());
+            assertFalse(result.problem().contains(KEY));
         }
     }
 

@@ -227,7 +227,7 @@ final class StandInRowsTest {
             }
 
             @Override
-            public void secret(String key, String value) {
+            public void secret(String key, String value, String scope) {
                 throw new AssertionError("这一条不该发密钥");
             }
         };
@@ -288,7 +288,8 @@ final class StandInRowsTest {
     @Test
     @DisplayName("大模型设置：值取自表；密钥先取设置菜单存的、没有再看环境变量；温度小于 0 当作不发")
     void llmConfigReadsTheTableThenTheStoredKeyThenTheEnvironment() throws Exception {
-        Map<String, String> env = Map.of(LlmConfig.KEY_ENV, "env-key-for-test");
+        // 环境变量里的密钥要配一个写明发往哪里的变量才带（审查 2026-10-07 L1）
+        Map<String, String> env = Map.of(LlmConfig.KEY_ENV, "env-key-for-test", LlmConfig.KEY_ORIGIN_ENV, URL);
         try (TestSettings t = TestSettings.defaults(); AutoCloseable use = ServerSettings.useForTests(t.settings())) {
             Map<String, String> changes = new LinkedHashMap<>();
             changes.put(ServerSettingsTable.LLM_ENABLED, "true");
@@ -307,13 +308,14 @@ final class StandInRowsTest {
             assertEquals("env-key-for-test", fromEnv.config().apiKey());
             assertEquals(LlmConfig.KEY_SOURCE_ENV, fromEnv.keySource());
 
-            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, "stored-key-for-test").accepted());
+            assertTrue(t.settings().setSecret(true, ServerSettingsTable.LLM_API_KEY, "stored-key-for-test", URL).accepted());
             LlmConfig.Loaded stored = ServerSettings.llmConfig(env::get);
             assertEquals("stored-key-for-test", stored.config().apiKey(), "设置菜单存的密钥没压过环境变量");
             assertEquals(LlmConfig.KEY_SOURCE_STORE, stored.keySource());
 
-            // 合不起来（开着却没写模型）：关着，但密钥取自哪里照样说得出来（status 要用）
-            assertTrue(t.settings().save(true, Map.of(ServerSettingsTable.LLM_MODEL, "")).accepted());
+            // 合不起来（开着却没写模型）：菜单存不进去了（R8），只有手改文件才走得到 —— 关着，但密钥取自哪里照样说得出来（status 要用）
+            assertFalse(t.settings().save(true, Map.of(ServerSettingsTable.LLM_MODEL, "")).accepted(), "菜单该拒");
+            t.setRaw(ServerSettingsTable.LLM_MODEL, "");
             LlmConfig.Loaded broken = ServerSettings.llmConfig(env::get);
             assertTrue(broken.broken(), "开着却没写模型，该合不起来");
             assertFalse(broken.config().enabled());

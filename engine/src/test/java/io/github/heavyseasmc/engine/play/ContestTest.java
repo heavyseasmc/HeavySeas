@@ -2,6 +2,7 @@ package io.github.heavyseasmc.engine.play;
 
 import io.github.heavyseasmc.engine.data.TestProvisions;
 import io.github.heavyseasmc.engine.model.Ability;
+import io.github.heavyseasmc.engine.model.Affinities;
 import io.github.heavyseasmc.engine.model.CharacterId;
 import io.github.heavyseasmc.engine.model.Provisions;
 import io.github.heavyseasmc.engine.model.Roster;
@@ -9,7 +10,9 @@ import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.NavigationDeck;
 import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.seat.Legal;
 import io.github.heavyseasmc.engine.state.Fight;
+import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.engine.state.Phase;
 import io.github.heavyseasmc.engine.thirst.ThirstSource;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -463,6 +467,71 @@ class ContestTest {
             s.reveal(KID, "water");                                  // 别人照常
             s.pickFromHand(0);
             assertEquals(List.of("knife"), s.state().stateOf(MATE).hand());
+        }
+
+        @Test
+        @DisplayName("❗挑牌那一刻被抢方不能喝酒：小孩偷到只剩一瓶酒的人，他喝不掉它；别人照常能喝（对照，审查 C1）")
+        void noDrinkingAtThePick() {
+            // 大副手里只有一瓶酒。原先 drinkRum 没有亮牌那道门：一喝，酒被挪到面前，小孩一张能挑的都没有，
+            // 这一场再也收不了场 —— 模组的超时默认挑牌去拿面前那瓶，在 pickFromFront 里抛，服务端 tick 里没人接住。
+            Session s = deal(List.of(thief(1), mate(2), captain(3), sailor(4)), "water", "rum", "rum", "water");
+            s.declare(KID, Contest.Kind.STEAL, MATE);
+            assertEquals(Contest.Stage.PICK, stage(s));
+            assertTrue(assertThrows(IllegalStateException.class, () -> s.drinkRum(MATE, "rum"), "挑牌那一刻")
+                    .getMessage().contains("挑牌那一刻"));
+            assertEquals(List.of("rum"), s.state().stateOf(MATE).hand(), "那瓶还在他手里，小孩挑得到");
+            s.drinkRum(CAPTAIN, "rum");                              // 别人照常
+            assertTrue(s.state().stateOf(CAPTAIN).usedThisTurn("rum"));
+            s.pickFromHand(0);
+            assertEquals(List.of("water", "rum"), s.state().stateOf(KID).hand());
+            assertTrue(s.contest().isEmpty(), "收场了");
+        }
+
+        @Test
+        @DisplayName("挑牌那一刻合法清单里没有被抢方的酒；别人的照列，收场之后他自己的也照列（对照，审查 C1）")
+        void legalDrinksSkipTheVictimAtThePick() {
+            Session s = deal(List.of(thief(1), mate(2), captain(3), sailor(4)), "water", "rum", "rum", "water");
+            s.giveCard(SAILOR, MATE, "water");                       // 大副：手里一瓶酒、一张水
+            s.declare(KID, Contest.Kind.STEAL, MATE);
+            assertEquals(Contest.Stage.PICK, stage(s));
+            assertEquals(List.of(), Legal.drinks(s, MATE), "挑牌那一刻他一瓶都不能喝");
+            assertEquals(List.of("rum"), Legal.drinks(s, CAPTAIN), "别人照常");
+            s.pickFromHand(1);                                       // 小孩摸走那张水
+            assertEquals(List.of("rum"), Legal.drinks(s, MATE), "收场之后他照常能喝");
+        }
+
+        @Test
+        @DisplayName("❗兜底：挑牌那一刻被抢方身上已经没有能挑的了，endPickIfNothingToTake 照「进挑牌时没牌」收场；有牌时不动（对照，审查 C1）")
+        void endPickWhenNothingIsLeft() {
+            Session s = deal(List.of(thief(1), mate(2), captain(3), sailor(4)), "water", "rum", "water", "water");
+            s.dealAffinities(Affinities.random(s.state().roster(), new Random(3)));
+            assertFalse(s.endPickIfNothingToTake(), "没有进行中的这一场时什么也不做");
+            s.declare(KID, Contest.Kind.STEAL, MATE);
+            assertEquals(Contest.Stage.PICK, stage(s));
+            assertFalse(s.endPickIfNothingToTake(), "对照：他手里还有那瓶，小孩挑得到 —— 不收");
+            assertEquals(Contest.Stage.PICK, stage(s));
+
+            // 正路上已经没有办法在挑牌那一刻把牌挪走（亮牌、喝酒都拦着），兜底要验的正是「万一挪走了」：
+            // 照图纸重拼一局，只把大副手里那瓶挪进弃牌堆（对账照样对得上）。
+            Session stuck = withoutHandCard(s, MATE, "rum");
+            assertEquals(Contest.Stage.PICK, stage(stuck));
+            assertTrue(Legal.picks(stuck).isEmpty(), "正向对照：真的一张能挑的都没有");
+            assertThrows(IllegalStateException.class, () -> stuck.pickFromFront("rum"), "模组原先的默认挑牌就抛在这里");
+            assertTrue(stuck.endPickIfNothingToTake());
+            assertTrue(stuck.contest().isEmpty());
+            stuck.markActed(KID);                                    // 收了场，行动记得下，这一天往下走得动
+            assertEquals(MATE, stuck.nextActor().orElseThrow());
+        }
+
+        /** 夹具：照图纸重拼这一局，只把 {@code who} 手里的一张挪进弃牌堆。 */
+        private Session withoutHandCard(Session s, CharacterId who, String card) {
+            GameState st = s.state().withState(who, s.state().stateOf(who).withoutCard(card));
+            List<String> discard = new ArrayList<>(s.table().provisionDiscard());
+            discard.add(card);
+            return Session.rebuild(new Session.Blueprint("test", st, s.provisions(), s.table().pile().order(),
+                    s.table().rowStack(), s.table().rowerHand(), s.table().provisionPileOrder(), discard,
+                    s.table().removedProvisions(), Optional.empty(), s.provisionOffer(), s.rower(), s.contest(),
+                    s.progress(), s.affinities().orElseThrow(), s.deeds()));
         }
 
         @Test

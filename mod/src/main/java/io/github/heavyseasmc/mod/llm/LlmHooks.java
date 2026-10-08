@@ -30,6 +30,8 @@ public final class LlmHooks {
     private static volatile LlmService service = LlmService.disabled("服务端还没起来");
     private static volatile String lastLoad = "还没读过";
     private static volatile String keySource = LlmConfig.KEY_SOURCE_NONE;
+    /** 有密钥、却因为地址对不上没带的那一句（审查 2026-10-07 L1）；没有是 {@code null}。 */
+    private static volatile String keyWithheld;
     /** 上一次读到的那一份（设置变了时比一比：一样就不换服务，免得把在路上的决定白白收掉）。 */
     private static LlmConfig.Loaded lastLoaded;
 
@@ -66,18 +68,46 @@ public final class LlmHooks {
         return keySource;
     }
 
+    /** 有密钥、却因为地址对不上没带的那一句（{@link LlmConfig.Loaded#keyWithheld}）；没有是 {@code null}。 */
+    public static String keyWithheld() {
+        return keyWithheld;
+    }
+
     /**
      * 按此刻的设置重起一个服务；旧的那个关掉（还没收场的收成 {@code SHUTDOWN}，调用方走各自的退路）。
+     * 读设置时出了任何错都接住、关着大模型、记一行 ERROR —— 这条在 SERVER_STARTED 里跑，抛出去就是起服崩（审查 2026-10-07 C3）。
      *
      * @return 一句给人看的结果
      */
     public static synchronized String reload() {
-        return apply(ServerSettings.llmConfig(System::getenv));
+        try {
+            return apply(ServerSettings.llmConfig(System::getenv));
+        } catch (RuntimeException e) {
+            return failClosed(e);
+        }
     }
 
     /** 设置或密钥变了：读出来的那一份与上一次不一样才换服务。 */
     static synchronized void reloadIfChanged() {
-        reloadIfChanged(ServerSettings.llmConfig(System::getenv));
+        try {
+            reloadIfChanged(ServerSettings.llmConfig(System::getenv));
+        } catch (RuntimeException e) {
+            failClosed(e);
+        }
+    }
+
+    /** 读设置出错：关着大模型（换上一个当场回 DISABLED 的服务），说一句为什么。异常里不会有密钥（存储与设置的异常只带路径与键）。 */
+    private static String failClosed(RuntimeException e) {
+        String result = "大模型替身关着：读「大模型」一组的设置时出错（" + e + "）";
+        LOGGER.error(result);
+        LlmService old = service;
+        service = LlmService.disabled(result);
+        keySource = LlmConfig.KEY_SOURCE_NONE;
+        keyWithheld = null;
+        lastLoaded = null;
+        old.close();
+        lastLoad = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MM-dd HH:mm:ss")) + " · " + result;
+        return result;
     }
 
     static synchronized boolean reloadIfChanged(LlmConfig.Loaded loaded) {
@@ -98,8 +128,13 @@ public final class LlmHooks {
         LlmService old = service;
         service = next;
         keySource = loaded.keySource();
+        keyWithheld = loaded.keyWithheld();
         lastLoaded = loaded;
         old.close();
+        if (keyWithheld != null) {
+            // 「没带」与「没有」在请求里长得一样（都是 401）：说出来（审查 2026-10-07 L1）
+            LOGGER.warn("大模型替身没带密钥：{}", keyWithheld);
+        }
 
         String result;
         if (loaded.broken()) {
@@ -124,6 +159,7 @@ public final class LlmHooks {
         LlmService old = service;
         service = LlmService.disabled("服务端停了");
         lastLoaded = null;
+        keyWithheld = null;
         old.close();
     }
 }

@@ -68,7 +68,7 @@ class SearchSeatPolicyTest {
     // ================================================================ 推演从一个决定接着往下走
 
     /** 某个决定那一刻：那一局的副本、随机流的副本、以及「照这个答案接着走」。 */
-    record Snapshot(String kind, Session session, Random rng, Consumer<SeatDriver> resume) {
+    record Snapshot(String kind, Session session, SeatDriver.RandomState randoms, Consumer<SeatDriver> resume) {
     }
 
     /** 照第一层（温度 0）答；每到一个要推演的决定，先把那一刻记下来。 */
@@ -76,13 +76,14 @@ class SearchSeatPolicyTest {
         final Supplier<Session> live;
         final HeuristicSeatPolicy inner = new HeuristicSeatPolicy(DET);
         final List<Snapshot> snapshots = new ArrayList<>();
+        SeatDriver driver;
 
         Recorder(Supplier<Session> live) {
             this.live = live;
         }
 
         private void snap(String kind, Random rng, Consumer<SeatDriver> resume) {
-            snapshots.add(new Snapshot(kind, live.get().copy(), copyOf(rng), resume));
+            snapshots.add(new Snapshot(kind, live.get().copy(), driver.snapshotRandoms(SearchSeatPolicyTest::copyOf), resume));
         }
 
         @Override
@@ -219,15 +220,16 @@ class SearchSeatPolicyTest {
                 }
                 Random rng = new Random(seed);
                 SeatDriver driver = new SeatDriver(live[0], seats, rng);
+                rec.driver = driver;
                 while (!live[0].state().isOver()) {
                     assertTrue(live[0].state().turn() <= Simulator.TURN_LIMIT, live[0].context() + " 打不完");
                     driver.playPhase();
-                    String expected = describe(live[0], rng);
+                    String expected = describe(live[0], rng) + describeRandoms(driver);
                     for (Snapshot snap : rec.snapshots) {
-                        SeatDriver resumed = new SeatDriver(snap.session(), plain, snap.rng());
+                        SeatDriver resumed = new SeatDriver(snap.session(), plain, snap.randoms());
                         snap.resume().accept(resumed);
                         resumed.finishPhase();
-                        assertEquals(expected, describe(snap.session(), snap.rng()),
+                        assertEquals(expected, describe(snap.session(), snap.randoms().game()) + describeRandoms(resumed),
                                 "%s 第 %d 天：从「%s」接着走，与驱动者自己走的不一样".formatted(live[0].context(),
                                         live[0].state().turn(), snap.kind()));
                         counts.merge(snap.kind(), 1, Integer::sum);
@@ -246,6 +248,13 @@ class SearchSeatPolicyTest {
         for (String kind : List.of("补给箱留牌", "行动", "划船留牌", "表态", "站队", "押武器", "挑牌", "舵手挑牌", "喝水")) {
             assertTrue(counts.getOrDefault(kind, 0) > 0, "「" + kind + "」一次都没比过");
         }
+    }
+
+    private static String describeRandoms(SeatDriver driver) {
+        var state = driver.snapshotRandoms(SearchSeatPolicyTest::copyOf);
+        Map<CharacterId, Long> next = new TreeMap<>();
+        state.seats().forEach((id, random) -> next.put(id, random.nextLong()));
+        return "\nseatRandoms=" + next;
     }
 
     /** 一局此刻的全部（集合排好序）与随机流的下一个数，压成一段字。 */
@@ -430,6 +439,45 @@ class SearchSeatPolicyTest {
         }
         System.out.printf("推演可复现：6 局同种子两遍逐局相同；换推演种子后 %d / 6 局不同%n", differ);
         assertTrue(differ > 0, "正向对照：换了推演的种子，6 局一局都没变 —— 推演可能根本没在用自己的随机流");
+    }
+
+    @Test
+    @DisplayName("❗限时截断只连累被截断的那一个决定：同种子两位，第一个决定一位到点、一位跑满，第二个决定的推演分逐位相同（审查 R12）")
+    void timeoutDoesNotLeakIntoLaterDecisions() {
+        Scenario s = new Scenario(Map.of("water", 8, "knife", 1, "cash", 2, "rum", 1, "flail", 1, "oar", 2,
+                "jewelry", 1, "medical_kit", 1), 1)
+                .affinities(CAPTAIN, KID, MATE, 31)
+                .deal(CAPTAIN, "water", "knife").deal(MATE, "water", "cash").deal(KID, "rum").toAction();
+        while (!s.session.nextActor().orElseThrow().equals(CAPTAIN)) {
+            s.session.markActed(s.session.nextActor().orElseThrow());
+        }
+        List<ActionChoice> legal = Legal.actions(s.session, CAPTAIN);
+        SeatView view = s.view(CAPTAIN);
+        SeatPolicySettings limited = SMALL.withBudget(24, 50, 3, 1);          // 限时 50 ms；到不到点由假钟说了算
+
+        // 跑满的那一位：钟不走，永远不到点
+        SearchSeatPolicy full = new SearchSeatPolicy(limited, SCORING, 77, SearchSeatPolicy.Objective.NORMAL, () -> 0L);
+        // 被截断的那一位：第一个决定定下时限之后，第一局推演一做完钟就跳过了时限；之后钟停在那里 ——
+        // 第二个决定从那一刻重新起算时限，于是跑满
+        long[] calls = {0};
+        SearchSeatPolicy cut = new SearchSeatPolicy(limited, SCORING, 77, SearchSeatPolicy.Objective.NORMAL,
+                () -> ++calls[0] <= 2 ? 0L : 1_000_000_000_000L);
+
+        full.act(view, legal, new Random(5));
+        cut.act(view, legal, new Random(5));
+        assertTrue(full.rollouts() > 0, "正向对照：第一个决定真的推演了");
+        assertTrue(cut.rollouts() < full.rollouts(), "正向对照：被截断的那一位第一个决定少推演了（%d 对 %d）"
+                .formatted(cut.rollouts(), full.rollouts()));
+
+        long fullBefore = full.rollouts();
+        long cutBefore = cut.rollouts();
+        ActionChoice a = full.act(view, legal, new Random(5));
+        ActionChoice b = cut.act(view, legal, new Random(5));
+        assertEquals(full.rollouts() - fullBefore, cut.rollouts() - cutBefore, "第二个决定两位都跑满");
+        assertEquals(java.util.Arrays.toString(full.lastMeans), java.util.Arrays.toString(cut.lastMeans),
+                "第一个决定被截断，连累了第二个决定的推演");
+        assertEquals(a, b);
+        assertEquals(0, full.failures() + cut.failures());
     }
 
     // ================================================================ 预算

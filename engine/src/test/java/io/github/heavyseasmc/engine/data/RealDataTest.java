@@ -74,7 +74,14 @@ class RealDataTest {
         List<CharacterId> reversed = data.presets().get(6).reversed();
         Roster selected = data.select(reversed);
         assertEquals(data.presets().get(6), selected.survivors().stream().map(Survivor::id).toList());
-        assertThrows(IllegalArgumentException.class, () -> data.select(reversed.subList(0, 5)));
+        for (int count : List.of(6, 7, 8)) {
+            assertEquals(count, data.select(data.presets().get(count)).size());
+        }
+        assertThrows(IllegalArgumentException.class, () -> data.select(reversed.subList(0, 5)), "五人必须被人数下限拒绝");
+        var nine = new java.util.ArrayList<>(data.presets().get(8));
+        nine.add(nine.getFirst());
+        var tooMany = assertThrows(IllegalArgumentException.class, () -> data.select(nine));
+        assertTrue(tooMany.getMessage().contains("6–8"), "九人必须先被人数上限拒绝，不能只碰巧被重复角色拒绝");
         assertThrows(IllegalArgumentException.class, () -> data.select(List.of(
                 reversed.get(0), reversed.get(0), reversed.get(1), reversed.get(2), reversed.get(3), reversed.get(4))));
         assertThrows(IllegalArgumentException.class, () -> data.select(List.of(

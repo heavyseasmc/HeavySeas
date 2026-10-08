@@ -108,17 +108,70 @@ final class SettingsProtocolTest {
         assertEquals(List.copyOf(changes.keySet()), List.copyOf(save.changes().keySet()), "键的先后也要保住");
         assertTrue(settings.save(true, save.changes()).accepted());
 
-        ServerSettingsS2C snapshot = SettingsSync.snapshot(settings.table(), settings::current, def -> false, false);
+        assertFalse(roundTrip(ServerSettingsS2C.CODEC,
+                SettingsSync.snapshot(settings.table(), settings::current, def -> false, false), bytes).canEdit());
+        // 原样发回去的只会是能改的人（只读的人那一份里接口地址是遮着的，见 endpointIsHiddenFromReaders）
+        ServerSettingsS2C snapshot = SettingsSync.snapshot(settings.table(), settings::current, def -> false, true);
         ServerSettingsS2C back = roundTrip(ServerSettingsS2C.CODEC, snapshot, bytes);
         assertEquals("37", back.values().get(ServerSettingsTable.HELM));
         assertEquals("false", back.values().get(ServerSettingsTable.UNTIMED_DEMO));
-        assertFalse(back.canEdit());
         // 快照里的每一项原样发回去，核对得过、值不变
         ServerSettingsTable.Batch again = settings.table().validate(back.values());
         assertTrue(again.ok(), again.rejection());
         for (SettingDef def : settings.table().synced()) {
             assertEquals(settings.current(def), again.values().get(def.key()), def.key());
         }
+    }
+
+    @Test
+    @DisplayName("❗包装得下菜单收得下的最长值：密钥最长那么多字（BMP 以外的字按两个 UTF-16 算）照样编得出去（审查 2026-10-07 U2：超过 256 字一存就被踢）")
+    void packetsHoldTheLongestValueTheMenuAccepts() {
+        SettingDef key = ServerSettingsTable.DEFAULT.def(SECRET_KEY).orElseThrow();
+        byte[][] bytes = new byte[1][];
+        for (String unit : List.of("k", "🔑")) {                 // ASCII · 一个 BMP 以外的字（两个 UTF-16）
+            String longest = unit.repeat(key.maxLength());
+            assertTrue(key.parse(longest).ok(), "前提：这么长的值菜单与服务端都收");
+            io.github.heavyseasmc.mod.net.ServerSecretSetC2S packet = new io.github.heavyseasmc.mod.net.ServerSecretSetC2S(SECRET_KEY, longest,
+                    "http://127.0.0.1:8317/v1");
+            io.github.heavyseasmc.mod.net.ServerSecretSetC2S back = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                    () -> roundTrip(io.github.heavyseasmc.mod.net.ServerSecretSetC2S.CODEC, packet, bytes),
+                    "菜单收下的密钥包装不下：编码时抛、客户端被踢下线");
+            assertEquals(longest, back.value());
+        }
+        // 存盘包与快照：每一项文字都按它自己的上限、用 BMP 以外的字填满
+        Map<String, String> longest = new LinkedHashMap<>();
+        for (SettingDef def : ServerSettingsTable.DEFAULT.synced()) {
+            if (def.kind() == SettingDef.Kind.TEXT) {
+                longest.put(def.key(), "🔑".repeat(def.maxLength()));
+            }
+        }
+        assertFalse(longest.isEmpty(), "前提：表里有文字项");
+        ServerSettingsSaveC2S save = org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                () -> roundTrip(ServerSettingsSaveC2S.CODEC, new ServerSettingsSaveC2S(longest), bytes), "存盘包装不下最长的文字项");
+        assertEquals(longest, save.changes());
+        // 被拒的回话：理由按上限截短之后（BMP 以外的字按两个单元算）照样装得下
+        ServerSettingsS2C refused = new ServerSettingsS2C(true, Map.of(), List.of(),
+                "🔑".repeat(ServerSettingsS2C.MAX_REJECTION) + "…");
+        assertEquals(refused, org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                () -> roundTrip(ServerSettingsS2C.CODEC, refused, bytes), "被拒的理由装不下"));
+    }
+
+    @Test
+    @DisplayName("❗接口地址只给能改设置的人：只读的人收到的快照里没有原值（审查 2026-10-07 L1）")
+    void endpointIsHiddenFromReaders() {
+        ServerSettingsTest.Loaded file = new ServerSettingsTest.Loaded();
+        settings = ServerSettingsTest.loaded(ServerSettingsTable.DEFAULT, file);
+        String url = "http://10.20.30.40:8317/v1";
+        assertTrue(settings.save(true, Map.of(ServerSettingsTable.LLM_BASE_URL, url)).accepted());
+        byte[][] bytes = new byte[1][];
+        ServerSettingsS2C reader = roundTrip(ServerSettingsS2C.CODEC,
+                SettingsSync.snapshot(settings.table(), settings::current, def -> false, false), bytes);
+        String wire = new String(bytes[0], StandardCharsets.ISO_8859_1);
+        assertFalse(wire.contains("10.20.30.40"), "接口地址的原值发给了不能改设置的人");
+        assertTrue(reader.values().containsKey(ServerSettingsTable.LLM_BASE_URL), "那一行还在，只是不给值");
+        assertTrue(wire.contains(ServerSettingsTable.ACTION), "正向对照：判据确实在扫这一包");
+        ServerSettingsS2C editor = SettingsSync.snapshot(settings.table(), settings::current, def -> false, true);
+        assertEquals(url, editor.values().get(ServerSettingsTable.LLM_BASE_URL), "能改的人要看得到原值");
     }
 
     @Test

@@ -103,9 +103,11 @@ public final class Legal {
      *
      * <p>「今天喝过的不列」照原模拟器的口径（{@code Simulator#maybeDrink}），不看 {@code once_per_turn}：
      * 数据里的酒都是一天一次，而列不列会改变随机席位挑的是哪一瓶。
+     *
+     * <p>正在挨抢、到了挑牌那一刻的人一瓶都不列：与亮牌同一道门（{@code Session#drinkRum}，审查 2026-10-08 C1）。
      */
     public static List<String> drinks(Session session, CharacterId who) {
-        if (!session.state().canAct(who)) {
+        if (!session.state().canAct(who) || pickingFrom(session, who)) {
             return List.of();
         }
         SurvivorState s = session.state().stateOf(who);
@@ -194,7 +196,8 @@ public final class Legal {
             return List.of();
         }
         List<Session.OverboardPlay> plays = new ArrayList<>(session.overboardPlays(who));
-        // overboardPlays 按落海名单遍历，那份名单的次序每次起 JVM 都不同 —— 这里按目标座位排，免得「挑第一项」跟着变。
+        // overboardPlays 按落海名单遍历 —— 这里按目标座位排，不依赖那份名单的次序（它曾经每次起 JVM 都不同，审查 Z3），
+        // 免得「挑第一项」跟着变。
         List<CharacterId> order = session.state().bySeat();
         plays.sort((a, b) -> {
             int byCard = a.card().compareTo(b.card());
@@ -216,7 +219,7 @@ public final class Legal {
         return session.currentWeather().map(w -> w.effect() == WeatherEffect.SKIP_NAVIGATION).orElse(false);
     }
 
-    /** 他正在挨抢、到了挑牌那一刻 —— 这一刻不能亮牌（规则第五章）。 */
+    /** 他正在挨抢、到了挑牌那一刻 —— 这一刻不能亮牌（规则第五章），也不能喝酒（喝酒会把手里那瓶亮出来）。 */
     private static boolean pickingFrom(Session session, CharacterId who) {
         return session.contest().map(c -> c.stage() == Contest.Stage.PICK && c.target().equals(who)).orElse(false);
     }

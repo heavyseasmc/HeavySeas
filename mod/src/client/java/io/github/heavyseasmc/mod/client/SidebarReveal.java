@@ -23,8 +23,13 @@ final class SidebarReveal {
     /** 自己滑出来之后停多久（毫秒）。够看清一条播报，又不至于赖在牌上面。 */
     static final long REVEAL_MS = 4000L;
 
-    /** 上一帧见到的播报（按文字比）。{@code null} = 还没见过，第一帧不算「新到了几条」。 */
-    private static List<String> last = null;
+    /**
+     * 上一帧见到的播报序号（{@link io.github.heavyseasmc.mod.state.HudView#notificationSeq}）。
+     * {@code -1} = 还没见过，第一帧不算「新到了几条」；{@link #forget} 之后是 0 —— 新一局开场那一批要算新到的
+     * （「没有值」与「值是 0」是两种零，证伪表 2026-09-24）。
+     */
+    private static long lastSeq = -1;
+    private static java.util.UUID epoch;
     /** 这一局一共新到过几条 —— 只增不减；日志页签上的未读数拿它减去「展开到底时看到第几条」。 */
     private static int arrived = 0;
     /** 最近一次到了几条（主画面日志里「刚刚」那一批，样张 b-2）。 */
@@ -33,7 +38,7 @@ final class SidebarReveal {
     private static boolean pinned;
 
     /**
-     * 这一局客户端自己记下的全部播报（旧的在前）。服务端的投影只留最新八条，往回翻要靠这一本
+     * 这一局客户端自己记下的全部播报（旧的在前）。服务端的投影只带最新十六条，往回翻要靠这一本
      * （用户 2026-10-07：「航海日志不能滚动」）。每次新到几条就把投影末尾那几条接上来（{@link NotificationArrivals}）。
      */
     private static final java.util.ArrayList<Text> history = new java.util.ArrayList<>();
@@ -51,14 +56,17 @@ final class SidebarReveal {
      * 每帧报一次现在的播报。有新到的那一刻起算。
      *
      * <p>❗数的是**新到了几条**，不是「侧栏该不该显示」：后者每帧都成立，那样它就永远不收回去了。
-     * ❗也不是**条数变多**：服务端只留最新的八条，满了之后新来一条条数不变 ——
-     * 2026-09-30 实拍，按条数判的时候开局不久右栏就再也不自己滑出来了（{@link NotificationArrivals}）。
+     * ❗也不是**条数变多**、也不比内容：按服务端给的序号数（{@link NotificationArrivals}，审查 U13）。
      */
-    static void observe(List<Text> notes, long now) {
-        List<String> current = notes.stream().map(Text::getString).toList();
+    static boolean observe(java.util.UUID incomingEpoch, List<Text> notes, long seq, long now) {
+        boolean newGame = !java.util.Objects.equals(epoch, incomingEpoch);
+        if (newGame) {
+            forget();
+            epoch = incomingEpoch;
+        }
         int n = 0;
-        if (last != null) {
-            n = NotificationArrivals.count(last, current);
+        if (lastSeq >= 0) {
+            n = NotificationArrivals.count(lastSeq, seq, notes.size());
             if (n > 0) {
                 // 已经露出来（滑入中 · 停着 · 收回途中）时不从零再滑一遍，只把停留重新算起（用户 2026-10-07：
                 // 「如果关闭倒计时没结束之前有新的日志他又会弹一遍」）；收着的时候照旧滑出来
@@ -80,7 +88,8 @@ final class SidebarReveal {
                 scroll += n;                  // 正在往回翻：新来的接在上面，翻到的那几条别跟着动
             }
         }
-        last = current;
+        lastSeq = seq;
+        return newGame;
     }
 
     /** 这一局记下的全部播报（旧的在前）。还没见过任何播报时是空的 —— 调用方退回投影里的那几条。 */
@@ -132,14 +141,15 @@ final class SidebarReveal {
     }
 
     /**
-     * 换了一局（或这一局结束）就清成**空的一本**，不是清回「还没见过」。
+     * 换了一局（或这一局结束）就把序号清成 <b>0</b>（新一局从 0 数起），不是清回「还没见过」（-1）。
      *
      * <p>❗清回「还没见过」的话，新一局那一批开场播报会被当成「第一次见到」而不是「新到了几条」，
      * 于是**整局第一次什么都不滑出来**（2026-09-24 实测：右侧亮块 0.013，与收着时一模一样）。
-     * 清成空的才对：开局本来就是「有事发生」。
+     * 清成 0 才对：开局本来就是「有事发生」。
      */
     static void forget() {
-        last = List.of();
+        epoch = null;
+        lastSeq = 0;
         arrived = 0;
         lastBatch = 0;
         shownAt = 0L;

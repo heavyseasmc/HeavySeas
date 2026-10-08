@@ -5,6 +5,7 @@ import io.github.heavyseasmc.mod.llm.ChoiceOutcome.Usage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -12,6 +13,7 @@ import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -24,10 +26,12 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Flow;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -66,6 +70,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * 还要再试，须 R − B_k ≥ minAttemptMs，且已发次数 &lt; maxAttempts；否则带着这一次的原因收场（「来不及再试」）
  * </pre>
  * 截止定时器在 R 用完那一刻无条件收成 {@code TIMEOUT}，并取消在途的那一次 —— 上面的切分管「留得出重试的时间」，定时器管「结果按时到」。
+ * T_k 管到<b>回包读完</b>为止（每一次自己挂一个定时器，审查 2026-10-07 U12）：{@code HttpRequest} 自带的 timeout 收到响应头就不再计，
+ * 服务端先回 200、再慢慢吐空白时，原先这一次会一直吊到截止。
  * 例：8 秒的站队窗口、余量 1 秒 → R = 7 秒，第一次最多等 3.85 秒；吊住了还剩约 3 秒再试一次。
  * ❗代价（2026-10-07 本机代理实测）：一个常要 4–6 秒的推理模型，在这样的窗口里两次都被切成超时（5 个里 3 个），
  * 不切分反而来得及 —— 防「吊住」与防「慢」是相反的两头，所以 s 是设置项，慢而稳的模型调高它或设 reasoningEffort。
@@ -76,7 +82,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *       认不出（{@code bad}）、或者 {@code content} 是空的（{@code empty}：推理模型可能只写了 {@code reasoning_content}）。</li>
  *   <li><b>再问一遍，只一遍</b>：回答认不出编号（{@code unparsed}）或越界（{@code range}）。用户消息末尾加一句输出要求，仍不带历史。</li>
  *   <li><b>不重试</b>：401 · 403 → {@code AUTH}，402 → {@code BALANCE}（这两种<b>记住</b>：之后的决定不再发请求，改好配置后 reload）；
- *       400 · 404 · 422 及别的 4xx → {@code BAD_REQUEST}；别的状态码 → {@code HTTP_ERROR}。详细原因只在第一次的那一行里写全。</li>
+ *       400 · 404 · 422 及别的 4xx → {@code BAD_REQUEST}；别的状态码 → {@code HTTP_ERROR}。详细原因只在第一次的那一行里写全。
+ *       回包超过 {@link #maxReplyBytes} → 读到一半丢掉，{@code BAD_RESPONSE}（经过 {@code big}）。</li>
  * </ul>
  *
  * <h2>熔断与并发</h2>
@@ -330,6 +337,96 @@ public final class LlmService implements AutoCloseable {
         return Math.min(config.attemptTimeoutMs(), last ? remainingMs : share);
     }
 
+    /**
+     * 回包最多读多少字节（审查 2026-10-07 U12：原先没有上限，能改地址的人可以拿一个超大回包把服务端撑爆内存）。
+     * 64 KB 起；{@code max_tokens} 调大时按每个 token 16 字节放宽 —— 推理模型的思考（{@code reasoning_content}）也在回包里，
+     * 中文按 {@code \\uXXXX} 转义一个字就占 6 字节。{@code max_tokens} 有上限，所以这里最多 512 KB。
+     */
+    static int maxReplyBytes(LlmConfig config) {
+        return (int) Math.max(64L * 1024, config.maxTokens() * 16L);
+    }
+
+    /** 回包超过 {@link #maxReplyBytes}：读到一半就丢掉、断开。 */
+    static final class ReplyTooLarge extends IOException {
+        ReplyTooLarge(int maxBytes) {
+            super("回包超过 " + maxBytes + " 字节");
+        }
+    }
+
+    /** 读回包（UTF-8），读到超过 {@code maxBytes} 就停、取消订阅、按 {@link ReplyTooLarge} 失败 —— 不把整份读进内存。 */
+    static HttpResponse.BodyHandler<String> limitedBody(int maxBytes) {
+        return info -> new LimitedBody(maxBytes);
+    }
+
+    private static final class LimitedBody implements HttpResponse.BodySubscriber<String> {
+
+        private final int maxBytes;
+        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        private final CompletableFuture<String> body = new CompletableFuture<>();
+        private Flow.Subscription subscription;
+        /** Flow 保证 onNext · onError · onComplete 不并发，但取消之后可能还会来几包：来了也不收。 */
+        private boolean done;
+
+        LimitedBody(int maxBytes) {
+            this.maxBytes = maxBytes;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription s) {
+            subscription = s;
+            s.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+            if (done) {
+                return;
+            }
+            for (ByteBuffer item : items) {
+                if (bytes.size() + (long) item.remaining() > maxBytes) {
+                    done = true;
+                    subscription.cancel();
+                    body.completeExceptionally(new ReplyTooLarge(maxBytes));
+                    return;
+                }
+                byte[] chunk = new byte[item.remaining()];
+                item.get(chunk);
+                bytes.writeBytes(chunk);
+            }
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            if (!done) {
+                done = true;
+                body.completeExceptionally(error);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (!done) {
+                done = true;
+                body.complete(bytes.toString(StandardCharsets.UTF_8));
+            }
+        }
+
+        @Override
+        public CompletionStage<String> getBody() {
+            return body;
+        }
+    }
+
+    /** 异常链上有没有这一种（HttpClient 会把回包那一侧的异常包上一两层）。 */
+    private static boolean causedBy(Throwable t, Class<? extends Throwable> kind) {
+        for (Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause()) {
+            if (kind.isInstance(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** 第 k 次失败（从 1 数）后的退避：指数 + 抖动；上限不管抖动那一截。 */
     static long backoffMs(LlmConfig config, int k) {
         long exponential = config.backoffBaseMs() * (1L << Math.min(k - 1, 20));
@@ -443,12 +540,31 @@ public final class LlmService implements AutoCloseable {
                 }
                 long sentAt = System.nanoTime();
                 CompletableFuture<HttpResponse<String>> f =
-                        http.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                        http.sendAsync(builder.build(), limitedBody(maxReplyBytes(config)));
                 inFlight = f;
+                // 这一次的总时限（审查 2026-10-07 U12）：HttpRequest 的 timeout 只管到响应头 —— 服务端先回 200、再慢慢吐空白时，
+                // 读回包没有时限，切分与重试全部失效，只能吊到截止。这个定时器管到回包读完：到点就把这一次切开、按单次超时算
+                AtomicBoolean cut = new AtomicBoolean();
+                ScheduledFuture<?> attemptTimer;
+                try {
+                    attemptTimer = timer.schedule(() -> {
+                        if (!f.isDone()) {
+                            cut.set(true);
+                            f.cancel(true);
+                        }
+                    }, timeoutMs, TimeUnit.MILLISECONDS);
+                } catch (RejectedExecutionException e) {
+                    f.cancel(true);
+                    finish(Fallback.SHUTDOWN, "服务正在关");
+                    return;
+                }
                 if (finished.get()) {
                     f.cancel(true);               // 截止的那一刻正好落在发出与登记之间
                 }
-                f.whenComplete((response, error) -> onResponse(timeoutMs, sentAt, response, error));
+                f.whenComplete((response, error) -> {
+                    attemptTimer.cancel(false);
+                    onResponse(timeoutMs, sentAt, response, error, error != null && cut.get());
+                });
             } catch (Throwable t) {
                 finish(Fallback.INTERNAL_ERROR, "发请求时出错：" + t);
             }
@@ -462,7 +578,9 @@ public final class LlmService implements AutoCloseable {
             return reminderBody;
         }
 
-        private void onResponse(long timeoutMs, long sentAt, HttpResponse<String> response, Throwable error) {
+        /** @param cutByAttemptTimer 这一次是被它自己的总时限切开的（见 {@link #attempt}）：按单次超时算 */
+        private void onResponse(long timeoutMs, long sentAt, HttpResponse<String> response, Throwable error,
+                                boolean cutByAttemptTimer) {
             try {
                 inFlight = null;
                 if (finished.get()) {
@@ -470,7 +588,14 @@ public final class LlmService implements AutoCloseable {
                 }
                 if (error != null) {
                     Throwable cause = unwrap(error);
-                    if (cause instanceof HttpConnectTimeoutException) {
+                    if (cutByAttemptTimer) {
+                        unhealthy("timeout");
+                        retryOrFinish(Fallback.TIMEOUT, "timeout", "单次 " + timeoutMs + " ms 没读完回答", -1, false);
+                    } else if (causedBy(error, ReplyTooLarge.class)) {
+                        // 不重试：同一个请求再发一次多半还是这么大；也不算服务商不健康（它回得很快）
+                        trail.add("big");
+                        finish(Fallback.BAD_RESPONSE, "回包超过 " + maxReplyBytes(config) / 1024 + " KB，丢掉不读");
+                    } else if (cause instanceof HttpConnectTimeoutException) {
                         unhealthy("conn");
                         retryOrFinish(Fallback.NETWORK_ERROR, "conn", "连接超时", -1, false);
                     } else if (cause instanceof HttpTimeoutException) {

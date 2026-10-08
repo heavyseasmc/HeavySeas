@@ -1,36 +1,28 @@
 package io.github.heavyseasmc.mod.ui;
 
-import java.util.List;
-
 /**
- * 播报列表从上一帧到这一帧新到了几条。
+ * 播报从上一次同步到这一次新到了几条。
  *
- * <p>服务端只留最新的 {@code MAX_NOTIFICATIONS} 条（新的接在末尾、最老的从头上掉）。所以「条数变多了」
- * 只在前几条管用：满了之后条数永远是那个数，新来一条与什么都没来<b>条数一样</b>。
- * 2026-09-30 实拍：一局打到第一回合行动阶段，右栏就再也不会自己滑出来了 —— 而那一面的回归
- * {@code sidebar_test.py} 一直绿，因为它只在开局、还没满八条的时候测过。
+ * <p>服务端给这一局的每条播报一个只增不减的序号（{@code GameComponent#notificationSeq}，开局从 0 数），
+ * 投影里带着「到现在一共播了几条」，新到的就是两次之差。
  *
- * <p>判法：找最小的 {@code s}，使上一帧去掉头上 {@code s} 条之后，正好是这一帧的开头 ——
- * 这一帧剩下的就是新到的。一条都对不上（换了一局、或者一帧之内来了超过一整本）就算全是新的。
+ * <p>❗不再比内容（审查 2026-10-07 U13）。原先找「上一帧的尾巴接上这一帧的开头」，两种局面数错而且不报错：
+ * 一模一样的几条接连来（几场打架各一句「败方每人受 1 点伤害」），满了之后新来一条与什么都没来<b>内容一样</b>；
+ * 一帧之内来的超过投影留的条数，最早那几条在发出去之前就掉了。再往前（2026-09-30）是比条数，满了之后条数不变 ——
+ * 那一次实拍是开局不久右栏就再也不自己滑出来了。
  */
 public final class NotificationArrivals {
 
     private NotificationArrivals() {
     }
 
-    public static int count(List<String> previous, List<String> current) {
-        if (previous.equals(current)) {
-            return 0;
-        }
-        for (int s = 0; s <= previous.size(); s++) {
-            List<String> tail = previous.subList(s, previous.size());
-            if (tail.isEmpty()) {
-                break;
-            }
-            if (current.size() >= tail.size() && current.subList(0, tail.size()).equals(tail)) {
-                return current.size() - tail.size();
-            }
-        }
-        return current.size();
+    /**
+     * @param lastSeq 上一次见到的序号
+     * @param seq     这一次的序号；比上一次小 = 换了一局（序号从 0 重数），这一局播过的全算新到的
+     * @param size    这一次投影里带着几条 —— 新到的再多也只拿得到这几条
+     */
+    public static int count(long lastSeq, long seq, int size) {
+        long arrived = seq >= lastSeq ? seq - lastSeq : seq;
+        return (int) Math.min(arrived, size);
     }
 }

@@ -30,6 +30,8 @@ import java.util.Optional;
  * @param phase     当前阶段
  * @param gulls     已有几只海鸥
  * @param fog       今天的雾（起点 · 终点，格；0/0 = 走游戏默认）· 公开
+ * @param notificationSeq 这一局一共播了几条（开局从 0 数，只增不减）· 公开。客户端拿两次之差数新到了几条
+ *                  （{@code NotificationArrivals}，审查 U13）—— 不比内容：一模一样的播报接连来时内容分不出来
  * @param seats     座位顺序（角色 id，船头到船尾）· 公开。❗<b>含被移出游戏的人</b>
  * @param removed   被移出游戏的人（角色 id）· 公开（ADR-0022）
  * @param actor     行动阶段正轮到谁（角色 id）；不在行动阶段、或已经没人能动时是空串 · 公开
@@ -61,7 +63,7 @@ import java.util.Optional;
  *                  要等头顶信息条（决策 ⑥）才有地方显示
  */
 public record HudView(boolean active, int turn, Phase phase, int gulls, String weather, boolean canRow,
-                      Fog fog, List<Text> notifications,
+                      Fog fog, List<Text> notifications, long notificationSeq,
                       List<String> seats, List<String> removed, String actor, Sea sea, Thirst thirstPrompt,
                       Endgame endgame, ContestView contest, boolean seated, String character,
                       int health, int maxHealth, Condition condition, int thirst, String love, String hate,
@@ -92,7 +94,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
 
     /** 没有对局时的样子。**不是 null** —— 空值会一路漂到渲染里才炸。 */
     public static final HudView IDLE = new HudView(
-            false, 0, Phase.PROVISION, 0, "", false, Fog.NONE, List.of(), List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
+            false, 0, Phase.PROVISION, 0, "", false, Fog.NONE, List.of(), 0L, List.of(), List.of(), "", Sea.NONE, Thirst.NONE, Endgame.NONE,
             ContestView.NONE, false, "", 0, 0, Condition.CONSCIOUS, 0, "", "", false, 0L, 0L, false, 0L,
             "", List.of(), 0, List.of(), List.of(), Score.NONE);
 
@@ -123,7 +125,7 @@ public record HudView(boolean active, int turn, Phase phase, int gulls, String w
      * @param alive    终局时还活着几个人
      * @param stage    正在哪一段；不在终局时为 {@code null}
      * @param flipped  这一轮已经翻开了几张
-     * @param entries  按翻牌次序的每个人：这一轮翻开了的带着目标（没翻开的是空串），计分阶段带着合计（其余时候是 -1）
+     * @param entries  按翻牌位置排列，尚未点名的身份为空；已翻开的带目标，计分阶段才带合计
      * @param debugChanges 这一局有几处调试改动（ADR-0060 D3）；0 = 没有。计分面板按它盖章
      */
     public record Endgame(GameState.Outcome outcome, int alive, EndgameProgress.Stage stage, int flipped,

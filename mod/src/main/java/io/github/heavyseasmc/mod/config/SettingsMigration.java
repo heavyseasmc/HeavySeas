@@ -2,6 +2,9 @@ package io.github.heavyseasmc.mod.config;
 
 import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.toml.TomlParser;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import io.github.heavyseasmc.mod.llm.LlmConfig;
 import io.github.heavyseasmc.mod.llm.LlmConfigFile;
 import org.slf4j.Logger;
@@ -13,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,10 +33,12 @@ import java.util.function.Function;
  *       写还是经 FCAP（{@link ServerSettings#save}）。文件里已经写了新键的不动。</li>
  *   <li><b>旧的 {@code config/heavyseas/llm.json}</b>：逐项迁进「大模型」一组，<b>只填还是默认值的那几项</b>（菜单里已经改过的以菜单为准）；
  *       密钥进服务端的密钥文件（设置菜单里还没设、环境变量里也没有时 —— 原先环境变量就压过文件里的那一份）；
- *       然后把文件改名成 {@code llm.json.migrated}（被占了就 {@code .1}、{@code .2}……），<b>不删</b>。
- *       整份读不了（不是 JSON）就什么都不迁、文件留在原地，并说一句：改好了下次起服再迁。</li>
+ *       然后把文件改名成 {@code llm.json.migrated}（被占了就 {@code .1}、{@code .2}……），<b>不删</b>；
+ *       已迁入或安全保存在密钥文件恢复项后，才从旧文件抹掉 {@code apiKey} 并归档。
+ *       配置值有独立完成标记；归档或密钥重试不再覆盖用户之后改回的默认值。
+ *       整份读不了（不是 JSON）就什么都不迁、文件留在原地，并说一句：改好了下次起服再迁。密钥该迁却没写进去时也不改名。</li>
  * </ol>
- * 两件都是幂等的：迁完旧键已经没了、文件已经改了名，再起服什么都不做。
+ * 两件都是幂等的：配置已迁的标记与旧文件是否归档分开，完整归档后再起服什么都不做。
  */
 final class SettingsMigration {
 
@@ -109,8 +115,12 @@ final class SettingsMigration {
     record LlmImport(List<String> imported, List<String> skipped, String keyNote, Path renamedTo, String problem) {
 
         void log(Logger logger, Path file) {
-            if (problem != null) {
+            if (problem != null && imported.isEmpty()) {
                 logger.error("设置迁移：{} 没有迁进设置（{}），文件留在原地；改好了下次起服再迁", file, problem);
+                return;
+            }
+            if (problem != null) {
+                logger.error("设置迁移：{} 迁了一半：填了 {} 项 {}；{}", file, imported.size(), imported, problem);
                 return;
             }
             logger.info("设置迁移：{} 迁进了「大模型」一组：填了 {} 项 {}{}{}；原文件改名为 {}", file, imported.size(), imported,
@@ -132,10 +142,19 @@ final class SettingsMigration {
         if (read.unreadable() != null) {
             return new LlmImport(List.of(), List.of(), null, null, read.unreadable());
         }
+        LegacyMigrationMarker marker;
+        try {
+            marker = LegacyMigrationMarker.begin(file);
+        } catch (IOException failure) {
+            return new LlmImport(List.of(), List.of(), null, null, "不能安全记录迁移进度：" + failure.getMessage());
+        }
         ServerSettingsTable table = settings.table();
         List<String> skipped = new ArrayList<>(read.problems());
         Map<String, String> changes = new LinkedHashMap<>();
         values(read.draft()).forEach((key, value) -> {
+            if (marker.complete()) {
+                return;
+            }
             SettingDef def = table.def(key).orElseThrow();
             if (!settings.current(def).equals(def.fallback())) {
                 skipped.add(key + "（设置里已经改过，以设置为准）");
@@ -153,35 +172,112 @@ final class SettingsMigration {
         if (!changes.isEmpty()) {
             ServerSettings.Outcome outcome = settings.save(true, changes);
             if (!outcome.accepted()) {
+                try {
+                    marker.rejected();
+                } catch (IOException failure) {
+                    return new LlmImport(List.of(), skipped, null, null,
+                            "设置没保存，迁移待处理标记也未清掉：" + failure.getClass().getSimpleName());
+                }
                 return new LlmImport(List.of(), skipped, null, null, "存不进设置：" + outcome.rejection());
             }
         }
-        String keyNote = importKey(read.draft().apiKey(), settings, env);
+        try {
+            marker.saved();
+        } catch (IOException failure) {
+            return new LlmImport(List.copyOf(changes.keySet()), skipped, null, null,
+                    "设置已处理，完成标记没写成；保留 .values-importing 防止下次重填：" + failure.getClass().getSimpleName());
+        }
+        KeyImport key = importKey(read.draft(), settings, env);
+        if (key.failed()) {
+            // 审查 2026-10-07 R10：密钥写不进密钥文件时原先照样改名 —— 密钥从此只剩在 .migrated 里，以后也不会再迁
+            return new LlmImport(List.copyOf(changes.keySet()), List.copyOf(skipped), key.note(), null,
+                    "值迁进了设置，但" + key.note() + "：文件留在原地，下次起服再迁密钥");
+        }
+        String keyNote = key.note();
+        String oldKey = read.draft().apiKey();
+        if (oldKey != null && !oldKey.isBlank()) {
+            if (!key.imported() && !settings.secret(ServerSettingsTable.LLM_API_KEY).filter(oldKey.strip()::equals).isPresent()) {
+                ServerSettings.Outcome backup = settings.preserveLegacyKey(oldKey.strip(), LlmConfig.origin(url(read.draft().baseUrl())));
+                if (!backup.accepted()) {
+                    return new LlmImport(List.copyOf(changes.keySet()), skipped, keyNote, null, backup.rejection());
+                }
+                keyNote = (keyNote == null ? "" : keyNote + "；") + "旧值保留在服务端密钥文件的恢复项，不用于请求";
+            }
+            // 先确保密钥可恢复，再去掉旧配置的副本；改名失败重试时不会重复导入设置。
+            String scrubNote = scrubKey(file);
+            if (scrubNote != null) {
+                FileSecretStore.restrict(file);
+                return new LlmImport(List.copyOf(changes.keySet()), skipped, keyNote, null, scrubNote);
+            }
+        }
         Path renamed;
         try {
             renamed = rename(file);
         } catch (IOException e) {
             return new LlmImport(List.copyOf(changes.keySet()), skipped, keyNote, null,
-                    "值迁进了设置，但文件改不了名（" + e + "）：下次起服还会再看它一遍（已改过的那几项照样不动）");
+                    "值已处理，但旧文件改不了名（" + e.getClass().getSimpleName() + "）：下次只重试归档，不重填设置");
         }
+        FileSecretStore.restrict(renamed);
         return new LlmImport(List.copyOf(changes.keySet()), List.copyOf(skipped), keyNote, renamed, null);
     }
 
-    /** 密钥：设置菜单里还没设、环境变量里也没有时才迁进密钥文件。返回一句说明（不含密钥）；文件里没有密钥返回 {@code null}。 */
-    private static String importKey(String key, ServerSettings settings, Function<String, String> env) {
+    /**
+     * 密钥那一项迁得怎么样。
+     *
+     * @param note     一句说明（不含密钥）；文件里没有密钥是 {@code null}
+     * @param imported 迁进了密钥文件
+     * @param failed   该迁、却没写进去（这时文件不改名）
+     */
+    private record KeyImport(String note, boolean imported, boolean failed) {
+    }
+
+    /**
+     * 密钥：设置菜单里还没设、环境变量里也没有时才迁进密钥文件，绑到 {@code llm.json} 自己写的地址（审查 2026-10-07 L1：
+     * 不绑此刻设置里的 —— 存档自带的 {@code serverconfig/} 可以把此刻的地址改到任何地方；原先这把密钥也只发往 llm.json 的地址）。
+     */
+    private static KeyImport importKey(LlmConfig.Draft draft, ServerSettings settings, Function<String, String> env) {
+        String key = draft.apiKey();
         if (key == null || key.isBlank()) {
-            return null;
+            return new KeyImport(null, false, false);
         }
         SettingDef def = settings.table().def(ServerSettingsTable.LLM_API_KEY).orElseThrow();
         if (settings.secretSet(def)) {
-            return "密钥：设置菜单里已经设了，llm.json 里的那一份没迁";
+            return new KeyImport("密钥：设置菜单里已经设了，llm.json 里的那一份没迁", false, false);
         }
         String envKey = env.apply(LlmConfig.KEY_ENV);
         if (envKey != null && !envKey.isBlank()) {
-            return "密钥：环境变量 " + LlmConfig.KEY_ENV + " 里有（原先就是它压过 llm.json），llm.json 里的那一份没迁";
+            return new KeyImport("密钥：环境变量 " + LlmConfig.KEY_ENV + " 里有（原先就是它压过 llm.json），llm.json 里的那一份没迁",
+                    false, false);
         }
-        ServerSettings.Outcome outcome = settings.setSecret(true, ServerSettingsTable.LLM_API_KEY, key.strip());
-        return outcome.accepted() ? "密钥：迁进了服务端的密钥文件" : "密钥：没迁成（" + outcome.rejection() + "）";
+        String origin = LlmConfig.origin(url(draft.baseUrl()));
+        if (origin == null) {
+            return new KeyImport("密钥：llm.json 里没有可用的地址，没迁（密钥只发往设它时的那个地址）", false, false);
+        }
+        ServerSettings.Outcome outcome = settings.importSecret(ServerSettingsTable.LLM_API_KEY, key.strip(), origin);
+        return outcome.accepted()
+                ? new KeyImport("密钥：迁进了服务端的密钥文件（只发往 " + origin + "）", true, false)
+                : new KeyImport("密钥没迁成（" + outcome.rejection() + "）", false, true);
+    }
+
+    /**
+     * 密钥已经迁进了密钥文件：把改了名的那一份里的 {@code apiKey} 抹掉（审查 2026-10-07 R10：原先明文密钥原样留在
+     * {@code llm.json.migrated} 里，换了、清了密钥之后它还在）。先写临时文件再替换。返回一句说明；抹掉了是 {@code null}。
+     */
+    static String scrubKey(Path migrated) {
+        try {
+            JsonElement root = JsonParser.parseString(Files.readString(migrated, StandardCharsets.UTF_8));
+            if (!root.isJsonObject() || !root.getAsJsonObject().has("apiKey")) {
+                return null;
+            }
+            root.getAsJsonObject().remove("apiKey");
+            Path tmp = migrated.resolveSibling(migrated.getFileName() + ".tmp");
+            Files.writeString(tmp, new GsonBuilder().setPrettyPrinting().create().toJson(root) + "\n", StandardCharsets.UTF_8);
+            FileSecretStore.restrict(tmp);
+            Files.move(tmp, migrated, StandardCopyOption.REPLACE_EXISTING);
+            return null;
+        } catch (IOException | RuntimeException e) {
+            return migrated.getFileName() + " 里的密钥没抹掉（" + e.getClass().getSimpleName() + "）：请手动删掉其中的 apiKey";
+        }
     }
 
     /** {@code llm.json} 里写了的每一项（密钥除外）→ 表里的键与值（类型与表那一项一样）。 */

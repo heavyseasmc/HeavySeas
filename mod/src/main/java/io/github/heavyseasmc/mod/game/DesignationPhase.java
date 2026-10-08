@@ -6,8 +6,8 @@ import io.github.heavyseasmc.engine.play.Session;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.world.StandInBodies;
 import net.minecraft.entity.Entity;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -51,21 +51,23 @@ public final class DesignationPhase {
      * 不是「选人」那一步：规则里他也要指一个人。
      */
     public static void begin(ServerWorld world, GameComponent component, CharacterId actor, Contest.Kind kind) {
-        boolean quiet = quiet(component, actor);
+        boolean quiet = StandInDesignation.quiet(component.requireSession(), actor, kind);
+        boolean human = component.occupantOf(actor).map(o -> !o.isDummy()).orElse(false);
         long windowMs = component.timing().designationMs();   // 开局快照（ADR-0099 D8）
         component.clearActionWindow();
-        component.beginDesignation(actor, kind, component.humanWindow(windowMs));   // 演示局里等真人不限时（用户 2026-10-07）
+        component.beginDesignation(actor, kind, human ? component.humanWindow(windowMs) : windowMs);
         ServerPlayerEntity player = playerOf(world, component, actor);
         if (player != null && !quiet) {
             player.setGlowing(true);          // 全船看得见的那一下（ADR-0025 §7.3：头顶图标的替身）
         }
+        StandInBodies.setDesignating(world, actor, !quiet);
         // 与语言无关的一行：验收靠它判「指定模式真的开起来了」。
         LOGGER.info("指定模式：{} 要{}（{} 秒{}）", actor.value(), kind == Contest.Kind.STEAL ? "抢夺" : "换座位",
                 windowMs / 1000, quiet ? " · 无预告" : "");
         if (!quiet) {
             GameFlow.broadcast(world, Text.translatable(kind == Contest.Kind.STEAL
                             ? "heavyseas.designate.announce_steal" : "heavyseas.designate.announce_swap",
-                    GameFlow.characterName(actor), component.demoNoTimeout()
+                    GameFlow.characterName(actor), human && component.demoNoTimeout()
                             ? Text.translatable("heavyseas.hud.unlimited") : String.valueOf(windowMs / 1000))
                     .formatted(Formatting.RED));
         }
@@ -162,23 +164,20 @@ public final class DesignationPhase {
      *
      * <p>到点算 Pass：那是「什么也不做」，不会凭空给谁制造伤害。
      */
-    public static void tick(MinecraftServer server) {
-        for (ServerWorld world : server.getWorlds()) {
-            GameComponent component = GameComponents.of(world);
-            long deadline = component.designationDeadline();
-            if (component.session().isEmpty() || deadline <= 0 || System.currentTimeMillis() < deadline) {
-                continue;
-            }
-            Optional<CharacterId> actor = component.designating();
-            finish(world, component, actor.orElse(null));
-            if (actor.isEmpty()) {
-                continue;
-            }
-            LOGGER.info("指定超时：{} 没点人，算什么也不做", actor.get().value());
-            GameFlow.broadcast(world, Text.translatable("heavyseas.command.passed",
-                    GameFlow.characterName(actor.get())));
-            GameFlow.finishAction(world, component, actor.get());
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        long deadline = component.designationDeadline();
+        if (component.session().isEmpty() || deadline <= 0 || now < deadline) {
+            return;
         }
+        Optional<CharacterId> actor = component.designating();
+        finish(world, component, actor.orElse(null));
+        if (actor.isEmpty()) {
+            return;
+        }
+        LOGGER.info("指定超时：{} 没点人，算什么也不做", actor.get().value());
+        GameFlow.broadcast(world, Text.translatable("heavyseas.command.passed",
+                GameFlow.characterName(actor.get())));
+        GameFlow.finishAction(world, component, actor.get());
     }
 
     /**
@@ -189,6 +188,7 @@ public final class DesignationPhase {
      */
     public static void finish(ServerWorld world, GameComponent component, CharacterId actor) {
         if (actor != null) {
+            StandInBodies.setDesignating(world, actor, false);
             ServerPlayerEntity player = playerOf(world, component, actor);
             if (player != null) {
                 player.setGlowing(false);
@@ -200,11 +200,6 @@ public final class DesignationPhase {
     /** 对局结束时把可能还亮着的那一位熄掉。 */
     public static void clear(ServerWorld world, GameComponent component) {
         component.designating().ifPresent(actor -> finish(world, component, actor));
-    }
-
-    /** 小孩的抢夺没有预告（决策 ⑦）：不发光、不播报。 */
-    private static boolean quiet(GameComponent component, CharacterId actor) {
-        return component.requireSession().stealsUncontested(actor);
     }
 
     private static ServerPlayerEntity playerOf(ServerWorld world, GameComponent component, CharacterId who) {

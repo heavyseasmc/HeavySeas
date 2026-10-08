@@ -8,7 +8,7 @@ import io.github.heavyseasmc.mod.state.HudView;
 import io.github.heavyseasmc.mod.ui.HudLayout;
 import io.github.heavyseasmc.mod.ui.HudLayout.Rect;
 import io.github.heavyseasmc.mod.ui.HudPart;
-import io.github.heavyseasmc.mod.ui.NotificationSidebarLayout;
+import io.github.heavyseasmc.mod.ui.VanillaHudVisibility;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.option.KeyBinding;
@@ -49,12 +49,7 @@ import java.util.List;
  */
 public final class GameHud {
 
-    private static final int MARGIN = NotificationSidebarLayout.MARGIN;
-    /** 普通 HUD 底部留给热栏；对局 Screen 没有热栏，可以用到窗口底。 */
-    private static final int HUD_BOTTOM_SAFE = 48;
-
     /** 状态牌第二行四格阶段的图标（样张 b-1：天候 · 补给 · 行动 · 航海，与 {@link Phase} 的顺序一致）。 */
-    private static final HudPart[] PHASE_ICONS = {HudPart.IC_SUN, HudPart.IC_CRATE, HudPart.IC_FIST, HudPart.IC_BOAT};
     /** 样张里几处字号（{@code font-size}，稿子像素）。 */
     private static final double ROMAN_PX = 22;
     private static final double COUNT_PX = 19;
@@ -100,7 +95,10 @@ public final class GameHud {
             return;                          // 没有对局就什么都不画，不留一个空框
         }
         long now = System.currentTimeMillis();
-        SidebarReveal.observe(view.notifications(), now);
+        if (SidebarReveal.observe(GameComponents.of(client.world).notificationEpoch(),
+                view.notifications(), view.notificationSeq(), now)) {
+            seenArrived = 0;
+        }
         if (WindowNotice.required()) {
             if (client.currentScreen == null) {
                 WindowNotice.render(context);
@@ -128,22 +126,19 @@ public final class GameHud {
     // ---------------------------------------------------------------- Minecraft 自带 HUD 在对局中的样子（InGameHudMixin 调）
 
     /**
-     * 此刻要不要按样张收起 Minecraft 自带的心 · 饥饿 · 护甲 · 氧气 · 经验、把热栏画成样张那一条：有对局、且偏好没说要自带的。
-     *
-     * <p>对局中这几条不带信息：服务端每 tick 把饥饿钉在满、血量只是引擎体力的镜像、身体不许受伤（{@code PlayerBodies}），
-     * 背包在开航时托管清空（{@code MistSea}）—— 体力已经画在状态牌的点上。偏好 {@code vanillaHud=show} 回到 Minecraft 自带的样子。
-     */
-    /**
-     * 这一帧热栏画不画：在雾海维度里不画（用户 2026-10-07，{@code InGameHudMixin}）。
+     * 雾海里除创造与旁观外，热栏、状态条、经验条及等级统一隐藏（用户 2026-10-09）。
      *
      * <p>「在不在雾海」认服务端那一包天色（{@link SkyOverride}）：服务端只给进了雾海的人发接管，维度名来自航程布局的数据，
-     * 客户端不另写一份。偏好 {@code vanillaHud=show} 照旧回到 Minecraft 自带的样子（用户 2026-09-30：「不要直接删除这些功能」）。
+     * 客户端不另写一份。不问有没有对局，也不受旧偏好影响；每帧读取游戏模式，换模式与离开维度立即恢复。
      */
     public static boolean hotbarHidden() {
         MinecraftClient client = MinecraftClient.getInstance();
-        return client.world != null && !ClientPrefs.vanillaHudInVoyage() && SkyOverride.forWorld(client.world) != null;
+        return client.world != null && client.player != null && client.interactionManager != null
+                && VanillaHudVisibility.hidden(SkyOverride.forWorld(client.world) != null,
+                        client.interactionManager.getCurrentGameMode());
     }
 
+    /** 对局热栏的材质偏好；不决定各状态条是否隐藏。 */
     public static boolean voyageHud() {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null || ClientPrefs.vanillaHudInVoyage()) {
@@ -214,7 +209,7 @@ public final class GameHud {
             if (on) {
                 GuiMaterial.hudPart(context, HudPart.PHASE_ON, ph.x(), ph.y(), ph.w(), ph.h(), k);
             }
-            GuiMaterial.hudIcon(context, PHASE_ICONS[i], ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
+            GuiMaterial.hudIcon(context, io.github.heavyseasmc.mod.ui.GameLabels.phaseIcon(i), ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
                     icon, icon, on ? GuiLanguage.Hud.PHASE_ON_ICON : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.PHASE_OFF_ALPHA), k);
         }
         // 此刻是什么阶段，写出字来（用户 2026-10-07：「另外写出当前阶段」，样张 A：四格阶段右头）。
@@ -259,12 +254,7 @@ public final class GameHud {
 
     /** 阶段名。写成 switch 而不是拼键：拼出来的键 checkLangKeys 扫不到（与 GameFlow.phaseName 同一条）。 */
     private static Text phaseName(io.github.heavyseasmc.engine.state.Phase phase) {
-        return Text.translatable(switch (phase) {
-            case WEATHER -> "heavyseas.phase.weather";
-            case PROVISION -> "heavyseas.phase.provision";
-            case ACTION -> "heavyseas.phase.action";
-            case NAVIGATION -> "heavyseas.phase.navigation";
-        });
+        return io.github.heavyseasmc.mod.ui.GameLabels.phaseName(phase);
     }
 
     // ---------------------------------------------------------------- 图例（用户 2026-10-07 · 样张 A）
@@ -347,11 +337,11 @@ public final class GameHud {
                     int d = s + l.len(2);
                     GuiMaterial.hudPart(context, HudPart.PHASE_ON, cx, y - l.len(1), d, d, d / (double) HudPart.PHASE_ON.w());
                     int ic = (int) Math.round(d * 0.66);
-                    GuiMaterial.hudIcon(context, PHASE_ICONS[i], cx + (d - ic) / 2, y - l.len(1) + (d - ic) / 2, ic, ic,
+                    GuiMaterial.hudIcon(context, io.github.heavyseasmc.mod.ui.GameLabels.phaseIcon(i), cx + (d - ic) / 2, y - l.len(1) + (d - ic) / 2, ic, ic,
                             GuiLanguage.Hud.PHASE_ON_ICON, ic / 24.0);
                     cx += d + gap;
                 } else {
-                    GuiMaterial.hudIcon(context, PHASE_ICONS[i], cx, y, s, s, ink, s / 24.0);
+                    GuiMaterial.hudIcon(context, io.github.heavyseasmc.mod.ui.GameLabels.phaseIcon(i), cx, y, s, s, ink, s / 24.0);
                     cx += s + gap;
                 }
             }
@@ -559,6 +549,10 @@ public final class GameHud {
         }
         if (view.endgame().active()) {
             return new Cue("endgame", null, 0);
+        }
+        if (HeavySeasClient.provisionWaiting()) {
+            // 补给箱在我手上、那一面却收着（聊天框刚关 · 被别的顶掉）：按 G 重开（审查 2026-10-07 K3）—— 原先这一态没有金签
+            return new Cue("provision", null, 0);
         }
         if (view.myDesignating()) {
             // 举着拳头找人：有倒计时，到点就退回 —— 紧迫，秒数用朱砂（ADR-0025）
@@ -798,7 +792,7 @@ public final class GameHud {
     /** 航海日志（样张 b-2 的 .log）：栏头「航海日志 · 第几天」+ 图钉 + 日志键，下面最新的几条，最底下一道自动收回的短横。 */
     private static void drawLog(DrawContext context, HudLayout l, HudView view, long now, double aboveBottom, int scale,
                                 int maxEntries) {
-        // 这一局客户端自己记下的那一本（往回翻要它：投影只留最新八条）；还没记下任何一条时退回投影
+        // 这一局客户端自己记下的那一本（往回翻要它：投影只带最新十六条）；还没记下任何一条时退回投影
         List<Text> notes = SidebarReveal.history().isEmpty() ? view.notifications() : SidebarReveal.history();
         if (notes.isEmpty()) {
             return;
@@ -1016,12 +1010,20 @@ public final class GameHud {
             return;
         }
         long now = System.currentTimeMillis();
-        SidebarReveal.observe(view.notifications(), now);
+        if (SidebarReveal.observe(GameComponents.of(client.world).notificationEpoch(),
+                view.notifications(), view.notificationSeq(), now)) {
+            seenArrived = 0;
+        }
         // 纸板开着时<b>一律不自己滑出来</b>：它会压住纸板右上角与座位轨末尾那两座（用户 2026-10-01 定，ADR-0050 §5 ——
         // 把 2026-09-30 计分面板那一条例外推广到每一面）。播报照数（observe 在上面，未读数挂在主画面的日志页签上，
         // 纸板一收就看得见）；按 L 钉住照旧给整列。原先自己滑出来的那一支（最新两条、自动收回）整支删掉，
         // 不留开关 —— 从结构上不可能再压上来。
         if (!SidebarReveal.pinned()) {
+            return;
+        }
+        // 设置菜单开着时不画（审查 2026-10-07 U6）：它按整个窗口排版、右栏一直排到板的右边，钉住的日志栏盖在上面，
+        // 1280×720 下正在改的那一格控件与「只读」锁牌大半看不见。播报照数（observe 在上面），收起菜单就回来。
+        if (client.currentScreen instanceof SettingsScreen) {
             return;
         }
         // ❗**盖在舞台上**，不占版面：舞台一个像素都不动，否则每钉一次整屏就要重排一次（§7.13）。
@@ -1049,14 +1051,6 @@ public final class GameHud {
         // 「在世界里的时候使用上下键控制日志滚动，在 gui 界面才使用滚轮」）
         return DesignationAim.scroll(vertical);
     }
-
-    /** GameScreen 与实际绘制共用这一份几何；两边各算一遍仍会得到完全相同的边界。 */
-    static NotificationSidebarLayout sidebarLayout(int screenWidth, HudView view) {
-        boolean visible = view.active() && (!view.notifications().isEmpty() || !view.weather().isEmpty())
-                && !(MinecraftClient.getInstance().currentScreen instanceof GameScreen);
-        return NotificationSidebarLayout.of(screenWidth, visible);
-    }
-
 
     // ---------------------------------------------------------------- 小件
 

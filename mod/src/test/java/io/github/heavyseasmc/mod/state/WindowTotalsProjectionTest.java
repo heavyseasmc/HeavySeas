@@ -124,6 +124,7 @@ final class WindowTotalsProjectionTest {
     void untimedDemoDefaultsToTheFourConditions() {
         UUID human = UUID.randomUUID();
         GameComponent component = component(human);
+        component.setDemo(true);              // /seas start 开的、有替身的局（开局时由 GameFlow.start 定，审查 R5）
         assertFalse(component.demoNoTimeout(), "随机行动关着：不是演示局");
         component.setDummyRandom(true);
         assertTrue(component.demoNoTimeout(), "自动推进 · 随机 · 有真人 · 有替身：四条都成立");
@@ -137,6 +138,17 @@ final class WindowTotalsProjectionTest {
                 d.weaponMs(), d.weaponBumpMs(), d.contestPickMs(), d.designationMs(), d.helmPickMs(), d.overboardMs(),
                 d.thirstMs(), d.provisionPerCardMs(), d.provisionMinMs(), d.revealHoldMs(), d.scoreHoldMs(), false));
         assertFalse(component.demoNoTimeout(), "demo.untimed_humans 关掉：随机替身的局也限时");
+        assertEquals(20_000L, component.humanWindow(20_000L));
+    }
+
+    @Test
+    @DisplayName("演习艇开航、替身补了位的正式局：不是演示局，等真人照常限时（审查 2026-10-07 R5）")
+    void filledSeatsDoNotMakeADemo() {
+        UUID human = UUID.randomUUID();
+        GameComponent component = component(human);   // 一个真人 + 一个替身：替身补位（stand_ins.fill_empty_seats）开出来的就是这样
+        component.setDummyRandom(true);
+        assertFalse(component.isDemo(), "前提：开局时没定成演示局（演习艇开航）");
+        assertFalse(component.demoNoTimeout(), "名单里有替身就被当成演示局，正式局等真人变成了不限时");
         assertEquals(20_000L, component.humanWindow(20_000L));
     }
 }

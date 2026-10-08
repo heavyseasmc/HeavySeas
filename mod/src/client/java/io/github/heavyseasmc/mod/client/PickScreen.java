@@ -221,12 +221,12 @@ public final class PickScreen extends GameScreen {
 
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (inspectKey(keyCode)) {
             return true;
         }
         if (committed) {
-            return super.keyPressed(keyCode, scanCode, modifiers);
+            return super.onKey(keyCode, scanCode, modifiers);
         }
         int count = options(view.contest());
         switch (keyCode) {
@@ -243,7 +243,7 @@ public final class PickScreen extends GameScreen {
                 return true;
             }
             default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.onKey(keyCode, scanCode, modifiers);
             }
         }
     }

@@ -275,6 +275,57 @@ class GuiConsistencyTest {
         assertTrue(problems.isEmpty(), String.join("\n", problems));
     }
 
+    /**
+     * 键盘也只在 {@code GameScreen} 里先拦一道，各面只写 {@code onKey}（审查 2026-10-07 U7 · U1）。
+     *
+     * <p>「正在合上」的拦截原先只在基类的 {@code keyPressed} 里，而各面都是先自己处理、最后才调 super ——
+     * 合上那 200 ms 里按回车照样生效（阵容面板能连发两次开航包）。弹出后 300 ms 内的确认键、按住的系统重复
+     * （{@link ConfirmGate}）也要在各面之前拦。与 {@code mouseClicked} 同一个办法：{@code final}，子类覆写在编译期就过不去。
+     *
+     * <h2>正向对照</h2>
+     * {@code GameScreen} 里那一处必须找得到、而且是 {@code final}；扫到的界面数必须够。
+     */
+    @Test
+    void keysAreGatedOnceInGameScreen() throws IOException {
+        List<Path> files;
+        try (Stream<Path> listing = Files.list(CLIENT_DIR)) {
+            files = listing.filter(p -> p.toString().endsWith(".java")).sorted().toList();
+        }
+        assertTrue(files.size() >= MIN_FILES, "只扫到 " + files.size() + " 份客户端源码 —— 没在扫，不是干净");
+
+        Pattern override = Pattern.compile("\\bboolean\\s+keyPressed\\s*\\(\\s*int\\b");
+        List<String> problems = new ArrayList<>();
+        int screens = 0;
+        boolean dispatcher = false;
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            String whole = String.join("\n", lines);
+            if (name.equals("GameScreen.java")) {
+                dispatcher = whole.contains("public final boolean keyPressed(");
+                continue;
+            }
+            if (!whole.contains("extends GameScreen")) {
+                continue;
+            }
+            screens++;
+            for (int i = 0; i < lines.size(); i++) {
+                String code = lines.get(i).strip();
+                if (code.startsWith("//") || code.startsWith("*") || code.startsWith("/*")) {
+                    continue;
+                }
+                if (override.matcher(code).find()) {
+                    problems.add(name + ":" + (i + 1) + "  自己覆写了 keyPressed：合上那一下与确认键的闸在 GameScreen 里，这一面只写 onKey");
+                }
+            }
+        }
+        if (!dispatcher) {
+            problems.add(0, "GameScreen.java  那一处先拦再分派的 keyPressed 不在了、或者不再是 final —— 各面又能绕过它");
+        }
+        assertTrue(screens >= 12, "只扫到 " + screens + " 个界面 —— 没在扫，不是干净");
+        assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
     @Test
     void bandsAreComputedOnceInGameScreen() throws IOException {
         List<Path> files;

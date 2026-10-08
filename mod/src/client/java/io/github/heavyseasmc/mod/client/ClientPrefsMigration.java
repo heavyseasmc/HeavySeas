@@ -54,7 +54,9 @@ final class ClientPrefsMigration {
      *
      * @param newFile 新文件名（在 {@code configDir} 下）
      * @return 旧文件里的值；不用迁时为空
-     * @throws IOException 旧文件在却读不出来（调用方说一句、按默认值走，不让客户端起不来）
+     * @throws IOException 旧文件在却读不出来（调用方说一句、按默认值走，不让客户端起不来）。
+     *                     残缺的 {@code \\u} 转义（{@code Properties.load} 抛的是 {@code IllegalArgumentException}）也包成这个 ——
+     *                     原先它一路冒到客户端入口，客户端起不来（审查 2026-10-07 C3，同一个毛病在服务端的密钥文件上）
      */
     static Optional<Prefs> readLegacy(Path configDir, String newFile) throws IOException {
         Path legacy = configDir.resolve(LEGACY_FILE);
@@ -64,6 +66,8 @@ final class ClientPrefsMigration {
         Properties props = new Properties();
         try (Reader in = Files.newBufferedReader(legacy, StandardCharsets.UTF_8)) {
             props.load(in);
+        } catch (IllegalArgumentException malformed) {
+            throw new IOException(legacy + " 里有残缺的转义：" + malformed.getMessage(), malformed);
         }
         return Optional.of(fromProperties(props));
     }

@@ -312,12 +312,12 @@ public final class ScoreScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         // 用哪个键开的，就用哪个键收起来（理由同行动一面：写死的键，玩家改了键位就收不起来）。
         if (HeavySeasClient.actKey().matchesKey(keyCode, scanCode)) {
             close();
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.onKey(keyCode, scanCode, modifiers);
     }
 }

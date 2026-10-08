@@ -127,11 +127,11 @@ public final class ConsentScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (cards.keyPressed(keyCode, this::confirm)) {
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.onKey(keyCode, scanCode, modifiers);
     }
 
     /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */

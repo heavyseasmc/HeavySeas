@@ -30,6 +30,8 @@ public final class ServerSettingsClient {
 
     /** 最近一次收到的快照；没进服或者服务端没装本模组时为空。 */
     private static volatile ServerSettingsS2C latest;
+    /** 服务端回话说刚发的那一包被拒了：理由，等菜单取走（只取一次，{@link SettingsMenuState.Outbox#takeRejection}）。 */
+    private static String rejection;
     /** 收到 {@code /seas config} 的回话、还没开出来（排到聊天框收起之后的那一 tick）。 */
     private static boolean openRequested;
     /** 第几次进服：草稿只在同一次连接里接回（换了服务端，上一台的改动不该挂到这一台上）。 */
@@ -47,6 +49,10 @@ public final class ServerSettingsClient {
                     latest = payload;
                     // 与语言无关的一行：验收脚本据此判「快照到了 · 能不能改」
                     LOGGER.info("服务端设置：收到快照 {} 项 · {}", payload.values().size(), payload.canEdit() ? "能改" : "只读");
+                    if (!payload.rejection().isEmpty()) {
+                        rejection = payload.rejection();         // 菜单在下面 snapshotArrived 里取走
+                        LOGGER.info("服务端设置：刚发的那一包被拒（{}）", payload.rejection());
+                    }
                     if (context.client().currentScreen instanceof SettingsScreen screen) {
                         screen.snapshotArrived();
                     }
@@ -59,14 +65,18 @@ public final class ServerSettingsClient {
             latest = null;
             openRequested = false;
             draft = null;
+            rejection = null;
         });
     }
 
-    /** 设置菜单被别的界面顶掉（对局里自动弹出的决策面）：没存的改动留着，下次开菜单接回。 */
+    /**
+     * 设置菜单没走「存不存」那一问就收起了：被别的界面顶掉（对局里自动弹出的决策面），或窗口太小时按了 Esc
+     * （那一问画不出来，审查 2026-10-07 Z6）。没存的改动留着，下次开菜单接回。
+     */
     static void keepDraft(SettingsMenuState.Draft kept) {
         draft = kept;
         draftConnection = connection;
-        LOGGER.info("设置菜单：被别的界面顶掉，留下没存的 {} 项", kept.pending().size());
+        LOGGER.info("设置菜单：没问存不存就收起了，留下没存的 {} 项草稿", kept.pending().size());
     }
 
     /** 取走草稿（只取一次）；不是这一次连接留的就不给。 */
@@ -106,10 +116,17 @@ public final class ServerSettingsClient {
             }
 
             @Override
-            public void secret(String key, String value) {
-                ClientPlayNetworking.send(new ServerSecretSetC2S(key, value));
+            public void secret(String key, String value, String scope) {
+                ClientPlayNetworking.send(new ServerSecretSetC2S(key, value, scope));
                 // ❗只写键与「设 / 清」，不写值
                 LOGGER.info("服务端设置：发出密钥包 {}（{}）", key, value.isEmpty() ? "清掉" : "设新值");
+            }
+
+            @Override
+            public Optional<String> takeRejection() {
+                String why = rejection;
+                rejection = null;
+                return Optional.ofNullable(why);
             }
         };
     }

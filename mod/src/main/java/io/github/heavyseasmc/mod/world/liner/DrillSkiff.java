@@ -216,8 +216,16 @@ public final class DrillSkiff {
             player.sendMessage(Text.translatable("heavyseas.lobby.need_players", registered.size()), true);
             return ActionResult.FAIL;
         }
-        ServerPlayNetworking.send(player, RosterConfigS2C.from(rig.anchor().asLong(), players,
-                GameDataLoader.require().roster()));
+        RosterConfigS2C panel;
+        try {
+            panel = RosterConfigS2C.from(rig.anchor().asLong(), players, GameDataLoader.require().roster());
+        } catch (IllegalArgumentException tooMany) {
+            // 数据包里的角色多到一个包装不下（审查 2026-10-07 U8）：在造包这一刻就拒，不发一个注定编码失败、把人踢下线的包
+            LOGGER.warn("演习艇：阵容面板发不出去：{}", tooMany.getMessage());
+            player.sendMessage(Text.translatable("heavyseas.lobby.start_failed"), true);
+            return ActionResult.FAIL;
+        }
+        ServerPlayNetworking.send(player, panel);
         return ActionResult.SUCCESS;
     }
 
@@ -254,7 +262,7 @@ public final class DrillSkiff {
             rig.world().playSound(null, BlockPos.ofFloored(rig.seats().getFirst()), SoundEvents.BLOCK_BELL_USE, SoundCategory.BLOCKS, 1f, 1f);
             LOGGER.info("演习艇：{} 人入座，敲钟开局{}", registered.size(),
                     players > registered.size() ? " · 替身补 " + (players - registered.size()) + " 座（服务端设置 stand_ins.fill_empty_seats）" : "");
-            MistSea.startVoyage(player.server, players, registered, Set.of(), selected);
+            MistSea.startVoyage(player.server, players, registered, Set.of(), selected);   // 演习艇开航：正式局（审查 R5）
         } catch (RuntimeException failure) {
             LOGGER.warn("演习艇：开局被拒：{}", failure.getMessage());   // 异常信息留在日志里
             player.sendMessage(Text.translatable("heavyseas.lobby.start_failed"), true);
@@ -299,9 +307,17 @@ public final class DrillSkiff {
         found.sort(Comparator.comparing((SeatEntity seat) -> !seat.hasPassengers()));
         boolean[] taken = new boolean[SEATS];
         List<SeatEntity> kept = new ArrayList<>();
+        // 同号的第二个座位上坐着人：多半是掉线的人回来了 —— Minecraft 下线时把他身下的座位一起存进玩家文件、从世界里拿走
+        //   （PlayerManager.remove），这一号随后被补了一个新的、别人坐了上去；他回来时旧座位跟着他回到同一格（审查 2026-10-07 R6）。
+        //   原先这里把重号的连人带座一起清掉，悄悄踢出了报名；现在挪到空着的那一号去，没有空号了才照旧清
+        List<SeatEntity> displaced = new ArrayList<>();
         for (SeatEntity seat : found) {
             int i = seat.index();
             if (i < 0 || i >= SEATS || taken[i]) {
+                if (seat.hasPassengers()) {
+                    displaced.add(seat);
+                    continue;
+                }
                 seat.removeAllPassengers();
                 seat.discard();
                 continue;
@@ -311,6 +327,26 @@ public final class DrillSkiff {
             if (seat.squaredDistanceTo(at) > 0.0001 || seat.getYaw() != rig.seatYaw()) {
                 seat.refreshPositionAndAngles(at.x, at.y, at.z, rig.seatYaw(), 0f);
             }
+            kept.add(seat);
+        }
+        for (SeatEntity seat : displaced) {
+            int free = -1;
+            for (int i = 0; i < SEATS && free < 0; i++) {
+                if (!taken[i]) {
+                    free = i;
+                }
+            }
+            if (free < 0) {
+                LOGGER.info("演习艇：第 {} 号座位重了、又没有空号，清掉后来的那一个", seat.index() + 1);
+                seat.removeAllPassengers();
+                seat.discard();
+                continue;
+            }
+            LOGGER.info("演习艇：第 {} 号座位重了（掉线的人回来了），挪到空着的第 {} 号", seat.index() + 1, free + 1);
+            taken[free] = true;
+            seat.setIndex(free);
+            Vec3d at = rig.seats().get(free);
+            seat.refreshPositionAndAngles(at.x, at.y, at.z, rig.seatYaw(), 0f);
             kept.add(seat);
         }
         for (int i = 0; i < SEATS; i++) {

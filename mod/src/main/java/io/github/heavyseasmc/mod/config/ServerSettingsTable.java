@@ -150,8 +150,27 @@ public final class ServerSettingsTable {
 
     /** 网址最长几个字（{@link LlmConfig} 不限长；菜单里输得下一个带端口与路径的地址就够）。 */
     static final int URL_MAX = 256;
-    /** 密钥最长几个字。 */
-    static final int KEY_MAX = 512;
+    /** 密钥最长几个字（按码点数）。包要装得下它：{@code ServerSecretSetC2S} 的上限照它算（审查 2026-10-07 U2）。 */
+    public static final int KEY_MAX = 512;
+
+    /**
+     * 密钥绑哪一项设置（审查 2026-10-07 L1）：{@code llm.api_key} 只发往设它那一刻 {@code llm.base_url} 的「协议 + 主机 + 端口」
+     * （{@link LlmConfig#origin}）。设密钥的包要带上发包的人以为的那个地址，与服务端此刻的对不上就拒（{@link ServerSettings#setSecret}）。
+     */
+    private static final Map<String, String> SECRET_SCOPES = Map.of(LLM_API_KEY, LLM_BASE_URL);
+
+    /** 这项密钥绑的那一项设置的键；不绑的是空。 */
+    public static Optional<String> secretScope(String secretKey) {
+        return Optional.ofNullable(SECRET_SCOPES.get(secretKey));
+    }
+
+    /**
+     * 只给能改设置的人看原值的几项（审查 2026-10-07 L1）：发给只读的人的快照里换成 {@link #HIDDEN}。
+     * ❗FCAP 进服时仍把整份 SERVER 文件发给每个客户端（{@code ConfigSync.syncConfigs}）—— 这一道只管本模组自己的快照包。
+     */
+    public static final java.util.Set<String> EDITORS_ONLY = java.util.Set.of(LLM_BASE_URL);
+    /** 只读的人看到的那几项写成这个。 */
+    public static final String HIDDEN = "***";
     /** {@code reasoning_effort} 最长几个字（{@link LlmConfig} 只认 1–16 个小写字母）。 */
     static final int EFFORT_MAX = 16;
 
@@ -419,6 +438,24 @@ public final class ServerSettingsTable {
                 integer(current, LLM_MAX_CONCURRENT), integer(current, LLM_MAX_QUEUED),
                 integer(current, LLM_DEADLINE_MARGIN), integer(current, LLM_BREAKER_THRESHOLD),
                 integer(current, LLM_BREAKER_COOLDOWN), text(current, LLM_LANGUAGE), flag(current, LLM_DEBUG_LOG));
+    }
+
+    /** {@link #llmDraft} 读的那几项。 */
+    private static final List<String> LLM_DRAFT_KEYS = List.of(LLM_ENABLED, LLM_BASE_URL, LLM_MODEL, LLM_MAX_TOKENS,
+            LLM_TEMPERATURE, LLM_REASONING_EFFORT, LLM_ATTEMPT_TIMEOUT, LLM_ATTEMPT_SHARE, LLM_MAX_ATTEMPTS, LLM_MIN_ATTEMPT,
+            LLM_BACKOFF_BASE, LLM_BACKOFF_MAX, LLM_MAX_CONCURRENT, LLM_MAX_QUEUED, LLM_DEADLINE_MARGIN,
+            LLM_BREAKER_THRESHOLD, LLM_BREAKER_COOLDOWN, LLM_LANGUAGE, LLM_DEBUG_LOG);
+
+    /**
+     * 按这一份值，「大模型」一组合不合得成大模型那一层收的设置（{@link LlmConfig#problemOf}）；合得成、或者这张表里没有整组
+     * （单测里的小表）是 {@code null}。审查 2026-10-07 R8：每项单看都合法、合起来不收的一批（reasoning_effort 写成「High」、
+     * 退避底数大于上限、地址没写 {@code http://}），原先存下去、显示「已保存」，然后整个大模型层静默关掉。
+     */
+    public String llmProblem(Function<SettingDef, Object> current) {
+        if (!byKey.keySet().containsAll(LLM_DRAFT_KEYS)) {
+            return null;
+        }
+        return LlmConfig.problemOf(llmDraft(current, null));
     }
 
     /** 替身问大模型一个决定最多等多久（毫秒）。 */

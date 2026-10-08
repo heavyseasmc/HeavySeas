@@ -116,6 +116,14 @@ public final class HeavySeasClient implements ClientModInitializer {
                 .filter(Objects::nonNull).toList();
     }
 
+    /**
+     * 撞了键就让给别的绑定的那几个：日志翻页（↑ ↓ End）。默认键保持方向键（用户认过），而把移动绑在方向键上的玩家
+     * 按 ↑ 不能被截走（审查 2026-10-07 U4，判据在 {@link KeyRoute}）。
+     */
+    static List<KeyBinding> yieldingKeys() {
+        return Stream.of(logOlderKey, logNewerKey, logLatestKey).filter(Objects::nonNull).toList();
+    }
+
     /** 上一次记过的「别的界面」：窗口改尺寸会让同一个界面再 init 一次，同一个实例只记一次。 */
     private static WeakReference<Screen> lastOtherScreen = new WeakReference<>(null);
 
@@ -160,6 +168,25 @@ public final class HeavySeasClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         HudRenderCallback.EVENT.register(GameHud::render);
+        // 字体与纹理应用完之后，一并作废牌面、布局与量字缓存。
+        net.fabricmc.fabric.api.resource.ResourceManagerHelper.get(net.minecraft.resource.ResourceType.CLIENT_RESOURCES)
+                .registerReloadListener(new net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener() {
+                    @Override
+                    public net.minecraft.util.Identifier getFabricId() {
+                        return net.minecraft.util.Identifier.of(HeavySeasMod.MOD_ID, "gui_text_measurements");
+                    }
+
+                    @Override
+                    public java.util.Collection<net.minecraft.util.Identifier> getFabricDependencies() {
+                        return List.of(net.fabricmc.fabric.api.resource.ResourceReloadListenerKeys.FONTS,
+                                net.fabricmc.fabric.api.resource.ResourceReloadListenerKeys.TEXTURES);
+                    }
+
+                    @Override
+                    public void reload(net.minecraft.resource.ResourceManager manager) {
+                        CardTexture.resourcesReloaded();
+                    }
+                });
         // 救生艇方块里只有帆（四角帆的斜边）与星徽（圆牌）的贴图有透明像素：按镂空画，其余照实心
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getCutout(), SkiffBlocks.SAIL, SkiffBlocks.EMBLEM);
         // 大邮轮的灯与家具（ADR-0063）一律按镂空画：灯柱横担、灯罩流苏、台灯拉链是镂空片；别的件没有透明像素，按镂空画也一样
@@ -245,6 +272,7 @@ public final class HeavySeasClient implements ClientModInitializer {
                     ClientPrefs.toggleLegend();
                 }
             }
+            CardTexture.tick(client);
             CardComposite.tick(client);      // 一 tick 合成一张牌；渲染中途不动帧缓冲
             OverboardCue.tick(client);       // 有人落海：溅水一声 · 四边朱砂一闪（ADR-0048）
             while (logKey.wasPressed()) {
@@ -311,7 +339,12 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 这个人的天该画成什么样（ADR-0054 §9.8 D12 第 4 条 (a)）；掉线就不再接管。
         ClientPlayNetworking.registerGlobalReceiver(SkyS2C.ID, (payload, context) ->
                 context.client().execute(() -> SkyOverride.accept(payload)));
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> SkyOverride.clear());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
+            SkyOverride.clear();
+            CardTexture.cancelPreload();
+        }));
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING
+                .register(client -> CardTexture.stopPreload());
         ClientPlayNetworking.registerGlobalReceiver(RosterConfigS2C.ID, (payload, context) ->
                 context.client().execute(() -> context.client().setScreen(new RosterScreen(payload))));
         // 「这张是替你挑的」（舵手超时）。次序的道理与上面相同：先到，结算后的那一次投影后到。
@@ -360,7 +393,9 @@ public final class HeavySeasClient implements ClientModInitializer {
             return;                           // 已经有界面开着（比如补给箱）时不抢
         }
         HudView view = GameComponents.of(client.world).hudView();
-        if (view.hasHand() || (view.active() && view.seated() && !view.love().isEmpty())) {
+        // 面前有牌、手里空了也开（审查 2026-10-07 Z1）：面前的酒、医疗箱、伞、信号枪要在这一面上打
+        boolean front = view.active() && view.seated() && !view.front().isEmpty();
+        if (view.hasHand() || front || (view.active() && view.seated() && !view.love().isEmpty())) {
             client.setScreen(new HandScreen());
         }
     }
@@ -382,7 +417,11 @@ public final class HeavySeasClient implements ClientModInitializer {
 
         boolean mine = view.myTurnToAct();
         if (mine && !wasMyTurn) {
-            actionPending = true;
+            // 轮到你的那一刻行动一面已经开着（没轮到时按 G 开的只读那一版，它就地变成可按的），或者开着的是它的二级页面：
+            // 这一次「弹」已经算弹过了（审查 2026-10-07 U5）。原先照样记一笔，Esc 收起之后下一 tick 它又弹回来，违背「只弹这一次」
+            Screen open = client.currentScreen;
+            actionPending = !(open instanceof ActionScreen
+                    || (open instanceof GameScreen screen && screen.parent() instanceof ActionScreen));
             // 轮到你时开着别的对局界面（手牌 · 座位面板……）：行动一面不会弹出来顶掉它，所以在最上层说一句
             // （ADR-0095 B1）；窗口不在前台时让任务栏闪一下 —— 原先 60 秒在后台无声走完
             if (client.currentScreen instanceof GameScreen && !(client.currentScreen instanceof ActionScreen)) {
@@ -440,6 +479,10 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 正在聊天框里打字时不弹任何一面（ADR-0095 D2）：站队、表态那几秒正是靠聊天谈判，弹出来会把没发出去的那句关掉。
         // 聊天一关，下一 tick 照常弹；窗口的倒计时在服务端照走，所以只是晚几秒看到，不会错过结算。
         if (client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
+            return;
+        }
+
+        if (pollProvision(client, pressed)) {
             return;
         }
 
@@ -592,6 +635,11 @@ public final class HeavySeasClient implements ClientModInitializer {
             return true;
         }
 
+        // ❗「窗口换了」不全是新窗（审查 2026-10-07 U14）：该答的真人都答完时服务端把这一段<b>收短</b>（ContestPhase#endIfAllDecided），
+        //   超时时刻跟着变，客户端看起来与「重开」一样。刚选了旁观的人，若那一包在「顿」+ 合上（约 0.6 秒）之后才到，
+        //   站队一面会被重新弹出来。投影里没有「我答过了」，所以客户端自己记：这一场的这一段答过了，就只认 G。
+        boolean answered = contestKey(view).equals(contestAnswered);
+
         if (view.myStance()) {
             if (fresh) {
                 contestWindowShown = window;
@@ -602,7 +650,7 @@ public final class HeavySeasClient implements ClientModInitializer {
             if (open instanceof StanceScreen) {
                 return true;                  // 有人加入把窗口重置了：界面照旧开着，它自己会读到新的投影
             }
-            if (fresh || pressed) {
+            if ((fresh && !answered) || pressed) {
                 client.setScreen(new StanceScreen(view));
             }
             return true;
@@ -618,7 +666,7 @@ public final class HeavySeasClient implements ClientModInitializer {
             if (open instanceof WeaponScreen) {
                 return true;                  // 自己押下一张也会重置窗口：不重开，那会把「抬」打断
             }
-            if (fresh || pressed) {
+            if ((fresh && !answered) || pressed) {
                 client.setScreen(new WeaponScreen(view));
             }
             return true;
@@ -641,6 +689,20 @@ public final class HeavySeasClient implements ClientModInitializer {
         return false;                         // 这一场在等的是别人：HUD 上看得见，但什么也不弹
     }
 
+    /** 我已经答过的那一场的那一段（{@link #contestKey}）；站队选了加入或旁观、挂武器说了押完时记下（U14）。 */
+    private static String contestAnswered = "";
+
+    /** 站队 / 挂武器一面发出「我定了」的那一包时调：这一段之后的窗口变化（收短、别人加入）不再自己把这一面弹回来。 */
+    static void answeredContest(HudView view) {
+        contestAnswered = contestKey(view);
+    }
+
+    /** 一场的一段：回合 · 种类 · 谁对谁 · 哪一段。一个人一回合只有一次行动，同一回合不会有第二场一模一样的。 */
+    private static String contestKey(HudView view) {
+        ContestView c = view.contest();
+        return view.turn() + "|" + c.kind() + "|" + c.attacker() + "|" + c.target() + "|" + c.stage();
+    }
+
     /**
      * 补给箱的包到了。
      *
@@ -649,6 +711,9 @@ public final class HeavySeasClient implements ClientModInitializer {
      */
     private static void onProvisionUpdate(MinecraftClient client, ProvisionUpdateS2C payload) {
         boolean mine = payload.active() && !payload.offer().isEmpty();
+        // 每传一手服务端都给每个人发一包：不是给我的那一包一到，上一包（如果是我的）就作废了
+        lastProvision = mine ? payload : null;
+        provisionDeferred = false;
         if (client.currentScreen instanceof ProvisionScreen screen) {
             if (mine) {
                 screen.apply(payload);
@@ -663,8 +728,67 @@ public final class HeavySeasClient implements ClientModInitializer {
             return;
         }
         if (mine) {
+            // 聊天框（含指令输入）开着时先不弹（审查 2026-10-07 U1）：原先直接把它换掉，打了一半的字丢失，
+            // 接着敲下的第一个空格就替玩家把高亮的第 1 张留下了。包存着，聊天一关 pollTurn 当场开（ADR-0095 D2 同一条）。
+            if (client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
+                provisionDeferred = true;
+                LOGGER.info("补给箱：聊天框开着，等它关上再开");
+                return;
+            }
             // ❗补给箱是有倒计时的决策，优先级高于正开着的手牌界面：直接顶掉。
             client.setScreen(new ProvisionScreen(payload));
         }
+    }
+
+    /**
+     * 最后一包「轮到我」的补给箱；箱子从我手上传走（不是给我的下一包到了）、或对局没了就清掉（审查 2026-10-07 K3）。
+     *
+     * <p>补给箱只在收到包时打开。原先它一旦被关掉（窗口太小时 Esc 被接成「关掉这一面」）就再也找不回来：
+     * 正常局等超时替选，演示局（等真人不限时）整桌卡在补给阶段，直到这个人重连。现在收着最后一包，按 G 重开。
+     */
+    private static ProvisionUpdateS2C lastProvision;
+    /** 那一包到的时候聊天框开着：聊天一关就开（U1）。 */
+    private static boolean provisionDeferred;
+
+    /** 箱子在我手上，而补给箱那一面没开着 —— 主画面挂金签、按 G 重开。 */
+    static boolean provisionWaiting() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        return lastProvision != null && !(client.currentScreen instanceof ProvisionScreen);
+    }
+
+    /** 补给箱那一面自己留完了（或「顿」完了）：这一包不必再重开。 */
+    static void provisionSettled(ProvisionUpdateS2C data) {
+        if (data != null && data == lastProvision) {
+            lastProvision = null;
+            provisionDeferred = false;
+        }
+    }
+
+    /**
+     * 补给箱的两条回头路：聊天框关上后补开（U1）· 收起之后按 G 重开（K3）。返回 {@code true} = 这一帧归它。
+     *
+     * <p>G 本来是「行动」：补给阶段里行动一面只有只读的那一版可开，箱子在我手上时按 G 开箱子 ——
+     * 「G 在哪儿都表示『轮到你要做的那件事』」，金签上印的也是它。
+     */
+    private static boolean pollProvision(MinecraftClient client, boolean pressed) {
+        if (lastProvision == null) {
+            return false;
+        }
+        if (client.world == null || !GameComponents.of(client.world).hudView().active()) {
+            lastProvision = null;
+            provisionDeferred = false;
+            return false;
+        }
+        if (client.currentScreen instanceof ProvisionScreen) {
+            provisionDeferred = false;
+            return true;
+        }
+        if (provisionDeferred || (pressed && client.currentScreen == null)) {
+            LOGGER.info("补给箱：{}", provisionDeferred ? "聊天框关上了，补开" : "按 G 重开");
+            provisionDeferred = false;
+            client.setScreen(ProvisionScreen.reopen(lastProvision));
+            return true;
+        }
+        return false;
     }
 }

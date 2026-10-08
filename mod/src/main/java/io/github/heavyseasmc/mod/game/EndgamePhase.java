@@ -7,7 +7,6 @@ import io.github.heavyseasmc.engine.scoring.ScoreSheet;
 import io.github.heavyseasmc.engine.state.GameState;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.data.GameDataLoader;
-import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.data.VoyageLayout;
 import io.github.heavyseasmc.mod.state.EndgameProgress;
 import io.github.heavyseasmc.mod.state.GameComponent;
@@ -96,7 +95,7 @@ public final class EndgamePhase {
         EndgameProgress progress = new EndgameProgress(outcome, end.turn(),
                 session.aliveCount(), revealOrder(end.bySeat(), scores), first, 0, scores);
         component.setEndgame(progress);
-        VoyageLayout layout = component.layoutId().map(SceneDataLoader::require).orElse(null);
+        VoyageLayout layout = component.layout().orElse(null);   // 开局快照（审查 2026-10-07 C6）
         if (first == EndgameProgress.Stage.ARRIVAL) {
             component.clearFog();
             if (layout != null) {

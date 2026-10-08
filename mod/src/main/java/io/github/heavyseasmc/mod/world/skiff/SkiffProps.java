@@ -1,6 +1,7 @@
 package io.github.heavyseasmc.mod.world.skiff;
 
 import io.github.heavyseasmc.engine.weather.WeatherCard;
+import io.github.heavyseasmc.engine.weather.WeatherEffect;
 import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
@@ -51,11 +52,35 @@ public final class SkiffProps {
     private SkiffProps() {
     }
 
+    /** 玩家离线后不保留这一秒的交互记录；只在服务端线程上调用。 */
+    public static void forget(UUID player) {
+        LAST_USE.remove(player);
+    }
+
+    /** 单人游戏换世界也会重用静态字段，停服时一起释放。 */
+    public static void reset() {
+        LAST_USE.clear();
+    }
+
+    static boolean acceptUse(UUID player, long now) {
+        Long last = LAST_USE.get(player);
+        if (last != null && now >= last && now - last < COOLDOWN_MS) {
+            return false;
+        }
+        LAST_USE.put(player, now);
+        return true;
+    }
+
     /** 不碰 Minecraft 的那一半规则：单测直接测这里。 */
     public static final class Rules {
 
-        /** 暴风雨、巨浪那两天帆升不起来（大风浪收帆）。 */
-        public static final Set<String> TOO_ROUGH = Set.of("storm", "huge_wave");
+        /**
+         * 暴风雨（划船的落海）、巨浪（打架的落海）那两天帆升不起来（大风浪收帆）。
+         *
+         * <p>❗按天候<b>效果</b>判、不按 id（审查 2026-10-07 Q4，与 90dde61 定的「按效果判」同一条）：数据包可以给任何 id 配这个效果，
+         * 原先写死 {@code storm} / {@code huge_wave} 两个 id，换一套天候数据帆就不认了 —— 只影响样子，不报错。
+         */
+        public static final Set<WeatherEffect> TOO_ROUGH = Set.of(WeatherEffect.ROWERS_OVERBOARD, WeatherEffect.FIGHTERS_OVERBOARD);
 
         private Rules() {
         }
@@ -65,16 +90,19 @@ public final class SkiffProps {
             return turn <= 1 ? oilBefore : Math.max(0, oilBefore - 1);
         }
 
-        /** 升起来的帆鼓几档：无风垂着（0）· 狂风鼓满（2）· 其余（1）。 */
-        public static int bellyFor(String weather) {
-            return switch (weather == null ? "" : weather) {
-                case "becalmed" -> 0;
-                case "gale" -> 2;
+        /** 升起来的帆鼓几档：无风（没有航海阶段）垂着（0）· 狂风（多翻一张航海牌）鼓满（2）· 其余（1）。{@code null} = 不在对局里。 */
+        public static int bellyFor(WeatherEffect weather) {
+            if (weather == null) {
+                return 1;
+            }
+            return switch (weather) {
+                case SKIP_NAVIGATION -> 0;
+                case EXTRA_NAVIGATION -> 2;
                 default -> 1;
             };
         }
 
-        public static boolean mayRaise(String weather) {
+        public static boolean mayRaise(WeatherEffect weather) {
             return weather == null || !TOO_ROUGH.contains(weather);
         }
 
@@ -97,12 +125,9 @@ public final class SkiffProps {
         if (player.isSpectator()) {
             return ActionResult.PASS;
         }
-        long now = System.currentTimeMillis();
-        Long last = LAST_USE.get(player.getUuid());
-        if (last != null && now - last < COOLDOWN_MS) {
+        if (!acceptUse(player.getUuid(), System.currentTimeMillis())) {
             return ActionResult.SUCCESS;
         }
-        LAST_USE.put(player.getUuid(), now);
         ServerWorld server = (ServerWorld) world;
         if (block == SkiffBlocks.LANTERN) {
             refill(server, pos, state, player);
@@ -123,7 +148,9 @@ public final class SkiffProps {
     }
 
     private static void toggleSail(ServerWorld world, BlockPos pos, PlayerEntity player) {
-        String weather = currentWeather(world).orElse(null);
+        WeatherCard card = currentWeather(world).orElse(null);
+        WeatherEffect weather = card == null ? null : card.effect();
+        String weatherId = card == null ? null : card.id();
         List<BlockPos> sails = new ArrayList<>();
         List<BlockPos> yards = new ArrayList<>();
         find(world, searchBox(world, pos), sails, yards);
@@ -133,14 +160,14 @@ public final class SkiffProps {
         boolean raised = world.getBlockState(sails.get(0)).get(SkiffBlocks.RAISED);
         if (!raised && !Rules.mayRaise(weather)) {
             player.sendMessage(Text.translatable("heavyseas.skiff.sail_too_rough"), true);
-            LOGGER.info("艇上：{} 想升帆，天候 {} —— 风浪太大，没升", player.getGameProfile().getName(), weather);
+            LOGGER.info("艇上：{} 想升帆，天候 {} —— 风浪太大，没升", player.getGameProfile().getName(), weatherId);
             return;
         }
         setSail(world, sails, yards, !raised, Rules.bellyFor(weather));
         world.playSound(null, pos, raised ? SoundEvents.BLOCK_WOOL_PLACE : SoundEvents.BLOCK_WOOL_BREAK,
                 SoundCategory.BLOCKS, 1.0f, 0.7f);
         LOGGER.info("艇上：{} {}帆 · 天候 {} · 鼓 {} · {} 块帆面", player.getGameProfile().getName(), raised ? "收" : "升",
-                weather, Rules.bellyFor(weather), sails.size());
+                weatherId, Rules.bellyFor(weather), sails.size());
     }
 
     private static void setSail(ServerWorld world, List<BlockPos> sails, List<BlockPos> yards, boolean raise, int belly) {
@@ -157,7 +184,8 @@ public final class SkiffProps {
     // ---------------------------------------------------------------- 跟着游戏动
 
     /** 新的一天翻出天候之后：灯油烧掉一档；风浪太大就收帆，升着的帆按天候换鼓度。 */
-    public static void onNewDay(ServerWorld world, GameComponent component, String weather, int turn) {
+    public static void onNewDay(ServerWorld world, GameComponent component, WeatherCard card, int turn) {
+        WeatherEffect weather = card.effect();
         Optional<BlockBox> box = hullBox(component);
         if (box.isEmpty()) {
             return;
@@ -191,7 +219,7 @@ public final class SkiffProps {
             setSail(world, sails, yards, keep, Rules.bellyFor(weather));
             sail = keep ? "升着 · 鼓 " + Rules.bellyFor(weather) : "风浪太大，自动收起";
         }
-        LOGGER.info("艇上：第 {} 天 · 天候 {} · 灯油 {} · 帆 {}", turn, weather, oil.isEmpty() ? "（没有灯）" : oil, sail);
+        LOGGER.info("艇上：第 {} 天 · 天候 {} · 灯油 {} · 帆 {}", turn, card.id(), oil.isEmpty() ? "（没有灯）" : oil, sail);
     }
 
     /** 有人划了一下船：插着的桨都往船尾扫一下，伴一声划水，{@value #STROKE_TICKS} tick 后回位。 */
@@ -295,12 +323,13 @@ public final class SkiffProps {
         List<BlockPos> sails = new ArrayList<>();
         List<BlockPos> yards = new ArrayList<>();
         hullBox(component).ifPresent(box -> find(world, box, sails, yards));
-        String weather = currentWeather(world).orElse(null);
+        WeatherCard card = currentWeather(world).orElse(null);
+        WeatherEffect weather = card == null ? null : card.effect();
         if (!sails.isEmpty()) {
             setSail(world, sails, yards, raise, Rules.bellyFor(weather));
         }
-        LOGGER.info("艇上：调试 · {}帆 · 天候 {} · 鼓 {} · {} 块帆面 · {}", raise ? "升" : "收", weather,
-                Rules.bellyFor(weather), sails.size(), positions(sails));
+        LOGGER.info("艇上：调试 · {}帆 · 天候 {} · 鼓 {} · {} 块帆面 · {}", raise ? "升" : "收",
+                card == null ? null : card.id(), Rules.bellyFor(weather), sails.size(), positions(sails));
         return List.copyOf(sails);
     }
 
@@ -339,8 +368,8 @@ public final class SkiffProps {
         }
     }
 
-    private static Optional<String> currentWeather(ServerWorld world) {
+    private static Optional<WeatherCard> currentWeather(ServerWorld world) {
         GameComponent component = GameComponents.of(world);
-        return component.session().flatMap(s -> s.currentWeather()).map(WeatherCard::id);
+        return component.session().flatMap(s -> s.currentWeather());
     }
 }

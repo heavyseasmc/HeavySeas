@@ -1,5 +1,6 @@
 package io.github.heavyseasmc.mod.ui;
 
+import io.github.heavyseasmc.mod.config.ServerSettingsTable;
 import io.github.heavyseasmc.mod.config.SettingDef;
 import io.github.heavyseasmc.mod.config.SettingsCategory;
 
@@ -54,8 +55,21 @@ public final class SettingsMenuState {
         /** 一批改动（只含改过的键）。 */
         void save(Map<String, String> changes);
 
-        /** 设一项密钥；空串 = 清掉。 */
-        void secret(String key, String value);
+        /**
+         * 设一项密钥；空串 = 清掉。
+         *
+         * @param scope 这项密钥绑的那一项设置此刻在菜单里的值（接口地址；不绑的是空串）—— 服务端拿它核「密钥是给哪个地址的」
+         *              （审查 2026-10-07 L1）
+         */
+        void secret(String key, String value, String scope);
+
+        /**
+         * 服务端对刚发出去的包的回话：被拒了就是理由，<b>只取一次</b>（审查 2026-10-07 U2：原先被拒的存盘也显示「已保存」）。
+         * 每收到一份快照问一次（{@link #snapshot}）。
+         */
+        default Optional<String> takeRejection() {
+            return Optional.empty();
+        }
     }
 
     /** 服务端那几组此刻能不能改。 */
@@ -97,6 +111,10 @@ public final class SettingsMenuState {
 
     private boolean confirming;
     private Notice notice = Notice.NONE;
+    /** 上一次存盘被服务端拒了的理由（服务端的原话）；没被拒是 {@code null}。下一次按 S 时清掉。 */
+    private String rejection;
+    /** 全部行按键（找密钥绑的那一项用）。 */
+    private final Map<String, SettingDef> byKey = new LinkedHashMap<>();
 
     /**
      * @param defs 全部行（本机的与服务端的；密钥也在里面）。先后就是各组里的先后
@@ -106,6 +124,7 @@ public final class SettingsMenuState {
         this.outbox = Objects.requireNonNull(outbox, "outbox");
         for (SettingDef def : defs) {
             rows.computeIfAbsent(def.category(), c -> new ArrayList<>()).add(def);
+            byKey.put(def.key(), def);
         }
         List<SettingsCategory> present = new ArrayList<>();
         for (SettingsCategory c : SettingsCategory.values()) {
@@ -124,6 +143,9 @@ public final class SettingsMenuState {
     /**
      * 服务端此刻的值。{@code connected = false} = 没进存档（标题画面的 Mod Menu）：服务端那几组只看不改。
      * 攒着的改动里与新值相同的丢掉（别人刚好存了同一个值）；改不了了（被撤了管理员）就整个丢掉 —— 存不出去的改动留着只会骗人。
+     *
+     * <p>按过 S 之后来的快照：服务端回话说拒了（{@link Outbox#takeRejection}）就不说「已保存」，记下理由（{@link #rejection()}）；
+     * 一次存盘发两包（改动 + 密钥）时，先到的那份说「已保存」、后到的说拒了，以拒了为准（审查 2026-10-07 U2）。
      */
     public void snapshot(boolean connected, boolean canEdit, Map<String, String> values, Set<String> secretsSet) {
         this.connected = connected;
@@ -139,9 +161,21 @@ public final class SettingsMenuState {
                 cancelEdit();
             }
         }
-        if (notice == Notice.SENT) {
+        Optional<String> refused = outbox.takeRejection();     // 每份都取：不是这一次存盘的（菜单刚开）就扔掉
+        if (refused.isPresent() && (notice == Notice.SENT || notice == Notice.SAVED)) {
+            notice = Notice.NONE;
+            rejection = refused.get();
+        } else if (notice == Notice.SENT) {
             notice = Notice.SAVED;
         }
+    }
+
+    /**
+     * 上一次存盘被服务端拒了：理由（服务端的原话，一行）。界面在右栏顶上那一行照「没存上：理由」画；没被拒是空。
+     * 按 S 再存一次时清掉。
+     */
+    public Optional<String> rejection() {
+        return Optional.ofNullable(rejection);
     }
 
     public Access access() {
@@ -551,14 +585,23 @@ public final class SettingsMenuState {
                 changes.put(key, value);
             }
         });
+        // 密钥绑的那一项（接口地址）按发出去之后的样子给：这一批里改了就是新值 —— 服务端先收这一批、再收密钥
+        Map<String, String> scopes = new LinkedHashMap<>();
+        pendingSecrets.keySet().forEach(key -> scopes.put(key, scopeOf(key)));
+        rejection = null;
         if (!changes.isEmpty()) {
             outbox.save(Collections.unmodifiableMap(changes));
         }
-        pendingSecrets.forEach(outbox::secret);
+        pendingSecrets.forEach((key, value) -> outbox.secret(key, value, scopes.get(key)));
         pending.clear();
         pendingSecrets.clear();
         notice = Notice.SENT;
         return SaveResult.SENT;
+    }
+
+    /** 这项密钥绑的那一项此刻在菜单里的值（攒着的改动优先）；不绑的、或者表里没有那一项是空串。 */
+    private String scopeOf(String secretKey) {
+        return ServerSettingsTable.secretScope(secretKey).map(byKey::get).flatMap(this::display).orElse("");
     }
 
     /**

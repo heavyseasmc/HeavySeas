@@ -165,12 +165,7 @@ public final class TableScreen extends GameScreen {
             return false;
         }
         String card = seat.front().get(Math.max(0, Math.min(seat.front().size() - 1, selected)));
-        return CardPlay.playableNow(view, card, openParasol(view, card));
-    }
-
-    /** 这一张是不是已经撑开的伞（投影里自己面前那一排带着「撑开」标记）。 */
-    private static boolean openParasol(io.github.heavyseasmc.mod.state.HudView view, String card) {
-        return view.front().stream().anyMatch(f -> f.id().equals(card) && f.open());
+        return CardPlay.playableNow(view, card);       // 「已撑开的伞」也在那一处判（按牌 id，审查 2026-10-07 U15）
     }
 
     /**
@@ -255,16 +250,16 @@ public final class TableScreen extends GameScreen {
             return;                           // 别人的座位：没有「打出」这回事
         }
         String card = seat.front().get(selected);
-        if (!CardPlay.playableNow(view, card, openParasol(view, card))) {
+        if (!CardPlay.playableNow(view, card)) {
             // 发出去只会被静默丢掉（或者白花一个行动）：当场说一句为什么（ADR-0095 A3）
-            ActionBarEcho.record(CardPlay.whyNot(view, card, openParasol(view, card), provisionName(card)));
+            ActionBarEcho.record(CardPlay.whyNot(view, card, provisionName(card)));
             return;
         }
         ClientPlayNetworking.send(UseProvisionC2S.play(card));
     }
 
     @Override
-    public boolean keyPressed(int key, int scan, int modifiers) {
+    protected boolean onKey(int key, int scan, int modifiers) {
         if (inspectKey(key)) {
             return true;
         }
@@ -280,6 +275,6 @@ public final class TableScreen extends GameScreen {
             play();
             return true;
         }
-        return super.keyPressed(key, scan, modifiers);
+        return super.onKey(key, scan, modifiers);
     }
 }

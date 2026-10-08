@@ -88,6 +88,46 @@ class CardRowTest {
         assertTrue(problems.isEmpty(), String.join("\n", problems));
     }
 
+    /**
+     * 手牌一面轮到你时画行动的倒计时（ADR-0095 B3），而那两排牌照样张 b-4 锚在板顶 408 —— 样张没有倒计时，
+     * 牌底压进了横杠（审查 2026-10-07 U3：1280×720 叠 14 px、1920×1080 叠 23 px）。
+     * 判据按 HandScreen 的同一套算法现算牌的大小与锚点，只信 {@link CardRow#handRowTop} 给回来的顶。
+     */
+    @Test
+    @DisplayName("手牌一面：两排牌的底不压倒计时外圈；窗口够高时照样张的锚点不动")
+    void handRowClearsTheCountdown() {
+        List<String> problems = new ArrayList<>();
+        int checked = 0;
+        for (int[] win : WINDOWS) {
+            if (!io.github.heavyseasmc.mod.ui.HudLayout.supportsWindow(win[0], win[1])) {
+                continue;                              // 窗口太小时整面只画「窗口太小」
+            }
+            SheetLayout l = SheetLayout.of(win[0], win[1]);
+            int s = win[2];
+            double k = l.k();
+            int smallW = Math.max(8, (int) Math.round(104 * k / s));
+            int smallH = GuiLanguage.cardHeight(smallW);
+            int anchored = Math.round((l.sheet().y() + l.len(408)) / (float) s);
+            int top = CardRow.handRowTop(l, s, anchored, smallH);
+            int rim = (int) Math.floor(l.countBar().y() - CardRow.BAR_RIM * k);
+            int bottomPx = (top + smallH) * s;
+            String at = win[0] + "×" + win[1] + "@" + s;
+            if (bottomPx > rim) {
+                problems.add(at + "：牌底 " + bottomPx + " 压进倒计时外圈 " + rim + "（叠 " + (bottomPx - rim) + " px）");
+            }
+            if (top > anchored) {
+                problems.add(at + "：牌排比样张的锚点还低");
+            }
+            int anchoredBottom = (anchored + smallH) * s;
+            if (anchoredBottom + (CardRow.BAR_RIM + CardRow.BAR_CLEAR) * k + s <= l.countBar().y() && top != anchored) {
+                problems.add(at + "：放得下却挪了位置（" + anchored + " → " + top + "）");
+            }
+            checked++;
+        }
+        assertTrue(checked >= 8, "只查了 " + checked + " 档窗口 —— 没在查，不是干净");
+        assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
     @Test
     @DisplayName("1280×720：8 张叠、6 张不叠；牌比样张 b-3 的 124 大")
     void provisionAtTheDesignSize() {

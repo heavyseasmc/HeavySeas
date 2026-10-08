@@ -243,7 +243,7 @@ public final class SeatView {
         return new SeatView(b);
     }
 
-    /** 落海名单来自 {@code Set.copyOf}，遍历次序每次起 JVM 都不同 —— 视角里一律按座位排。 */
+    /** 视角里一律按座位排，不依赖名单自己的次序（落海名单曾经来自 {@code Set.copyOf}，每次起 JVM 都不同；审查 Z3）。 */
     private static List<CharacterId> inSeatOrder(GameState g, Collection<CharacterId> ids) {
         return g.bySeat().stream().filter(ids::contains).toList();
     }
@@ -483,6 +483,8 @@ public final class SeatView {
                 .append(" overboard:").append(p.overboard()).append(" seq:").append(p.overboardSequence())
                 .append(" thirst:").append(p.thirstCard().map(NavigationCard::id).orElse("-")).append(p.thirstQueue())
                 .append('@').append(p.thirstAt()).append('+').append(p.thirstWatersSpent())
+                .append(" recipients:").append(new java.util.TreeMap<>(p.thirstWatersByRecipient()))
+                .append(" sharedUsed:").append(new java.util.TreeMap<>(p.sharedWaterUsed()))
                 .append(" settled:").append(sortedSources(p.thirstSettledToday()))
                 .append(" cover:").append(new java.util.TreeMap<>(p.coverUsedToday()))
                 .append(" rum:").append(new TreeSet<>(p.sharedRum())).append(" healed:")
@@ -571,7 +573,7 @@ public final class SeatView {
      * @param thirst    今天背着的口渴标记（划过船 · 打过架 · 喝过酒……全船都看得见做过这些事）
      * @param front     面前的牌
      * @param opened    面前撑开的（阳伞）
-     * @param used      面前今天用过的（喝过的酒）
+     * @param used      他今天用过的（喝过的酒；按人记，瓶子不在面前了也算）
      * @param handCount 手里有几张 —— 只有张数
      * @param strength  今天打架的力气：体型 + 喝过的酒（含陪酒女蹭到的），不含没押的武器
      */

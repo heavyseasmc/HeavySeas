@@ -9,7 +9,6 @@ import io.github.heavyseasmc.mod.state.NavCardView;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.texture.AbstractTexture;
-import net.minecraft.client.texture.MipmapHelper;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceManager;
@@ -17,7 +16,6 @@ import net.minecraft.util.Identifier;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -58,36 +56,94 @@ public final class CardTexture extends AbstractTexture {
     /** 进服时预载的目录：拼牌要用的全部分层素材，外加座位轨那八枚头像（口渴排也用它）。 */
     private static final String[] PRELOAD_DIRS = {"textures/gui/cards", "textures/gui/portrait", "textures/gui/hud"};
 
-    /** 已经换成本类载入的标识。只在渲染线程上碰。 */
-    private static final Set<Identifier> REGISTERED = new HashSet<>();
+    /** 本轮资源中失败过的标识；重载后可以重试，避免每帧重复解码缺失/损坏的图片。 */
+    private static final Set<Identifier> FAILED = new HashSet<>();
     /** 载入过的贴图的宽高（像素），只在渲染线程上碰。角标图标按它的宽高比画 —— 海鸥是扁的（ADR-0090）。 */
     private static final Map<Identifier, int[]> SIZES = new HashMap<>();
     /** 量不到宽高的：同一张只报一次。 */
     private static final Set<Identifier> NO_SIZE = new HashSet<>();
+    private static final TexturePreloadQueue<Identifier, CardImages> PRELOADER =
+            new TexturePreloadQueue<>(1, CardImages::close);
 
     private final Identifier location;
+    private CardImages prepared;
 
     private CardTexture(Identifier location) {
         this.location = location;
     }
 
+    private CardTexture(Identifier location, CardImages prepared) {
+        this(location);
+        this.prepared = prepared;
+    }
+
     @Override
     public void load(ResourceManager manager) throws IOException {
-        Resource resource = manager.getResource(location)
-                .orElseThrow(() -> new FileNotFoundException(location.toString()));
-        NativeImage base;
-        try (InputStream in = resource.getInputStream()) {
-            base = NativeImage.read(in);
+        com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThreadOrInit();
+        SIZES.remove(location);
+        try {
+            if (prepared != null) {
+                CardImages images = prepared;
+                prepared = null;
+                upload(images);                // 只借用；后台队列在 registerTexture 返回后释放。
+                return;
+            }
+            Resource resource = manager.getResource(location)
+                    .orElseThrow(() -> new FileNotFoundException(location.toString()));
+            try (CardImages images = CardImages.read(resource.getInputStream(), MIP_LEVELS)) {
+                upload(images);
+            }
+        } catch (IOException | RuntimeException | Error failure) {
+            FAILED.add(location);
+            clearGlId();
+            throw failure;
+        }
+    }
+
+    private void upload(CardImages images) {
+        NativeImage base = images.level(0);
+        TextureUtil.prepareImage(getGlId(), images.maxLevel(), base.getWidth(), base.getHeight());
+        for (int level = 0; level <= images.maxLevel(); level++) {
+            NativeImage image = images.level(level);
+            image.upload(level, 0, 0, 0, 0, image.getWidth(), image.getHeight(), true, true, true, false);
         }
         SIZES.put(location, new int[]{base.getWidth(), base.getHeight()});
-        int mips = mipLevels(base.getWidth(), base.getHeight(), MIP_LEVELS);
-        NativeImage[] levels = MipmapHelper.getMipmapLevelsImages(new NativeImage[]{base}, mips);
-        TextureUtil.prepareImage(getGlId(), mips, base.getWidth(), base.getHeight());
-        for (int level = 0; level <= mips; level++) {
-            NativeImage image = levels[level];
-            // blur + mipmap = GL_LINEAR_MIPMAP_LINEAR；clamp 让卡边不去采对边的颜色。传完即释放。
-            image.upload(level, 0, 0, 0, 0, image.getWidth(), image.getHeight(), true, true, true, true);
-        }
+        NO_SIZE.remove(location);
+        FAILED.remove(location);
+    }
+
+    static void tick(MinecraftClient client) {
+        PRELOADER.drain(4, (id, images) -> {
+            var textures = client.getTextureManager();
+            if (!(textures.getOrDefault(id, null) instanceof CardTexture)) {
+                textures.registerTexture(id, new CardTexture(id, images));
+            }
+        }, (id, failure) -> {
+            FAILED.add(id);
+            LOGGER_PRELOAD.warn("贴图预载失败：{}（{}），本轮不再预载；资源重载后重试", id, failure.toString());
+        });
+    }
+
+    static void cancelPreload() {
+        PRELOADER.clear();
+    }
+
+    static void stopPreload() {
+        PRELOADER.close();
+    }
+
+    /** 在字体、纹理应用完之后调用；此时可以安全销毁派生纹理并重新读取布局。 */
+    static void resourcesReloaded() {
+        com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThreadOrInit();
+        cancelPreload();
+        CardComposite.forget();
+        CardPainter.reset();
+        CardNameFit.reset();
+        GuiText.forgetMeasurements();
+        FAILED.clear();
+        NO_SIZE.clear();
+        var textures = MinecraftClient.getInstance().getTextureManager();
+        SIZES.keySet().removeIf(id -> !(textures.getOrDefault(id, null) instanceof CardTexture));
     }
 
     /**
@@ -183,13 +239,42 @@ public final class CardTexture extends AbstractTexture {
      */
     public static void preload(MinecraftClient client) {
         CardPainter.reset();
+        Set<Identifier> hudNow = hudForNow(client);
+        Set<Identifier> pending = new java.util.LinkedHashSet<>();
+        int[] skipped = {0};
         for (String dir : PRELOAD_DIRS) {
             client.getResourceManager()
                     .findResources(dir, id -> id.getPath().endsWith(".png"))
                     .keySet().stream()
                     .filter(id -> id.getNamespace().equals(HeavySeasMod.MOD_ID))
-                    .forEach(CardTexture::ensure);
+                    .filter(id -> {
+                        boolean later = id.getPath().startsWith(HUD_DIR) && !hudNow.contains(id);
+                        skipped[0] += later ? 1 : 0;
+                        return !later;
+                    })
+                    .filter(id -> !(client.getTextureManager().getOrDefault(id, null) instanceof CardTexture))
+                    .forEach(pending::add);
         }
+        ResourceManager resources = client.getResourceManager();
+        PRELOADER.start(pending, id -> CardImages.read(resources.getResource(id)
+                .orElseThrow(() -> new FileNotFoundException(id.toString())).getInputStream(), MIP_LEVELS));
+        LOGGER_PRELOAD.info("进服预载：后台解码 {} 张，HUD 另 {} 张用到时再载；等待上传最多一张", pending.size(), skipped[0]);
+    }
+
+    private static final String HUD_DIR = "textures/gui/hud/";
+    private static final org.slf4j.Logger LOGGER_PRELOAD = org.slf4j.LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    /**
+     * 此刻这个窗口、这个主题下 HUD 各件用的那一份（审查 2026-10-07 P2）。
+     *
+     * <p>原先 HUD 贴图三种倍率 × 两套主题全在进服那一刻、渲染线程上同步解码（约 89 MB，其中约 64 MB 永远画不到）。
+     * 只预载此刻用得到的那一份；换主题（F8）、拖窗口换了倍率时，用到的那几张由 {@link #ensure} 当场载 —— 与原先没预载到的件同一条路。
+     * 挑哪一份只在 {@link GuiMaterial#hudPartsAt} 一处（主题怎么选只此一处）。
+     */
+    private static Set<Identifier> hudForNow(MinecraftClient client) {
+        var window = client.getWindow();
+        return GuiMaterial.hudPartsAt(
+                io.github.heavyseasmc.mod.ui.SheetLayout.of(window.getFramebufferWidth(), window.getFramebufferHeight()).k());
     }
 
     // ---------------------------------------------------------------- 主画面 HUD（物理像素）
@@ -235,13 +320,34 @@ public final class CardTexture extends AbstractTexture {
         }
         // 先把纸铺满，再画两层：❗fill 每画一次就把它那一层的混合收掉（关掉），夹在两层贴图中间的话，
         //   后面那层画层就不混合、半透明的海天直接画成实色（2026-09-30 实拍：舷窗里一块块墨绿）。
-        for (int row = 0; row < d; row++) {
-            if (chords[row] != null) {
-                context.fill(x + chords[row][0], y + row, x + chords[row][1], y + row + 1, GuiLanguage.CARD_PAPER);
+        // 一层只交一次（审查 2026-10-07 P3）：原先每一行一次 fill、两次 drawTexture，各自立即提交 ——
+        //   1080p 下舷窗（d = 96）加图例（d = 30）每帧约 378 次绘制调用。纸用 DrawContext#draw(Runnable) 收进同一批，
+        //   两层贴图各拼进一个 BufferBuilder；每一行的位置与纹理坐标与原先逐行画的一模一样（同一套算法），像素不变。
+        context.draw(() -> {
+            for (int row = 0; row < d; row++) {
+                if (chords[row] != null) {
+                    context.fill(x + chords[row][0], y + row, x + chords[row][1], y + row + 1, GuiLanguage.CARD_PAPER);
+                }
             }
-        }
+        });
         com.mojang.blaze3d.systems.RenderSystem.enableBlend();
         com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+        discLayer(context, frame, x, y, d, chords, offX, offY, imgW, imgH, tw, th);
+        discLayer(context, art, x, y, d, chords, offX, offY, imgW, imgH, tw, th);
+    }
+
+    /**
+     * 舷窗的一层（边框层或画层）：每一行一条横带，全部拼进同一个 {@code BufferBuilder}，一次画完。
+     * 与 {@code DrawContext#drawTexture} 逐行画的是同一组四边形（{@code drawTexturedQuad} 的写法，1.21.1 源码核过）。
+     */
+    private static void discLayer(DrawContext context, Identifier texture, int x, int y, int d, int[][] chords,
+                                  double offX, double offY, double imgW, double imgH, int tw, int th) {
+        com.mojang.blaze3d.systems.RenderSystem.setShaderTexture(0, texture);
+        com.mojang.blaze3d.systems.RenderSystem.setShader(net.minecraft.client.render.GameRenderer::getPositionTexProgram);
+        org.joml.Matrix4f m = context.getMatrices().peek().getPositionMatrix();
+        net.minecraft.client.render.BufferBuilder buffer = net.minecraft.client.render.Tessellator.getInstance().begin(
+                net.minecraft.client.render.VertexFormat.DrawMode.QUADS, net.minecraft.client.render.VertexFormats.POSITION_TEXTURE);
+        boolean any = false;
         for (int row = 0; row < d; row++) {
             if (chords[row] == null) {
                 continue;
@@ -252,8 +358,22 @@ public final class CardTexture extends AbstractTexture {
             float v = (float) ((row - offY) / imgH * th);
             int rw = (int) Math.round((x1 - x0) / imgW * tw);
             int rh = (int) Math.round(1 / imgH * th);
-            context.drawTexture(frame, x + x0, y + row, x1 - x0, 1, u, v, rw, rh, tw, th);
-            context.drawTexture(art, x + x0, y + row, x1 - x0, 1, u, v, rw, rh, tw, th);
+            float u1 = u / tw;
+            float u2 = (u + rw) / tw;
+            float v1 = v / th;
+            float v2 = (v + rh) / th;
+            int left = x + x0;
+            int right = x + x1;
+            int top = y + row;
+            int bottom = top + 1;
+            buffer.vertex(m, left, top, 0).texture(u1, v1);
+            buffer.vertex(m, left, bottom, 0).texture(u1, v2);
+            buffer.vertex(m, right, bottom, 0).texture(u2, v2);
+            buffer.vertex(m, right, top, 0).texture(u2, v1);
+            any = true;
+        }
+        if (any) {
+            net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(buffer.end());   // 空的 BufferBuilder 不许 end
         }
     }
 
@@ -297,9 +417,10 @@ public final class CardTexture extends AbstractTexture {
     }
 
     private static Identifier ensure(Identifier id) {
-        if (REGISTERED.add(id)) {
+        var textures = MinecraftClient.getInstance().getTextureManager();
+        if (!(textures.getOrDefault(id, null) instanceof CardTexture) && !FAILED.contains(id)) {
             // 同一标识若已被默认方式载过一份，注册会把那一份换下并释放。
-            MinecraftClient.getInstance().getTextureManager().registerTexture(id, new CardTexture(id));
+            textures.registerTexture(id, new CardTexture(id));
         }
         return id;
     }

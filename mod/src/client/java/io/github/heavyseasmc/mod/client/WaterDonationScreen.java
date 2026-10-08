@@ -143,7 +143,7 @@ public final class WaterDonationScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         // Esc（与背包键）只收起，不替你做决定（用户 2026-10-07：「esc 是关闭页面」）—— 不给是「什么也不做」那一张
         switch (keyCode) {
             case GLFW.GLFW_KEY_LEFT -> {
@@ -159,7 +159,7 @@ public final class WaterDonationScreen extends GameScreen {
                 return true;
             }
             default -> {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.onKey(keyCode, scanCode, modifiers);
             }
         }
     }

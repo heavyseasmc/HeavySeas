@@ -7,6 +7,7 @@
   "authors": ["Heavy Seas contributors"],
   "license": "MIT",
   "environment": "*",
+  "accessWidener": "heavyseas.accesswidener",
   "custom": {
     "cardinal-components": ["heavyseas:game"]
   },

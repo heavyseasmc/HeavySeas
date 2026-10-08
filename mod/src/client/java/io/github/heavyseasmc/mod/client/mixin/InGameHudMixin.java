@@ -18,12 +18,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 对局中 Minecraft 自带的 HUD 照样张 b-1（ADR-0046）：心 · 饥饿 · 护甲 · 氧气 · 坐骑血量 · 经验条与等级不画，热栏画成样张那一条。
- *
- * <h2>为什么可以不画</h2>
- * 对局中这几条不带信息：服务端每 tick 把饥饿钉在满、血量只是引擎体力的镜像、身体不许受伤（{@code PlayerBodies}），
- * 背包开航时托管清空（{@code MistSea}）。体力已经画在状态牌的点上。没有对局时（大厅、别的服）一切照 Minecraft 自带的；
- * 偏好 {@code vanillaHud=show} 也回到 Minecraft 自带的样子 —— 用户 2026-09-30：「不要直接删除这些功能」。
+ * 雾海里的热栏、心、饥饿、护甲、氧气、坐骑血量、经验条与等级共用维度/模式判据。
+ * 创造与旁观模式不拦截这些绘制方法；其他模式不论有没有对局都隐藏。维度外不拦截。
  *
  * <h2>热栏只换底，不换行为</h2>
  * 包住 {@code renderHotbar} 里画底与选中框的那两次 {@code drawGuiTexture}：底换成样张的深色格；
@@ -52,35 +48,34 @@ public abstract class InGameHudMixin {
 
     @Inject(method = "renderStatusBars", at = @At("HEAD"), cancellable = true)
     private void heavyseas$statusBars(DrawContext context, CallbackInfo ci) {
-        if (GameHud.voyageHud()) {
+        if (GameHud.hotbarHidden()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "renderMountHealth", at = @At("HEAD"), cancellable = true)
     private void heavyseas$mountHealth(DrawContext context, CallbackInfo ci) {
-        if (GameHud.voyageHud()) {
+        if (GameHud.hotbarHidden()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "renderExperienceBar", at = @At("HEAD"), cancellable = true)
     private void heavyseas$experienceBar(DrawContext context, int x, CallbackInfo ci) {
-        if (GameHud.voyageHud()) {
+        if (GameHud.hotbarHidden()) {
             ci.cancel();
         }
     }
 
     @Inject(method = "renderExperienceLevel", at = @At("HEAD"), cancellable = true)
     private void heavyseas$experienceLevel(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {
-        if (GameHud.voyageHud()) {
+        if (GameHud.hotbarHidden()) {
             ci.cancel();
         }
     }
 
     /**
-     * 雾海维度里整条热栏不画（用户 2026-10-07：「下面装备栏可以去掉了，整个隐藏，在雾海维度里都隐藏」）：
-     * 过了魔镜背包就托管清空，热栏只剩一排空格。北辰号上没开局时也一样 —— 判据是「在不在雾海」，不是「有没有对局」。
+     * 热栏及其物品图标统一隐藏；创造与旁观豁免，北辰号上没开局时也使用同一判据。
      */
     @Inject(method = "renderHotbar", at = @At("HEAD"), cancellable = true)
     private void heavyseas$hideHotbar(DrawContext context, RenderTickCounter tickCounter, CallbackInfo ci) {

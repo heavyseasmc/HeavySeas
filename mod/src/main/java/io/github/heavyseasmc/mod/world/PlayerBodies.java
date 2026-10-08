@@ -1,7 +1,6 @@
 package io.github.heavyseasmc.mod.world;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
-import io.github.heavyseasmc.mod.data.SceneDataLoader;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
@@ -123,8 +122,7 @@ public final class PlayerBodies {
                 if (state.isRemoved(id)) {
                     player.stopRiding();
                     player.changeGameMode(GameMode.SPECTATOR);
-                    component.layoutId().ifPresent(layoutId -> {
-                        var layout = SceneDataLoader.require(layoutId);
+                    component.layout().ifPresent(layout -> {   // 开局快照（审查 2026-10-07 C6）
                         if (player.getServerWorld() != world || player.getPos().distanceTo(layout.boat().bow()) < 32) {
                             Vec3d point = layout.boat().bow().subtract(layout.boatForward().multiply(48)).add(0, 8, 0);
                             player.teleport(world, point.x, point.y, point.z, layout.ridersFacing(), 0);
@@ -161,10 +159,10 @@ public final class PlayerBodies {
 
     public static void fall(ServerWorld world, GameComponent component, List<CharacterId> swimmers) {
         component.setWaterBodies(swimmers, System.currentTimeMillis() + FALL_MILLIS);
-        if (component.layoutId().isEmpty()) {
+        if (component.layout().isEmpty()) {
             return;
         }
-        var layout = SceneDataLoader.require(component.layoutId().get());
+        var layout = component.layout().get();   // 开局快照（审查 C6）
         var state = component.requireSession().state();
         Vec3d forward = layout.boatForward();
         Vec3d side = new Vec3d(forward.z, 0, -forward.x);

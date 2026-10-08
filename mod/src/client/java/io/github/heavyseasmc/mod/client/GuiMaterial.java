@@ -309,6 +309,20 @@ final class GuiMaterial {
     }
 
     /**
+     * 系数 {@code k}、当前主题下 HUD 各件用的那一份贴图（{@link #hudPart} · {@link #hudIcon} 挑的那一倍，外加不按件夹的那一倍）。
+     * 进服预载只载这些（审查 2026-10-07 P2，{@code CardTexture#preload}）；挑法与下面画的那几处同一个算法，只此一处。
+     */
+    static java.util.Set<Identifier> hudPartsAt(double k) {
+        String theme = GuiLanguage.theme() == GuiLanguage.Theme.DARK ? "dark" : "light";
+        java.util.Set<Identifier> out = new java.util.HashSet<>();
+        for (HudPart part : HudPart.values()) {
+            out.add(Identifier.of(HeavySeasMod.MOD_ID, part.path(theme, part.bakeFor(k, true))));
+            out.add(Identifier.of(HeavySeasMod.MOD_ID, part.path(theme, HudPart.bakeFor(k))));
+        }
+        return out;
+    }
+
+    /**
      * 主画面 HUD 的一件装饰件（{@link HudPart}）：样张 B 形制的 CSS 由浏览器渲出来的贴图，按表拼上去。
      *
      * <p>❗调用方已经把矩阵缩到 1 / 界面尺寸，这里的坐标是<b>物理像素</b>；{@code x, y, w, h} 是这一件的<b>盒子</b>

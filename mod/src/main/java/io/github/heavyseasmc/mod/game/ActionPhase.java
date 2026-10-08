@@ -15,7 +15,6 @@ import io.github.heavyseasmc.mod.net.RowDecisionC2S;
 import io.github.heavyseasmc.mod.net.UseProvisionC2S;
 import io.github.heavyseasmc.mod.state.GameComponent;
 import io.github.heavyseasmc.mod.state.GameComponents;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -146,6 +145,13 @@ public final class ActionPhase {
         if (kind.get() == UseProvisionC2S.Kind.PLAY && session.state().canAct(actor)
                 && !session.state().isOver() && session.provisions().has(action.card())
                 && session.provisions().get(action.card()).effect() instanceof ProvisionEffect.BuffSize) {
+            if (drinkRefusedDuringPick(session, actor, action.card())) {
+                // 审查 2026-10-07 C1：被抢的人在挑牌窗里把手里那瓶酒喝了（喝酒会先把它亮到面前）—— 小孩只能拿手牌，
+                //   手里空了就什么都挑不了，到点的默认挑牌在引擎里抛，原先一路冒到每 tick 的计时里、崩服。
+                LOGGER.info("喝酒（界面）：{} 正在挨抢，挑牌那一刻不能喝手里的酒", actor.value());
+                player.sendMessage(Text.translatable("heavyseas.card_action.rejected"), true);
+                return;
+            }
             try {
                 session.drinkRum(actor, action.card());
                 GameComponents.sync(world);
@@ -168,7 +174,8 @@ public final class ActionPhase {
             }
         } catch (RuntimeException e) {
             // 与指令层同一条：规则拒绝要让真人知道，不把一次无效点击伪装成「包没到」。
-            LOGGER.info("特殊物资（界面）：{} 的操作被拒绝：{}", actor.value(), e.getMessage());
+            // ❗异常信息里带着客户端发来的牌 id —— 原样进日志的话，3 万字的乱串一包一行（审查 2026-10-07 L5）：截短、去换行
+            LOGGER.info("特殊物资（界面）：{} 的操作被拒绝：{}", actor.value(), clipForLog(e.getMessage()));
             // 引擎的异常信息是给日志看的（中文、带 world= 前缀）：给玩家一句按语言走的话（ADR-0095 A8）
             player.sendMessage(Text.translatable("heavyseas.card_action.rejected").formatted(Formatting.RED), true);
             if (component.provisionTargeter().map(actor::equals).orElse(false)) {
@@ -177,6 +184,27 @@ public final class ActionPhase {
             GameComponents.sync(world);
         }
     }
+
+    /**
+     * 被抢的人在挑牌那一刻不能喝<b>手里</b>的酒（审查 2026-10-07 C1）：喝酒会先把那瓶亮到面前，与引擎那道
+     * 「挑牌那一刻不能亮牌」（规则 §5 抢夺）是同一个躲法。面前本来就有的那瓶照喝 —— 它不从手里走。
+     * 根上那一道在引擎的 {@code drinkRum}（另一路在改）；这里先拦下，给按下去的人一句被拒的话。
+     */
+    static boolean drinkRefusedDuringPick(Session session, CharacterId who, String card) {
+        return session.contest().map(c -> c.stage() == Contest.Stage.PICK && c.target().equals(who)).orElse(false)
+                && session.state().stateOf(who).hasInHand(card);
+    }
+
+    /** 客户端带来的字串进日志之前：去掉换行（不让它伪造日志行）、截到 {@value #LOG_CLIP} 字（审查 2026-10-07 L5）。 */
+    static String clipForLog(String text) {
+        if (text == null) {
+            return "null";
+        }
+        String flat = text.replace('\r', ' ').replace('\n', ' ');
+        return flat.length() <= LOG_CLIP ? flat : flat.substring(0, LOG_CLIP) + "…（共 " + flat.length() + " 字）";
+    }
+
+    private static final int LOG_CLIP = 160;
 
     private static void beginOrUse(ServerWorld world, GameComponent component, ServerPlayerEntity player,
                                    CharacterId actor, String cardId) {
@@ -344,48 +372,44 @@ public final class ActionPhase {
         GameFlow.finishAction(world, component, who);
     }
 
-    /** 每 tick 检查行动与划船窗口。0 表示没有窗口，不能被当成已超时。 */
-    public static void tick(MinecraftServer server) {
-        long now = System.currentTimeMillis();
-        for (ServerWorld world : server.getWorlds()) {
-            GameComponent component = GameComponents.of(world);
-            if (!windowExpired(component.actionDeadline(), now)) {
-                continue;
-            }
-            if (component.session().isEmpty()) {
-                component.clearActionWindow();
-                continue;
-            }
-            Session session = component.requireSession();
-            if (session.state().isOver() || session.state().phase() != Phase.ACTION) {
-                component.clearActionWindow();
-                continue;
-            }
-            if (component.designating().isPresent() || session.contest().isPresent()) {
-                component.clearActionWindow();
-                continue;
-            }
-            Optional<CharacterId> rower = session.rower();
-            if (rower.isPresent()) {
-                int returned = returnUndecided(session);
-                component.clearActionWindow();
-                LOGGER.info("划船超时：{} 有 {} 张未决定，全部塞回牌堆底", rower.get().value(), returned);
-                GameFlow.broadcast(world, Text.translatable("heavyseas.row.timed_out",
-                        GameFlow.characterName(rower.get()), returned).formatted(Formatting.GRAY));
-                finishRow(world, component, rower.get());
-                continue;
-            }
-            Optional<CharacterId> actor = session.nextActor();
-            component.clearActionWindow();
-            if (actor.isEmpty()) {
-                continue;
-            }
-            component.clearProvisionTarget();
-            LOGGER.info("行动超时：{} 什么也不做", actor.get().value());
-            GameFlow.broadcast(world, Text.translatable("heavyseas.action.timed_out",
-                    GameFlow.characterName(actor.get())).formatted(Formatting.GRAY));
-            GameFlow.finishAction(world, component, actor.get());
+    /** 每 tick 检查行动与划船窗口。0 表示没有窗口，不能被当成已超时。经 {@link GameFlow#guarded} 挂上：出错只结束这一局。 */
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        if (!windowExpired(component.actionDeadline(), now)) {
+            return;
         }
+        if (component.session().isEmpty()) {
+            component.clearActionWindow();
+            return;
+        }
+        Session session = component.requireSession();
+        if (session.state().isOver() || session.state().phase() != Phase.ACTION) {
+            component.clearActionWindow();
+            return;
+        }
+        if (component.designating().isPresent() || session.contest().isPresent()) {
+            component.clearActionWindow();
+            return;
+        }
+        Optional<CharacterId> rower = session.rower();
+        if (rower.isPresent()) {
+            int returned = returnUndecided(session);
+            component.clearActionWindow();
+            LOGGER.info("划船超时：{} 有 {} 张未决定，全部塞回牌堆底", rower.get().value(), returned);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.row.timed_out",
+                    GameFlow.characterName(rower.get()), returned).formatted(Formatting.GRAY));
+            finishRow(world, component, rower.get());
+            return;
+        }
+        Optional<CharacterId> actor = session.nextActor();
+        component.clearActionWindow();
+        if (actor.isEmpty()) {
+            return;
+        }
+        component.clearProvisionTarget();
+        LOGGER.info("行动超时：{} 什么也不做", actor.get().value());
+        GameFlow.broadcast(world, Text.translatable("heavyseas.action.timed_out",
+                GameFlow.characterName(actor.get())).formatted(Formatting.GRAY));
+        GameFlow.finishAction(world, component, actor.get());
     }
 
     static boolean windowExpired(long deadline, long now) {

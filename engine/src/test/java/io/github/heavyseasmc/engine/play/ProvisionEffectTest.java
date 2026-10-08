@@ -9,6 +9,8 @@ import io.github.heavyseasmc.engine.model.Survivor;
 import io.github.heavyseasmc.engine.navigation.NavigationCard;
 import io.github.heavyseasmc.engine.navigation.NavigationDeck;
 import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.seat.ActionChoice;
+import io.github.heavyseasmc.engine.seat.Legal;
 import io.github.heavyseasmc.engine.state.Condition;
 import io.github.heavyseasmc.engine.state.Fight;
 import io.github.heavyseasmc.engine.state.Phase;
@@ -21,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 
@@ -376,6 +379,19 @@ class ProvisionEffectTest {
             assertFalse(s.state().stateOf(MATE).hasInFront("parasol"), "伞被冲走了");
             assertEquals(2, s.state().stateOf(MATE).damage(), "落水 1 点 + 口渴 1 点");
         }
+
+        @Test
+        @DisplayName("❗已经撑开的伞不能再撑一次 —— 原先什么也没变、行动却白花了（审查 C9）；合法清单与它同一条（对照：没撑开时列）")
+        void cannotOpenTwice() {
+            Session s = deal(List.of(mate(1), kid(2)), "parasol", "water");
+            ActionChoice open = new ActionChoice.Play("parasol", Optional.empty());
+            assertTrue(Legal.actions(s, MATE).contains(open), "对照：没撑开时列");
+            s.openParasol(MATE, "parasol");
+            assertTrue(assertThrows(IllegalStateException.class, () -> s.openParasol(MATE, "parasol"))
+                    .getMessage().contains("已经撑开"));
+            assertFalse(Legal.actions(s, MATE).contains(open), "撑开之后不列");
+            assertTrue(s.state().stateOf(MATE).isOpen("parasol"), "被拒的那一下不动已撑开的伞");
+        }
     }
 
     // ------------------------------------------------------------------ 救生圈与诱饵
@@ -616,6 +632,91 @@ class ProvisionEffectTest {
     class Rum {
 
         @Test
+        void sharingRumIsNotDrinkingItAndDoesNotPreventHerOwnDrink() {
+            Session s = deal(List.of(mate(1), kid(2), hostess(3)), "rum", "water", "rum");
+            s.drinkRum(MATE, "rum");
+            assertFalse(s.state().stateOf(HOSTESS).usedThisTurn("rum"), "用户裁定：蹭酒不算今天喝过");
+            toNavigation(s);
+            NavigationReport report = s.beginNavigate(card("drunk", 0, new Selector.Conditional("used_rum"),
+                    new Selector.Nobody(), false, false));
+            assertTrue(report.overboardSelected().contains(MATE));
+            assertFalse(report.overboardSelected().contains(HOSTESS));
+            s.drinkRum(HOSTESS, "rum");
+            assertTrue(s.state().stateOf(HOSTESS).usedThisTurn("rum"));
+            assertEquals(6, fightingSizeOf(s, HOSTESS), "自己喝与蹭到的体型加成仍不叠加");
+        }
+
+        @Test
+        void lateRumAddsOnlyItsNewSourceWithoutReplacingTheOpenPrompt() {
+            Session s = deal(List.of(mate(1), kid(2)), "rum", "water");
+            toNavigation(s);
+            s.beginNavigate(card("late", 0, new Selector.Nobody(), new Selector.Everyone(), false, false));
+            s.decideThirst(List.of());
+            assertEquals(1, s.state().stateOf(MATE).damage());
+            assertEquals(KID, s.thirstPending().orElseThrow().who());
+            s.drinkRum(MATE, "rum");
+            assertEquals(KID, s.thirstPending().orElseThrow().who(), "已经打开的决定仍有效");
+            s.decideThirst(List.of(KID));
+            Session.ThirstPrompt late = s.thirstPending().orElseThrow();
+            assertEquals(MATE, late.who());
+            assertEquals(Set.of(ThirstSource.DRANK_RUM), late.effective().sources(), "点名那次不能再收一次");
+            s.decideThirst(List.of());
+            assertEquals(2, s.state().stateOf(MATE).damage());
+            assertTrue(s.thirstPending().isEmpty());
+        }
+
+        @Test
+        void lateRumAfterAnEmptyResolutionMustBeSettledBeforeTheNextDay() {
+            Session s = deal(List.of(mate(1), kid(2)), "rum", "water");
+            toNavigation(s);
+            s.beginNavigate(card("dry", 0, new Selector.Nobody(), new Selector.Nobody(), false, false));
+            assertTrue(s.thirstPending().isEmpty());
+            s.drinkRum(MATE, "rum");
+            assertEquals(MATE, s.thirstPending().orElseThrow().who());
+            assertThrows(IllegalStateException.class, s::advancePhase);
+            Session copy = s.copy();
+            copy.decideThirst(List.of());
+            assertEquals(0, s.state().stateOf(MATE).damage(), "副本补算不改真实对局");
+            s.decideThirst(List.of());
+            assertEquals(1, s.state().stateOf(MATE).damage());
+            s.advancePhase();
+            assertTrue(s.thirstPending().isEmpty());
+            assertTrue(s.progress().thirstCard().isEmpty(), "换天后不带上昨天的结算上下文");
+        }
+
+        @Test
+        void supplementalThirstCannotReuseWaterTheHostessAlreadyShared() {
+            Session s = deal(List.of(mate(1), kid(2), hostess(3)), "water", "rum", "water");
+            toNavigation(s);
+            s.beginNavigate(card("all", 0, new Selector.Nobody(), new Selector.Everyone(), false, false));
+            s.decideThirst(List.of(MATE));
+            s.decideThirst(List.of());
+            assertEquals(1, s.thirstPending().orElseThrow().shared());
+            s.decideThirst(List.of());
+            s.drinkRum(KID, "rum");
+            assertEquals(KID, s.thirstPending().orElseThrow().who());
+            s.decideThirst(List.of());
+            Session.ThirstPrompt her = s.thirstPending().orElseThrow();
+            assertEquals(HOSTESS, her.who());
+            assertEquals(0, her.shared(), "之前那张水已经抵过点名口渴");
+            assertEquals(1, her.remaining());
+            s.decideThirst(List.of(HOSTESS));
+            assertTrue(s.thirstPending().isEmpty());
+        }
+
+        @Test
+        void supplementalThirstDoesNotShareHerOwnEarlierDrink() {
+            Session s = deal(List.of(mate(1), kid(2), hostess(3)), "water", "rum", "water");
+            toNavigation(s);
+            s.beginNavigate(card("her", 0, new Selector.Nobody(), new Selector.Only(Set.of(HOSTESS)), false, false));
+            s.decideThirst(List.of(HOSTESS));
+            s.drinkRum(KID, "rum");
+            s.decideThirst(List.of());
+            assertEquals(HOSTESS, s.thirstPending().orElseThrow().who());
+            assertEquals(0, s.thirstPending().orElseThrow().shared(), "不能蹭到自己喝掉的水");
+        }
+
+        @Test
         @DisplayName("喝过酒战斗 +3 体型，并在回合结束时口渴一次")
         void buffAndThirst() {
             Session sober = deal(List.of(mate(1), kid(2)), "rum", "water");
@@ -681,6 +782,37 @@ class ProvisionEffectTest {
             sober.navigate(card("c", 0, new Selector.Conditional("used_rum"), new Selector.Nobody(),
                     false, false), DRINKS_NOTHING);
             assertEquals(0, sober.state().stateOf(MATE).damage(), "没喝就点不到");
+        }
+
+        @Test
+        @DisplayName("❗「今天喝过」记在人身上：喝完把瓶子送人，他照样喝过（+3 还在、不能拿回来再喝）；拿到瓶子而今天没喝过的人能喝（审查 R2）")
+        void drankIsPerPersonNotPerBottle() {
+            Session s = deal(List.of(mate(1), kid(2)), "rum", "water");
+            s.drinkRum(MATE, "rum");
+            s.giveCard(MATE, KID, "rum");                            // 喝过的酒在面前，送出去进对方面前
+            assertTrue(s.state().stateOf(KID).hasInFront("rum"));
+            assertTrue(s.state().stateOf(MATE).usedThisTurn("rum"),
+                    "瓶子送走了，他今天照样喝过（规则书：每人每天一次 · 今天喝过朗姆酒的人）");
+            assertFalse(s.state().stateOf(KID).usedThisTurn("rum"), "瓶子不带「今天喝过」");
+            s.drinkRum(KID, "rum");                                  // 拿到瓶子、今天还没喝过的人照样能喝
+            s.giveCard(KID, MATE, "rum");
+            assertTrue(assertThrows(IllegalStateException.class, () -> s.drinkRum(MATE, "rum"))
+                    .getMessage().contains("已经喝过"), "拿回瓶子也不能再喝一次");
+            s.giveCard(MATE, KID, "rum");
+            assertEquals(8 + 3, fightingSizeOf(s, MATE), "瓶子不在面前，今天喝下去的 +3 照算");
+        }
+
+        @Test
+        @DisplayName("❗瓶子送走了，「醉者落海」照样点得到喝过的人；拿着瓶子没喝的人点不到（审查 R2）")
+        void usedRumFollowsTheDrinker() {
+            Session s = deal(List.of(mate(1), kid(2)), "rum", "water");
+            s.drinkRum(MATE, "rum");
+            s.giveCard(MATE, KID, "rum");
+            toNavigation(s);
+            s.navigate(card("c", 0, new Selector.Conditional("used_rum"), new Selector.Nobody(),
+                    false, false), DRINKS_NOTHING);
+            assertEquals(2, s.state().stateOf(MATE).damage(), "落水 1 点 + 喝酒的口渴 1 点");
+            assertEquals(0, s.state().stateOf(KID).damage(), "拿着瓶子、今天没喝过的人不落海");
         }
 
         @Test

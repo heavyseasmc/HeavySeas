@@ -17,6 +17,7 @@ import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -134,6 +135,26 @@ final class ClientPrefsMigrationTest {
         Files.writeString(dir.resolve(ClientPrefsMigration.LEGACY_FILE), "legend=hide\n", StandardCharsets.UTF_8);
         Files.writeString(dir.resolve(ClientPrefs.FILE), "show_legend = true\n", StandardCharsets.UTF_8);
         assertTrue(ClientPrefsMigration.readLegacy(dir, ClientPrefs.FILE).isEmpty(), "新文件在：不碰旧的");
+    }
+
+    @Test
+    @DisplayName("旧文件读坏了（残缺的 \\u 转义 · 记事本按 GBK 加的中文备注）：一律报成读不出来（IOException），调用方按默认值走，不让客户端起不来")
+    void unreadableLegacyFileIsAnIoProblem() throws IOException {
+        // 审查 2026-10-07 C3：Properties.load 遇到残缺的 \\u 抛的是 IllegalArgumentException，ClientPrefs.load 只接 IOException
+        Files.writeString(dir.resolve(ClientPrefsMigration.LEGACY_FILE), "theme=dark\nlegend=\\u12\n", StandardCharsets.UTF_8);
+        assertThrows(IOException.class, () -> ClientPrefsMigration.readLegacy(dir, ClientPrefs.FILE),
+                "残缺的 \\u 转义该报成读不出来，不是别的异常一路冒到客户端入口");
+        Files.write(dir.resolve(ClientPrefsMigration.LEGACY_FILE), concat("# ".getBytes(StandardCharsets.US_ASCII),
+                "备注".getBytes(java.nio.charset.Charset.forName("GBK")), "\ntheme=dark\n".getBytes(StandardCharsets.US_ASCII)));
+        assertThrows(IOException.class, () -> ClientPrefsMigration.readLegacy(dir, ClientPrefs.FILE), "GBK 的备注");
+    }
+
+    private static byte[] concat(byte[]... parts) {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        for (byte[] p : parts) {
+            out.writeBytes(p);
+        }
+        return out.toByteArray();
     }
 
     @Test

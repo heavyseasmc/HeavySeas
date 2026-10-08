@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -341,7 +342,8 @@ public final class SeasCommand {
         List<ServerPlayerEntity> humans = new ArrayList<>(lobby.getServer().getPlayerManager().getPlayerList().stream()
                 .filter(p -> MistSea.mirrorEscrow(p).isEmpty() || io.github.heavyseasmc.mod.world.liner.DrillSkiff.seated(p)).toList());
         try {
-            MistSea.startVoyage(lobby.getServer(), players, humans, lobbyComponent.pendingDummies(), null, layoutId);
+            // 指令开的局：名单里有替身就是演示局（审查 2026-10-07 R5，GameComponent#isDemo）
+            MistSea.startVoyage(lobby.getServer(), players, humans, lobbyComponent.pendingDummies(), null, layoutId, true);
             lobbyComponent.clearPendingDummies();
         } catch (RuntimeException e) {
             context.getSource().sendError(Text.literal(String.valueOf(e.getMessage())));
@@ -814,12 +816,33 @@ public final class SeasCommand {
     /** 物资 id 的补全：只补这一局里真的在谁手上/面前的牌。补出一张没人有的牌毫无用处。 */
     private static final SuggestionProvider<ServerCommandSource> HELD_CARDS = (context, builder) -> {
         GameComponent component = GameComponents.of(gameWorld(context));
-        component.session().ifPresent(session -> session.state().bySeat().forEach(id -> {
-            session.state().stateOf(id).hand().forEach(builder::suggest);
-            session.state().stateOf(id).front().forEach(builder::suggest);
-        }));
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        UUID executor = player == null ? null : player.getUuid();
+        component.session().ifPresent(session -> suggestableCards(session, component, executor).forEach(builder::suggest));
         return builder.buildFuture();
     };
+
+    /**
+     * 补全里给谁看哪些牌：面前的牌全船公开，照给；手牌按 D4（{@code DebugCommand#mayPeek}）—— 这一局里的人只看得到自己手上的。
+     *
+     * <p>❗审查 2026-10-07 L3：原先把全船的手牌都补出来，坐在这一局里的 2 级管理员打 {@code /seas pick } 按一下 Tab
+     * 就看见每个人手里有什么，而且不留痕 —— D4 只拦了 {@code inspect} 与 {@code dump}。
+     *
+     * @param executor 下指令的人；{@code null} = 控制台 / RCON（不在这一局里，照旧全给）
+     */
+    static java.util.Set<String> suggestableCards(Session session, GameComponent component, UUID executor) {
+        boolean peek = DebugCommand.mayPeek(executor,
+                id -> component.belongsToActiveVoyage(id) || component.seatOf(id).isPresent());
+        Optional<CharacterId> own = executor == null ? Optional.empty() : component.seatOf(executor);
+        java.util.Set<String> cards = new java.util.LinkedHashSet<>();
+        for (CharacterId id : session.state().bySeat()) {
+            if (peek || own.map(id::equals).orElse(false)) {
+                cards.addAll(session.state().stateOf(id).hand());
+            }
+            cards.addAll(session.state().stateOf(id).front());
+        }
+        return cards;
+    }
 
     // ------------------------------------------------------------------ 物资（ADR-0021）
 
@@ -952,10 +975,13 @@ public final class SeasCommand {
             return 0;
         }
         session.dealFromPile(who.get(), card);
-        GameComponents.sync(world);
         LOGGER.info("夹具：{} 从牌堆里拿到 {}", who.get().value(), card);
+        // 改了局面就留痕（ADR-0060 D3，审查 2026-10-07 L3）：与 /seas debug deal 同一句、同一条路 —— 原先 grant 不经 DebugTrace，
+        //   用了没人知道，计分面板那枚章也不算它。DebugTrace.changed 里会推投影。
+        io.github.heavyseasmc.mod.game.DebugTrace.changed(world, component, context.getSource().getName(), context.getInput(),
+                Text.translatable("heavyseas.debug.did.deal", GameFlow.characterName(who.get()), provisionName(card)));
         context.getSource().sendFeedback(() -> Text.translatable("heavyseas.command.granted",
-                GameFlow.characterName(who.get()), provisionName(card)), true);
+                GameFlow.characterName(who.get()), provisionName(card)), false);
         return 1;
     }
 

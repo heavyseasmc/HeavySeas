@@ -118,14 +118,17 @@ public final class Seats {
      * 已经坐对了的人一个字节都不动。
      *
      * <p>真人局里每个 tick 都把起身的人按回座位（位次就是游戏内容，谁站起来走开都会让船上读不出谁在哪）。
-     * <b>演示局</b>（名单里有替身的局）不钉：只有一个真人，走到替身跟前右键、绕着船看才是测试要做的事
+     * <b>演示局</b>（{@code /seas start} 开的、名单里有替身的局，{@link GameComponent#isDemo}）不钉：只有一个真人，走到替身跟前右键、绕着船看才是测试要做的事
      * （用户 2026-10-07）。那里只在该坐的位置变了时摆一次，见 {@link #PLACED}。
      */
     public static void refresh(ServerWorld world, GameComponent component) {
         if (component.session().isEmpty() || component.seatIds().isEmpty()) {
             return;
         }
-        boolean demo = component.occupants().values().stream().anyMatch(GameComponent.Occupant::isDummy);
+        replaceMissing(world, component);
+        // 演示局不钉人：问开局时定下的那个标志（审查 2026-10-07 R5）。原先从「名单里有替身」推，
+        //   演习艇开了替身补位的正式局也被当成演示局，起身走开的人不再按回座位
+        boolean demo = component.isDemo();
         List<CharacterId> order = component.requireSession().state().bySeat();
         for (int i = 0; i < order.size() && i < component.seatIds().size(); i++) {
             var state = component.requireSession().state();
@@ -164,6 +167,51 @@ public final class Seats {
             }
         }
         StandInBodies.refresh(world, component);  // 替身的人形照同一份名单摆（用户 2026-10-07「座位上坐一个人形」）
+    }
+
+    /**
+     * 座位实体不见了就照布局补生一个（审查 2026-10-07 R6）。
+     *
+     * <p>❗坐着的真人掉线时，Minecraft 把他身下的座位一起存进玩家文件、从世界里拿走：1.21.1 {@code PlayerManager.remove} 先
+     * {@code savePlayerData}（{@code ServerPlayerEntity} 把 {@code RootVehicle} 写进去），再
+     * {@code if (entity.hasPlayerRider()) { player.stopRiding(); entity.streamPassengersAndSelf().forEach(e -> e.setRemoved(UNLOADED_WITH_PLAYER)); }}
+     * —— 他回来时 {@code onPlayerConnect} 从 {@code RootVehicle} 把它载回来、让他重新骑上。这中间那一号座位是空的：
+     * 换了座位排到那一格的人摆不上去，替身的人形也坐不上去。现在补一个新的（新的 UUID 换进名单）；他回来时带回来的那个旧座位
+     * 不在名单里，载入时当孤儿清掉（{@link #onSeatLoaded}），他随即被摆到该坐的位置。只在那一格的区块载着时补 ——
+     * 没载着时实体本来就查不到，补了会多出一个。
+     */
+    private static void replaceMissing(ServerWorld world, GameComponent component) {
+        Optional<VoyageLayout> layout = component.layout();
+        if (layout.isEmpty()) {
+            return;
+        }
+        List<UUID> ids = component.seatIds();
+        List<UUID> next = null;
+        for (int i = 0; i < ids.size(); i++) {
+            if (world.getEntity(ids.get(i)) instanceof SeatEntity) {
+                continue;
+            }
+            Vec3d at = layout.get().seatAt(i).add(0, LIFT, 0);
+            // 问的是实体那一层载没载着（ServerWorld#isChunkLoaded(long) 问的是实体管理器）：方块载着、实体还没载进来时也查不到
+            if (!world.isChunkLoaded(net.minecraft.util.math.ChunkPos.toLong(net.minecraft.util.math.BlockPos.ofFloored(at)))) {
+                continue;
+            }
+            SeatEntity seat = new SeatEntity(SeatEntity.TYPE, world);
+            seat.setIndex(i);
+            seat.markOurs();
+            seat.refreshPositionAndAngles(at.x, at.y, at.z, layout.get().ridersFacing(), 0f);
+            if (next == null) {
+                next = new ArrayList<>(ids);
+            }
+            next.set(i, seat.getUuid());
+            // 先换进名单再进世界：进世界那一刻的 ENTITY_LOAD 要认得它（与 place 同一个次序）
+            component.setSeatIds(next);
+            if (world.spawnEntity(seat)) {
+                LOGGER.info("座位：第 {} 位的座位不在了（坐着的人掉线时被 Minecraft 连人带走），补一个", i + 1);
+            } else {
+                LOGGER.warn("座位：第 {} 位的座位不在了，补生失败", i + 1);
+            }
+        }
     }
 
     /** 收摊：把这一局摆下的座位全部清掉，坐着的人自然落地；补给箱实物与替身的人形一起收。 */

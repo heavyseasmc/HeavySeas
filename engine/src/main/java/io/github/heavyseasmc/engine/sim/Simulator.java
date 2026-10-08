@@ -84,8 +84,8 @@ public final class Simulator {
      * 全船随机席位，划船留牌与舵手挑牌按 {@code policy}。
      *
      * @param scoring 终局计分用的分值表；{@code null} 表示不计分。
-     *                ❗计分要分得清现金与美术品，而那靠阵容里有船长与收藏家（{@code Session#treasuresOf}）——
-     *                合成的小阵容里没有他们，所以默认不计分，真实阵容的测量台才传它
+     *                ❗计分要分得清现金与美术品，而那靠角色表里的船长与收藏家（{@code Roster#doublers}）——
+     *                手搭的合成小阵容里没有他们、也没有整张角色表可查，所以默认不计分，真实阵容的测量台才传它
      */
     public Simulator(Roster roster, List<NavigationCard> deck, Provisions provisions,
                      NavigationPolicy policy, TreasureScoring scoring) {

@@ -2,6 +2,7 @@ package io.github.heavyseasmc.engine.navigation;
 
 import io.github.heavyseasmc.engine.model.CharacterId;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -19,6 +20,11 @@ import java.util.Set;
  *   <li>口渴：死者不口渴，候选只含活着的（昏迷者<b>算</b>，他仍会口渴）。</li>
  * </ul>
  * 把这个判断放进选择器就等于让它知道自己被用在哪一步，那是两份真相。
+ *
+ * <h2>点出来的人按候选的次序排</h2>
+ * 调用方传进来的候选是按座位排好的（{@code LinkedHashSet}），点出来的名单就保持那个次序。
+ * ❗原先四处都 {@code return Set.copyOf(...)}：那种不可变集合的遍历次序带着每次起 JVM 都不同的盐，
+ * 落海与口渴名单的次序（模组按它播报、按它冲走面前的牌进弃牌堆）于是每次运行都不一样（审查 2026-10-08 Z3）。
  */
 public sealed interface Selector {
 
@@ -28,13 +34,19 @@ public sealed interface Selector {
         boolean holds(String condition, CharacterId who);
     }
 
+    /** @return 点到的人，不可修改，按 {@code candidates} 的遍历次序 */
     Set<CharacterId> select(Set<CharacterId> candidates, ConditionResolver resolver);
+
+    /** 不可修改、保持插入次序的一份。 */
+    private static Set<CharacterId> ordered(Set<CharacterId> picked) {
+        return Collections.unmodifiableSet(picked);
+    }
 
     /** 全体候选。 */
     record Everyone() implements Selector {
         @Override
         public Set<CharacterId> select(Set<CharacterId> candidates, ConditionResolver resolver) {
-            return Set.copyOf(candidates);
+            return ordered(new LinkedHashSet<>(candidates));
         }
     }
 
@@ -61,7 +73,7 @@ public sealed interface Selector {
         public Set<CharacterId> select(Set<CharacterId> candidates, ConditionResolver resolver) {
             Set<CharacterId> out = new LinkedHashSet<>(candidates);
             out.retainAll(characters);
-            return Set.copyOf(out);
+            return ordered(out);
         }
     }
 
@@ -75,7 +87,7 @@ public sealed interface Selector {
         public Set<CharacterId> select(Set<CharacterId> candidates, ConditionResolver resolver) {
             Set<CharacterId> out = new LinkedHashSet<>(candidates);
             out.removeAll(characters);
-            return Set.copyOf(out);
+            return ordered(out);
         }
     }
 
@@ -102,7 +114,7 @@ public sealed interface Selector {
                     out.add(id);
                 }
             }
-            return Set.copyOf(out);
+            return ordered(out);
         }
     }
 }

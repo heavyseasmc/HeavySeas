@@ -145,12 +145,7 @@ public final class StandInPlay {
         return false;
     }
 
-    /**
-     * 换座位或抢夺：挑一个对象当场宣告。
-     *
-     * <p>替身没有「站起来举着拳头」那一段（决策 ⑦ 的预告窗口是给真人临场谈判的，替身不会谈判）——
-     * 停顿已经在轮到它之前给过了（{@link #beat}），宣告那一句播报就是预告。
-     */
+    /** 换座位或抢夺：先选定目标，经过预告后才公开点名；小孩偷牌不预告。 */
     private static boolean contest(ServerWorld world, GameComponent component, Session session, CharacterId dummy,
                                    Contest.Kind kind, Random rng) {
         List<CharacterId> targets = new ArrayList<>(session.state().onBoatBySeat());
@@ -163,7 +158,7 @@ public final class StandInPlay {
         List<CharacterId> pool = !humans.isEmpty() && rng.nextDouble() < PREFER_HUMAN ? humans : targets;
         CharacterId target = pool.get(rng.nextInt(pool.size()));
         LOGGER.info("替身随机：{} 要{} {}", dummy.value(), kind == Contest.Kind.STEAL ? "抢夺" : "换座位", target.value());
-        ContestPhase.declare(world, component, dummy, kind, target);
+        StandInDesignation.begin(world, component, dummy, kind, target);
         return true;
     }
 
@@ -242,6 +237,44 @@ public final class StandInPlay {
             return victim.front().get(rng.nextInt(victim.front().size()));
         }
         return null;
+    }
+
+    /**
+     * 真人的口渴窗口开着时，随机替身递不递水（审查 2026-10-07 R4，用户报过：替身从不在真人的递水窗口里递水）。
+     * 照引擎随机策略那一条（{@code RandomSeatPolicy#donateWater}，原 {@code Simulator#water}）：口渴的人自己定不了（开口了）时，
+     * 船头起第一个有水的清醒替身递一次，其余不递；他自己定得了就不递。隔一拍（{@link #step}）再递，真人看得见是谁递的。
+     */
+    static void thirstWindow(ServerWorld world, GameComponent component, Session.ThirstPrompt prompt) {
+        Session session = component.requireSession();
+        if (ThirstPhase.canDecide(session, prompt)) {
+            return;
+        }
+        int per = prompt.waterPerSource();
+        CharacterId donor = null;
+        for (CharacterId other : session.state().bySeat()) {
+            if (!other.equals(prompt.who()) && isDummy(component, other) && session.state().canAct(other)
+                    && ThirstPhase.availableDonationWater(session, component, other) / per > 0) {
+                donor = other;
+                break;
+            }
+        }
+        if (donor == null) {
+            return;
+        }
+        CharacterId giver = donor;
+        StandInMinds.ThirstKey key = StandInMinds.thirstKey(session, prompt);
+        component.setStandInsThirst(true);        // 能打水的真人都表过态也先别收：等这一下递出去
+        GameFlow.schedule(component, step(component), "口渴：替身递水（随机）", () -> {
+            if (!StandInMinds.samePrompt(component, session, key, true)) {
+                return;                           // 窗口已经结了：clearThirst 也清了「替身还在想」
+            }
+            LOGGER.info("口渴（替身随机）：{} 在窗口里替 {} 递一次水", giver.value(), prompt.who().value());
+            for (int i = 0; i < per; i++) {
+                ThirstPhase.donate(world, component, giver);   // 一组几张递完之前不许提前结（「替身还在想」还亮着）
+            }
+            component.setStandInsThirst(false);
+            ThirstPhase.settleIfReady(world, component);
+        });
     }
 
     private static boolean isDummy(GameComponent component, CharacterId who) {

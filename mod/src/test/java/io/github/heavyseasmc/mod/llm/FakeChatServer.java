@@ -34,7 +34,20 @@ final class FakeChatServer implements AutoCloseable {
         Reply reply(int n, String body);
     }
 
-    record Reply(int status, String body, long delayMs, Map<String, String> headers, boolean hangUp) {
+    /**
+     * @param trickleMs 大于 0 时：先回响应头，再每 100 ms 吐一个空格、吐这么久，最后才写回包 ——
+     *                  高峰期「先回 200、再慢慢吐空白」的写法（审查 2026-10-07 U12：响应头到了之后单次超时就不再计）
+     */
+    record Reply(int status, String body, long delayMs, Map<String, String> headers, boolean hangUp, long trickleMs) {
+
+        Reply(int status, String body, long delayMs, Map<String, String> headers, boolean hangUp) {
+            this(status, body, delayMs, headers, hangUp, 0);
+        }
+
+        /** 先回响应头，再慢慢吐空白 {@code ms} 毫秒，最后才是回包本体。 */
+        Reply trickle(long ms) {
+            return new Reply(status, body, delayMs, headers, hangUp, ms);
+        }
 
         /** 一条正常的回答：content 是模型说的话。 */
         static Reply answer(String content) {
@@ -73,13 +86,13 @@ final class FakeChatServer implements AutoCloseable {
         }
 
         Reply after(long ms) {
-            return new Reply(status, body, ms, headers, hangUp);
+            return new Reply(status, body, ms, headers, hangUp, trickleMs);
         }
 
         Reply header(String name, String value) {
             Map<String, String> h = new LinkedHashMap<>(headers);
             h.put(name, value);
-            return new Reply(status, body, delayMs, Map.copyOf(h), hangUp);
+            return new Reply(status, body, delayMs, Map.copyOf(h), hangUp, trickleMs);
         }
     }
 
@@ -140,6 +153,19 @@ final class FakeChatServer implements AutoCloseable {
             byte[] out = reply.body().getBytes(StandardCharsets.UTF_8);
             reply.headers().forEach((k, v) -> exchange.getResponseHeaders().add(k, v));
             exchange.getResponseHeaders().add("Content-Type", "application/json");
+            if (reply.trickleMs() > 0) {
+                exchange.sendResponseHeaders(reply.status(), 0);     // 0 = 分块：响应头先到
+                try (OutputStream os = exchange.getResponseBody()) {
+                    long end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(reply.trickleMs());
+                    while (System.nanoTime() < end) {
+                        os.write(' ');
+                        os.flush();
+                        Thread.sleep(100);
+                    }
+                    os.write(out);
+                }
+                return;
+            }
             exchange.sendResponseHeaders(reply.status(), out.length == 0 ? -1 : out.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(out);

@@ -15,8 +15,10 @@ class ChoiceParserTest {
 
     @ParameterizedTest(name = "「{0}」→ 3")
     @ValueSource(strings = {"3", " 3 ", "3\n", "3.", "3。", "(3)", "（3）", "[3]", "【3】", "「3」", "\"3\"", "'3'", "`3`",
-            "**3**", "#3", "３", "03", "<think>选 1 还是 2？</think>3", "<think>\n长长的思考\n</think>\n\n3"})
-    @DisplayName("认得：数字外面只包了空白、括号引号、句末标点、markdown 的星号；全角数字；去掉思考之后")
+            "**3**", "#3", "３", "03", "<think>选 1 还是 2？</think>3", "<think>\n长长的思考\n</think>\n\n3",
+            // 审查 2026-10-07 U12：有的推理模型模板只吐收尾标签（开标签在提示词模板里），思考段在前、答案在 </think> 之后
+            "选 1 还是 2？想想\n</think>\n\n3", "思考里有 4 和 5</think>3"})
+    @DisplayName("认得：数字外面只包了空白、括号引号、句末标点、markdown 的星号；全角数字；去掉思考之后（含只有收尾标签的）")
     void accepts(String answer) {
         ChoiceParser.Result r = ChoiceParser.parse(answer, 5);
         assertEquals(ChoiceParser.Result.Kind.OK, r.kind(), answer);
@@ -25,7 +27,7 @@ class ChoiceParserTest {
 
     @ParameterizedTest(name = "「{0}」")
     @ValueSource(strings = {"", "   ", "三", "three", "Option 3", "选项3", "选 3", "我选 3", "3 或 4", "3,4", "3.5", "1 2",
-            "3/5", "3. 抢", "I choose 3", "<think>3</think>", "<think>3", "答：3"})
+            "3/5", "3. 抢", "I choose 3", "<think>3</think>", "<think>3", "答：3", "想好了选 3</think>", "3</think>"})
     @DisplayName("认不出：带了别的字、两个数、小数、只在思考里有数字")
     void rejects(String answer) {
         assertEquals(ChoiceParser.Result.Kind.UNPARSEABLE, ChoiceParser.parse(answer, 5).kind(), answer);

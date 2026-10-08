@@ -274,7 +274,7 @@ public final class RowScreen extends GameScreen {
 
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (inspectKey(keyCode)) {
             return true;
         }
@@ -301,7 +301,7 @@ public final class RowScreen extends GameScreen {
                 }
             }
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.onKey(keyCode, scanCode, modifiers);
     }
 
     private void choose(int i) {

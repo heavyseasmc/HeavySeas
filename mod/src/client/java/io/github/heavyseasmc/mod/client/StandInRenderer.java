@@ -5,6 +5,7 @@ import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.client.render.entity.model.EntityModelLayers;
+import net.minecraft.client.render.entity.model.BipedEntityModel;
 import net.minecraft.client.render.entity.model.PlayerEntityModel;
 import net.minecraft.client.util.DefaultSkinHelper;
 import net.minecraft.client.util.SkinTextures;
@@ -40,6 +41,7 @@ public final class StandInRenderer extends LivingEntityRenderer<StandInEntity, P
     public void render(StandInEntity entity, float yaw, float tickDelta, MatrixStack matrices,
                        VertexConsumerProvider vertexConsumers, int light) {
         model = skin(entity).model() == SkinTextures.Model.SLIM ? slim : wide;
+        model.rightArmPose = entity.isDesignating() ? BipedEntityModel.ArmPose.BLOCK : BipedEntityModel.ArmPose.EMPTY;
         super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
     }
 

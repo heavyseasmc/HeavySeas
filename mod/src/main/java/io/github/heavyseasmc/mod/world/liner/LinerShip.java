@@ -447,7 +447,7 @@ public final class LinerShip {
             if (state.areas.isEmpty()) {
                 LOGGER.info("北辰号：{}，不摆", unavailable);
             } else {
-                begin(server, null, state, "地图数据里没有北辰号了");
+                beginOrLog(server, null, state, "地图数据里没有北辰号了");
             }
             return;
         }
@@ -478,7 +478,25 @@ public final class LinerShip {
             LOGGER.info("北辰号：世界里已是这一版（{}），不动", m.version());
             return;
         }
-        begin(server, m, state, state.placed.isEmpty() ? (state.areas.isEmpty() ? "世界里还没有" : "上次没摆完") : "换了一版");
+        beginOrLog(server, m, state, state.placed.isEmpty() ? (state.areas.isEmpty() ? "世界里还没有" : "上次没摆完") : "换了一版");
+    }
+
+    /**
+     * 起服时排上摆放；排不上（缺了某一段 {@code seg_*.nbt}、艇的结构不在）只记一行，不拦起服 —— 照类注释那一条。
+     *
+     * <p>❗审查 2026-10-07 C5：原先 try 只包住了艇的模板那一段，这一下在 try 外 —— 数据包里缺一段船体、世界里的版本又对不上，
+     * {@link #begin} 的 {@code orElseThrow} 一抛，SERVER_STARTED 回调冒到 {@code runServer} 的总 catch，起服就崩。
+     * {@link #begin} 在动存档之前就把模板全取齐，取不齐时存档与世界都没动过：世界里原来的那一版照旧在。
+     */
+    private static void beginOrLog(MinecraftServer server, @Nullable Manifest manifest, State state, String why) {
+        try {
+            begin(server, manifest, state, why);
+        } catch (RuntimeException failure) {
+            loaded = null;                    // 这一版没摆上：魔镜、演习艇不认它（世界里还是旧的那一版，或者没有）
+            running = null;
+            unavailable = "排不上摆放（" + why + "）：" + failure.getMessage();
+            LOGGER.error("北辰号：{} —— 不摆，世界里原来的不动", unavailable, failure);
+        }
     }
 
     public static void onServerStopped() {

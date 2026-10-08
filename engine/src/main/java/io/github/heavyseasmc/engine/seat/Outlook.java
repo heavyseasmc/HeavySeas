@@ -13,6 +13,8 @@ import io.github.heavyseasmc.engine.thirst.ThirstSource;
 import io.github.heavyseasmc.engine.weather.WeatherEffect;
 
 import java.util.HashMap;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -216,8 +218,7 @@ final class Outlook {
         myTreasure = treasureOf(view, view.hand(), view.me().front());
         gulls = view.gulls();
 
-        DeckStats stats = DECK_STATS.computeIfAbsent(new DeckKey(view.navDeck(), boardOf(seats)),
-                key -> deckStats(key.deck(), key.board()));
+        DeckStats stats = cachedDeckStats(view.navDeck(), boardOf(seats));
         pOverboard = new double[n];
         pThirst = new double[n];
         for (int i = 0; i < n; i++) {
@@ -237,7 +238,25 @@ final class Outlook {
                              double fightIcon) {
     }
 
-    private static final Map<DeckKey, DeckStats> DECK_STATS = new java.util.concurrent.ConcurrentHashMap<>();
+    // 八人阵容最多 256 种在艇集合；留四套牌组的空间。不同数据包再多也不会一直保留旧牌组。
+    static final int MAX_DECK_STATS = 1024;
+    private static final Map<DeckKey, DeckStats> DECK_STATS = Collections.synchronizedMap(
+            new LinkedHashMap<>(256, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<DeckKey, DeckStats> eldest) {
+                    return size() > MAX_DECK_STATS;
+                }
+            });
+
+    static DeckStats cachedDeckStats(List<NavigationCard> deck, Set<CharacterId> board) {
+        // synchronizedMap 的 computeIfAbsent 同时保护访问次序、生成与驱逐，供两条推演线程共用。
+        return DECK_STATS.computeIfAbsent(new DeckKey(List.copyOf(deck), Set.copyOf(board)),
+                key -> deckStats(key.deck(), key.board()));
+    }
+
+    static int cachedDeckCount() {
+        return DECK_STATS.size();
+    }
 
     private static Set<CharacterId> boardOf(List<SeatView.SeatInfo> seats) {
         Set<CharacterId> board = new LinkedHashSet<>();

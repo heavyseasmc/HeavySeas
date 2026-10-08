@@ -78,6 +78,9 @@ public final class StandInBodies {
                 bodies.put(id, body.getUuid());
                 LOGGER.info("替身人形：{} 坐上第 {} 位", id.value(), i + 1);
             }
+            body.setDesignating(component.designating().filter(id::equals).isPresent()
+                    && !(component.designationKind().orElse(null) == io.github.heavyseasmc.engine.play.Contest.Kind.STEAL
+                    && component.requireSession().stealsUncontested(id)));
             if (body.getVehicle() == seat) {
                 continue;                     // 已经坐对了 —— 绝大多数帧走到的分支
             }
@@ -111,6 +114,13 @@ public final class StandInBodies {
         }
         return bodies.entrySet().stream().filter(e -> e.getValue().equals(entity.getUuid()))
                 .map(Map.Entry::getKey).findFirst();
+    }
+
+    /** 指定窗口的身体表现；目标尚未公开，只抬手并发光。 */
+    public static void setDesignating(ServerWorld world, CharacterId id, boolean raised) {
+        Map<CharacterId, UUID> bodies = BODIES.get(world.getRegistryKey());
+        StandInEntity body = bodies == null ? null : bodyOf(world, bodies, id);
+        if (body != null) body.setDesignating(raised);
     }
 
     /** 收摊：这一局的人形全部清掉（{@link Seats#clear} 调）。 */

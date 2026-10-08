@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -101,6 +102,27 @@ class SelectorTest {
         new Selector.Except(Set.of(MATE)).select(input, NO_CONDITIONS);
         new Selector.Only(Set.of(MATE)).select(input, NO_CONDITIONS);
         assertEquals(CANDIDATES, input, "候选集被就地改掉会让同一张牌的两栏互相污染");
+    }
+
+    @Test
+    @DisplayName("❗点出来的名单按候选的次序（座位次序）排 —— 原先 Set.copyOf 的次序每次起 JVM 都不同（审查 Z3）")
+    void keepsCandidateOrder() {
+        // 八个人：Set.copyOf 碰巧排成原样的机会是八万分之一量级，三个人的话六次里就有一次碰巧绿。
+        List<CharacterId> seats = List.of("jeweler", "collector", "captain", "mate", "hostess", "sailor", "doctor",
+                "kid").stream().map(CharacterId::of).toList();
+        Set<CharacterId> bySeat = new LinkedHashSet<>(seats);
+        Set<CharacterId> printed = Set.of(CharacterId.of("kid"), CharacterId.of("jeweler"), CharacterId.of("mate"),
+                CharacterId.of("doctor"), CharacterId.of("captain"));
+        List<CharacterId> named = seats.stream().filter(printed::contains).toList();
+        List<CharacterId> others = seats.stream().filter(id -> !printed.contains(id)).toList();
+        Selector.ConditionResolver drank = (c, who) -> printed.contains(who);
+
+        assertEquals(seats, List.copyOf(new Selector.Everyone().select(bySeat, NO_CONDITIONS)), "all");
+        assertEquals(named, List.copyOf(new Selector.Only(printed).select(bySeat, NO_CONDITIONS)), "list");
+        assertEquals(others, List.copyOf(new Selector.Except(printed).select(bySeat, NO_CONDITIONS)), "except");
+        assertEquals(named, List.copyOf(new Selector.Conditional("used_rum").select(bySeat, drank)), "conditional");
+        assertThrows(UnsupportedOperationException.class,
+                () -> new Selector.Everyone().select(bySeat, NO_CONDITIONS).clear(), "交出去的名单改不动");
     }
 
     @Test

@@ -30,10 +30,14 @@ public final class CardActions {
         if (action.kind().get() == CardActionC2S.Kind.OVERBOARD_DONE) {
             // 落海那一窗「不用」（ADR-0095 D1）：原先只是收起界面，窗口空等到时；演示局不限时之后会一直等。
             // 手上有牌可出的真人都说了「不用」，这一窗就当场收（下一 tick 照到时那样结算）。
+            if (component.hasDecided(seat.get())) {
+                return;                       // 已经说过「不用」了：重复的包不再算一次（审查 2026-10-07 L5 同一类）
+            }
             component.markDecided(seat.get());
-            boolean waiting = humanStillChoosing(component.requireSession(), component);
-            LOGGER.info("落海：{} 这一窗不用牌{}", seat.get().value(), waiting ? "" : "，没人要等了，收");
-            if (!waiting) {
+            boolean settled = overboardSettled(component.requireSession(), component);
+            LOGGER.info("落海：{} 这一窗不用牌{}", seat.get().value(), !settled ? ""
+                    : "，没人要等了，收");
+            if (settled) {
                 component.setOverboardDeadline(System.currentTimeMillis());
             }
             return;
@@ -41,11 +45,11 @@ public final class CardActions {
         try {
             apply(component.requireSession(), seat.get(), action);
             LOGGER.info("Card UI: {} {} -> {}", seat.get().value(), action.kind().orElseThrow(),
-                    action.target());
+                    ActionPhase.clipForLog(action.target()));
             // ❗出了牌之后也要问一遍：把手上唯一一张落海牌打出去的人再没有可选的，那一面空着，
             // 没人会再按「不用」—— 正常局等满 20 秒，演示局不限时就永远等下去（用户 2026-10-07：「无限时间后，有的阶段会卡住」）
             if (action.kind().get() == CardActionC2S.Kind.OVERBOARD
-                    && !humanStillChoosing(component.requireSession(), component)) {
+                    && overboardSettled(component.requireSession(), component)) {
                 LOGGER.info("落海：{} 出过牌之后没有真人还有牌可出，收", seat.get().value());
                 component.setOverboardDeadline(System.currentTimeMillis());
             }
@@ -64,6 +68,16 @@ public final class CardActions {
         return component.occupants().entrySet().stream().anyMatch(e -> !e.getValue().isDummy()
                 && !component.hasDecided(e.getKey()) && !session.state().isOffline(e.getKey())
                 && !session.overboardPlays(e.getKey()).isEmpty());
+    }
+
+    /**
+     * 落海这一窗可以提前收了吗：没有真人还在选，<b>也没有替身还在想</b>（{@link GameComponent#standInsOverboard}）。
+     *
+     * <p>❗审查 2026-10-07 R3（用户报过）：原先只问真人 —— 真人先说「不用」，下一 tick 就结算，动脑 / 大模型的替身
+     * 那一手落地时窗口已经没了，记成「作废」。真人那一侧收窗都走这里；替身的接力走完时由它自己问真人那一半（{@link StandInMinds}）。
+     */
+    static boolean overboardSettled(Session session, GameComponent component) {
+        return !humanStillChoosing(session, component) && !component.standInsOverboard();
     }
 
     // ---- 动脑 / 大模型的替身（StandInMinds）：与界面那几下同一个引擎调用，之后同样推一次投影 ----

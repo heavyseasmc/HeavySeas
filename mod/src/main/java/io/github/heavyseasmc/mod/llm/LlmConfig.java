@@ -65,6 +65,14 @@ public record LlmConfig(boolean enabled, String baseUrl, String apiKey, String m
     /** 密钥的环境变量：有值就压过配置里的 {@code apiKey}（密钥不必落进服务端的配置目录）。 */
     public static final String KEY_ENV = "HEAVYSEAS_LLM_API_KEY";
 
+    /**
+     * {@value #KEY_ENV} 里的密钥只发往这个变量写明的地址（审查 2026-10-07 L1）：写一个地址就行（{@code https://api.example.com}，
+     * 写到 {@code /v1} 也可以），比的是它的「协议 + 主机 + 端口」（{@link #origin}）。<b>没写就不带环境变量里的密钥</b> ——
+     * 能改设置的人（专用服务端上任意一个 2 级管理员、局域网开了作弊的客人、下载来的存档自带的 {@code serverconfig/}）
+     * 都改得了 {@code llm.base_url}，而环境变量是服主一个人定的。
+     */
+    public static final String KEY_ORIGIN_ENV = "HEAVYSEAS_LLM_KEY_ORIGIN";
+
     public static final List<String> LANGUAGES = List.of("zh_cn", "en_us");
 
     /** 整数项的范围：缺省值与上下限（含）。 */
@@ -254,6 +262,10 @@ public record LlmConfig(boolean enabled, String baseUrl, String apiKey, String m
         if (uri.getHost() == null) {
             return "baseUrl 里没有主机名";
         }
+        if (uri.getRawUserInfo() != null) {
+            // 审查 2026-10-07 L1：地址随设置同步给每个客户端；凭据只走密钥那一项（只写不读、绑地址）
+            return "baseUrl 不能带用户名或密码（user:pass@）：凭据放进密钥那一项";
+        }
         if (uri.getQuery() != null || uri.getFragment() != null) {
             return "baseUrl 不能带 ? 或 #（后面要接 /chat/completions）";
         }
@@ -261,6 +273,29 @@ public record LlmConfig(boolean enabled, String baseUrl, String apiKey, String m
             return "baseUrl 写到 /v1 为止就行，/chat/completions 会自动接上";
         }
         return null;
+    }
+
+    /**
+     * 一个地址的「协议://主机:端口」（协议与主机小写、没写端口补上 80 / 443）：密钥绑的就是它（审查 2026-10-07 L1）。
+     * 路径不算 —— 同一台服务器上换个路径不是「换了地方」。不是 {@code http(s)://} 带主机名的地址返回 {@code null}。
+     * 与 {@link #endpoint()} 读同一个 {@link URI} 的同几个部分，{@code HttpClient} 连的就是这三样。
+     */
+    public static String origin(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        URI uri;
+        try {
+            uri = new URI(url.strip());
+        } catch (Exception e) {
+            return null;
+        }
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        if ((!scheme.equals("http") && !scheme.equals("https")) || uri.getHost() == null) {
+            return null;
+        }
+        int port = uri.getPort() >= 0 ? uri.getPort() : scheme.equals("https") ? 443 : 80;
+        return scheme + "://" + uri.getHost().toLowerCase(Locale.ROOT) + ":" + port;
     }
 
     // ---- 从某个来源合成设置 ----
@@ -290,8 +325,15 @@ public record LlmConfig(boolean enabled, String baseUrl, String apiKey, String m
      * @param problem   写坏了的原因（一句人话，可直接进日志）；没坏是 {@code null}
      * @param note      没坏时的一句说明（「没有配置文件」「enabled 不是 true」「开着」）
      * @param keySource 密钥的来源（「环境变量 …」「配置文件」「无」）—— 给 status 看，密钥本身不在这里
+     * @param keyWithheld 有密钥、却因为地址对不上没带的那一句（审查 2026-10-07 L1）；都带上了或者本来就没有是 {@code null}。
+     *                    接入层起来时记一行 WARN、{@code /seasllm status} 也说 —— 「没带」与「没有」在请求里长得一样（都是 401）
      */
-    public record Loaded(LlmConfig config, String problem, String note, String keySource) {
+    public record Loaded(LlmConfig config, String problem, String note, String keySource, String keyWithheld) {
+
+        public Loaded(LlmConfig config, String problem, String note, String keySource) {
+            this(config, problem, note, keySource, null);
+        }
+
         public boolean broken() {
             return problem != null;
         }
@@ -309,14 +351,15 @@ public record LlmConfig(boolean enabled, String baseUrl, String apiKey, String m
      * @param env            查环境变量（服务端传 {@code System::getenv}，单测传一张表）
      */
     public static Loaded from(Draft d, List<String> sourceProblems, Function<String, String> env) {
+        // ❗只给旧文件那一套读法（LlmConfigFile）与单测用：不查地址绑定。服务端起的接入层一律走 fromSettings
         String envKey = env.apply(KEY_ENV);
         if (envKey != null && !envKey.isBlank()) {
-            return build(d, sourceProblems, envKey, KEY_SOURCE_ENV);
+            return build(d, sourceProblems, envKey, KEY_SOURCE_ENV, null);
         }
         if (d.apiKey() != null && !d.apiKey().isBlank()) {
-            return build(d, sourceProblems, d.apiKey(), "配置文件");
+            return build(d, sourceProblems, d.apiKey(), "配置文件", null);
         }
-        return build(d, sourceProblems, "", KEY_SOURCE_NONE);
+        return build(d, sourceProblems, "", KEY_SOURCE_NONE, null);
     }
 
     /** 密钥取自设置菜单（服务端自己的密钥文件）时 {@link Loaded#keySource()} 说的话。 */
@@ -329,19 +372,59 @@ public record LlmConfig(boolean enabled, String baseUrl, String apiKey, String m
     /**
      * 服务端设置（设置菜单的「大模型」一组）→ 设置。密钥<b>先看设置菜单存的</b>（{@code d.apiKey()}，服务端的密钥文件），
      * 没有再看环境变量 {@value #KEY_ENV} —— 习惯用环境变量的服务端照旧能用，菜单里设了就以菜单为准。
+     *
+     * <h2>❗密钥只发往它该去的地址（审查 2026-10-07 L1）</h2>
+     * 「只写不读」原先没和地址绑在一起：谁能改 {@code llm.base_url}，谁就能把地址改到自己的服务器、让服务端把密钥送过去
+     * （专用服务端上任意一个 2 级管理员 · 局域网开了作弊的客人 · 下载来的存档自带的 {@code serverconfig/} 覆盖全局那份）。所以：
+     * <ul>
+     *   <li>菜单存的密钥只在 {@code storedKeyOrigin}（设它那一刻的「协议 + 主机 + 端口」，{@link #origin}）与此刻的地址一致时带；
+     *       改了地址要在菜单里重新设一次。旧版本存的、没记下地址的一律不带。</li>
+     *   <li>环境变量里的密钥只发往 {@value #KEY_ORIGIN_ENV} 写明的地址；没写就不带。</li>
+     * </ul>
+     * 带不了的那一句进 {@link Loaded#keyWithheld()}（接入层起来时记 WARN）。比对就在这里做一次：
+     * 结果是一份不可变的设置，请求发往的 {@link #endpoint()} 与带的密钥出自同一份，中间没有第二处能改地址。
+     *
+     * @param storedKeyOrigin 菜单存的密钥绑的地址（{@link #origin} 的写法）；没有绑（旧版本存的）是 {@code null}
      */
-    public static Loaded fromSettings(Draft d, Function<String, String> env) {
+    public static Loaded fromSettings(Draft d, String storedKeyOrigin, Function<String, String> env) {
+        boolean enabled = Boolean.TRUE.equals(d.enabled());
+        String target = origin(d.baseUrl());
+        List<String> withheld = new ArrayList<>();
         if (d.apiKey() != null && !d.apiKey().isBlank()) {
-            return build(d, List.of(), d.apiKey(), KEY_SOURCE_STORE);
+            if (target != null && target.equals(storedKeyOrigin)) {
+                return build(d, List.of(), d.apiKey(), KEY_SOURCE_STORE, null);
+            }
+            withheld.add(storedKeyOrigin == null
+                    ? "设置菜单里的密钥没记下是给哪个地址设的（旧版本存的）"
+                    : "设置菜单里的密钥是给 " + storedKeyOrigin + " 设的，地址现在是 " + (target == null ? "（无）" : target));
         }
         String envKey = env.apply(KEY_ENV);
         if (envKey != null && !envKey.isBlank()) {
-            return build(d, List.of(), envKey, KEY_SOURCE_ENV);
+            String allowed = origin(env.apply(KEY_ORIGIN_ENV));
+            if (target != null && target.equals(allowed)) {
+                return build(d, List.of(), envKey, KEY_SOURCE_ENV, enabled ? withheldNote(withheld) : null);
+            }
+            withheld.add(allowed == null
+                    ? "环境变量 " + KEY_ENV + " 里有密钥，但没用 " + KEY_ORIGIN_ENV + " 写明它发往哪个地址"
+                    : "环境变量 " + KEY_ENV + " 的密钥只发往 " + allowed + "，地址现在是 " + (target == null ? "（无）" : target));
         }
-        return build(d, List.of(), "", KEY_SOURCE_NONE);
+        return build(d, List.of(), "", KEY_SOURCE_NONE, enabled ? withheldNote(withheld) : null);
     }
 
-    private static Loaded build(Draft d, List<String> sourceProblems, String key, String keySource) {
+    private static String withheldNote(List<String> withheld) {
+        return withheld.isEmpty() ? null
+                : String.join("；", withheld) + "。改了地址要在设置菜单里重新设一次密钥（环境变量的密钥改 " + KEY_ORIGIN_ENV + "）";
+    }
+
+    /**
+     * 这一份原始值合不合得成一份设置（构造器那一套）；合得成是 {@code null}，否则是一句理由。不碰密钥。
+     * 设置菜单存「大模型」一组之前先问它（审查 2026-10-07 R8：原先每项单看都合法就存，存完整个大模型层静默关掉）。
+     */
+    public static String problemOf(Draft d) {
+        return build(d, List.of(), "", KEY_SOURCE_NONE, null).problem();
+    }
+
+    private static Loaded build(Draft d, List<String> sourceProblems, String key, String keySource, String keyWithheld) {
         LlmConfig def = defaults();
         boolean enabled = d.enabled() != null && d.enabled();
         List<String> problems = new ArrayList<>(sourceProblems);
@@ -358,13 +441,13 @@ public record LlmConfig(boolean enabled, String baseUrl, String apiKey, String m
                     or(d.breakerThreshold(), def.breakerThreshold()), or(d.breakerCooldownMs(), def.breakerCooldownMs()),
                     or(d.language(), def.language()), d.debugLog() != null && d.debugLog());
             if (!problems.isEmpty()) {
-                return new Loaded(off(), String.join("；", problems), null, keySource);
+                return new Loaded(off(), String.join("；", problems), null, keySource, keyWithheld);
             }
-            return new Loaded(config, null, enabled ? "开着" : "enabled 不是 true，大模型替身关着", keySource);
+            return new Loaded(config, null, enabled ? "开着" : "enabled 不是 true，大模型替身关着", keySource, keyWithheld);
         } catch (IllegalArgumentException e) {
             // 合不起来时照样说密钥取自哪里（status 要用）；构造器的理由里没有密钥本身（只说「有控制字符」）
             problems.add(e.getMessage());
-            return new Loaded(off(), String.join("；", problems), null, keySource);
+            return new Loaded(off(), String.join("；", problems), null, keySource, keyWithheld);
         }
     }
 

@@ -26,7 +26,6 @@ import io.github.heavyseasmc.mod.world.Gulls;
 import io.github.heavyseasmc.mod.world.MistSea;
 import io.github.heavyseasmc.mod.world.Nameplates;
 
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -73,23 +72,29 @@ public final class GameFlow {
     private GameFlow() {
     }
 
-    /** 开一局。座位顺序由角色决定（夫人永远在船头），与谁来占无关；座位摆在哪由布局定（ADR-0034 §5.5）。 */
+    /**
+     * 开一局。座位顺序由角色决定（夫人永远在船头），与谁来占无关；座位摆在哪由布局定（ADR-0034 §5.5）。
+     *
+     * @param viaCommand 是 {@code /seas start} 开的（不是演习艇敲钟开航）。指令开的、名单里有替身的局是<b>演示局</b>
+     *                   （{@link GameComponent#isDemo}）；演习艇开航即使补了替身也是正式局（审查 2026-10-07 R5）
+     */
     public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
-                             Set<CharacterId> reservedForDummies, VoyageLayout layout) {
+                             Set<CharacterId> reservedForDummies, VoyageLayout layout, boolean viaCommand) {
         GameData data = GameDataLoader.require();
-        start(world, players, humans, reservedForDummies, layout, data.roster().preset(players));
+        start(world, players, humans, reservedForDummies, layout, data.roster().preset(players), viaCommand);
     }
 
     /** 房主从大厅面板确认的自定义阵容。 */
     public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
                              Set<CharacterId> reservedForDummies, VoyageLayout layout,
-                             List<CharacterId> selectedRoster) {
+                             List<CharacterId> selectedRoster, boolean viaCommand) {
         GameData data = GameDataLoader.require();
-        start(world, players, humans, reservedForDummies, layout, data.roster().select(selectedRoster));
+        start(world, players, humans, reservedForDummies, layout, data.roster().select(selectedRoster), viaCommand);
     }
 
     private static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
-                              Set<CharacterId> reservedForDummies, VoyageLayout layout, Roster roster) {
+                              Set<CharacterId> reservedForDummies, VoyageLayout layout, Roster roster,
+                              boolean viaCommand) {
         GameData data = GameDataLoader.require();
         if (roster.survivors().size() != players) {
             throw new IllegalArgumentException("阵容人数与登船人数不一致");
@@ -148,6 +153,9 @@ public final class GameFlow {
         GameComponent component = GameComponents.of(world);
         component.begin(session, occupants, humans.stream().map(ServerPlayerEntity::getUuid)
                 .collect(java.util.stream.Collectors.toSet()));
+        // 演示局在开局这一刻定死（审查 2026-10-07 R5）：Seats 不钉人与「等真人不限时」都问这一个标志，不再各自推导。
+        //   ❗按倾向定、用户可推翻：演习艇开了替身补位（stand_ins.fill_empty_seats）的那一局算正式局。
+        component.setDemo(viaCommand && occupants.values().stream().anyMatch(GameComponent.Occupant::isDummy));
         component.setGameRandom(new Random(dealt.gameSeed()));
         // 动脑 / 大模型替身的种子：由开局种子派生，<b>不从</b>上面那条流里取（取一次就改了天意，同一个种子打出另一局）
         component.setStandInSeed(new java.util.SplittableRandom(dealt.gameSeed() ^ 0x5A17D1CE5EEDL).nextLong());
@@ -184,6 +192,8 @@ public final class GameFlow {
                 seedSetting.map(s -> " · 调试种子 " + s.value()).orElse(""));
         // 另起一行，不往上面那行里加：那一行的前半段被验收脚本盯着。这一行说清用的是哪一套时限、取自哪里（设置 / 默认）。
         LOGGER.info("对局时限（{}）：{}", timing.source(), component.timing().describe());
+        // 又一行，同样不往上面加：这一局算不算演示局（不钉座位 · 等真人可不限时），有退路的地方要说走的是哪一条
+        LOGGER.info("对局类型：{}", component.isDemo() ? "演示局（/seas start 开的、有替身）" : "正式局");
         // 位次摆进世界（ADR-0024）。放在播报之后：摆船会再推一次投影，而开局那一帧已经推过了。
         Seats.place(world, component, layout, session.state().bySeat().size());
         enterWeather(world, component);
@@ -205,7 +215,7 @@ public final class GameFlow {
         LOGGER.info("天候：{}（{}）", weather.id(), weather.effect().id());
         // 天候到世界（ADR-0034 §5.1.5）：只记一行；昼夜与雨雷由 PlayerSky 按人发、客户端照画（ADR-0058 §4），雾由投影带给客户端。
         MistSea.applyWeather(world, component, weather.id());
-        SkiffProps.onNewDay(world, component, weather.id(), session.state().turn());   // 灯油烧掉一档 · 帆按天候（ADR-0057）
+        SkiffProps.onNewDay(world, component, weather, session.state().turn());   // 灯油烧掉一档 · 帆按天候效果（ADR-0057）
         session.advancePhase();
         enterProvision(world, component);
     }
@@ -420,15 +430,29 @@ public final class GameFlow {
         long revealHold = component.timing().revealHoldMs();   // 开局快照（ADR-0099 D8）
         if (session.finishNavigationResolution()) {
             schedule(component, component.anyHumanSeated() ? revealHold : 0L,
-                    "狂风额外航海牌后进入标准航海", () -> NavigationPhase.begin(world, component));
+                    "狂风额外航海牌后进入标准航海", () -> continueAfterThirst(world, component, session,
+                            () -> NavigationPhase.begin(world, component)));
             return;
         }
         LOGGER.info("航海阶段结束：第 {} 回合（口渴已结算完）", session.state().turn());
         long hold = component.anyHumanSeated() ? revealHold : 0L;
-        schedule(component, hold, "航海结算后进下一回合", () -> {
+        schedule(component, hold, "航海结算后进下一回合", () -> continueAfterThirst(world, component, session, () -> {
             session.advancePhase();
             enterWeather(world, component);
-        });
+        }));
+    }
+
+    /** 展示航海结果的停顿里也能喝酒；执行后续步骤前先处理新排入的口渴。 */
+    private static void continueAfterThirst(ServerWorld world, GameComponent component, Session expected, Runnable next) {
+        if (component.session().orElse(null) != expected || expected.state().phase() != Phase.NAVIGATION
+                || expected.state().isOver()) {
+            return;
+        }
+        if (expected.thirstInProgress()) {
+            ThirstPhase.begin(world, component);
+        } else {
+            next.run();
+        }
     }
 
     /**
@@ -466,35 +490,82 @@ public final class GameFlow {
         component.schedule(System.currentTimeMillis() + delayMs, what, step);
     }
 
-    /** 每 tick 执行到期的一步。 */
-    public static void tick(MinecraftServer server) {
-        long now = System.currentTimeMillis();
-        for (ServerWorld world : server.getWorlds()) {
-            GameComponent component = GameComponents.of(world);
-            Optional<GameComponent.Step> due = component.pollDueStep(now);
-            if (due.isEmpty()) {
-                continue;
+    /** 每 tick 执行到期的一步（挂在 {@link #guarded} 上：取步骤那一下出错也照样收这一局）。 */
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        Optional<GameComponent.Step> due = component.pollDueStep(now);
+        if (due.isEmpty()) {
+            return;
+        }
+        try {
+            due.get().action().run();
+        } catch (RuntimeException e) {
+            abort(world, component, due.get().what(), e);
+        }
+    }
+
+    /** 一面在一个世界里的每 tick 计时（各阶段的 {@code tick}）。 */
+    @FunctionalInterface
+    public interface WorldTick {
+        void tick(ServerWorld world, GameComponent component, long now);
+    }
+
+    /**
+     * 把一面的计时挂上 {@code END_SERVER_TICK}，并套上与排程同一条「出错就结束这一局」（{@link #abort}）。
+     *
+     * <p>❗审查 2026-10-07 C1：各阶段的计时原先直接挂在每 tick 的事件上、外面没有 try —— 挑牌超时那一下引擎一抛，
+     * 异常一路冒到 {@code MinecraftServer} 的总 catch，写崩溃报告、停服。排程里的一步出错只结束这一局，
+     * 计时里的同一种错却让整个服务端停掉：两条路的后果不该差这么多。这里是唯一的包法，每一面都经它挂，不各写一份 try。
+     *
+     * @param what 这是哪一面的计时（出错时进日志）
+     */
+    public static net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.EndTick guarded(String what, WorldTick tick) {
+        return server -> {
+            long now = System.currentTimeMillis();
+            for (ServerWorld world : server.getWorlds()) {
+                GameComponent component = GameComponents.of(world);
+                try {
+                    tick.tick(world, component, now);
+                } catch (RuntimeException e) {
+                    abort(world, component, what, e);
+                }
             }
-            try {
-                due.get().action().run();
-            } catch (RuntimeException e) {
-                // ❗排程里的一步抛了，局面就停在那儿 —— 不会再有下一步来推它。
-                //   与其留一局永远不动的对局，不如当场结束并点名：日志里有这一行，验收脚本才判得出来。
-                LOGGER.error("对局推进出错（{}），这一局到此为止", due.get().what(), e);
-                DesignationPhase.clear(world, component);
-                Nameplates.clear(world);
-                Gulls.clear(world, component);
-                Backdrop.clear(world, component);
-                Seats.clear(world, component);
-                // 普通系统事件都进 HUD 侧栏；崩溃会立刻收起会话，侧栏也随之消失，
-                // 所以最后这一句只能走 action bar。它不写入聊天历史。
-                world.getServer().getPlayerManager().getPlayerList().stream()
-                        .filter(player -> component.belongsToActiveVoyage(player.getUuid()))   // 北辰号上的人不在这一局里（ADR-0083）
-                        .forEach(player -> player.sendMessage(
-                                Text.translatable("heavyseas.game.crashed").formatted(Formatting.RED), true));
+        };
+    }
+
+    /**
+     * 出错就结束这一局：排程里的一步、各阶段的计时、替身的看门狗，抛出来的异常都走这里（审查 2026-10-07 C1 · Q4）。
+     *
+     * <p>❗局面停在一步抛错的地方，就不会再有下一步来推它 —— 与其留一局永远不动的对局，不如当场结束并点名：
+     * 日志里有这一行，验收脚本才判得出来。收场本身再出错只记一行，不往外抛：这里是兜底，兜底不能把服务端带倒。
+     *
+     * @param what 出错的是哪一步（进日志）
+     */
+    public static void abort(ServerWorld world, GameComponent component, String what, RuntimeException e) {
+        if (component.session().isEmpty()) {
+            // 没有对局可收（比如刚收完那一刻到的一下）：只记下来，不碰别的
+            LOGGER.error("对局计时出错（{}），此刻没有进行中的对局", what, e);
+            return;
+        }
+        LOGGER.error("对局推进出错（{}），这一局到此为止", what, e);
+        try {
+            DesignationPhase.clear(world, component);
+            Nameplates.clear(world);
+            Gulls.clear(world, component);
+            Backdrop.clear(world, component);
+            Seats.clear(world, component);
+            // 普通系统事件都进 HUD 侧栏；崩溃会立刻收起会话，侧栏也随之消失，
+            // 所以最后这一句只能走 action bar。它不写入聊天历史。
+            world.getServer().getPlayerManager().getPlayerList().stream()
+                    .filter(player -> component.belongsToActiveVoyage(player.getUuid()))   // 北辰号上的人不在这一局里（ADR-0083）
+                    .forEach(player -> player.sendMessage(
+                            Text.translatable("heavyseas.game.crashed").formatted(Formatting.RED), true));
+            component.end();
+            sync(world);
+            MistSea.restoreAll(world, component);
+        } catch (RuntimeException again) {
+            LOGGER.error("对局出错后收场时又出错（{}）：会话已尽量收起，剩下的靠 /seas end 或重启清", what, again);
+            if (component.session().isPresent()) {
                 component.end();
-                sync(world);
-                MistSea.restoreAll(world, component);
             }
         }
     }
@@ -548,6 +619,12 @@ public final class GameFlow {
         component.clearProvision();
         component.clearHelm();
         component.clearThirst();
+        // 审查 2026-10-07 R7：站队 / 押武器、举着拳头找人、落海这三扇窗原先不收 —— 分数已经在终局开头算定，
+        //   它们到点照样结算（打架掉血、落海受伤、举拳的人还能宣告一场新打架），计分面板与局面对不上。
+        component.clearContest();
+        DesignationPhase.clear(world, component);
+        component.setOverboardDeadline(0L);
+        component.setStandInsOverboard(false);
         announceOutcome(world, component);
     }
 
@@ -592,20 +669,11 @@ public final class GameFlow {
      * 写成 switch 之后，加一个枚举值编译期就红，键漏没漏也由构建期的闸门查得到。
      */
     private static Text conditionName(Condition condition) {
-        return Text.translatable(switch (condition) {
-            case CONSCIOUS -> "heavyseas.condition.conscious";
-            case UNCONSCIOUS -> "heavyseas.condition.unconscious";
-            case DEAD -> "heavyseas.condition.dead";
-        });
+        return io.github.heavyseasmc.mod.ui.GameLabels.conditionName(condition);
     }
 
     private static Text phaseName(Phase phase) {
-        return Text.translatable(switch (phase) {
-            case WEATHER -> "heavyseas.phase.weather";
-            case PROVISION -> "heavyseas.phase.provision";
-            case ACTION -> "heavyseas.phase.action";
-            case NAVIGATION -> "heavyseas.phase.navigation";
-        });
+        return io.github.heavyseasmc.mod.ui.GameLabels.phaseName(phase);
     }
 
     private static String outcomeKey(GameState.Outcome outcome) {

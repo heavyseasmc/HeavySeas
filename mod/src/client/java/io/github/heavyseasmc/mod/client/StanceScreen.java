@@ -155,6 +155,8 @@ public final class StanceScreen extends GameScreen {
      */
     private boolean confirm(int i) {
         ActionCard c = CARDS.get(i);
+        // 这一段我答过了：服务端随即可能把窗口收短（该答的真人都答了），收短不是一扇新窗 —— 不能再把这一面弹回来（U14）
+        HeavySeasClient.answeredContest(view);
         if (c == ActionCard.WATCH) {
             ClientPlayNetworking.send(ContestActionC2S.of(ContestActionC2S.Kind.STAND_ASIDE));
             LOGGER.info("站队：确认「WATCH」，告诉服务端不加入");
@@ -184,11 +186,11 @@ public final class StanceScreen extends GameScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
         if (cards.keyPressed(keyCode, this::confirm)) {
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.onKey(keyCode, scanCode, modifiers);
     }
 
     /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */

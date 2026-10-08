@@ -44,6 +44,8 @@ public final class StandInEntity extends LivingEntity {
     /** 它替的是哪个角色（引擎的角色 id）。客户端按它挑皮肤。 */
     private static final TrackedData<String> CHARACTER =
             DataTracker.registerData(StandInEntity.class, TrackedDataHandlerRegistry.STRING);
+    private static final TrackedData<Boolean> DESIGNATING =
+            DataTracker.registerData(StandInEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
     public static final EntityType<StandInEntity> TYPE = EntityType.Builder
             .<StandInEntity>create(StandInEntity::new, SpawnGroup.MISC)
@@ -76,10 +78,20 @@ public final class StandInEntity extends LivingEntity {
         dataTracker.set(CHARACTER, id);
     }
 
+    public boolean isDesignating() {
+        return dataTracker.get(DESIGNATING);
+    }
+
+    public void setDesignating(boolean raised) {
+        dataTracker.set(DESIGNATING, raised);
+        setGlowing(raised);
+    }
+
     @Override
     protected void initDataTracker(DataTracker.Builder builder) {
         super.initDataTracker(builder);
         builder.add(CHARACTER, "");
+        builder.add(DESIGNATING, false);
     }
 
     @Override

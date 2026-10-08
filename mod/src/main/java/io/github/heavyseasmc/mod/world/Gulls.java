@@ -77,7 +77,7 @@ public final class Gulls {
 
     /** 这一局的布局；对局外（收摊时）退回默认布局 —— 那时只用来算个声音位置。 */
     private static VoyageLayout layoutOf(GameComponent component) {
-        return component.layoutId().map(SceneDataLoader::require).orElseGet(SceneDataLoader::defaultLayout);
+        return component.layout().orElseGet(SceneDataLoader::defaultLayout);   // 这一局用开局快照（审查 2026-10-07 C6）
     }
 
     public static void clear(ServerWorld world, GameComponent component) {
