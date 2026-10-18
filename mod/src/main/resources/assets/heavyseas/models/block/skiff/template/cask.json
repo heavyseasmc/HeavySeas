@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#side"},
+  "elements": [
+    {"from": [1, 1.5, 4.5], "to": [15, 9.5, 11.5], "faces": {"west": {"texture": "#head", "uv": [0, 0, 16, 16]}, "east": {"texture": "#head", "uv": [0, 0, 16, 16]}, "up": {"texture": "#side", "uv": [1, 0, 15, 16]}, "north": {"texture": "#side", "uv": [1, 0, 15, 16]}, "south": {"texture": "#side", "uv": [1, 0, 15, 16]}, "down": {"texture": "#side", "uv": [1, 0, 15, 16]}}},
+    {"from": [3, 0.5, 3.5], "to": [13, 10.5, 12.5], "faces": {"up": {"texture": "#side", "uv": [3, 0, 13, 16]}, "north": {"texture": "#side", "uv": [3, 0, 13, 16]}, "south": {"texture": "#side", "uv": [3, 0, 13, 16]}, "down": {"texture": "#side", "uv": [3, 0, 13, 16]}}},
+    {"from": [5.5, 0, 3], "to": [10.5, 11, 13], "faces": {"up": {"texture": "#side", "uv": [5, 0, 11, 16]}, "north": {"texture": "#side", "uv": [5, 0, 11, 16]}, "south": {"texture": "#side", "uv": [5, 0, 11, 16]}, "down": {"texture": "#side", "uv": [5, 0, 11, 16]}}},
+    {"from": [1, 0, 6], "to": [3, 1.5, 10], "faces": {"north": {"texture": "#side"}, "south": {"texture": "#side"}, "east": {"texture": "#side"}, "west": {"texture": "#side"}, "up": {"texture": "#side"}}},
+    {"from": [13, 0, 6], "to": [15, 1.5, 10], "faces": {"north": {"texture": "#side"}, "south": {"texture": "#side"}, "east": {"texture": "#side"}, "west": {"texture": "#side"}, "up": {"texture": "#side"}}}
+  ]
+}

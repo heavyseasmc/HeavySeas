@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/pilaster_plinth_skirting",
+  "textures": {
+    "b": "heavyseas:block/liner/pilaster_base",
+    "k": "heavyseas:block/liner/skirting",
+    "p": "heavyseas:block/liner/pilaster",
+    "particle": "heavyseas:block/liner/pilaster"
+  }
+}

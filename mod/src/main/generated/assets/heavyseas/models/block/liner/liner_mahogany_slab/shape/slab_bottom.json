@@ -1,0 +1,12 @@
+{
+  "parent": "heavyseas:block/liner/template/shape/slab_bottom",
+  "textures": {
+    "down": "heavyseas:block/liner/mahogany",
+    "east": "heavyseas:block/liner/mahogany",
+    "north": "heavyseas:block/liner/mahogany",
+    "particle": "heavyseas:block/liner/mahogany",
+    "south": "heavyseas:block/liner/mahogany",
+    "up": "heavyseas:block/liner/mahogany",
+    "west": "heavyseas:block/liner/mahogany"
+  }
+}

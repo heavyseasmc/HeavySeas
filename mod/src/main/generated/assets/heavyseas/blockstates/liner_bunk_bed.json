@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,part=foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_foot",
+      "y": 90
+    },
+    "facing=east,part=head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_head",
+      "y": 90
+    },
+    "facing=east,part=upper_foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_foot",
+      "y": 90
+    },
+    "facing=east,part=upper_head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_head",
+      "y": 90
+    },
+    "facing=north,part=foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_foot"
+    },
+    "facing=north,part=head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_head"
+    },
+    "facing=north,part=upper_foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_foot"
+    },
+    "facing=north,part=upper_head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_head"
+    },
+    "facing=south,part=foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_foot",
+      "y": 180
+    },
+    "facing=south,part=head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_head",
+      "y": 180
+    },
+    "facing=south,part=upper_foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_foot",
+      "y": 180
+    },
+    "facing=south,part=upper_head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_head",
+      "y": 180
+    },
+    "facing=west,part=foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_foot",
+      "y": 270
+    },
+    "facing=west,part=head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_head",
+      "y": 270
+    },
+    "facing=west,part=upper_foot": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_foot",
+      "y": 270
+    },
+    "facing=west,part=upper_head": {
+      "model": "heavyseas:block/liner/liner_bunk_bed/prop/bunk_bed_upper_head",
+      "y": 270
+    }
+  }
+}

@@ -1,0 +1,2045 @@
+// Fabric 模组（目标 Minecraft 1.21.1）。
+//
+// ❗依赖方向只能是 mod → engine。engine 那一侧由它自己的依赖白名单机械地拦；
+//   这里要守的是另一半：玩家机器上，引擎的类由谁提供。
+
+plugins {
+    id 'fabric-loom'
+}
+
+base {
+    archivesName = 'heavyseas'
+}
+
+// Opt-in private artifact only; ordinary builds and source jars never depend on private audio.
+apply from: 'audio.gradle'
+
+loom {
+    // 客户端专用的代码（HUD、渲染）只能写在 src/client：main 里引用客户端类，专用服务端上一加载就崩，
+    // 而开发环境与单人游戏都测不出。拆开之后这件事在编译期就失败 —— 拆之前实测，main 能直接编译过那种引用。
+    splitEnvironmentSourceSets()
+    accessWidenerPath = file('src/main/resources/heavyseas.accesswidener')
+}
+
+// 批量生成工具（ADR-0053 §5 · ADR-0056）：救生艇方块的方块状态文件与带贴图的模型，按方块的属性展开。
+// 生成物写进 src/main/generated 并入库（与卡面贴图一样：一份干净的克隆不跑生成器也能构建）；
+// 生成器自己的代码在单独的 datagen 源码集里，不进发给玩家的 jar。重跑：./gradlew :mod:runDatagen
+fabricApi {
+    configureDataGeneration {
+        createSourceSet = true
+        // ❗顺序是实测出来的：splitEnvironmentSourceSets() 必须在这之前（之后再调，它要改的属性已经定死）；
+        //   这一块又必须在 loom.mods 之前 —— Loom 按 modId 登记一份模组 heavyseas（带 datagen 源码集），
+        //   写在后面就与 loom.mods 里那一份撞名（Cannot add a ModSettings with name 'heavyseas'）。
+        //   不给 modId 也不行 —— Loom 要么要它、要么要 datagen 源码集里另有一份 fabric.mod.json（实测）。
+        modId = 'heavyseas'
+        strictValidation = false   // 大厅船那一块是手写的方块状态，不归生成器管
+    }
+}
+
+loom {
+    mods {
+        heavyseas {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+            sourceSet sourceSets.datagen
+        }
+    }
+
+    // 唯一的 mixin 在 client 源码集里（雾，ADR-0034 §5.1.1）。❗这一版 Loom 在 remapJar 时直接把 mixin 注解里的
+    //   目标翻成中间名（实测：jar 里的 BackgroundRendererMixin 引用的是 class_758 / method_3211），**不生成 refmap**。
+    //   第一版在 mixins.json 里写了 "refmap"，jar 里却没有那个文件 —— 开发客户端照样能注入，生产客户端只会多一行警告。
+    //   所以 mixins.json 不写 refmap；下面的 checkMixinRemapped 守着「生产 jar 里的 mixin 真的翻过了」。
+}
+
+repositories {
+    maven {
+        name = 'Ladysnake'
+        url = 'https://maven.ladysnake.org/releases'
+    }
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+    }
+    // Forge Config API Port 的作者自己的仓库（ADR-0099 §2.2）。只认这一组，别的依赖不许从这里解析。
+    maven {
+        name = 'Fuzs'
+        url = 'https://raw.githubusercontent.com/Fuzss/modresources/main/maven/'
+        content {
+            includeGroup 'fuzs.forgeconfigapiport'
+        }
+    }
+    // GeckoLib 作者的仓库（ADR-0109 §2 第二版：柜子开合的门 / 抽屉 / 箱盖由它慢慢画开）。只认这一组。
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+        content {
+            includeGroup 'software.bernie.geckolib'
+        }
+    }
+    // Mod Menu 的仓库（ADR-0099 D5）。同样只认这一组。
+    maven {
+        name = 'TerraformersMC'
+        url = 'https://maven.terraformersmc.com/releases/'
+        content {
+            includeGroup 'com.terraformersmc'
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings "net.fabricmc:yarn:${yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    // Cardinal Components：对局状态的承载层（决策 ⑫）。JIJ 进本模组，玩家不必单独下载。
+    // base 是框架，world 是「World 级组件」那一半 —— 座位数据只能放这一级，理由见 gradle.properties。
+    modImplementation "org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}"
+    modImplementation "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
+    include "org.ladysnake.cardinal-components-api:cardinal-components-base:${cca_version}"
+    include "org.ladysnake.cardinal-components-api:cardinal-components-world:${cca_version}"
+
+    // Forge Config API Port：设置的存储层（ADR-0099 D1 · D2）。与 CCA 一样 JIJ 进本模组（D9 (a)），玩家不必单独装。
+    // ❗它的 POM 把 fabric-api 0.116.x 与 fabric-loader 当编译依赖：不排除的话 Gradle 取高版本，开发环境的 Fabric API
+    //   被悄悄拉高到下限之上 —— 而「按下限编译」正是 gradle.properties 那两行的全部意义（用了只有新版才有的东西就当场红）。
+    //   Night Config 不排除：它打包在 FCAP 自己的 jar 里，编译期要它的类型（ModConfigSpec 的签名里有它）。
+    modImplementation("fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}") {
+        exclude group: 'net.fabricmc.fabric-api'
+        exclude group: 'net.fabricmc', module: 'fabric-loader'
+    }
+    include "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}"
+
+    // GeckoLib（ADR-0109 §2 第二版，用户 2026-10-17 选「内置」）：柜子的门 / 抽屉 / 箱盖按骨骼动画慢慢开合。JIJ，玩家不必单独装。
+    // ❗它的 POM 同样把 fabric-api 0.116.x 与 fabric-loader 0.16.14 当运行时依赖：照 FCAP 那一条排除，不许把下限拉高。
+    modImplementation("software.bernie.geckolib:geckolib-fabric-${minecraft_version}:${geckolib_version}") {
+        exclude group: 'net.fabricmc.fabric-api'
+        exclude group: 'net.fabricmc', module: 'fabric-loader'
+    }
+    include "software.bernie.geckolib:geckolib-fabric-${minecraft_version}:${geckolib_version}"
+
+    // Mod Menu（ADR-0099 D5）：可选。只有客户端那一个入口类（ModMenuEntry）编译期要它的 API；不打包、不进开发运行时，
+    // fabric.mod.json 里是 suggests —— 玩家没装它游戏照样起得来。transitive = false：它的 POM 带的 Fabric API 不许把开发环境拉高。
+    modClientCompileOnly("com.terraformersmc:modmenu:${modmenu_version}") {
+        transitive = false
+    }
+
+    // M5 只需要 Simple Voice Chat 自带的距离衰减，不注册会改变频道/窃听规则的 API 插件。
+    // 只进开发运行时：生产 metadata 用 suggests 保持真正的软依赖。
+    modRuntimeOnly "maven.modrinth:simple-voice-chat:${voicechat_version}"
+
+    // 引擎不是 Fabric 模组，只是一个普通 jar：编译期直接依赖，打包时嵌进本模组的 jar。
+    // ❗不嵌的话开发环境照样能跑（引擎就在类路径上），玩家那边却是 NoClassDefFoundError ——
+    //   所以「runServer 起得来」证明不了这一行写对了，只有生产环境启动才证明得了。
+    // 引擎的 Gson 不嵌：生产环境里用的是 Minecraft 自带的那一份，版本对齐见 engine/build.gradle。
+    implementation project(':engine')
+    include project(':engine')
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    // 测试经 Knot 起 Minecraft 的类（yarn 的包访问修正与访问放宽都要它）；testImplementation 已含运行时，不再另写一行
+    testImplementation "net.fabricmc:fabric-loader-junit:${loader_version}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// fabric.mod.json 里的版本约束全部从 gradle.properties 展开，JSON 里不另写一份。
+// minecraft 展开成精确版本而不是 ~x.y.z：实测 Fabric 的 ~1.21.1 会放行 1.21.2 与 1.21.11。
+def modMetadata = [
+    version           : project.version.toString(),
+    minecraft_version : minecraft_version,
+    loader_version    : loader_version,
+    fabric_api_version: fabric_api_version,
+    java_version      : java_version,
+    cca_version       : cca_version,
+    forge_config_api_port_version: forge_config_api_port_version,
+    geckolib_version  : geckolib_version,
+]
+
+processResources {
+    inputs.properties modMetadata
+    // Ship the exact license texts and their scope with both normal and extended game jars.
+    from(rootProject.projectDir) {
+        include 'LICENSE', 'LICENSE-ASSETS', 'NOTICE'
+        into 'META-INF/heavyseas-licenses'
+    }
+    filesMatching('fabric.mod.json') {
+        expand modMetadata
+    }
+
+    // 数值数据以内置数据包的形式进 jar：仓库根的 data/ → jar 里的 data/heavyseas/。
+    // ❗**不在模组资源里放第二份拷贝。** 引擎单测读的是仓库根那一份，模组读的是 jar 里那一份；
+    //   两份各自维护必然漂移（证伪表里那两份 textguard 就是这么分岔的），所以这里只做搬运。
+    // data/README.md 是权属声明，不是数值，不进 jar。
+    from(rootProject.file('data')) {
+        into 'data/heavyseas'
+        include '**/*.json'
+    }
+}
+
+// 上面那条 from 是「复制了几个文件」，复制 0 个与复制成功输出完全一样。
+// 三份数值缺任何一份，模组在运行时才炸；这里让它在构建期就炸。
+def checkBundledData = tasks.register('checkBundledData') {
+    group = 'verification'
+    description = '四份数值数据必须都进了 jar 的内置数据包'
+    def expected = ['roster', 'provisions', 'navigation', 'weather'].collect { "data/heavyseas/${it}/default.json" }
+    // ❗destinationDir 是 File 不是 Provider，用 flatMap 会在执行期炸「cannot be cast to Provider」。
+    def resourceDir = tasks.named('processResources').map { it.destinationDir }
+    inputs.files(tasks.named('processResources'))
+    doLast {
+        def root = resourceDir.get()
+        def missing = expected.findAll { !new File(root, it).isFile() }
+        if (missing) {
+            throw new GradleException((['内置数据包缺文件（仓库根 data/ 没搬进来）：']
+                    + missing.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("内置数据包核对通过：${expected.join('、')}")
+    }
+}
+
+tasks.named('classes') {
+    dependsOn checkBundledData
+}
+
+// 模组测试按写死的相对路径直接读这几处（审查 2026-10-07 G2）：仓库根的 data/ 与 art/cards、本模组源码的文本、build.gradle 本身。
+//   不声明成输入时，Gradle 只看编进类路径的那一份 —— 卡面 SVG、源码里编译后不留痕的改动（注释）、不进 jar 的数据文件改了，
+//   :mod:test 照样 UP-TO-DATE（本地）/ FROM-CACHE（CI），读它们的那几条用例从没重跑。按相对路径记指纹：换个克隆目录不算变。
+//   红测：build-redtests.sh 的 mod-test-inputs（直接问 Gradle 这几个文件在不在 :mod:test 的输入里，外加一个必须答「不在」的对照）。
+tasks.named('test') {
+    // ❗不设 fabric.side：fabric-loader-junit 0.16.1 不设时就按 CLIENT 起 Knot（字节码里是 getProperty("fabric.side", "CLIENT")），
+    //   客户端那几条用例要的 client 环境本来就有。实测设成 server：JUnit 连用例都发现不了（客户端类被剥掉，整个 :mod:test 失败）——
+    //   环境是整个测试 JVM 一份，要收窄只能另拆测试任务与源码集，不值。
+    inputs.dir(rootProject.file('data')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('repoData')
+    inputs.dir(rootProject.file('art/cards')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('cardMasters')
+    inputs.dir(file('src')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('modSourceText')
+    inputs.file(file('build.gradle')).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName('modBuildScript')
+}
+
+// 规则书网页版（ADR-0087 §2「网页版同源」）：与游戏里那本是同一份源文件、同一串块，
+// 第三、十二、十三章的名字与数字一样从 data/ 与 lang 展开。不进 jar、不在门禁里，要看时跑一次。
+tasks.register('rulebookHtml', JavaExec) {
+    group = 'documentation'
+    description = '规则书网页版 → build/rulebook/<语言>.html'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'io.github.heavyseasmc.mod.rulebook.RulebookHtml'
+    def out = layout.buildDirectory.dir('rulebook')
+    args out.get().asFile.path
+    outputs.dir out
+}
+
+// 漏一个 lang 键的表现是界面上出现一行 `heavyseas.command.foo` 的原文 ——
+// 游戏照跑，没有任何报错，也没有任何日志。正因为它安静，才必须在构建期拦。
+//
+// 判据只认**字面量**：代码里的 lang 键一律写成常量或 switch，不拼字符串
+// （GameFlow 里那三个 switch 就是为这条改的）。唯一的例外是角色那一族 ——
+// 角色 id 来自 data/roster，代码里没有那张表，所以单独按数据核对。
+def checkLangKeys = tasks.register('checkLangKeys') {
+    group = 'verification'
+    description = '代码里用到的 lang 键必须在两份 lang 文件里都有，且两份键集相同'
+    def sources = files(sourceSets.main.allJava, sourceSets.client.allJava)
+    def langDir = file('src/main/resources/assets/heavyseas/lang')
+    def rosterFile = rootProject.file('data/roster/default.json')
+    def provisionFile = rootProject.file('data/provisions/default.json')
+    inputs.files(sources, rosterFile, provisionFile)
+    inputs.dir(langDir)
+    doLast {
+        def slurper = new groovy.json.JsonSlurper()
+        def zh = slurper.parse(new File(langDir, 'zh_cn.json'), 'UTF-8') as Map
+        def en = slurper.parse(new File(langDir, 'en_us.json'), 'UTF-8') as Map
+
+        def problems = []
+        def onlyZh = zh.keySet() - en.keySet()
+        def onlyEn = en.keySet() - zh.keySet()
+        onlyZh.each { problems << "只有 zh_cn 有：${it}" }
+        onlyEn.each { problems << "只有 en_us 有：${it}" }
+
+        // 两族键：界面文案 heavyseas.*，以及键位那一族 key.categories.heavyseas / key.heavyseas.*。
+        // ❗第二族单独写一条，是因为它**不以 heavyseas 开头** —— 漏了它，
+        //   键位设置里会直接显示 `key.heavyseas.hand` 这行原文，而游戏照跑、没有任何报错。
+        def pattern = ~/"(heavyseas\.[A-Za-z0-9_.]+|key\.[A-Za-z0-9_.]*heavyseas[A-Za-z0-9_.]*)"/
+        def used = [] as Set
+        sources.each { f ->
+            // 以 . 结尾的是拼接用的前缀（唯一一处：角色那一族），不是键本身。
+            f.getText('UTF-8').findAll(pattern) { whole, key ->
+                if (!key.endsWith('.')) {
+                    used << key
+                }
+            }
+        }
+        if (used.isEmpty()) {
+            // 正向对照：扫到 0 个与「全都有」输出一样。至少 /seas 的报错键该在。
+            throw new GradleException('一个 lang 键都没扫到 —— 判据坏了，不是代码干净')
+        }
+        // 第二族也要各自有正向对照：只写一条 isEmpty，键位那一族整族扫不到时照样是绿的。
+        if (!used.any { it.startsWith('key.') }) {
+            throw new GradleException('键位那一族一个都没扫到 —— 正则的第二个分支坏了，不是真的没有键位')
+        }
+        (used - zh.keySet()).sort().each { problems << "代码用到但 lang 里没有：${it}" }
+
+        // 角色那一族按数据核对：加一个角色而忘了加译名，同样是安静的。
+        def roster = slurper.parse(rosterFile, 'UTF-8') as Map
+        roster.characters.each { c ->
+            // ❗.toString() 不能省：GString 与 String 的 hashCode 不同，
+            //   containsKey 会对每一个键都返回 false —— 一道永远报错的闸门，和永远放行的一样坏。
+            def key = "heavyseas.character.${c.id}".toString()
+            if (!zh.containsKey(key)) {
+                problems << "data/roster 有角色 ${c.id}，但 lang 里没有 ${key}"
+            }
+        }
+
+        // 物资那一族同理：牌名与**提示签上那一句效果**都是拼出来的键，上面那一轮正则扫不到。
+        // ❗加一张牌而忘了写那一句，屏幕上只会出现键名原文 —— 不报错，只是没人知道这张牌做什么。
+        def provisions = slurper.parse(provisionFile, 'UTF-8') as Map
+        provisions.cards.each { c ->
+            ["heavyseas.provision.${c.id}".toString(),
+             "heavyseas.provision.${c.id}.effect".toString()].each { key ->
+                if (!zh.containsKey(key)) {
+                    problems << "data/provisions 有 ${c.id}，但 lang 里没有 ${key}"
+                }
+            }
+            def cat = "heavyseas.category.${c.category}".toString()
+            if (!zh.containsKey(cat)) {
+                problems << "data/provisions 里的类别 ${c.category} 在 lang 里没有 ${cat}"
+            }
+        }
+
+        if (problems) {
+            throw new GradleException((['lang 键核对失败：'] + problems.collect { '  - ' + it })
+                    .join(System.lineSeparator()))
+        }
+        logger.lifecycle("lang 键核对通过：代码用到 ${used.size()} 个，两份 lang 各 ${zh.size()} 个，" +
+                "角色 ${roster.characters.size()} 个都有译名，物资 ${provisions.cards.size()} 张都有牌名与效果句")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkLangKeys
+}
+
+// ADR-0093 B13 · B8：物品名与创造物品栏。两件事在游戏里都不报错 ——
+//   ① 名字带括号或「 · 」（用户 2026-10-07「物品名后面不要带括号」：说明写进名字；分不开的写进 <键>.desc，名字下面那一行灰字）
+//   ② 页表（CreativeTabs）漏了一件、写了两次、写了没登记的 id —— 物品栏里只是「找不到」
+// 名字从两份 lang 读；登记的物品从各族源码的登记写法读，与页表不同源。起服时 CreativeTabs 还会照 Registries 再核一遍。
+def checkItemCatalog = tasks.register('checkItemCatalog') {
+    group = 'verification'
+    description = '物品名不带括号与「 · 」· 每件登记的物品在创造物品栏里恰好出现一次（场景用的几件除外）'
+    // 任务属性：红测要能把它们指向造坏的副本（docs/tools/build-redtests.sh）
+    ext.langDir = file('src/main/resources/assets/heavyseas/lang')
+    ext.tabsSource = file('src/main/java/io/github/heavyseasmc/mod/world/CreativeTabs.java')
+    ext.mainSource = file('src/main/java')
+    inputs.dir(ext.langDir)
+    inputs.file(ext.tabsSource)
+    inputs.dir(ext.mainSource)
+    doLast { Task t ->
+        def problems = []
+        def slurper = new groovy.json.JsonSlurper()
+        def names = 0
+        ['zh_cn', 'en_us'].each { lang ->
+            def m = slurper.parse(new File(t.ext.langDir, "${lang}.json"), 'UTF-8') as Map
+            m.each { k, v ->
+                if (k ==~ /(block|item|entity)\.heavyseas\.[a-z0-9_]+/) {
+                    names++
+                    if (v =~ /[()（）\[\]【】]/ || v.contains(' · ')) {
+                        problems << "${lang}：${k} =「${v}」—— 名字里有括号或「 · 」（说明写进名字；分不开的写进 ${k}.desc）"
+                    }
+                }
+            }
+        }
+        if (names < 200) {
+            throw new GradleException("只认出 ${names} 条物品名 —— 判据坏了，不是名字干净")
+        }
+
+        // 页表：「页表开始」与「页表结束」之间的每个字符串字面量（页 id 是 p<数字>_…）
+        def tabs = t.ext.tabsSource.getText('UTF-8')
+        int a = tabs.indexOf('// ---- 页表开始'), b = tabs.indexOf('// ---- 页表结束')
+        if (a < 0 || b < a) {
+            throw new GradleException("${t.ext.tabsSource.name} 里找不到「页表开始 / 页表结束」—— 判据坏了")
+        }
+        def pages = [:]
+        def listed = []
+        String page = null
+        tabs.substring(a, b).findAll(/"([a-z0-9_]+)"/) { whole, id ->
+            if (id ==~ /p\d_[a-z_]+/) {
+                page = id
+                pages[page] = 0
+            } else {
+                listed << id
+                pages[page] = pages[page] + 1
+            }
+        }
+        def exempt = [] as Set
+        def ex = tabs =~ /NOT_IN_TABS = Set\.of\(([^;]*)\);/
+        if (ex.find()) {
+            ex.group(1).findAll(/"([a-z0-9_]+)"/) { whole, id -> exempt << id }
+        }
+
+        // 登记的物品：各族的登记写法（与 checkLinerBlocks 同一套）· 直接按 id 登记物品的 · 场景物品
+        def registered = [] as Set
+        def files = project.fileTree(t.ext.mainSource).matching { include '**/*.java' }.files
+        files.each { File f ->
+            def text = f.getText('UTF-8')
+            if (f.name ==~ /(Liner(Blocks|Props|Glass|Hull|Doors|Stairs|Lift|Shapes)|SkiffBlocks)\.java/) {
+                text.findAll(/(?:add|frame|prop|glass|hull|door|window|lift)\("((?:liner|skiff)_[a-z0-9_]+)"/) { whole, id -> registered << id }
+            }
+            text.findAll(/Registries\.ITEM, Identifier\.of\(HeavySeasMod\.MOD_ID, "([a-z0-9_]+)"\)/) { whole, id -> registered << id }
+            if (f.name == 'SceneItems.java') {
+                text.findAll(/register\("([a-z0-9_]+)"/) { whole, id -> registered << id }
+            }
+        }
+        // 正向对照：每一种登记写法都得认出东西来，否则「没登记」与「没在扫」一样
+        ['liner_wall', 'liner_sofa_cream', 'liner_window_2x2', 'liner_door_cabin', 'liner_lift_gate', 'liner_balustrade', 'skiff_hull',
+         'gull_spawn_egg', 'chart_ship', 'liner_teak_slab'].each {
+            if (!registered.contains(it)) {
+                throw new GradleException("登记的物品里没认出 ${it}（共认出 ${registered.size()} 件）—— 判据坏了")
+            }
+        }
+
+        def seen = [] as Set
+        listed.each { id ->
+            if (!seen.add(id)) {
+                problems << "${id} 在物品栏里出现了两次"
+            }
+            if (!registered.contains(id)) {
+                problems << "物品栏里的 ${id} 没有登记"
+            }
+        }
+        (registered - seen - exempt).sort().each { problems << "${it} 没进物品栏的任何一页（场景用的写进 NOT_IN_TABS）" }
+        (exempt - registered).sort().each { problems << "NOT_IN_TABS 里的 ${it} 没有登记" }
+
+        if (problems) {
+            throw new GradleException((['物品目录核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        t.logger.lifecycle("物品目录核对通过：两份 lang 共 ${names} 条名字不带括号 · 登记 ${registered.size()} 件 = " +
+                "物品栏 ${listed.size()} 件（${pages.collect { k, v -> "$k $v" }.join(' · ')}）+ 不进物品栏 ${exempt.size()} 件（场景用 · 骑缝吸顶灯）")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkItemCatalog
+}
+
+// Java 源码去掉注释（行注释与块注释）再交给源码判据（审查 2026-10-07 G4）：判据问「源码里有没有这一行」，
+//   注释掉的那一行也算「有」—— 接线被注释掉，代码照样编译，闸门照样绿。字符串、文本块与字符字面量里的 // 与 /* 原样保留；
+//   注释换成等长的空白、换行留着，行号不变。
+def stripJavaComments = { String src ->
+    src.replaceAll(~/(?s)"""(?:[^\\]|\\.)*?"""|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|\/\/[^\n]*|\/\*.*?\*\//) { String m ->
+        m.startsWith('/') ? m.replaceAll(/[^\n]/, ' ') : m
+    }
+}
+
+// 通知侧栏有两条容易“看起来代码都在、实机却完全看不见”的约束：
+//   ① HudRenderCallback 比 Screen 先画，GameScreen 打开的那一帧必须改由 afterRender 画；
+//   ② GameScreen 不改写 width（压暗铺满整窗）；日志钉住时让出右栏由预算（PaneBudget）给，
+//      各面横向只排在界面那一块里（2026-10-13 起），日志只画在让出来的那一栏，让不出就不画。
+// 这两条是 Fabric/Minecraft 回调接线，普通 JVM 单测触不到；
+// 这里把接线本身做成源码闸门，防止以后“整理回调”时安静地退回错误层级。
+def checkNotificationSidebarIntegration = tasks.register('checkNotificationSidebarIntegration') {
+    group = 'verification'
+    description = 'GameScreen 不改写 width、横向排在界面那一块里，并在 Screen 完成后才绘制通知侧栏'
+    // 任务属性而不是局部变量：红测要能把它们指向造坏的副本（docs/tools/build-redtests.sh 的 sidebar-*）
+    ext.entryFile = file('src/client/java/io/github/heavyseasmc/mod/client/HeavySeasClient.java')
+    ext.hookFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreenSidebar.java')
+    ext.hudFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameHud.java')
+    ext.screenFile = file('src/client/java/io/github/heavyseasmc/mod/client/GameScreen.java')
+    ext.materialFile = file('src/client/java/io/github/heavyseasmc/mod/client/GuiMaterial.java')
+    def gameScreenSources = fileTree('src/client/java/io/github/heavyseasmc/mod/client') {
+        include '*Screen.java'
+    }
+    inputs.files(ext.entryFile, ext.hookFile, ext.hudFile, ext.screenFile, ext.materialFile, gameScreenSources)
+    doLast { Task t ->
+        // 先去掉注释再查：注释掉的接线也是「源码里有这一行」（审查 2026-10-07 G4，红测 build-redtests.sh 的 sidebar-*）
+        def entry = stripJavaComments(t.ext.entryFile.getText('UTF-8'))
+        def hook = stripJavaComments(t.ext.hookFile.getText('UTF-8'))
+        def hud = stripJavaComments(t.ext.hudFile.getText('UTF-8'))
+        def screen = stripJavaComments(t.ext.screenFile.getText('UTF-8'))
+        def problems = []
+
+        if (!entry.contains('GameScreenSidebar.register();')) {
+            problems << '客户端入口没有注册 GameScreenSidebar'
+        }
+        if ([hook, hud, screen].any { it.contains('reserveNotificationSidebar') || it.contains('sidebarLayout(') }
+                || java.util.regex.Pattern.compile('(?m)^\\s*width\\s*[-+*/]?=').matcher(screen).find()) {
+            problems << 'GameScreen 不得为通知浮层改写完整窗口宽度'
+        }
+        // 2026-10-13 用户定：对局界面开着、日志钉住时，界面给日志让出右栏（PaneBudget）；让不出就收起，不盖在界面上。
+        // （同一天早些时候是「界面开着时日志一律不画」，这里要求的是 observeInScreen；被这一条取代。）
+        // 挂在 GameScreen 完成之后的那一支只许经 renderInScreen 画，而 renderInScreen 要先问「让出来了没有」再画
+        if (!hook.contains('ScreenEvents.afterRender(screen).register')
+                || !hook.contains('GameHud.renderInScreen(context, client)')) {
+            problems << '对局界面开着时没有在 GameScreen 完成后经 renderInScreen 画日志'
+        }
+        if (['GameHud.renderSidebar', 'drawDrawer', 'drawRightAboveChat'].any { hook.substring(Math.max(0, hook.indexOf('instanceof GameScreen'))).contains(it) }) {
+            problems << '对局界面那一支绕过 renderInScreen 直接画了航海日志（不问让没让出那一栏）'
+        }
+        def inScreenAt = hud.indexOf('static void renderInScreen(')
+        def inScreen = inScreenAt < 0 ? '' : hud.substring(inScreenAt, Math.min(hud.length(),
+                hud.indexOf('\n    }', inScreenAt) < 0 ? hud.length() : hud.indexOf('\n    }', inScreenAt)))
+        // 同一天第二次定：让出来的那一栏只画航海日志（drawScreenLog），不再照搬世界视图那一整列（drawDrawer：天候卡 + 私密 + 日志）
+        def gate = inScreen.indexOf('budget.logShown()')
+        def drawn = inScreen.indexOf('drawScreenLog(')
+        if (inScreen.isEmpty() || drawn < 0) {
+            problems << '没扫到 GameHud#renderInScreen 画日志的那一段（drawScreenLog）'
+        } else if (!inScreen.contains('PaneBudget budget = PaneWindow.current();') || gate < 0 || gate > drawn) {
+            problems << 'renderInScreen 没先问界面让没让出日志那一栏（PaneWindow.current() 的 logShown）就画了'
+        }
+        if (['drawDrawer(', 'drawSecret(', 'drawWeatherPx('].any { inScreen.contains(it) }) {
+            problems << '对局界面让出来的那一栏只放航海日志：renderInScreen 又画了整列（天候卡 / 只有你看得到）'
+        }
+        // 各面横向一律排在界面那一块里：骨架从预算取、横向用 paneW()，不得再用整窗宽（Screen 的 width · 帧缓冲宽）。
+        // 判据只认「这一行用了整窗宽」这个形状 —— 用了的那一面，日志钉住时就有东西居中到日志底下。
+        if (!screen.contains('return budget().sheet();')) {
+            problems << 'GameScreen#sheet 不是从界面那一块的预算（budget）取的骨架'
+        }
+        def bareWidth = java.util.regex.Pattern.compile('(?<![\\w.])width(?![\\w(])')
+        def wholeWindow = { String name, String text ->
+            if (bareWidth.matcher(text).find()) {
+                problems << "${name} 用整窗宽 width 排版（应为 paneW()，日志钉住时界面只有左边那一块）"
+            }
+            if (text.contains('getFramebufferWidth()')) {
+                problems << "${name} 读帧缓冲宽排版（应从 budget() 取界面那一块）"
+            }
+        }
+        wholeWindow('GameScreen.java', screen.replace('this.width', ''))
+        def skipsHudLayer = java.util.regex.Pattern.compile(
+                'if \\(client\\.currentScreen instanceof GameScreen\\) \\{\\s*return;\\s*\\}',
+                java.util.regex.Pattern.DOTALL).matcher(hud).find()
+        if (!skipsHudLayer) {
+            problems << '普通 HudRenderCallback 没有跳过 GameScreen，会在错误层级重复绘制'
+        }
+        // 「整窗压暗」自 ADR-0037 起归 GuiMaterial.dimWorld：铺底要调它，而它铺的必须是整个窗口 ——
+        // 纸板外的浮层也需要一致的底色。
+        def material = stripJavaComments(t.ext.materialFile.getText('UTF-8'))
+        // 2026-09-30 起那一层是样张的 .dimmer（ADR-0047）：按帧缓冲的全宽全高画，照样是整个窗口。
+        if (!screen.contains('GuiMaterial.dimWorld(context);')
+                || !material.contains('hudPart(context, HudPart.DIMMER, 0, 0, window.getFramebufferWidth(), window.getFramebufferHeight(),')) {
+            problems << 'GameScreen 公共底色没有覆盖完整窗口'
+        }
+
+        int subclasses = 0
+        int initOverrides = 0
+        gameScreenSources.each { source ->
+            def text = stripJavaComments(source.getText('UTF-8'))
+            if (!text.contains('extends GameScreen')) {
+                return
+            }
+            subclasses++
+            wholeWindow(source.name, text)
+            if (text.contains('protected void init()')) {
+                initOverrides++
+                def superFirst = java.util.regex.Pattern.compile(
+                        'protected void init\\(\\) \\{\\s*super\\.init\\(\\);',
+                        java.util.regex.Pattern.DOTALL).matcher(text).find()
+                if (!superFirst) {
+                    problems << "${source.name} 的 init 没有先调用 super.init()，公共输入状态未初始化"
+                }
+            }
+        }
+        if (subclasses == 0 || initOverrides == 0) {
+            problems << "GameScreen 子类扫描没有命中（子类 ${subclasses}，init 覆写 ${initOverrides}）"
+        }
+
+        if (problems) {
+            throw new GradleException((['通知侧栏接线核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("通知侧栏接线核对通过：${subclasses} 个 GameScreen 子类（${initOverrides} 个覆写 init）" +
+                '不改写 width、横向排在界面那一块里，afterRender 经 renderInScreen 画侧栏，HUD 层不重复画（注释去掉之后查的）')
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkNotificationSidebarIntegration
+}
+
+// 物资的中文名必须与卡面 SVG 的 <title> 完全一致。
+//
+// 为什么单独一道闸：checkLangKeys 只认**字面量**键，而物资名在界面上是
+// `"heavyseas.provision." + id` 拼出来的 —— 它整族都在那道闸的视野之外。
+// 2026-09-15 实测：把 knife 的译名改成「小刀」、把 rum 从两份 lang 里一起删掉，
+// checkLangKeys 照样打印「核对通过」。
+//
+// 为什么要紧：显示「小刀」而卡面印着「短刀」，**没有任何机器会报错**。
+// 它和漏译不同 —— 漏译会露出键名，不一致则安安静静地一直错下去。
+//
+// 英文名只能查「有且非空」：卡面只印中文，没有可对照的权威英文。
+def checkProvisionNames = tasks.register('checkProvisionNames') {
+    group = 'verification'
+    description = '物资的中文名必须与卡面 SVG 的 <title> 相同；英文名必须有且非空'
+    def dataFile = rootProject.file('data/provisions/default.json')
+    // 做成任务属性而不是局部变量：红测要能把它们指向造坏的副本，而不去改被跟踪的文件。
+    ext.cardDir = rootProject.file('art/cards')
+    ext.langDir = file('src/main/resources/assets/heavyseas/lang')
+    inputs.file(dataFile)
+    inputs.dir(ext.cardDir).optional()
+    inputs.dir(ext.langDir).optional()
+    doLast {
+        File cardDir = ext.cardDir
+        File langDir = ext.langDir
+        def slurper = new groovy.json.JsonSlurper()
+        def zh = slurper.parse(new File(langDir, 'zh_cn.json'), 'UTF-8') as Map
+        def en = slurper.parse(new File(langDir, 'en_us.json'), 'UTF-8') as Map
+        def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
+        if (ids.isEmpty()) {
+            throw new GradleException('data/provisions 里一个 id 都没读到 —— 判据坏了，不是真的没有牌')
+        }
+        // 用单引号字符串而不是斜杠字面量：里头要写 </title>，斜杠会提前结束字面量。
+        def title = java.util.regex.Pattern.compile('<title>([^<]*)</title>')
+
+        def problems = []
+        int compared = 0
+        ids.each { id ->
+            def key = "heavyseas.provision.${id}".toString()
+            def svg = new File(cardDir, "provision.${id}.svg")
+            if (!svg.isFile()) {
+                problems << "data/provisions 有 ${id}，但卡面 ${svg.name} 不在"
+                return
+            }
+            def m = title.matcher(svg.getText('UTF-8'))
+            if (!m.find()) {
+                problems << "${svg.name} 里没有 <title> —— 权威名字无从取"
+                return
+            }
+            // <title> 形如「怒海狂涛 · 物资卡 · 短刀」，末段才是名字。
+            def parts = m.group(1).split(' · ')
+            def authoritative = parts[parts.length - 1].trim()
+            compared++
+            if (!zh.containsKey(key)) {
+                problems << "${id}：zh_cn 里没有 ${key}（SVG 里的名字为「${authoritative}」）"
+            } else if (zh[key] != authoritative) {
+                problems << "${id}：zh_cn 为「${zh[key]}」，SVG 里为「${authoritative}」"
+            }
+            if (!en.containsKey(key)) {
+                problems << "${id}：en_us 里没有 ${key}"
+            } else if (!en[key].toString().trim()) {
+                problems << "${id}：en_us 的 ${key} 是空的"
+            }
+        }
+        // 正向对照：一张都没比到时，「全都对」与「没在比」输出一样。本仓库已实证七次假绿。
+        if (compared == 0) {
+            throw new GradleException('一张物资卡都没比对到 —— 判据坏了，不是名字都对')
+        }
+        if (problems) {
+            throw new GradleException((['物资名与卡面核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("物资名核对通过：${compared} 张与卡面 <title> 完全一致，英文名 ${ids.size()} 个都在")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkProvisionNames
+}
+
+// 天候的 id 来自数据，中文名来自横版 SVG 卡面的 <title>；两边必须一一对应。
+def checkWeatherNames = tasks.register('checkWeatherNames') {
+    group = 'verification'
+    description = '十张天候卡的数据 id、SVG 与中英文名称必须一一对应'
+    def dataFile = rootProject.file('data/weather/default.json')
+    // 做成任务属性：红测能换成造坏的副本，不改被跟踪的卡面与 lang。
+    ext.cardDir = rootProject.file('art/cards')
+    ext.langDir = file('src/main/resources/assets/heavyseas/lang')
+    inputs.file(dataFile)
+    inputs.dir(ext.cardDir).optional()
+    inputs.dir(ext.langDir).optional()
+    doLast {
+        File cardDir = ext.cardDir
+        File langDir = ext.langDir
+        def slurper = new groovy.json.JsonSlurper()
+        def ids = (slurper.parse(dataFile, 'UTF-8') as Map).cards.collect { it.id.toString() }
+        def zh = slurper.parse(new File(langDir, 'zh_cn.json'), 'UTF-8') as Map
+        def en = slurper.parse(new File(langDir, 'en_us.json'), 'UTF-8') as Map
+        def title = java.util.regex.Pattern.compile('<title>([^<]*)</title>')
+        def problems = []
+        ids.each { id ->
+            def svg = new File(cardDir, "weather.${id}.svg")
+            def key = "heavyseas.weather.${id}".toString()
+            if (!svg.isFile()) {
+                problems << "data/weather 有 ${id}，但卡面 ${svg.name} 不在"
+                return
+            }
+            def match = title.matcher(svg.getText('UTF-8'))
+            if (!match.find()) {
+                problems << "${svg.name} 里没有 <title>"
+                return
+            }
+            def parts = match.group(1).split(' · ')
+            def authoritative = parts[parts.length - 1].trim()
+            if (zh[key] != authoritative) {
+                problems << "${id}：zh_cn 为「${zh[key]}」，SVG 里为「${authoritative}」"
+            }
+            if (!en.containsKey(key) || !en[key].toString().trim()) {
+                problems << "${id}：en_us 缺少非空的 ${key}"
+            }
+        }
+        (cardDir.listFiles({ f -> f.name.startsWith('weather.') && f.name.endsWith('.svg') } as FileFilter) ?: [])
+                .each { svg ->
+                    def id = svg.name.substring('weather.'.length(), svg.name.length() - '.svg'.length())
+                    if (!ids.contains(id)) {
+                        problems << "${svg.name} 有卡面，但 data/weather 没有 ${id}"
+                    }
+                }
+        if (ids.size() != 10) {
+            problems << "天候应有 10 张，数据里是 ${ids.size()} 张"
+        }
+        if (problems) {
+            throw new GradleException((['天候名与卡面核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("天候名核对通过：${ids.size()} 张数据、SVG 与中英文名一一对应")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkWeatherNames
+}
+
+// 航海牌的 31 张卡面必须与 data/navigation 一一对应（adr/0020）。
+//
+// 为什么要一道闸：卡面由内部管线生成、产物入库，而**数据在这边**。数据加一张牌、改一个 id，
+// 卡面不会自己跟着变；表现是那一张在 GUI 里画不出来（或画出另一张），而构建、单测、起服全是绿的。
+//
+// 判据取自与卡面正交的来源：id 来自 data，卡面只被问「你自称是谁」（`<title>` 末段）。
+// 英文名那种「有且非空」的软判据在这里不适用 —— 这一族根本没有名字，只有 id。
+def checkNavigationCards = tasks.register('checkNavigationCards') {
+    group = 'verification'
+    description = '每张航海牌都要有对应的卡面 SVG，且 SVG 自称的 id 与数据一致；不许多出没有数据的卡面'
+    def dataFile = rootProject.file('data/navigation/default.json')
+    // 做成任务属性而不是局部变量：红测要能把它指向造坏的副本，而不去改被跟踪的卡面。
+    ext.cardDir = rootProject.file('art/cards')
+    inputs.file(dataFile)
+    inputs.dir(ext.cardDir).optional()
+    doLast {
+        File cardDir = ext.cardDir
+        def ids = (new groovy.json.JsonSlurper().parse(dataFile, 'UTF-8') as Map)
+                .cards.collect { it.id.toString() }
+        if (ids.isEmpty()) {
+            throw new GradleException('data/navigation 里一个 id 都没读到 —— 判据坏了，不是真的没有牌')
+        }
+        // 用单引号字符串而不是斜杠字面量：里头要写 </title>，斜杠会提前结束字面量。
+        def title = java.util.regex.Pattern.compile('<title>([^<]*)</title>')
+        def problems = []
+        int compared = 0
+        ids.each { id ->
+            def svg = new File(cardDir, "nav.${id}.svg")
+            if (!svg.isFile()) {
+                problems << "data/navigation 有 ${id}，但卡面 ${svg.name} 不在"
+                return
+            }
+            def m = title.matcher(svg.getText('UTF-8'))
+            if (!m.find()) {
+                problems << "${svg.name} 里没有 <title> —— 它自称是谁无从问起"
+                return
+            }
+            // <title> 形如「怒海狂涛 · 航海卡 · nav_07」，末段才是 id。
+            def parts = m.group(1).split(' · ')
+            def claimed = parts[parts.length - 1].trim()
+            compared++
+            if (claimed != id) {
+                problems << "${svg.name} 自称 ${claimed}，但它该是 ${id}"
+            }
+        }
+        // 多出来的卡面同样要拦：删一张数据而卡面留着，GUI 会画出一张规则里不存在的牌。
+        def known = ids.collect { "nav.${it}.svg".toString() } as Set
+        (cardDir.listFiles({ f -> f.name.startsWith('nav.') && f.name.endsWith('.svg') } as FileFilter) ?: [])
+                .each { f ->
+            if (!known.contains(f.name)) {
+                problems << "${f.name} 在 art/cards 里，但 data/navigation 里没有这张牌"
+            }
+        }
+        // 正向对照：一张都没比到时，「全都对」与「没在比」输出一样。本仓库已实证八次假绿。
+        if (compared == 0) {
+            throw new GradleException('一张航海卡都没比对到 —— 判据坏了，不是 id 都对')
+        }
+        if (problems) {
+            throw new GradleException((['航海卡面与数据核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("航海卡面核对通过：${compared} 张与 data/navigation 的 id 一一对应")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkNavigationCards
+}
+
+// Minecraft 不认 SVG —— GUI 里能画的只有 PNG。牌面的分层素材由内部管线烘出来并**入库**（ADR-0039）：
+// 边框（每牌型每档一张）· 插画（每张牌一张，透明底）· 卡牌图标 · 牌背三档。生成物入库是有意的，
+// 否则一份干净的克隆构建不出能用的 jar。
+//
+// 这道闸门查的都是安静的失败：
+//   ① 数据里有这张牌、插画却没烘 —— 运行时画一块占位并记一行日志，但构建照样绿；
+//   ② 贴图烘成了 0 字节或不是 PNG —— 无头浏览器那一步失败时正是这样，而它 exit 0；
+//   ③ 贴图小于应有尺寸 —— 缩到小牌时字与线条糊掉（2026-09-15 真实客户端上看到的）；
+//   ④ 比例不对 —— 版面按比例排，不对就被拉伸，拉伸同样不报错；
+//   ⑤ 插画不是透明底 —— 那就等于又烘了一整张牌，边框被它盖住，而屏幕上「看起来还行」。
+// 应有尺寸取自版面描述（layout.json 的 texture），不在这里另写一份 —— 期望值与被测对象同源证明不了任何事，
+// 而与「烘出来的那一份」正交的来源正是版面描述（证伪表：尺寸检查的期望值与渲染同源那一次）。
+def checkCardTextures = tasks.register('checkCardTextures') {
+    group = 'verification'
+    description = '牌面的分层素材：每张牌的插画（透明底）· 每牌型每档的边框 · 秘密牌背三档 · 代码用到的卡牌图标，都在且尺寸、比例对'
+    def dataFile = rootProject.file('data/provisions/default.json')
+    def rosterFile = rootProject.file('data/roster/default.json')
+    def weatherFile = rootProject.file('data/weather/default.json')
+    def navFile = rootProject.file('data/navigation/default.json')
+    def layoutFile = file('src/main/resources/assets/heavyseas/cards/layout.json')
+    // 图标清单取自**用它的那一侧**（拼牌的代码），不是烘它的管线：管线漏烘一枚，这里才看得见。
+    def facesSrc = file('src/main/java/io/github/heavyseasmc/mod/card/CardFaces.java')
+    def painterSrc = file('src/client/java/io/github/heavyseasmc/mod/client/CardPainter.java')
+    // 行动 · 表态 · 站队（ADR-0050）不在 data 里：id 取自用它的那一侧（枚举常量名小写），理由同图标。
+    def actionSrc = file('src/main/java/io/github/heavyseasmc/mod/card/ActionCard.java')
+    // 做成任务属性而不是局部变量：红测要能把它指向一份造坏的目录树，而不去改被跟踪的贴图。
+    ext.cardsDir = file('src/main/resources/assets/heavyseas/textures/gui/cards')
+    inputs.files(dataFile, rosterFile, weatherFile, navFile, layoutFile, facesSrc, painterSrc, actionSrc)
+    inputs.dir(ext.cardsDir).optional()
+    doLast {
+        def slurper = new groovy.json.JsonSlurper()
+        def ids = { File f, String key -> (slurper.parse(f, 'UTF-8') as Map)[key].collect { it.id.toString() } }
+        def cards = [
+                provision: ids(dataFile, 'cards'),
+                character: ids(rosterFile, 'characters'),
+                weather  : ids(weatherFile, 'cards'),
+                nav      : ids(navFile, 'cards'),
+                // ❗不锚行首：枚举常量一行写好几个（ROW(…), SWAP(…), STEAL(…)），第一版按 ^ 取只认出每行第一个 ——
+                //   十张里查了三张，照样打印「核对通过」（2026-10-01 红测删 steal.png 时才照出来）
+                action   : (actionSrc.getText('UTF-8') =~ /\b([A-Z]+)\(Group\.[A-Z]+\)/).collect { it[1].toLowerCase() },
+        ]
+        cards.each { kind, list ->
+            if (list.isEmpty()) {
+                throw new GradleException("data 里一张 ${kind} 都没读到 —— 判据坏了，不是真的没有牌")
+            }
+        }
+        def layout = slurper.parse(layoutFile, 'UTF-8') as Map
+        def tiers = layout.tiers.collect { it.toString() }
+        def texOf = { String kind -> layout.shapes[layout.kinds[kind].shape].texture.collect { it as int } }
+        def icons = [] as TreeSet
+        (facesSrc.getText('UTF-8') =~ /public static final String \w+ = "(\w+)";/).each { icons << it[1] }
+        (painterSrc.getText('UTF-8') =~ /icon\("(\w+)"\)/).each { icons << it[1] }
+        if (icons.size() < 8) {
+            throw new GradleException("代码里只认出 ${icons.size()} 枚卡牌图标 —— 判据的正则坏了，不是图标都在")
+        }
+
+        File root = ext.cardsDir
+        def problems = []
+        def sizes = [] as TreeSet
+        int checked = 0
+        long bytes = 0
+        def checkOne = { String rel, int wantW, int wantH, boolean transparent ->
+            def f = new File(root, rel)
+            if (!f.isFile()) {
+                problems << "缺贴图：${rel}"
+                return
+            }
+            if (f.length() == 0) {
+                problems << "${rel} 是 0 字节 —— 烘制那一步失败了"
+                return
+            }
+            // PNG 头：前 4 字节是签名 89 50 4E 47；IHDR 里宽在第 16–19 字节、高在 20–23（大端）。
+            def head = new byte[24]
+            int got = f.withInputStream { it.read(head) }
+            if (!(got >= 4 && head[0] == (byte) 0x89 && head[1] == (byte) 0x50
+                    && head[2] == (byte) 0x4E && head[3] == (byte) 0x47)) {
+                problems << "${rel} 不是 PNG（签名对不上）"
+                return
+            }
+            def be = { int at ->
+                ((head[at] & 0xff) << 24) | ((head[at + 1] & 0xff) << 16) | ((head[at + 2] & 0xff) << 8) | (head[at + 3] & 0xff)
+            }
+            int w = be(16)
+            int h = be(20)
+            checked++
+            if (w < wantW || h < wantH) {
+                problems << "${rel} 只有 ${w}×${h}，低于 ${wantW}×${wantH} —— 烘制倍数不对，缩小时会糊"
+                return
+            }
+            if ((long) w * wantH != (long) h * wantW) {
+                problems << "${rel} 是 ${w}×${h}，不是 ${wantW}:${wantH} 的比例 —— 版面会把它拉伸"
+                return
+            }
+            if (transparent) {
+                def img = javax.imageio.ImageIO.read(f)
+                if (img == null || ((img.getRGB(2, 2) >>> 24) & 0xff) != 0) {
+                    problems << "${rel} 左上角不透明 —— 插画层带了纸或框，会把边框盖住"
+                    return
+                }
+            }
+            sizes << "${w}×${h}".toString()
+            bytes += f.length()
+        }
+        cards.each { kind, list ->
+            def (tw, th) = texOf(kind)
+            list.each { checkOne("art/${kind}/${it}.png", tw, th, true) }
+            tiers.each { checkOne("frame/${kind}/${it}.png", tw, th, false) }
+        }
+        // 牌背：终局翻牌的暗牌只用 secret（爱恨卡的背面），三档各一张。另两张没有界面在用，不拦。
+        def (bw, bh) = texOf('provision')
+        tiers.eachWithIndex { t, i -> checkOne(i == 0 ? 'back/secret.png' : "back/lod${i}/secret.png", bw, bh, false) }
+        // 图标按贴图自己的宽高比画（ADR-0090：海鸥是扁的、秤砣与箭头是瘦的），所以只查短边够不够；
+        // 圆盘、圆圈与斜线是按正方形画的（CardPainter 里给 d×d），这几枚还得是方的。
+        def squareOnly = ['chip_disc', 'chip_ring', 'strike'] as Set
+        icons.each {
+            if (it in squareOnly) {
+                checkOne("icon/${it}.png", 64, 64, false)
+            } else {
+                def f = new File(root, "icon/${it}.png")
+                if (!f.isFile()) {
+                    problems << "缺贴图：icon/${it}.png"
+                    return
+                }
+                def img = javax.imageio.ImageIO.read(f)
+                checked++
+                if (img == null) {
+                    problems << "icon/${it}.png 读不出来"
+                } else if (Math.min(img.width, img.height) < 64) {
+                    problems << "icon/${it}.png 只有 ${img.width}×${img.height}，短边低于 64 —— 缩小时会糊"
+                } else {
+                    sizes << "${img.width}×${img.height}".toString()
+                    bytes += f.length()
+                }
+            }
+        }
+        // 正向对照：一张都没查到时，「全都对」与「没在查」输出一样。
+        if (checked == 0 && problems.isEmpty()) {
+            throw new GradleException('一张贴图都没查到 —— 判据坏了，不是都对')
+        }
+        if (problems) {
+            throw new GradleException((['GUI 卡面贴图核对失败：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("GUI 贴图核对通过：插画 物资 ${cards.provision.size()} · 角色 ${cards.character.size()} · 天候 ${cards.weather.size()} · 航海 ${cards.nav.size()} · 行动 ${cards.action.size()}（透明底）· 边框 ${cards.size()} 种 × ${tiers.size()} 档 · 牌背 ${tiers.size()} 档 · 图标 ${icons.size()} 枚，尺寸 ${sizes.join('、')}，合计 ${(bytes / 1024) as int} KB")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkCardTextures
+}
+
+// 场景资源（ADR-0034 §5.2.3 · §8.2）：模型与贴图写错了，游戏照跑、没有报错 ——
+// 越界的元素被裁掉、缺的贴图是一块紫黑格子、非 16 倍数的贴图在低档位上糊掉，都只有进了世界才看得见。
+// 判据都读文件本身（JSON 坐标 · PNG 头 · 布局里的 item id），不问加载器怎么说。
+def checkSceneAssets = tasks.register('checkSceneAssets') {
+    group = 'verification'
+    description = '场景模型元素在 [-16, 32]、引用的贴图存在且是 16 的倍数的 PNG、布局里每个 item 有模型、音频都在 NOTICE 里登记'
+    // 任务属性而不是局部变量：红测要能把它们指向造坏的副本，而不去改被跟踪的资源。
+    ext.assetsDir = file('src/main/resources/assets/heavyseas')
+    ext.layoutFile = file('src/main/resources/data/heavyseas/voyage/default.json')
+    ext.noticeFile = rootProject.file('NOTICE')
+    inputs.dir(ext.assetsDir).optional()
+    inputs.file(ext.layoutFile).optional()
+    inputs.file(ext.noticeFile).optional()
+    doLast {
+        def slurper = new groovy.json.JsonSlurper()
+        def problems = []
+        def rel = { File f -> ext.assetsDir.toPath().relativize(f.toPath()).toString().replace('\\', '/') }
+        // PNG 头：8 字节签名 + IHDR 里的宽高（大端）。不经 ImageIO：无头环境下它的行为随平台变。
+        def pngSize = { File f ->
+            def head = new byte[24]
+            f.withInputStream { it.read(head) }
+            def sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+            if ((0..7).any { (head[it] & 0xFF) != sig[it] }) { return null }
+            def be = { int o -> ((head[o] & 0xFF) << 24) | ((head[o + 1] & 0xFF) << 16) | ((head[o + 2] & 0xFF) << 8) | (head[o + 3] & 0xFF) }
+            return [be(16), be(20)]
+        }
+        def modelFiles = []
+        ['item', 'block'].each { kind ->
+            def dir = new File(ext.assetsDir, "models/${kind}")
+            if (dir.isDirectory()) {
+                dir.listFiles({ File f -> f.name.endsWith('.json') } as FileFilter).sort { it.name }.each { modelFiles << it }
+            }
+        }
+        // 正向对照：一个模型都没扫到，「0 处问题」与「没在查」输出完全相同。
+        if (modelFiles.isEmpty()) {
+            throw new GradleException("没在查：${ext.assetsDir} 下 models/item 与 models/block 里一个模型 JSON 都没读到 —— 判据坏了，不是真的没有模型")
+        }
+        def checkedTextures = [] as Set
+        modelFiles.each { File f ->
+            def model = slurper.parse(f, 'UTF-8') as Map
+            (model.elements ?: []).eachWithIndex { el, i ->
+                ['from', 'to'].each { key ->
+                    (el[key] ?: []).eachWithIndex { v, axis ->
+                        if (v < -16 || v > 32) {
+                            problems << "${rel(f)}：元素 ${i} 的 ${key}.${'xyz'[axis]} = ${v}，越界 [−16, 32]"
+                        }
+                    }
+                }
+            }
+            (model.textures ?: [:]).each { name, ref ->
+                def s = ref.toString()
+                if (s.startsWith('#') || !s.startsWith('heavyseas:')) { return }   // 别的命名空间是 Minecraft 自带的，不归这里
+                def png = new File(ext.assetsDir, "textures/${s.substring('heavyseas:'.length())}.png")
+                if (!checkedTextures.add(png.path)) { return }
+                if (!png.isFile()) {
+                    problems << "${rel(f)}：贴图 ${s} 不存在（要 ${rel(png)}）"
+                    return
+                }
+                def size = pngSize(png)
+                if (size == null) {
+                    problems << "${rel(png)}：不是 PNG（签名对不上）"
+                } else if (size[0] % 16 != 0 || size[1] % 16 != 0) {
+                    problems << "${rel(png)}：${size[0]}×${size[1]}，边长不是 16 的倍数"
+                }
+            }
+        }
+        // 布局里出现的每个 item id 都要有物品模型：缺了它，布景 / 箱子在世界里是一块紫黑格子。
+        def layoutItems = [] as List
+        def walk
+        walk = { node ->
+            if (node instanceof Map) {
+                node.each { k, v -> if (k == 'item' && v instanceof CharSequence) { layoutItems << v.toString() } else { walk(v) } }
+            } else if (node instanceof List) {
+                node.each { walk(it) }
+            }
+        }
+        if (ext.layoutFile.isFile()) { walk(slurper.parse(ext.layoutFile, 'UTF-8')) }
+        layoutItems.each { id ->
+            def name = id.contains(':') ? id.substring(id.indexOf(':') + 1) : id
+            if (!new File(ext.assetsDir, "models/item/${name}.json").isFile()) {
+                problems << "布局里的 item ${id}：没有 models/item/${name}.json"
+            }
+        }
+        // 音频（§8.2）：每个 ogg 都要在 NOTICE 里有同名条目。判据与素材正交 —— 文件在、条目不在就红。
+        //   连子目录一起扫：交付布局是 sounds/<类别>/<id>.ogg（audio_gen.py deliver），只扫顶层时一个都扫不到、照样绿（审查 2026-10-07 G6）。
+        //   按整词比、不按子串：NOTICE 里一条以「<id>.ogg」（或 sounds/ 下的相对路径）打头 —— 子串匹配时 huge_wave.ogg
+        //   会被 vo_weather_huge_wave.ogg 那一条顺带放行。
+        def sounds = new File(ext.assetsDir, 'sounds')
+        def oggs = []
+        if (sounds.isDirectory()) {
+            sounds.eachFileRecurse(groovy.io.FileType.FILES) { File f -> if (f.name.endsWith('.ogg')) { oggs << f } }
+        }
+        oggs.sort { rel(it) }
+        def notice = ext.noticeFile.isFile() ? ext.noticeFile.getText('UTF-8') : ''
+        def noticed = notice.readLines().collect { it.trim().split(/\s+/)[0] }.findAll { it.endsWith('.ogg') } as Set
+        oggs.each { File f ->
+            def underSounds = sounds.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+            if (!noticed.contains(f.name) && !noticed.contains(underSounds)) {
+                problems << "${rel(f)}：NOTICE 里没有同名条目（按整词比，一条以「${f.name}」打头；音频必须登记出处与许可）"
+            }
+        }
+        if (problems) {
+            throw new GradleException((['场景资源核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        logger.lifecycle("场景资源核对通过：${modelFiles.size()} 个模型 · ${checkedTextures.size()} 张贴图 · 布局 item ${layoutItems.size()} 个 · 音频 ${oggs.size()} 个")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkSceneAssets
+}
+
+// 结构文件（gzip 的 NBT）读成 Groovy 的 Map / List。救生艇与北辰号两道判据共用这一份（一个实现，ADR-0080 提出来的）。
+def readStructureNbt = { File f ->
+    def input = new DataInputStream(new BufferedInputStream(new java.util.zip.GZIPInputStream(new FileInputStream(f))))
+    def readTag
+    readTag = { int type ->
+        switch (type) {
+            case 1: return input.readByte()
+            case 2: return input.readShort()
+            case 3: return input.readInt()
+            case 4: return input.readLong()
+            case 5: return input.readFloat()
+            case 6: return input.readDouble()
+            case 7: def b = new byte[input.readInt()]; input.readFully(b); return b
+            case 8: return input.readUTF()
+            case 9: def t = input.readByte() as int; def n = input.readInt(); return (0..<n).collect { readTag(t) }
+            case 10:
+                def map = [:]
+                while (true) {
+                    def t = input.readByte() as int
+                    if (t == 0) { return map }
+                    // ❗名字必须先单独读出来：写成 map[input.readUTF()] = readTag(t) 时 Groovy 先算右边，
+                    //   先读了值再读名字，整个流就错位了（实测：读到一半撞上「标签 0」）
+                    def key = input.readUTF()
+                    map[key] = readTag(t)
+                }
+            case 11: return (0..<input.readInt()).collect { input.readInt() }
+            case 12: return (0..<input.readInt()).collect { input.readLong() }
+            default: throw new GradleException("${f.name}：不认识的 NBT 标签 ${type}")
+        }
+    }
+    try {
+        if (input.readByte() != 10) { throw new GradleException("${f.name}：根标签不是 Compound") }
+        input.readUTF()
+        return readTag(10)
+    } finally {
+        input.close()
+    }
+}
+
+// 自制装饰方块（救生艇 ADR-0056 · ADR-0057 · 大邮轮 ADR-0062）：每一族四份来源要互相对得上 ——
+//   方块登记源码 · 批量生成的方块状态与模型（src/main/generated）·
+//   decor_textures.py / liner_decor.py 写进来的模板与贴图（src/main/resources）· 雾海那条艇的结构（boat_hull.nbt，只有救生艇）。
+// 哪一份改了、另一份没跟上，游戏里都不报错：只是某几格成了紫黑格子、整块看不见，或取到图集里别的贴图的颜色
+// （2026-10-02 灯杆横臂实拍成一条蓝紫色，就是贴图坐标越界）。两族同一段判据（按族给参数），不各抄一份。
+def checkDecorBlocks = { Task task, Map fam ->
+        def slurper = new groovy.json.JsonSlurper()
+        def problems = []
+        def rel = { File f -> f.path.replace('\\', '/').replaceFirst('^.*/assets/heavyseas/', '') }
+
+        // 1) Java 里登记了哪些方块（正向对照：一个都没扫到就是判据坏了）。大邮轮的灯与家具（ADR-0063）登记在另一个文件里
+        def sources = [task.ext.blocksSource] + (task.ext.has('extraSources') ? task.ext.extraSources : [])
+        def registered = (sources.collectMany { File src -> (src.getText('UTF-8') =~ fam.registerPattern).collect { it[1].toString() } }) as Set
+        if (registered.isEmpty()) {
+            throw new GradleException("没在查：${task.ext.blocksSource.name} 里一个 add(\"${fam.prefix}…\") 都没扫到 —— 判据坏了，不是没有方块")
+        }
+
+        // 2) 方块状态文件：与登记的方块一一对应
+        def bsDir = new File(task.ext.generatedDir, 'blockstates')
+        def bsFiles = (bsDir.listFiles({ File f -> f.name.startsWith(fam.prefix) && f.name.endsWith('.json') } as FileFilter) ?: []) as List
+        if (bsFiles.isEmpty()) {
+            throw new GradleException("没在查：${bsDir} 下一个 ${fam.prefix}*.json 都没有 —— 判据坏了，或者没跑 ./gradlew :mod:runDatagen")
+        }
+        def stateFiles = bsFiles.collect { (it.name - '.json').toString() } as Set
+        (registered - stateFiles).sort().each { problems << "方块 ${it} 登记了，但没有方块状态文件（改了 ${fam.blocksClass} 之后要重跑 ./gradlew :mod:runDatagen）" }
+        (stateFiles - registered).sort().each { problems << "方块状态文件 ${it}.json 没有对应的方块（${fam.blocksClass} 里删了它，生成物没跟上）" }
+        def variants = [:]
+        def checkedVariants = 0
+        def usedModels = [] as Set
+        // 「组合齐全」比集合，不比条数（审查 2026-10-07 G5）：一项写成了另一项的副本时条数不变 ——
+        //   缺的那一种被重复的那一种掩盖，只数条数的判据照样绿。各属性出现过的取值做笛卡尔积，与写出来的组合求差，
+        //   重复的与缺的各自点名（属性按名字排序拼成键：Minecraft 认的是属性与取值，不认键里的先后）。
+        def comboKey = { Map c -> c.keySet().collect { it.toString() }.sort().collect { "${it}=${c[it]}" }.join(',') }
+        def combosOf = { List<Map> combos ->
+            def vals = [:].withDefault { [] as Set }
+            combos.each { Map c -> c.each { k, v -> vals[k.toString()] << v.toString() } }
+            def seen = [:]
+            combos.each { Map c -> def k = comboKey(c); seen[k] = (seen[k] ?: 0) + 1 }
+            def all = [[:]]
+            vals.keySet().sort().each { String k -> all = all.collectMany { Map partial -> vals[k].sort().collect { v -> partial + [(k): v] } } }
+            [product: all.size(), dups: seen.findAll { k, n -> n > 1 }.keySet().sort(), missing: all.collect { comboKey(it) }.findAll { !seen.containsKey(it) }.sort()]
+        }
+        def sample = { List xs -> xs.size() <= 3 ? xs.toString() : "${xs.take(3)} 等 ${xs.size()} 种".toString() }
+        def comboDetail = { Map r -> "重复 ${r.dups.size()} 种、缺 ${r.missing.size()} 种" + (r.dups ? " —— 重复的 ${sample(r.dups)}" : '') + (r.missing ? " —— 缺的 ${sample(r.missing)}" : '') }
+        bsFiles.each { File f ->
+            def json = slurper.parse(f, 'UTF-8') as Map
+            if (json.multipart != null) {
+                // 多部件（格架上的常春藤，ADR-0080 §7）：同一组属性（when 里出现的那几个属性）算一层；每一层的项数 = 那几个属性
+                //   各自出现过的取值个数之积 —— 与 variants 的「全组合」同一个道理，漏一项游戏里那几格就少一层（不报错）
+                def layers = [:].withDefault { [] }
+                (json.multipart as List).each { part ->
+                    def when = (part.when ?: [:]) as Map
+                    layers[when.keySet().collect { it.toString() }.sort().join(',')] << when
+                    def applies = part.apply instanceof List ? part.apply : [part.apply]
+                    applies.each { usedModels << it.model.toString() }
+                }
+                layers.each { String props, List whens ->
+                    def r = combosOf(whens)
+                    if (r.dups || r.missing) {
+                        problems << "${rel(f)}：多部件模型按 ${props} 分的那一层 ${whens.size()} 项（各属性取值个数之积 ${r.product}），${comboDetail(r)}（漏了哪一种组合，那几格就少画一层）"
+                    }
+                }
+                checkedVariants += (json.multipart as List).size()
+                return
+            }
+            (json.variants as Map).each { k, v -> usedModels << v.model.toString() }
+            // ADR-0062：变体是各属性取值的全部组合。判据只取文件自己的键：哪一个属性出现过哪几个值，它们的每一种组合都要恰好出现一次
+            def combos = (json.variants as Map).keySet().collect { String key ->
+                key ? key.split(',').collectEntries { kv -> def p = kv.split('=', 2); [(p[0]): p[1]] } : [:]
+            }
+            variants[(f.name - '.json').toString()] = combos.collect { comboKey(it) } as Set
+            def count = combos.size()
+            def r = combosOf(combos)
+            if (r.dups || r.missing) {
+                problems << "${rel(f)}：方块状态的变体 ${count} 个（各属性取值个数之积 ${r.product}），${comboDetail(r)}（漏了哪一种组合，游戏里那一格就是紫黑格子）"
+            }
+            checkedVariants += count
+        }
+        // 跨几格的灯与家具（ADR-0063）的物品另有一块「整件缩小」的模板，物品模型直接以它为父 —— 也算用到（模板与贴图照样往下核对）
+        def itemModels = new File(task.ext.generatedDir, 'models/item')
+        registered.each { name ->
+            def f = new File(itemModels, "${name}.json")
+            if (f.isFile() && (slurper.parse(f, 'UTF-8') as Map).parent?.toString()?.startsWith("heavyseas:block/${fam.dir}/template/".toString())) {
+                usedModels << "heavyseas:item/${name}".toString()
+            }
+        }
+
+        // 3) 模型 → 模板 → 贴图
+        def modelFile = { String id ->
+            def path = id.substring(id.indexOf(':') + 1)
+            def g = new File(task.ext.generatedDir, "models/${path}.json")
+            if (g.isFile()) { return g }
+            def r = new File(task.ext.resourcesDir, "models/${path}.json")
+            return r.isFile() ? r : null
+        }
+        def usedTemplates = [] as Set
+        def usedTextures = [] as Set
+        usedModels.sort().each { String id ->
+            def f = modelFile(id)
+            if (f == null) { problems << "方块状态引用的模型 ${id} 不存在"; return }
+            def m = slurper.parse(f, 'UTF-8') as Map
+            def parent = m.parent?.toString()
+            if (parent == null || !parent.startsWith("heavyseas:block/${fam.dir}/template/".toString())) {
+                problems << "${rel(f)}：父模型 ${parent} 不是${fam.label}模板"
+                return
+            }
+            usedTemplates << parent
+            (m.textures ?: [:]).each { k, v -> usedTextures << v.toString() }
+        }
+        // 游戏按元件位置自动算贴图坐标的规则（没写 uv 的面就用它）；越出 0–16 时游戏不报错，只是取到图集里相邻的别的贴图
+        def autoUv = [
+                north: { f, t -> [16 - t[0], 16 - t[1], 16 - f[0], 16 - f[1]] },
+                south: { f, t -> [f[0], 16 - t[1], t[0], 16 - f[1]] },
+                west : { f, t -> [f[2], 16 - t[1], t[2], 16 - f[1]] },
+                east : { f, t -> [16 - t[2], 16 - t[1], 16 - f[2], 16 - f[1]] },
+                up   : { f, t -> [f[0], f[2], t[0], t[2]] },
+                down : { f, t -> [f[0], 16 - t[2], t[0], 16 - f[2]] },
+        ]
+        def checkedFaces = 0
+        usedTemplates.sort().each { String id ->
+            def f = modelFile(id)
+            if (f == null) { problems << "模板 ${id} 不存在（要 models/${id.substring(id.indexOf(':') + 1)}.json）"; return }
+            def m = slurper.parse(f, 'UTF-8') as Map
+            (m.elements ?: []).eachWithIndex { el, i ->
+                ['from', 'to'].each { key ->
+                    (el[key] ?: []).eachWithIndex { v, axis ->
+                        if (v < -16 || v > 32) { problems << "${rel(f)}：元素 ${i} 的 ${key}.${'xyz'[axis]} = ${v}，越界 [−16, 32]" }
+                    }
+                }
+                (el.faces ?: [:]).each { dir, face ->
+                    def uv = face.uv ?: autoUv[dir.toString()](el.from, el.to)
+                    checkedFaces++
+                    if (uv.any { it < 0 || it > 16 }) {
+                        problems << "${rel(f)}：元素 ${i} 的 ${dir} 面贴图坐标 ${uv} 越出 0–16（游戏里会取到图集里别的贴图）"
+                    }
+                }
+            }
+        }
+        def pngSize = { File png ->
+            def head = new byte[24]
+            png.withInputStream { it.read(head) }
+            def sig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
+            if ((0..7).any { (head[it] & 0xFF) != sig[it] }) { return null }
+            def be = { int o -> ((head[o] & 0xFF) << 24) | ((head[o + 1] & 0xFF) << 16) | ((head[o + 2] & 0xFF) << 8) | (head[o + 3] & 0xFF) }
+            return [be(16), be(20)]
+        }
+        usedTextures.sort().each { String ref ->
+            if (!ref.startsWith("heavyseas:block/${fam.dir}/".toString())) { problems << "贴图 ${ref} 不在 block/${fam.dir}/ 下（一族的模型只引用本族的贴图）"; return }
+            def png = new File(task.ext.resourcesDir, "textures/${ref.substring('heavyseas:'.length())}.png")
+            if (!png.isFile()) { problems << "贴图 ${ref} 不存在（要 ${rel(png)}）"; return }
+            def size = pngSize(png)
+            // 灯与家具（ADR-0061 §4 · ADR-0063）一件一张专用大图：prop/ 下的贴图许 16 / 32 / 64 / 128 的正方形；别的照旧 16 宽
+            //   （128：魔镜放大到 2 × 3 之后 64 那一张放不下全部的面，2026-10-04 实跑 liner_props 的装箱报错）
+            def prop = ref.startsWith("heavyseas:block/${fam.dir}/prop/".toString())
+            prop = prop || ref.startsWith("heavyseas:block/${fam.dir}/stairs/".toString())   // 大楼梯一族：栏杆、起步柱同灯与家具，一件一张专用图
+            if (size == null) { problems << "${rel(png)}：不是 PNG" }
+            else if (prop && !(size[0] in [16, 32, 64, 128] && size[1] == size[0])) { problems << "${rel(png)}：${size[0]}×${size[1]}，灯与家具的贴图应为 16 / 32 / 64 / 128 的正方形" }
+            else if (!prop && (size[0] != 16 || size[1] % 16 != 0)) { problems << "${rel(png)}：${size[0]}×${size[1]}，应为 16 宽、高是 16 的倍数" }
+        }
+        // 没人用的贴图与模板：生成器改了名 / 删了件，旧文件还躺在 jar 里（也说明两边的清单不一致）。
+        //   连子目录一起扫（灯与家具在 prop/ 下）；只扫一层时，prop/ 里改名留下的旧文件判据看不见
+        def texDir = new File(task.ext.resourcesDir, "textures/block/${fam.dir}")
+        // 文件 → 资源 id：按资源根算相对路径（rel() 认的是路径里的 assets/heavyseas/，红测造的副本目录里没有这一段 ——
+        //   第一版用了 rel()，副本里每一张都被判成「没人用」，「多一张没人用的」那一例是陪着全体一起红的）
+        def idOf = { File f, String top, String ext -> task.ext.resourcesDir.toPath().relativize(f.toPath()).toString()
+                .replace(File.separator, '/').replaceFirst("^${top}/", '') - ext }
+        def scanned = 0
+        // 亮着的玻璃（ADR-0082）：没有模型引用，客户端 GlassGlow 建网格时按屋里的光换上 —— 平常那一张有模型在用、
+        //   而且 GlassGlow 源码里写着这一族的换法，才算有人用（只认「…/glass_lit」「…/hull/glass_lit_<n>_<列><行>」（拼大的舷窗）
+        //   与「…/window_glass_lit_<压边>」三种名字）
+        def glowSource = task.ext.has('glowSource') ? task.ext.glowSource : null
+        def glowText = glowSource?.isFile() ? glowSource.getText('UTF-8') : ''
+        def unlitOf = { String id ->
+            if (id.endsWith('/hull/glass_lit') && glowText.contains('block/liner/hull/glass_lit')) { return id - '_lit' }
+            def h = (id =~ /^(.*\/hull\/glass_)lit_([0-9]_[0-9]{2})$/)
+            if (h.find() && glowText.contains('"block/liner/hull/glass_"') && glowText.contains('"lit_"')) { return h.group(1) + h.group(2) }
+            def m = (id =~ /^(.*\/glass\/window_glass_)lit_([a-z]+)$/)
+            if (m.find() && glowText.contains('"lit_"')) { return m.group(1) + m.group(2) }
+            return null
+        }
+        if (texDir.isDirectory()) {
+            texDir.eachFileRecurse(groovy.io.FileType.FILES) { File f ->
+                if (!f.name.endsWith('.png')) { return }
+                scanned++
+                def id = idOf(f, 'textures', '.png')
+                def unlit = unlitOf(id)
+                if (unlit != null && usedTextures.contains("heavyseas:${unlit}".toString())) { return }
+                if (!usedTextures.contains("heavyseas:${id}".toString())) { problems << "${rel(f)}：没有任何模型用到" }
+            }
+        }
+        def tplDir = new File(task.ext.resourcesDir, "models/block/${fam.dir}/template")
+        if (tplDir.isDirectory()) {
+            tplDir.eachFileRecurse(groovy.io.FileType.FILES) { File f ->
+                if (!f.name.endsWith('.json')) { return }
+                scanned++
+                def id = idOf(f, 'models', '.json')
+                if (!usedTemplates.contains("heavyseas:${id}".toString())) { problems << "${rel(f)}：没有任何模型用到" }
+            }
+        }
+
+        def ours = []
+        if (fam.hull) {
+            // 4) 船体结构：里面每个 heavyseas 方块的状态，都要在它的方块状态文件里有那一项（属性按名字排序拼成键）
+            def hull = readStructureNbt(task.ext.hullFile)
+            def palette = hull.palette as List
+            ours = palette.findAll { it.Name.toString().startsWith('heavyseas:') }
+            if (ours.isEmpty()) {
+                throw new GradleException("没在查：${task.ext.hullFile.name} 的调色板里一个 heavyseas 方块都没有 —— 船体不是新艇，或判据坏了")
+            }
+            ours.each { st ->
+                def name = st.Name.toString().substring('heavyseas:'.length())
+                def props = (st.Properties ?: [:]) as Map
+                def key = props.keySet().collect { it.toString() }.sort().collect { "${it}=${props[it]}" }.join(',')
+                if (!variants.containsKey(name)) {
+                    problems << "${task.ext.hullFile.name}：方块 heavyseas:${name} 没有方块状态文件"
+                } else if (!variants[name].contains(key)) {
+                    problems << "${task.ext.hullFile.name}：heavyseas:${name}[${key}] 在方块状态文件里没有这一项（结构生成器与 SkiffBlocks 的属性对不上）"
+                }
+            }
+        }
+
+        // 7) 物品（ADR-0058 Q6）：每种方块都有物品模型、两种语言都有名字；创造物品栏只用本模组自己的页签
+        def itemDir = new File(task.ext.generatedDir, 'models/item')
+        registered.each { name ->
+            if (!new File(itemDir, "${name}.json").isFile()) {
+                problems << "方块 ${name} 没有物品模型（models/item/${name}.json；重跑 ./gradlew :mod:runDatagen）"
+            }
+        }
+        int named = 0
+        ['zh_cn', 'en_us'].each { lang ->
+            def langFile = new File(task.ext.resourcesDir, "lang/${lang}.json")
+            def table = langFile.isFile() ? (slurper.parse(langFile, 'UTF-8') as Map) : [:]
+            if (table.isEmpty()) {
+                throw new GradleException("没在查：${rel(langFile)} 读不到或是空的 —— 判据坏了，不是没有名字")
+            }
+            registered.each { name ->
+                if (table["block.heavyseas.${name}".toString()]) {
+                    named++
+                } else {
+                    problems << "${lang} 里没有 block.heavyseas.${name}（物品栏里会露出键名）"
+                }
+            }
+        }
+        // 往 Minecraft 自带页签里加东西的写法：ItemGroupEvents.modifyEntriesEvent(ItemGroups.…)。正向对照：源码至少扫到几十个文件。
+        def javaFiles = (fam.scanTabs && task.ext.mainSource.isDirectory())
+                ? project.fileTree(task.ext.mainSource).matching { include '**/*.java' }.files : [] as Set
+        if (fam.scanTabs && javaFiles.size() < 20) {
+            throw new GradleException("没在查：${task.ext.mainSource} 下只扫到 ${javaFiles.size()} 个 Java 文件 —— 判据坏了")
+        }
+        javaFiles.each { File f ->
+            f.getText('UTF-8').eachLine { line, i ->
+                if (line =~ /ItemGroups\.[A-Z_]+/ && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
+                    // String.eachLine 的行号从 0 数（红测抓到：报成了第 2 行）—— 报给人看的要从 1 数
+                    problems << "${f.name}:${i + 1}：往 Minecraft 自带的创造物品栏页签里加了东西 —— 本模组的物品只进自己的那几页（CreativeTabs）"
+                }
+            }
+        }
+
+        if (problems) {
+            throw new GradleException((['' + fam.label + '方块核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        task.logger.lifecycle("${fam.label}方块核对通过：${registered.size()} 种方块 · ${checkedVariants} 个方块状态 · ${usedModels.size()} 个模型 · ${usedTemplates.size()} 块模板" +
+                "（${checkedFaces} 个面的贴图坐标）· ${usedTextures.size()} 张贴图" + (fam.hull ? " · 船体里 ${ours.size()} 种状态" : "") +
+                " · 物品模型 ${registered.size()} 个 · 名字 ${named} 条 · 扫了 ${scanned} 个贴图与模板文件（含子目录）" +
+                (fam.scanTabs ? " · 扫了 ${javaFiles.size()} 个源码文件" : ""))
+}
+
+def checkSkiffBlocks = tasks.register('checkSkiffBlocks') {
+    group = 'verification'
+    description = '救生艇：登记的方块都有方块状态 · 变体是各属性取值的全部组合 · 模型与模板与贴图都在 · 贴图坐标不越界 · 只引用本族贴图 · 没有没人用的贴图 · 船体结构里的每个状态都有对应的方块状态 · 每种方块都有物品模型与两种语言的名字 · 不往 Minecraft 自带的创造物品栏页签里加东西'
+    // 任务属性而不是局部变量：红测要能把它们指向造坏的副本（docs/tools/build-redtests.sh）。
+    ext.resourcesDir = file('src/main/resources/assets/heavyseas')
+    ext.generatedDir = file('src/main/generated/assets/heavyseas')
+    ext.hullFile = file('src/main/resources/data/heavyseas/structure/boat_hull.nbt')
+    ext.blocksSource = file('src/main/java/io/github/heavyseasmc/mod/world/skiff/SkiffBlocks.java')
+    ext.mainSource = file('src/main/java')
+    inputs.dir(ext.resourcesDir).optional()
+    inputs.dir(ext.generatedDir).optional()
+    inputs.file(ext.hullFile).optional()
+    inputs.file(ext.blocksSource).optional()
+    doLast { Task t ->
+        checkDecorBlocks(t, [label: '救生艇', prefix: 'skiff_', dir: 'skiff', blocksClass: 'SkiffBlocks',
+                             registerPattern: /add\("(skiff_[a-z_]+)"/, hull: true, scanTabs: true])
+    }
+}
+
+def checkLinerBlocks = tasks.register('checkLinerBlocks') {
+    group = 'verification'
+    description = '大邮轮（ADR-0062 · 灯与家具 ADR-0063）：登记的方块都有方块状态 · 变体是各属性取值的全部组合 · 模型与模板与贴图都在 · 贴图坐标不越界 · 只引用本族贴图 · 没有没人用的贴图 · 每种方块都有物品模型与两种语言的名字'
+    ext.resourcesDir = file('src/main/resources/assets/heavyseas')
+    ext.generatedDir = file('src/main/generated/assets/heavyseas')
+    ext.blocksSource = file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerBlocks.java')
+    ext.extraSources = [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerProps.java'),
+                        file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerGlass.java'),
+                        file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerHull.java'),
+                        file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerDoors.java')]
+    ext.extraSources += [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerStairs.java')]   // 大楼梯一族（登记写法 add("liner_…")）
+    ext.extraSources += [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerLift.java')]     // 电梯门（登记写法 lift("liner_…")）
+    ext.extraSources += [file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerShapes.java')]   // 五种材料的楼梯 / 台阶（ADR-0093 5d；登记写法 add("liner_…")）
+    ext.glowSource = file('src/client/java/io/github/heavyseasmc/mod/client/GlassGlow.java')              // 亮着的玻璃谁在用（ADR-0082）
+    inputs.file(ext.glowSource).optional()
+    inputs.dir(ext.resourcesDir).optional()
+    inputs.dir(ext.generatedDir).optional()
+    inputs.file(ext.blocksSource).optional()
+    inputs.files(ext.extraSources).optional()
+    doLast { Task t ->
+        // 大框五款走 frame("liner_frame_…") 登记，灯与家具走 prop("liner_…")（LinerProps），船壳与舷窗走 hull("liner_…")（LinerHull），
+        //   门走 door("liner_…")（LinerDoors），电梯门走 lift("liner_…")（LinerLift），整扇窗走 window("liner_window_<宽>x<高>", …)（ADR-0091；名字里有数字），其余走 add("liner_…")
+        checkDecorBlocks(t, [label: '大邮轮', prefix: 'liner_', dir: 'liner', blocksClass: 'LinerBlocks / LinerProps',
+                             registerPattern: /(?:add|frame|prop|glass|hull|door|window|lift)\("(liner_[a-z0-9_]+)"/, hull: false, scanTabs: false])
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkSkiffBlocks
+    dependsOn checkLinerBlocks
+}
+
+// 北辰号整船进模组（ADR-0080）：清单 data/heavyseas/liner/ship.json 写船自己（段 · 艇 · 落脚点，位置相对船体），
+// 摆在哪写在官方地图的默认航程布局里（voyage/default.json 的 liner.origin，维度就是那份布局的维度；ADR-0081）。
+// 生成器（docs/tools/scene/liner_ship.py write-mod）写得对不对，游戏里不报错 —— 船只是摆歪、泡水、露在对局的视野里，
+// 或者桅杆被维度顶削掉一截。所以对着与清单正交的几份来源核对：
+//   ① 结构文件：清单里每一段都在、校验和对得上、段首尾相接铺满全长；目录里没有清单之外的段
+//   ② 每段的调色板只有本模组方块与写明的空气，每个状态都在它的方块状态文件里（生成物 blockstates）
+//   ③ 装得下：船底到船顶（含舷外的艇）在维度类型的高度范围里
+//   ④ 水线那一道正好在平坦生成的水面上一格；黑板从那一道上面起，那一格要是一列钢板的下格（LinerHull.Rules.PHASE）
+//   ⑤ 离对局足够远：同一维度的每份航程布局，船头到整船（含艇）的水平距离超过最大视距
+//   ⑦ 位置只有一个来源：只有默认布局写 liner；清单里不再写原点与维度
+//   ⑧ 船上那面魔镜（ADR-0083）：清单写的那一格在结构里真是魔镜，落脚点是镜面前那一格、站得下、背对镜子
+// 地图作者换的那一份不经过构建：起服时 LinerShip 核 ③ ④ ⑤ 同样几条（不对就不摆）。
+def checkLinerShip = tasks.register('checkLinerShip') {
+    group = 'verification'
+    description = '北辰号整船（ADR-0080）：清单与结构文件对得上 · 只有本模组方块与写明的空气 · 维度装得下 · 水线在水面上一格且落在钢板横缝上 · 离每份航程布局的船头超过最大视距'
+    ext.dataDir = file('src/main/resources/data/heavyseas')
+    ext.generatedDir = file('src/main/generated/assets/heavyseas')
+    ext.hullSource = file('src/main/java/io/github/heavyseasmc/mod/world/liner/LinerHull.java')
+    inputs.dir(ext.dataDir)
+    inputs.dir(ext.generatedDir).optional()
+    inputs.file(ext.hullSource).optional()
+    doLast { Task task ->
+        def slurper = new groovy.json.JsonSlurper()
+        def problems = []
+        File data = task.ext.dataDir
+        def manifestFile = new File(data, 'liner/ship.json')
+        if (!manifestFile.isFile()) {
+            throw new GradleException("没在查：${manifestFile} 不在 —— 重跑 python docs/tools/scene/liner_ship.py write-mod")
+        }
+        def m = slurper.parse(manifestFile, 'UTF-8') as Map
+        // ⑦ 位置只有一个来源（ADR-0081）：默认布局的 liner.origin；清单里不写，别的布局不写
+        def defaultFile = new File(data, 'voyage/default.json')
+        if (!defaultFile.isFile()) { throw new GradleException("没在查：默认航程布局 ${defaultFile} 不在") }
+        def defaultLayout = slurper.parse(defaultFile, 'UTF-8') as Map
+        if (!(defaultLayout.liner instanceof Map) || !(defaultLayout.liner.origin instanceof List)) {
+            throw new GradleException("没在查：默认航程布局 voyage/default.json 没写 liner.origin —— 官方地图要有北辰号（ADR-0081）")
+        }
+        def origin = (defaultLayout.liner.origin as List).collect { it as int }
+        ['origin', 'dimension'].each { k ->
+            if (m.containsKey(k)) { problems << "清单里还写着 ${k}：位置写在默认航程布局的 liner 里，两处都写就有两个来源（重跑 liner_ship.py write-mod）" }
+        }
+        def size = m.size as List
+        def segs = m.segments as List
+        if (!segs) {
+            throw new GradleException("没在查：清单里一段都没有")
+        }
+
+        // ① 结构文件
+        def structDir = new File(data, 'structure/liner')
+        def listed = [] as Set
+        int expectX = 0
+        def sha1 = { File f -> java.security.MessageDigest.getInstance('SHA-1').digest(f.bytes).encodeHex().toString() }
+        def nbts = [:]
+        segs.each { seg ->
+            def id = seg.structure.toString()
+            if (!id.startsWith('heavyseas:liner/')) { problems << "段 ${id} 不在 heavyseas:liner/ 下"; return }
+            def f = new File(structDir, id.substring('heavyseas:liner/'.length()) + '.nbt')
+            listed << f.name
+            if (seg.x0 != expectX) { problems << "段 ${id} 从 x ${seg.x0} 起，上一段到 ${expectX} 为止（段要首尾相接）" }
+            expectX = seg.x1 as int
+            if (!f.isFile()) { problems << "清单里的 ${id} 没有结构文件 ${f.name}"; return }
+            if (sha1(f) != seg.sha1) { problems << "${f.name} 的校验和对不上清单（文件被改过、或清单没跟着重写）"; return }
+            nbts[id] = readStructureNbt(f)
+        }
+        if (expectX != size[0]) { problems << "段铺到 x ${expectX}，船长 ${size[0]}" }
+        (structDir.listFiles({ File f -> f.name.endsWith('.nbt') } as FileFilter) ?: []).each { File f ->
+            if (!listed.contains(f.name)) { problems << "structure/liner/${f.name}：清单里没有这一段（生成器改了段、旧文件还在）" }
+        }
+
+        // ② 调色板
+        def bsDir = new File(task.ext.generatedDir, 'blockstates')
+        def variants = [:]
+        (bsDir.listFiles({ File f -> f.name.endsWith('.json') } as FileFilter) ?: []).each { File f ->
+            def json = slurper.parse(f, 'UTF-8') as Map
+            if (json.multipart != null) {
+                // 多部件（格架，ADR-0080 §7）：合法的状态 = when 里出现过的每个属性各取一值的全组合（属性按名字排序拼成键，同 variants）
+                def vals = [:].withDefault { [] as Set }
+                // 「a|b|c」是「或」：底层对叠层那几个属性写了全取值（DecorModels），拆开才认得出 ivy = none 这类只在「不画那一层」时出现的值
+                (json.multipart as List).each { part -> ((part.when ?: [:]) as Map).each { k, v -> v.toString().split('\\|').each { vals[k.toString()] << it } } }
+                def keys = ['']
+                vals.keySet().sort().each { String k -> keys = keys.collectMany { String pre -> vals[k].sort().collect { String v -> (pre ? pre + ',' : '') + k + '=' + v } } }
+                variants[(f.name - '.json').toString()] = keys as Set
+                return
+            }
+            variants[(f.name - '.json').toString()] = (json.variants as Map ?: [:]).keySet().collect { it.toString() } as Set
+        }
+        if (variants.isEmpty()) {
+            throw new GradleException("没在查：${bsDir} 下一个方块状态文件都没有 —— 判据坏了，或者没跑 ./gradlew :mod:runDatagen")
+        }
+        long blocks = 0, air = 0
+        int states = 0
+        nbts.each { id, nbt ->
+            def pal = nbt.palette as List
+            def segSize = nbt.size as List
+            def seg = segs.find { it.structure == id }
+            if (segSize[0] != (seg.x1 - seg.x0) || segSize[2] != size[2] || segSize[1] > size[1]) {
+                problems << "${id}：结构尺寸 ${segSize}，清单里这一段是 ${seg.x1 - seg.x0} × ≤${size[1]} × ${size[2]}"
+            }
+            def isAir = pal.collect { it.Name.toString() == 'minecraft:air' }
+            (nbt.blocks as List).each { b -> if (isAir[b.state as int]) { air++ } else { blocks++ } }
+            pal.each { st ->
+                def name = st.Name.toString()
+                if (name == 'minecraft:air') { return }
+                states++
+                if (!name.startsWith('heavyseas:')) { problems << "${id}：${name} 不是本模组的方块（一律自制）"; return }
+                def shortName = name.substring('heavyseas:'.length())
+                def props = (st.Properties ?: [:]) as Map
+                def key = props.keySet().collect { it.toString() }.sort().collect { "${it}=${props[it]}" }.join(',')
+                if (!variants.containsKey(shortName)) { problems << "${id}：${name} 没有方块状态文件" }
+                else if (!variants[shortName].contains(key)) { problems << "${id}：${name}[${key}] 在方块状态文件里没有这一项" }
+            }
+        }
+        // 有一段没读（文件缺 · 校验和不对）时格数必然对不上：那一段已经点过名，这里不再陪着红
+        if (nbts.size() == segs.size() && (blocks != (m.blocks as long) || air != (m.air as long))) {
+            problems << "结构里本模组方块 ${blocks} 格 · 空气 ${air} 格，清单写的是 ${m.blocks} · ${m.air}"
+        }
+
+        // 舷外的艇：按艇的结构尺寸与转向算它占哪一块（只会算 clockwise_90 —— 生成器改了转向要先改这里）
+        def skiffNbt = readStructureNbt(new File(data, 'structure/boat_hull.nbt'))
+        def ks = skiffNbt.size as List
+        int minX = origin[0], minY = origin[1], minZ = origin[2]
+        int maxX = origin[0] + size[0] - 1, maxY = origin[1] + size[1] - 1, maxZ = origin[2] + size[2] - 1
+        def skiffBoxes = []
+        (m.skiffs as List).each { k ->
+            if (k.rotation != 'clockwise_90') { problems << "艇 ${k.no} 的转向 ${k.rotation}：判据只会算 clockwise_90"; return }
+            def p = [0, 1, 2].collect { (k.pos[it] as int) + origin[it] }      // 清单里相对船体
+            def b = [no: k.no, x: (p[0] - (ks[2] - 1))..(p[0]), y: (p[1])..(p[1] + ks[1] - 1), z: (p[2])..(p[2] + ks[0] - 1)]
+            skiffBoxes << b
+            minX = Math.min(minX, b.x.from); maxX = Math.max(maxX, b.x.to)
+            minY = Math.min(minY, b.y.from); maxY = Math.max(maxY, b.y.to)
+            minZ = Math.min(minZ, b.z.from); maxZ = Math.max(maxZ, b.z.to)
+        }
+        // ⑥ 落脚点：人站的那两格都不在任何一条艇里 —— 艇是摆的时候才挂上去的，生成器看不见它（第一版就落在 4 号艇正下方，头顶一格是艇底）
+        def arr = m.arrival as List                                         // 清单里相对船体
+        int ax = (Math.floor(arr[0] as double) as int) + origin[0], ay = (Math.floor(arr[1] as double) as int) + origin[1]
+        int az = (Math.floor(arr[2] as double) as int) + origin[2]
+        if (ax < origin[0] || ax >= origin[0] + size[0] || az < origin[2] || az >= origin[2] + size[2]) {
+            problems << "落脚点 (${ax} ${ay} ${az}) 不在船上"
+        }
+        skiffBoxes.each { b ->
+            [ay, ay + 1].each { y ->
+                if (ax in b.x && y in b.y && az in b.z) { problems << "落脚点那一格 (${ax} ${y} ${az}) 在 ${b.no} 号艇里：人站上去会卡在艇里" }
+            }
+        }
+
+        // ⑧ 船上那面魔镜与落脚点（ADR-0083；2026-10-04 放大到 3 × 3、摆法 C）：清单写的那一格（下面一层正中 wide_mid）在结构里真是魔镜，
+        //   整件九格都在、每一格是该在那里的那一块、朝向对得上（模型的西 = 人面对镜面时的右手，照 LinerProp.Rules.toWorld 算）；
+        //   落脚点是镜面正中前那一格、那两格空着、脚下是实的，落脚时面朝镜面朝的方向（背对镜子、面朝光井）。生成器写的是位置，判据回到结构里看那几格是什么
+        def cellAt = { int lx, int ly, int lz ->
+            def seg = segs.find { lx >= (it.x0 as int) && lx < (it.x1 as int) }
+            def nbt = seg == null ? null : nbts[seg.structure.toString()]
+            if (nbt == null) { return null }
+            def b = (nbt.blocks as List).find { (it.pos[0] as int) == lx - (seg.x0 as int) && (it.pos[1] as int) == ly && (it.pos[2] as int) == lz }
+            return b == null ? null : (nbt.palette as List)[b.state as int]
+        }
+        def facingOff = [north: [0, -1], south: [0, 1], west: [-1, 0], east: [1, 0]]
+        def yawOf = [south: 0d, west: 90d, north: 180d, east: 270d]
+        def mpos = (m.mirror as List)?.collect { it as int }
+        def mface = m.mirror_facing?.toString()
+        if (mpos == null || !facingOff.containsKey(mface)) {
+            problems << "清单的 mirror / mirror_facing 缺了或写错（${m.mirror} · ${m.mirror_facing}）"
+        } else if (nbts.size() == segs.size()) {
+            def modelX = [north: [1, 0], east: [0, 1], south: [-1, 0], west: [0, -1]]      // 模型的 +x（东）在世界里朝哪
+            [west: 0, mid: 1, east: 2].each { col, cx ->
+                [0: '', 1: 'upper_', 2: 'top_'].each { dy, row ->
+                    def part = "wide_${row}${col}".toString()
+                    int wx = mpos[0] + modelX[mface][0] * (cx - 1), wz = mpos[2] + modelX[mface][1] * (cx - 1)
+                    def st = cellAt(wx, mpos[1] + (dy as int), wz)
+                    if (st?.Name?.toString() != 'heavyseas:liner_mirror' || st.Properties?.part != part || st.Properties?.facing != mface) {
+                        problems << "清单说魔镜在 (${mpos.join(' ')})（朝 ${mface}），${part} 该在 (${wx} ${mpos[1] + (dy as int)} ${wz})，结构里那一格是 ${st == null ? '空的' : st.Name + (st.Properties ?: '')}"
+                    }
+                }
+            }
+            def front = [mpos[0] + facingOff[mface][0], mpos[1], mpos[2] + facingOff[mface][1]]
+            int lx = (Math.floor(arr[0] as double) as int), ly = (Math.floor(arr[1] as double) as int), lz = (Math.floor(arr[2] as double) as int)
+            if ([lx, ly, lz] != front) {
+                problems << "落脚点 (${lx} ${ly} ${lz}) 不在魔镜的镜面前那一格 (${front.join(' ')})：过了镜子的人该从镜子前走出来"
+            } else if (cellAt(lx, ly, lz) != null && cellAt(lx, ly, lz).Name.toString() != 'minecraft:air'
+                    || cellAt(lx, ly + 1, lz) != null && cellAt(lx, ly + 1, lz).Name.toString() != 'minecraft:air'
+                    || cellAt(lx, ly - 1, lz) == null) {
+                problems << "魔镜前的落脚点 (${lx} ${ly} ${lz}) 站不下人（那两格要空、脚下要实）"
+            }
+            if (Math.abs((m.arrival_yaw as double) - yawOf[mface]) > 0.01) {
+                problems << "落脚时面朝 ${m.arrival_yaw}°，镜面朝 ${mface}（${yawOf[mface]}°）：过了镜子该背对镜子"
+            }
+        }
+
+        // ⑨ 平台上的斜面海图桌（C3 第二轮，ADR-0086 §2 第 5 条）：清单写的锚点在结构里真是朝那个方向的 front_east，
+        //   整件六格都在（模型的 +x 在世界里朝哪同魔镜那一条；后排在模型 +z）；浮字与小铜船按它摆，几何那一份（chart_table.json）九档都在
+        def cpos = (m.chart_table as List)?.collect { it as int }
+        def cface = m.chart_table_facing?.toString()
+        if (cpos == null || !facingOff.containsKey(cface)) {
+            problems << "清单的 chart_table / chart_table_facing 缺了或写错（${m.chart_table} · ${m.chart_table_facing}）"
+        } else if (nbts.size() == segs.size()) {
+            def modelX = [north: [1, 0], east: [0, 1], south: [-1, 0], west: [0, -1]]
+            def modelZ = [north: [0, 1], east: [-1, 0], south: [0, -1], west: [1, 0]]          // 模型的 +z（后排）在世界里朝哪
+            int checkedCells = 0
+            [west: 0, mid: 1, east: 2].each { col, cx ->
+                [front: 0, back: 1].each { row, cz ->
+                    def part = "${row}_${col}".toString()
+                    int wx = cpos[0] + modelX[cface][0] * (cx - 2) + modelZ[cface][0] * cz
+                    int wz = cpos[2] + modelX[cface][1] * (cx - 2) + modelZ[cface][1] * cz
+                    def st = cellAt(wx, cpos[1], wz)
+                    checkedCells++
+                    if (st?.Name?.toString() != 'heavyseas:liner_chart_table' || st.Properties?.part != part || st.Properties?.facing != cface) {
+                        problems << "清单说海图桌锚点在 (${cpos.join(' ')})（朝 ${cface}），${part} 该在 (${wx} ${cpos[1]} ${wz})，结构里那一格是 ${st == null ? '空的' : st.Name + (st.Properties ?: '')}"
+                    }
+                }
+            }
+            if (checkedCells != 6) { throw new GradleException("没在查：海图桌只核了 ${checkedCells} 格") }
+            def geo = new File(data, 'liner/chart_table.json')
+            if (!geo.isFile()) {
+                problems << "缺 liner/chart_table.json（小铜船九档的几何，liner_ship.py write-mod 写）"
+            } else if (((slurper.parse(geo, 'UTF-8') as Map).ship as List)?.size() != 9) {
+                problems << "liner/chart_table.json 里小铜船不是 9 档"
+            }
+        }
+
+        // ③ 装得下 · ④ 水线（维度 JSON 与维度类型 JSON 是这两条的事实源）
+        def dimId = defaultLayout.dimension.toString()
+        def dimFile = new File(data, "dimension/${dimId.substring(dimId.indexOf(':') + 1)}.json")
+        if (!dimFile.isFile()) { throw new GradleException("没在查：清单的维度 ${dimId} 没有 ${dimFile}") }
+        def dim = slurper.parse(dimFile, 'UTF-8') as Map
+        def typeId = dim.type.toString()
+        def typeFile = new File(data, "dimension_type/${typeId.substring(typeId.indexOf(':') + 1)}.json")
+        def type = slurper.parse(typeFile, 'UTF-8') as Map
+        int bottom = type.min_y as int
+        int top = bottom + (type.height as int) - 1
+        if (minY < bottom || maxY > top) {
+            problems << "维度 ${dimId} 装不下北辰号：船占 y ${minY}–${maxY}，维度只有 y ${bottom}–${top}（${typeFile.name} 的 height ${type.height}）"
+        }
+        def layers = dim.generator?.settings?.layers as List
+        if (!layers) { throw new GradleException("没在查：${dimFile.name} 不是平坦生成、读不到 layers") }
+        int waterTop = bottom + (layers.sum { it.height as int } as int) - 1
+        if (layers[-1].block != 'minecraft:water') { problems << "${dimFile.name} 最上面那一层是 ${layers[-1].block}，不是水" }
+        int band = (origin[1] as int) + (m.waterline as int)
+        if (band != waterTop + 1) {
+            problems << "水线那一道在 y ${band}，水面在 y ${waterTop}：应当正好在水面上一格（龙骨 y 该是 ${waterTop + 1 - (m.waterline as int)}）"
+        }
+        def phaseMatch = (task.ext.hullSource.getText('UTF-8') =~ /int PHASE = (\d+);/)
+        if (!phaseMatch.find()) { throw new GradleException("没在查：${task.ext.hullSource.name} 里找不到 PHASE") }
+        int phase = phaseMatch.group(1) as int
+        if (Math.floorMod(band + 1 - phase, 2) != 0) {
+            problems << "黑板从 y ${band + 1} 起，那一格不是一列钢板的下格（PHASE ${phase}）：水线会切在一块板的正中"
+        }
+
+        // ⑤ 离对局足够远：最大视距 32 区块；客户端按整块区块画，再加一块
+        int far = 33 * 16
+        def layouts = (new File(data, 'voyage').listFiles({ File f -> f.name.endsWith('.json') } as FileFilter) ?: []) as List
+        if (layouts.isEmpty()) { throw new GradleException("没在查：${data}/voyage 下一份航程布局都没有") }
+        int near = 0
+        layouts.each { File f ->
+            def v = slurper.parse(f, 'UTF-8') as Map
+            if (f.name != 'default.json' && v.containsKey('liner')) {
+                problems << "航程布局 ${f.name} 写了 liner：只有默认布局可以写北辰号的位置（模组读到它会拒绝整个数据包）"
+            }
+            if (v.dimension != dimId) { return }
+            near++
+            double bx = v.boat.bow[0] as double, bz = v.boat.bow[2] as double
+            double dx = Math.max(0d, Math.max(minX - bx, bx - (maxX + 1)))
+            double dz = Math.max(0d, Math.max(minZ - bz, bz - (maxZ + 1)))
+            double dist = Math.sqrt(dx * dx + dz * dz)
+            if (dist <= far) {
+                problems << "航程布局 ${f.name} 的船头离北辰号只有 ${Math.round(dist)} 格，最大视距是 ${far} 格：对局里看得见它"
+            }
+        }
+        if (near == 0) { throw new GradleException("没在查：没有一份航程布局在维度 ${dimId} 里") }
+
+        if (problems) {
+            throw new GradleException((['北辰号整船核对失败：'] + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        task.logger.lifecycle("北辰号整船核对通过：${segs.size()} 段 · 本模组方块 ${blocks} 格（${states} 种状态）· 水线下空气 ${air} 格 · 艇 ${(m.skiffs as List).size()} 条 · " +
+                "占 (${minX} ${minY} ${minZ})..(${maxX} ${maxY} ${maxZ})，维度 y ${bottom}–${top} · 水线 y ${band} 在水面 ${waterTop} 上一格 · 离 ${near} 份航程布局的船头都超过 ${far} 格")
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkLinerShip
+}
+
+// 生产 jar 里的 mixin 类必须已经翻成中间名（ADR-0034 §5.1.1）。
+//
+// 为什么要一道闸：开发客户端直接按 yarn 名注入，mixin 写错了 refmap、或 Loom 没翻注解，开发环境**一点都看不出来**；
+// 生产客户端上要么启动即崩（defaultRequire 1），要么 —— 若目标碰巧解析到了别处 —— 安静地没雾。
+// 判据与被测对象正交：不问 Loom 的配置，直接读 remapJar 产物里的类文件与 mixins.json。
+//
+// 「残留的开发环境名字」怎么认（审查 2026-10-07 C8）：第一版是一张手抄的目标名名单，后加的三个 mixin
+//   （物品提示 · 右键 / 描边 · 滚轮）没人补进去，它们翻没翻对这道闸门看不见；InGameHudMixin 的七个目标也不在名单里，
+//   只是碰巧被「类名」那一条拦着。现在从 mixin 源码自己读：注解里的 method = … · @At 的 target = … ·
+//   @Shadow 的成员名 · @Accessor / @Invoker 写明的名字，逐个要求不出现在生产类的常量池里（按整条常量比，不按子串）；
+//   常量池里出现的 Minecraft 类一律要是 net/minecraft/class_…。哪几个类：jar 里 fabric.mod.json 登记的每一份 mixin 配置
+//   列出的全部，不再只扫 client/mixin/ 一个包。
+//   ⚠️某个局部变量恰好与目标同名时会误报 —— 改名即可；误报是红，不会放行。用了 remap = false、或 @Accessor 不写名字的，
+//   判据分不清哪几个名字该留着，当场判失败（现在一个都没有），先改判据再用。
+def checkMixinRemapped = tasks.register('checkMixinRemapped') {
+    group = 'verification'
+    description = '生产 jar 里登记的每个 mixin 类：源码里写的目标名一个都不剩、只引用中间名的类；mixins.json 不得指向不存在的 refmap'
+    def jarFile = tasks.named('remapJar').flatMap { it.archiveFile }
+    inputs.file(jarFile)
+    inputs.files(sourceSets.main.allJava, sourceSets.client.allJava)
+    // 任务属性：红测要能把它们指向造坏的 jar 副本 / 不存在的源码目录（docs/tools/build-redtests.sh 的 mixin-*）
+    ext.jarFile = null
+    ext.sourceDirs = (sourceSets.main.java.srcDirs + sourceSets.client.java.srcDirs) as List
+    doLast { Task t ->
+        File jar = t.ext.jarFile ?: jarFile.get().asFile
+        def slurper = new groovy.json.JsonSlurper()
+
+        // 类文件常量池里的 UTF8 常量：类名、成员名、描述符、注解里的字符串值都在这里
+        def utf8Of = { byte[] bytes ->
+            def din = new DataInputStream(new ByteArrayInputStream(bytes))
+            if ((din.readInt() & 0xFFFFFFFFL) != 0xCAFEBABEL) {
+                return null
+            }
+            din.readUnsignedShort()
+            din.readUnsignedShort()
+            int count = din.readUnsignedShort()
+            def strings = [] as Set
+            for (int i = 1; i < count; i++) {
+                int tag = din.readUnsignedByte()
+                switch (tag) {
+                    case 1: strings << din.readUTF(); break
+                    case 3: case 4: din.skipBytes(4); break
+                    case 5: case 6: din.skipBytes(8); i++; break     // long / double 占两格
+                    case 7: case 8: case 16: case 19: case 20: din.skipBytes(2); break
+                    case 9: case 10: case 11: case 12: case 17: case 18: din.skipBytes(4); break
+                    case 15: din.skipBytes(3); break
+                    default: throw new GradleException("类文件里有不认识的常量标签 ${tag}")
+                }
+            }
+            return strings
+        }
+
+        // 一个 mixin 的源码对 Minecraft 说了哪些名字（开发环境的 yarn 名）。注释先去掉：注释里写的方法名不算
+        def memberOf = { String v -> v.replaceFirst(/^L[^;]+;/, '').replaceFirst(/[(:].*$/, '') }
+        def namesOf = { String text ->
+            def src = stripJavaComments(text)
+            def strings = { String block -> (block =~ /"([^"]*)"/).collect { it[1].toString() } }
+            def r = [names: [] as Set, targets: [] as Set, counts: [method: 0, target: 0, shadow: 0, accessor: 0], unsupported: []]
+            (src =~ /\bmethod\s*=\s*(\{[^}]*\}|"[^"]*")/).each { m ->
+                strings(m[1]).each { v ->
+                    def name = memberOf(v)
+                    if (name && !name.startsWith('<') && !name.contains('*')) {
+                        r.names << name
+                        r.counts.method++
+                    }
+                }
+            }
+            (src =~ /\btarget\s*=\s*"([^"]*)"/).each { m ->
+                def v = m[1].toString()
+                r.targets << v
+                r.counts.target++
+                def name = memberOf(v)
+                if (name && !name.startsWith('<')) {
+                    r.names << name
+                }
+            }
+            (src =~ /@Shadow\b(\s*\([^)]*\))?([^;({=]*)/).each { m ->
+                def decl = m[2].toString().replaceAll(/@\w+/, ' ').trim()
+                def last = (decl =~ /(\w+)$/)
+                if (last.find()) {
+                    def prefix = m[1] ? (m[1] =~ /prefix\s*=\s*"([^"]*)"/) : null
+                    def name = last.group(1)
+                    if (prefix != null && prefix.find() && name.startsWith(prefix.group(1))) {
+                        name = name.substring(prefix.group(1).length())
+                    } else if (name.startsWith('shadow$')) {
+                        name = name.substring('shadow$'.length())
+                    }
+                    r.names << name
+                    r.counts.shadow++
+                }
+            }
+            (src =~ /@(?:Accessor|Invoker)\s*\(\s*(?:value\s*=\s*)?"([^"]+)"/).each { m ->
+                r.names << memberOf(m[1].toString())
+                r.counts.accessor++
+            }
+            if (src =~ /@(?:Accessor|Invoker)\b(?!\s*\(\s*(?:value\s*=\s*)?")/) {
+                r.unsupported << '@Accessor / @Invoker 没写名字（判据不会从方法名推）'
+            }
+            if (src =~ /\bremap\s*=\s*false/) {
+                r.unsupported << 'remap = false（判据分不清哪几个名字该留着不翻）'
+            }
+            return r
+        }
+
+        // Minecraft 的类在生产 jar 里一律是 net/minecraft/class_<数字>；别的写法就是开发环境的 yarn 类名
+        def yarnClass = java.util.regex.Pattern.compile('net/minecraft/(?!class_\\d)[\\w/$]+')
+        def zip = new java.util.zip.ZipFile(jar)
+        try {
+            def problems = []
+            def modJson = zip.getEntry('fabric.mod.json')
+            if (modJson == null) {
+                throw new GradleException("没在查：${jar.name} 里没有 fabric.mod.json")
+            }
+            def configs = (((slurper.parse(zip.getInputStream(modJson), 'UTF-8') as Map).mixins ?: []) as List)
+                    .collect { (it instanceof Map ? it.config : it).toString() }
+            // 正向对照：一份配置都没读到时，「全翻对了」与「没在查」输出一样
+            if (configs.isEmpty()) {
+                throw new GradleException('没在查：jar 里的 fabric.mod.json 一份 mixin 配置都没登记 —— 判据坏了，不是干净')
+            }
+            int classes = 0
+            def counts = [method: 0, target: 0, shadow: 0, accessor: 0]
+            configs.each { String cfg ->
+                def entry = zip.getEntry(cfg)
+                if (entry == null) {
+                    problems << "fabric.mod.json 登记了 ${cfg}，jar 里没有这个文件"
+                    return
+                }
+                def json = slurper.parse(zip.getInputStream(entry), 'UTF-8') as Map
+                if (json.refmap) {
+                    problems << "${cfg} 指向 refmap ${json.refmap}，而这一版 Loom 不生成 refmap —— 那个文件不在 jar 里"
+                }
+                def listed = (((json.mixins ?: []) + (json.client ?: []) + (json.server ?: [])) as List).collect { it.toString() }
+                if (listed.isEmpty()) {
+                    problems << "${cfg} 的 mixin 列表是空的"
+                    return
+                }
+                def pkg = json.package.toString().replace('.', '/')
+                listed.each { String name ->
+                    def rel = "${pkg}/${name.replace('.', '/')}".toString()
+                    def cls = zip.getEntry(rel + '.class')
+                    if (cls == null) {
+                        problems << "${cfg} 登记了 ${name}，jar 里没有 ${rel}.class"
+                        return
+                    }
+                    def source = t.ext.sourceDirs.collect { new File(it as File, rel + '.java') }.find { it.isFile() }
+                    if (source == null) {
+                        throw new GradleException("没在读：找不到 mixin 的源码 ${rel}.java（在 ${t.ext.sourceDirs.join('、')} 里找）—— " +
+                                '目标名从源码读，读不到就等于没在查')
+                    }
+                    classes++
+                    def pool = utf8Of(zip.getInputStream(cls).bytes)
+                    if (pool == null) {
+                        problems << "${rel}.class 不是类文件"
+                        return
+                    }
+                    def read = namesOf(source.getText('UTF-8'))
+                    read.unsupported.each { problems << "${source.name}：用了 ${it} —— 先改判据" }
+                    if (read.names.isEmpty() && read.targets.isEmpty()) {
+                        problems << "${source.name}：源码里一个目标名都没读出来 —— 判据的读法不认得它的写法，不是没有目标"
+                        return
+                    }
+                    read.counts.each { k, v -> counts[k] += v }
+                    if (!pool.any { it.contains('net/minecraft/class_') }) {
+                        problems << "${rel}.class：没有引用任何中间名 —— remapJar 没把 mixin 的目标翻过来"
+                    }
+                    def leftNames = (read.names + read.targets).findAll { pool.contains(it) }.sort()
+                    def leftClasses = (pool.collectMany { s -> (s =~ yarnClass).collect { it.toString() } } as Set).sort()
+                    if (leftNames || leftClasses) {
+                        def parts = []
+                        if (leftNames) { parts << "残留开发环境的名字 ${leftNames}" }
+                        if (leftClasses) { parts << "没翻的类 ${leftClasses.take(3)}${leftClasses.size() > 3 ? " 等 ${leftClasses.size()} 个" : ''}" }
+                        problems << "${rel}.class：${parts.join('，')} —— 生产客户端上找不到目标"
+                    }
+                }
+            }
+            if (problems) {
+                throw new GradleException((['生产 jar 的 mixin 核对失败：'] + problems.collect { '  - ' + it })
+                        .join(System.lineSeparator()))
+            }
+            int names = counts.values().sum() as int
+            logger.lifecycle("生产 jar 的 mixin 核对通过：${configs.size()} 份配置 · ${classes} 个类，引用的 Minecraft 类都是中间名；" +
+                    "从源码读出 ${names} 个目标名（method = ${counts.method} · @At target = ${counts.target} · @Shadow ${counts.shadow}" +
+                    " · @Accessor/@Invoker ${counts.accessor}），生产类里一个都不剩；mixins.json 不指向 refmap")
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkMixinRemapped
+    dependsOn 'validateAccessWidener'
+    dependsOn 'checkNestedJars'
+}
+
+// 发布物的直接内嵌清单独立于 include 配置。删 include 不应同时缩短期望清单。
+tasks.register('checkNestedJars') {
+    group = 'verification'
+    description = '最终 jar 的直接内嵌依赖：声明、文件、身份和版本完整且唯一'
+    def produced = tasks.named('remapJar').flatMap { it.archiveFile }
+    dependsOn tasks.named('remapJar')
+    ext.jarFile = null // 红测只切换到坏副本，真实产物不改写。
+    def expected = [
+            'cardinal-components-base': cca_version.toString(),
+            'cardinal-components-world': cca_version.toString(),
+            'io_github_heavyseasmc_engine': project.version.toString(),
+            'forgeconfigapiport': forge_config_api_port_version.toString(),
+            'geckolib': geckolib_version.toString(),
+    ]
+    inputs.property('expectedNestedMods', expected)
+    inputs.file(provider { ext.jarFile ?: produced.get().asFile })
+    doLast { Task t ->
+        File target = t.ext.jarFile ?: produced.get().asFile
+        def problems = []
+        def slurper = new groovy.json.JsonSlurper()
+        def outer = new java.util.zip.ZipFile(target)
+        try {
+            def metadataEntry = outer.getEntry('fabric.mod.json')
+            if (metadataEntry == null) {
+                throw new GradleException('内嵌依赖核对失败：主包没有 fabric.mod.json')
+            }
+            def metadata = outer.getInputStream(metadataEntry).withCloseable { slurper.parse(it, 'UTF-8') }
+            def declared = (metadata.jars ?: []).collect { it.file?.toString() }
+            def nestedFiles = outer.entries().findAll {
+                !it.directory && it.name.startsWith('META-INF/jars/') && it.name.endsWith('.jar')
+            }.collect { it.name }
+            if (declared.size() != declared.toSet().size()) {
+                problems << '重复的内嵌路径声明'
+            }
+            if (nestedFiles.size() != nestedFiles.toSet().size()) {
+                problems << '重复的内嵌文件路径'
+            }
+            (nestedFiles.toSet() - declared.toSet()).each { problems << "未声明的内嵌文件：${it}" }
+            def identities = [:]
+            declared.toSet().each { String path ->
+                if (path == null || !path.startsWith('META-INF/jars/') || path.contains('..') || !path.endsWith('.jar')) {
+                    problems << "无效的内嵌路径：${path}"
+                    return
+                }
+                def entry = outer.getEntry(path)
+                if (entry == null) {
+                    problems << "缺少声明的内嵌文件：${path}"
+                    return
+                }
+                def manifests = []
+                outer.getInputStream(entry).withCloseable { input ->
+                    new java.util.zip.ZipInputStream(input).withCloseable { nested ->
+                        java.util.zip.ZipEntry member
+                        while ((member = nested.nextEntry) != null) {
+                            if (member.name == 'fabric.mod.json') {
+                                manifests << slurper.parseText(new String(nested.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
+                            }
+                            nested.closeEntry()
+                        }
+                    }
+                }
+                if (manifests.size() != 1) {
+                    problems << "${path} 应含一份 fabric.mod.json，实际 ${manifests.size()}"
+                    return
+                }
+                String id = manifests[0].id?.toString()
+                String version = manifests[0].version?.toString()
+                if (identities.containsKey(id)) {
+                    problems << "重复的内嵌身份：${id}"
+                }
+                identities[id] = version
+                if (!expected.containsKey(id)) {
+                    problems << "非预期内嵌身份：${id}"
+                } else if (version != expected[id]) {
+                    problems << "内嵌版本不符：${id} 需要 ${expected[id]}，实际 ${version}"
+                }
+            }
+            (expected.keySet() - identities.keySet()).each { problems << "缺少必需内嵌依赖：${it}" }
+            if (problems) {
+                throw new GradleException('内嵌依赖核对失败：\n' + problems.collect { '  - ' + it }.join('\n'))
+            }
+            logger.lifecycle("内嵌依赖核对通过：${identities.size()} 个直接依赖，声明与文件一致，身份与版本完整")
+        } finally {
+            outer.close()
+        }
+    }
+}
+
+// ❗引擎的运行时依赖不嵌进本模组的 jar，靠 Minecraft 自带的那一份。于是必须同时成立两条：
+//   ① Minecraft 带了它 —— 否则玩家那边 NoClassDefFoundError，而开发环境照样能跑；
+//   ② 两边是同一个版本 —— 否则单测与开发环境（Gradle 取高版本）测的不是玩家那边的库。
+// 两条被破坏时都不会有任何报错，所以在这里变成构建失败。
+//
+// 判据是两份各自独立解析的清单直接比对，谁也不从对方推出来：
+//   · 引擎要什么：单独解析引擎自己的运行时依赖闭包（engineRuntimeLibraries，不混入任何别的依赖）；
+//   · MC 带什么：Loom 给出的客户端与服务端运行时库清单，取交集 —— 模组两边都得能跑。
+// ❗不要改回「在模组的类路径上，除了引擎还有别人要它，就算 MC 带了」：模组自己声明的依赖也算「别人」，
+//   引擎与模组都声明一个 MC 不带的库时，那种写法照样放行（实测复现过）。
+// ❗局部变量别与配置同名：同名时 Groovy 把下面的 `engineRuntimeScope project(':engine')`
+//   当成调用这个变量，报 Could not find method call()（实测踩过）。
+def engineScope = configurations.dependencyScope('engineRuntimeScope')
+def engineRuntimeLibraries = configurations.resolvable('engineRuntimeLibraries') {
+    extendsFrom(engineScope.get())
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.JAR))
+        attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+    }
+}
+dependencies {
+    engineRuntimeScope project(':engine')
+}
+
+def engineLibraries = tasks.register('checkEngineLibraries') {
+    group = 'verification'
+    description = '引擎的运行时依赖必须由 Minecraft 自带（客户端与服务端都带），且版本一致'
+    def required = engineRuntimeLibraries.flatMap { it.incoming.resolutionResult.rootComponent }
+    def client = configurations.named('minecraftClientRuntimeLibraries').flatMap { it.incoming.resolutionResult.rootComponent }
+    def server = configurations.named('minecraftServerRuntimeLibraries').flatMap { it.incoming.resolutionResult.rootComponent }
+    doLast {
+        // 一张解析结果里的全部模块（不含工程节点）：group:name → version。解析不了的依赖一律当场失败，不跳过。
+        def modulesOf = { String label, root ->
+            def found = [:]
+            def seen = [] as Set
+            def queue = [root]
+            while (queue) {
+                def node = queue.remove(0)
+                if (!seen.add(node)) {
+                    continue
+                }
+                if (node.id instanceof ModuleComponentIdentifier) {
+                    found[node.id.group + ':' + node.id.module] = node.id.version
+                }
+                node.dependencies.each { edge ->
+                    if (!(edge instanceof ResolvedDependencyResult)) {
+                        throw new GradleException("${label} 里有解析不了的依赖：${edge.requested.displayName}")
+                    }
+                    queue << edge.selected
+                }
+            }
+            found
+        }
+
+        def requiredRoot = required.get()
+        def engineFound = requiredRoot.dependencies.any {
+            it instanceof ResolvedDependencyResult &&
+                    it.selected.id instanceof ProjectComponentIdentifier && it.selected.id.projectPath == ':engine'
+        }
+        if (!engineFound) {
+            // 检查对象不在图里时，下面的比对一次都不会进 —— 那就是一道只见过绿灯的闸门。
+            throw new GradleException('engineRuntimeLibraries 里解析不到 :engine，这道检查什么也没查到')
+        }
+        def needed = modulesOf('引擎的运行时依赖', requiredRoot)
+        def sides = ['客户端': modulesOf('Minecraft 客户端库清单', client.get()),
+                     '服务端': modulesOf('Minecraft 服务端库清单', server.get())]
+        sides.each { side, provided ->
+            if (provided.isEmpty()) {
+                throw new GradleException("Loom 给出的 Minecraft ${side}库清单是空的，比对没有意义")
+            }
+        }
+
+        def problems = []
+        needed.each { module, version ->
+            def missing = sides.findAll { side, provided -> !provided.containsKey(module) }.keySet()
+            if (missing) {
+                problems << "${module}:${version}：Minecraft 的${missing.join('与')}库清单里没有 —— 玩家那边会缺类" +
+                        '（若它只是编译期注解，在引擎里把它 exclude 掉）'
+            }
+            sides.each { side, provided ->
+                if (provided.containsKey(module) && provided[module] != version) {
+                    problems << "${module}：引擎要 ${version}，Minecraft ${side}带的是 ${provided[module]}"
+                }
+            }
+        }
+        if (problems) {
+            throw new GradleException((['引擎的运行时依赖与 Minecraft 自带的库对不上：']
+                    + problems.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        // 打出核对了哪些库、对照清单有多长：「没有问题」与「什么都没比」输出一样，只有这些数分得开。
+        logger.lifecycle("引擎运行时依赖核对通过：${needed.collect { k, v -> k + ':' + v }.sort().join('、')}" +
+                "（对照 Minecraft 客户端 ${sides['客户端'].size()} 个库、服务端 ${sides['服务端'].size()} 个库）")
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn engineLibraries
+}

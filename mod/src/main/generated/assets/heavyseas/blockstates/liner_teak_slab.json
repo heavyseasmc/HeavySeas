@@ -1,0 +1,46 @@
+{
+  "variants": {
+    "axis=x,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_bottom",
+      "y": 90
+    },
+    "axis=x,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_bottom",
+      "y": 90
+    },
+    "axis=x,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_teak_slab/floor",
+      "y": 90
+    },
+    "axis=x,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_teak_slab/floor",
+      "y": 90
+    },
+    "axis=x,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_top",
+      "y": 90
+    },
+    "axis=x,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_top",
+      "y": 90
+    },
+    "axis=z,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_bottom"
+    },
+    "axis=z,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_bottom"
+    },
+    "axis=z,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_teak_slab/floor"
+    },
+    "axis=z,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_teak_slab/floor"
+    },
+    "axis=z,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_top"
+    },
+    "axis=z,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_teak_slab/shape/slab_top"
+    }
+  }
+}

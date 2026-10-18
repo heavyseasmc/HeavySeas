@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/bathtub_foot",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/bathtub",
+    "particle": "heavyseas:block/liner/prop/bathtub"
+  }
+}

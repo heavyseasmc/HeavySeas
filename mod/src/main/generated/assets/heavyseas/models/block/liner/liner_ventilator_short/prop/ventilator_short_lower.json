@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/ventilator_short_lower",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/ventilator_short",
+    "k": "heavyseas:block/liner/prop/ventilator_short_mouth",
+    "particle": "heavyseas:block/liner/prop/ventilator_short"
+  }
+}

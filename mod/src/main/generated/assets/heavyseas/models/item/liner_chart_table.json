@@ -1,0 +1,14 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/chart_table_item",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/chart_table",
+    "c00": "heavyseas:block/liner/prop/chart_table_chart_front_west",
+    "c01": "heavyseas:block/liner/prop/chart_table_chart_back_west",
+    "c10": "heavyseas:block/liner/prop/chart_table_chart_front_mid",
+    "c11": "heavyseas:block/liner/prop/chart_table_chart_back_mid",
+    "c20": "heavyseas:block/liner/prop/chart_table_chart_front_east",
+    "c21": "heavyseas:block/liner/prop/chart_table_chart_back_east",
+    "k": "heavyseas:block/liner/prop/chart_table_brass",
+    "particle": "heavyseas:block/liner/prop/chart_table"
+  }
+}

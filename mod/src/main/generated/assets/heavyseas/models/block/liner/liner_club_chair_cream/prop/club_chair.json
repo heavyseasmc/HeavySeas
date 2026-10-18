@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/club_chair",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/club_chair_cream",
+    "particle": "heavyseas:block/liner/prop/club_chair_cream"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/palm_lower",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/palm",
+    "particle": "heavyseas:block/liner/prop/palm"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/skiff/template/binnacle",
+  "textures": {
+    "brass": "heavyseas:block/skiff/brass",
+    "particle": "heavyseas:block/skiff/binnacle_side",
+    "side": "heavyseas:block/skiff/binnacle_side",
+    "top": "heavyseas:block/skiff/binnacle_top"
+  }
+}

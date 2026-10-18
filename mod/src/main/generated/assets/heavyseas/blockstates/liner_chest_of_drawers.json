@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=east,open=false": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers",
+      "y": 90
+    },
+    "facing=east,open=true": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers",
+      "y": 90
+    },
+    "facing=north,open=false": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers"
+    },
+    "facing=north,open=true": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers"
+    },
+    "facing=south,open=false": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers",
+      "y": 180
+    },
+    "facing=south,open=true": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers",
+      "y": 180
+    },
+    "facing=west,open=false": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers",
+      "y": 270
+    },
+    "facing=west,open=true": {
+      "model": "heavyseas:block/liner/liner_chest_of_drawers/prop/rig_chest_of_drawers",
+      "y": 270
+    }
+  }
+}

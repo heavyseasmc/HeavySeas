@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#p"},
+  "elements": [
+    {"from": [0, 1.5, 0], "to": [1.5, 14.5, 1.5], "faces": {"south": {"texture": "#p", "uv": [0, 2, 1.5, 13]}, "down": {"texture": "#p", "uv": [0, 13, 1.5, 14.5]}, "east": {"texture": "#p", "uv": [0, 2, 1.5, 13]}}},
+    {"from": [0, 0.5, 0], "to": [2.5, 1.5, 2.5], "faces": {"south": {"texture": "#p", "uv": [0, 14, 2.5, 15]}, "up": {"texture": "#p", "uv": [0, 13, 2.5, 14]}, "east": {"texture": "#p", "uv": [0, 14, 2.5, 15]}}},
+    {"from": [0, 0, 0], "to": [2.0, 0.5, 2.0], "faces": {"south": {"texture": "#p", "uv": [0, 15, 2.0, 15.5]}, "down": {"texture": "#p", "uv": [0, 15, 2.0, 16]}, "east": {"texture": "#p", "uv": [0, 15, 2.0, 15.5]}}},
+    {"from": [0, 14.5, 0], "to": [2.0, 15, 2.0], "faces": {"south": {"texture": "#p", "uv": [0, 1, 2.0, 1.5]}, "down": {"texture": "#p", "uv": [0, 1, 2.0, 2]}, "east": {"texture": "#p", "uv": [0, 1, 2.0, 1.5]}}},
+    {"from": [0, 15, 0], "to": [3, 16.75, 3], "faces": {"south": {"texture": "#n", "uv": [0, 1, 3, 2.75]}, "up": {"texture": "#n", "uv": [0, 5, 3, 10]}, "down": {"texture": "#n", "uv": [0, 3, 3, 8]}, "east": {"texture": "#n", "uv": [0, 1, 3, 2.75]}}}
+  ]
+}

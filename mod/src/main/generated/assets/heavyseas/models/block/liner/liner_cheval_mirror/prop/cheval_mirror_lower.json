@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/cheval_mirror_lower",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/cheval_mirror",
+    "particle": "heavyseas:block/liner/prop/cheval_mirror"
+  }
+}

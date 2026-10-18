@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/folding_screen_lower",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/folding_screen",
+    "particle": "heavyseas:block/liner/prop/folding_screen"
+  }
+}

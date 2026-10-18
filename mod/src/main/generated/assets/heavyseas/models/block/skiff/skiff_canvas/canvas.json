@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/skiff/template/canvas",
+  "textures": {
+    "particle": "heavyseas:block/skiff/canvas_top",
+    "r": "heavyseas:block/skiff/rope",
+    "side": "heavyseas:block/skiff/canvas_side",
+    "top": "heavyseas:block/skiff/canvas_top"
+  }
+}

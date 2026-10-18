@@ -1,0 +1,282 @@
+{
+  "bark_captain_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_captain_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_captain_overboard"
+  },
+  "bark_captain_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_captain_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_captain_refuse"
+  },
+  "bark_captain_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_captain_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_captain_thirst"
+  },
+  "bark_collector_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_collector_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_collector_overboard"
+  },
+  "bark_collector_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_collector_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_collector_refuse"
+  },
+  "bark_collector_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_collector_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_collector_thirst"
+  },
+  "bark_doctor_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_doctor_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_doctor_overboard"
+  },
+  "bark_doctor_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_doctor_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_doctor_refuse"
+  },
+  "bark_doctor_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_doctor_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_doctor_thirst"
+  },
+  "bark_hostess_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_hostess_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_hostess_overboard"
+  },
+  "bark_hostess_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_hostess_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_hostess_refuse"
+  },
+  "bark_hostess_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_hostess_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_hostess_thirst"
+  },
+  "bark_jeweler_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_jeweler_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_jeweler_overboard"
+  },
+  "bark_jeweler_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_jeweler_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_jeweler_refuse"
+  },
+  "bark_jeweler_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_jeweler_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_jeweler_thirst"
+  },
+  "bark_kid_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_kid_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_kid_overboard"
+  },
+  "bark_kid_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_kid_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_kid_refuse"
+  },
+  "bark_kid_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_kid_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_kid_thirst"
+  },
+  "bark_mate_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_mate_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_mate_overboard"
+  },
+  "bark_mate_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_mate_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_mate_refuse"
+  },
+  "bark_mate_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_mate_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_mate_thirst"
+  },
+  "bark_sailor_overboard": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_sailor_overboard"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_sailor_overboard"
+  },
+  "bark_sailor_refuse": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_sailor_refuse"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_sailor_refuse"
+  },
+  "bark_sailor_thirst": {
+    "sounds": [
+      {
+        "name": "heavyseas:barks/bark_sailor_thirst"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.bark_sailor_thirst"
+  },
+  "card_deal": {
+    "sounds": [
+      {
+        "name": "heavyseas:ui/card_deal"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.card_deal"
+  },
+  "card_flip": {
+    "sounds": [
+      {
+        "name": "heavyseas:ui/card_flip"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.card_flip"
+  },
+  "card_snap": {
+    "sounds": [
+      {
+        "name": "heavyseas:ui/card_snap"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.card_snap"
+  },
+  "drink_gulp": {
+    "sounds": [
+      {
+        "name": "heavyseas:event/drink_gulp"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.drink_gulp"
+  },
+  "fight_clash": {
+    "sounds": [
+      {
+        "name": "heavyseas:event/fight_clash"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.fight_clash"
+  },
+  "fight_start": {
+    "sounds": [
+      {
+        "name": "heavyseas:event/fight_start"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.fight_start"
+  },
+  "gull_call": {
+    "sounds": [
+      {
+        "name": "heavyseas:world/gull_call"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.gull_call"
+  },
+  "gull_flock_depart": {
+    "sounds": [
+      {
+        "name": "heavyseas:world/gull_flock_depart"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.gull_flock_depart"
+  },
+  "overboard_fall": {
+    "sounds": [
+      {
+        "name": "heavyseas:event/overboard_fall"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.overboard_fall"
+  },
+  "taken_by_sea": {
+    "sounds": [
+      {
+        "name": "heavyseas:event/taken_by_sea"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.taken_by_sea"
+  },
+  "turn_chime": {
+    "sounds": [
+      {
+        "name": "heavyseas:ui/turn_chime"
+      }
+    ],
+    "subtitle": "subtitles.heavyseas.turn_chime"
+  }
+}

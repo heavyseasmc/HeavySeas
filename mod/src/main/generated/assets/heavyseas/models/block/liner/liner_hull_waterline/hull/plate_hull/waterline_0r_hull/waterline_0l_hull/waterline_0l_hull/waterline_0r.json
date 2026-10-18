@@ -1,0 +1,12 @@
+{
+  "parent": "heavyseas:block/liner/template/hull/plate",
+  "textures": {
+    "down": "heavyseas:block/liner/hull/red_top",
+    "east": "heavyseas:block/liner/hull/waterline_0l",
+    "north": "heavyseas:block/liner/hull/waterline_0r",
+    "particle": "heavyseas:block/liner/hull/waterline_0r",
+    "south": "heavyseas:block/liner/hull/waterline_0l",
+    "up": "heavyseas:block/liner/hull/red_top",
+    "west": "heavyseas:block/liner/hull/waterline_0r"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,furled=false,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_fore",
+      "y": 270
+    },
+    "facing=east,furled=false,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard",
+      "y": 270
+    },
+    "facing=east,furled=true,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled_fore",
+      "y": 270
+    },
+    "facing=east,furled=true,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled",
+      "y": 270
+    },
+    "facing=north,furled=false,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_fore",
+      "y": 180
+    },
+    "facing=north,furled=false,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard",
+      "y": 180
+    },
+    "facing=north,furled=true,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled_fore",
+      "y": 180
+    },
+    "facing=north,furled=true,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled",
+      "y": 180
+    },
+    "facing=south,furled=false,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_fore"
+    },
+    "facing=south,furled=false,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard"
+    },
+    "facing=south,furled=true,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled_fore"
+    },
+    "facing=south,furled=true,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled"
+    },
+    "facing=west,furled=false,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_fore",
+      "y": 90
+    },
+    "facing=west,furled=false,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard",
+      "y": 90
+    },
+    "facing=west,furled=true,part=fore": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled_fore",
+      "y": 90
+    },
+    "facing=west,furled=true,part=yard": {
+      "model": "heavyseas:block/skiff/skiff_yard/yard_furled",
+      "y": 90
+    }
+  }
+}

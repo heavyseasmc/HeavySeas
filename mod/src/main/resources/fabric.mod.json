@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "heavyseas",
+  "version": "${version}",
+  "name": "Heavy Seas",
+  "description": "6–8 人谈判游戏。",
+  "authors": ["Heavy Seas contributors"],
+  "license": ["MIT", "CC-BY-SA-4.0"],
+  "environment": "*",
+  "accessWidener": "heavyseas.accesswidener",
+  "custom": {
+    "cardinal-components": ["heavyseas:game"]
+  },
+  "entrypoints": {
+    "main": ["io.github.heavyseasmc.mod.HeavySeasMod"],
+    "client": ["io.github.heavyseasmc.mod.client.HeavySeasClient"],
+    "cardinal-components": ["io.github.heavyseasmc.mod.state.GameComponents"],
+    "fabric-datagen": ["io.github.heavyseasmc.mod.datagen.HeavySeasDataGenerator"],
+    "modmenu": ["io.github.heavyseasmc.mod.client.ModMenuEntry"]
+  },
+  "mixins": [
+    { "config": "heavyseas.client.mixins.json", "environment": "client" }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}",
+    "fabric-api": ">=${fabric_api_version}",
+    "cardinal-components-base": ">=${cca_version}",
+    "cardinal-components-world": ">=${cca_version}",
+    "forgeconfigapiport": ">=${forge_config_api_port_version}",
+    "geckolib": ">=${geckolib_version}"
+  },
+  "suggests": {
+    "voicechat": "*",
+    "modmenu": "*"
+  }
+}

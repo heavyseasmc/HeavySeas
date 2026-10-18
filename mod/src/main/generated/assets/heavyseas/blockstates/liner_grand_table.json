@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,part=ne": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_ne",
+      "y": 90
+    },
+    "facing=east,part=nw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_nw",
+      "y": 90
+    },
+    "facing=east,part=se": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_se",
+      "y": 90
+    },
+    "facing=east,part=sw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_sw",
+      "y": 90
+    },
+    "facing=north,part=ne": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_ne"
+    },
+    "facing=north,part=nw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_nw"
+    },
+    "facing=north,part=se": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_se"
+    },
+    "facing=north,part=sw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_sw"
+    },
+    "facing=south,part=ne": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_ne",
+      "y": 180
+    },
+    "facing=south,part=nw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_nw",
+      "y": 180
+    },
+    "facing=south,part=se": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_se",
+      "y": 180
+    },
+    "facing=south,part=sw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_sw",
+      "y": 180
+    },
+    "facing=west,part=ne": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_ne",
+      "y": 270
+    },
+    "facing=west,part=nw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_nw",
+      "y": 270
+    },
+    "facing=west,part=se": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_se",
+      "y": 270
+    },
+    "facing=west,part=sw": {
+      "model": "heavyseas:block/liner/liner_grand_table/prop/grand_table_sw",
+      "y": 270
+    }
+  }
+}

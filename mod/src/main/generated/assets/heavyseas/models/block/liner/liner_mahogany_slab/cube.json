@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/cube",
+  "textures": {
+    "all": "heavyseas:block/liner/mahogany",
+    "particle": "heavyseas:block/liner/mahogany"
+  }
+}

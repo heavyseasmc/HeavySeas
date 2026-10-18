@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/upright_piano_west",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/upright_piano",
+    "particle": "heavyseas:block/liner/prop/upright_piano"
+  }
+}

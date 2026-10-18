@@ -1,0 +1,183 @@
+Heavy Seas
+Copyright (c) 2026 Heavy Seas contributors
+
+本产品包含以下第三方组件。
+
+================================================================================
+构建期 / 运行期依赖
+================================================================================
+
+Gson
+  https://github.com/google/gson
+  Apache License 2.0
+
+Gradle Wrapper
+  https://gradle.org
+  Apache License 2.0
+
+--- 以下自 M1 起 ---
+
+Fabric Loader / Fabric API
+  https://fabricmc.net
+  Apache License 2.0
+
+Cardinal Components API
+  https://github.com/OnyxStudios/Cardinal-Components-API
+  MIT License
+  随 jar 一并分发（JIJ），其 LICENSE 已包含在 jar 内。
+
+Forge Config API Port 21.1.6（设置的存储层，ADR-0099）
+  https://github.com/Fuzss/forgeconfigapiport
+  Mozilla Public License 2.0
+  随 jar 一并分发（JIJ），原样、未作任何修改；源码见上面的仓库（Minecraft 1.21.1 那一支）。
+  其中取自 NeoForge / Minecraft Forge 配置系统的源文件（net.neoforged.* · net.minecraftforge.*）
+  按 GNU Lesser General Public License 2.1；它自己的 jar 里又打包了 Night Config 3.8.0
+  （core · toml，https://github.com/TheElectronWill/night-config），按 GNU Lesser General Public License 3.0。
+  三份许可证全文都在它的 jar 内（LICENSE.md · LICENSE-FORGE.md · LICENSE-NIGHT-CONFIG.md）。
+  它 jar 内的图标等资源作者保留全部权利（LICENSE-ASSETS.md），随原 jar 原样分发。
+
+GeckoLib 4.7.7（柜子开合的骨骼动画，ADR-0109）
+  https://github.com/bernie-g/geckolib
+  MIT License
+  随 jar 一并分发（JIJ），原样、未作任何修改；其 LICENSE 已包含在 jar 内（LICENSE_GeckoLib 4）。
+
+Mod Menu（软依赖，仅编译期对其公开 API；不随 jar 分发）
+  https://github.com/TerraformersMC/ModMenu
+  MIT License
+
+Simple Voice Chat（软依赖，仅编译期对其公开 API）
+  https://github.com/henkelmax/simple-voice-chat
+  许可证待核对后填写 —— 首发前必须确认。
+
+================================================================================
+字体
+================================================================================
+
+分两类：**随模组分发的字体文件**（界面文字，运行时绘制），与**只用于构建前渲染贴图的字体**
+（卡面上的文字烘进 PNG，字体文件本身不在本仓库里）。
+
+---- 随模组分发 ----
+
+Noto Serif SC（思源宋体）—— 界面上的全部文字
+  文件    mod/src/main/resources/assets/heavyseas/font/serif.ttf · serif_bold.ttf
+          （由可变字体定成静态字重 600 / 800 后取子集而成，属 OFL 所说的 Modified Version；
+          name 表里的版权与授权字段原样保留）
+  版权    (c) 2017-2024 Adobe (http://www.adobe.com/).（字体文件 name 表 nameID 0 原文）
+          Noto is a trademark of Google Inc.（nameID 7 原文）
+  授权    SIL Open Font License 1.1（字体文件 nameID 13 自述，nameID 14 指向
+          https://openfontlicense.org）。授权全文随字体一起分发：
+          mod/src/main/resources/assets/heavyseas/font/ofl_noto_serif_sc.txt
+  出处    https://github.com/google/fonts/tree/main/ofl/notoserifsc
+          （NotoSerifSC[wght].ttf，2026-03-12 的提交；上游 https://github.com/notofonts/noto-cjk）
+
+---- 只用于构建前渲染贴图（字体文件不在本仓库）----
+
+汇文明朝体（匯文明朝體 · Huiwen-MinchoGBK）—— 全部中文
+  作者    特里王
+  版权    Font (c) Copyright 2022 TerryWang.（字体文件 name 表 nameID 0 原文）
+  授权    作者自定义授权（非标准协议）。作者原文四条：
+            · 此字体可免费用于印刷、显示、嵌入电子文档、设备。
+            · 此字体可自由转发。
+            · 可以将此字体作为更大规模的套装软件的一部分来销售。
+              （但不可单独将此字体文件作为商品转卖）
+            · 可以使用此字体开发新字体。
+  来源层   平假名 · 片假名与一些符号来自 **Oradano明朝**，作者声明「谨照此声明」：
+          该字体同样允许任何人免费用于印刷 · 显示 · 嵌入电子文档，允许自由再分发，
+          允许作为更大规模的软件包的一部分销售，也允许用它开发新字体。
+  出处    作者本人的文章「4、授权声明」一节 https://zhuanlan.zhihu.com/p/344103391
+          字体页 https://fonts.zeoseven.com/items/437/
+  ✅ 2026-09-24 已按作者原文逐条核对过本段。此前本段转述自字体页，有两处与原文不符，
+    已改正：原文**没有**「须保留版权声明并附授权原件副本」这一条要求；
+    原文的限制是**不可单独将字体文件作为商品转卖**，而不是笼统的「免费商用」。
+    字体文件内**没有** nameID 13/14（授权描述与授权网址），只有一句
+    "All rights reserved" 与版本字段里的「开源且免费商用，禁止第三方以任何方式牟利」——
+    以作者原文为准。
+    首发前必须取得并存档原文，再据原文复核本段。
+
+Old Standard TT —— 全部拉丁字母与数字
+  授权    SIL Open Font License 1.1（字体文件 nameID 13 自述，nameID 14 指向
+          http://scripts.sil.org/OFL）
+  出处    https://cdn.jsdelivr.net/npm/@fontsource/old-standard-tt@5.3.0/
+
+================================================================================
+卡牌插画（AI 辅助生成）
+================================================================================
+
+卡面插画、角色头像，卡角角标与信息带里的木刻小图，以及界面上的木刻图标、
+牌背与伤势裂纹，由 OpenAI 的图像生成模型（gpt-image 系列）按本项目自写的画面说明
+生成，再由本项目挑选、抠图、排版。
+画面说明只写本作自己的规则与人物设定，不含任何第三方作品的名称或图像。
+  文件    mod/src/main/resources/assets/heavyseas/textures/gui/cards/art/
+          mod/src/main/resources/assets/heavyseas/textures/gui/portrait/
+          mod/src/main/resources/assets/heavyseas/textures/gui/cards/icon/ 里的木刻小图，
+          母版在 art/icons/*.png
+          mod/src/main/resources/assets/heavyseas/textures/gui/cards/back/（牌背；
+          字标是 art/brand/wordmark.svg 的轮廓，不是生成的）
+          mod/src/main/resources/assets/heavyseas/textures/gui/hud/common/ 里的
+          ic_*（图标）与 crack_*（伤势裂纹）
+  权利    按 OpenAI 的服务条款，生成内容的权利归使用者。与本项目其余美术一样，
+          以 CC BY-SA 4.0 授权（见 LICENSE-ASSETS）。
+
+================================================================================
+音效与配音（CC BY-SA 4.0）
+================================================================================
+
+在本项目有权许可的范围内，下列音频与项目美术、游戏文本适用
+Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)，
+完整条款见 LICENSE-ASSETS。允许商业共享与改编，须署名、标明修改，
+并按相同方式共享改编内容。建议署名为 Heavy Seas contributors。
+此声明不扩大本项目持有的权利，也不替代另有声明的第三方许可。
+代码单独适用 LICENSE 中的 MIT License。
+
+已接入的 35 条音频随源码和默认游戏构建提供，位于模组资源的
+assets/heavyseas/sounds/；对应路径、时长与 SHA-256 见 audio-index.json。
+本批为 11 条音效与 24 句英文角色台词，均经项目维护者整理、用户试听批准，
+从批准的 OGG 按原字节纳入。完整来源与授权核验记录由维护者保留。
+以下文件按上述 CC BY-SA 4.0 范围提供，不因与代码一起打包而适用 MIT：
+
+card_deal.ogg                 ui/card_deal.ogg
+card_flip.ogg                 ui/card_flip.ogg
+card_snap.ogg                 ui/card_snap.ogg
+turn_chime.ogg                ui/turn_chime.ogg
+fight_start.ogg               event/fight_start.ogg
+fight_clash.ogg               event/fight_clash.ogg
+drink_gulp.ogg                event/drink_gulp.ogg
+overboard_fall.ogg            event/overboard_fall.ogg
+taken_by_sea.ogg              event/taken_by_sea.ogg
+gull_call.ogg                 world/gull_call.ogg
+gull_flock_depart.ogg         world/gull_flock_depart.ogg
+bark_jeweler_refuse.ogg       barks/bark_jeweler_refuse.ogg
+bark_jeweler_thirst.ogg       barks/bark_jeweler_thirst.ogg
+bark_jeweler_overboard.ogg    barks/bark_jeweler_overboard.ogg
+bark_collector_refuse.ogg     barks/bark_collector_refuse.ogg
+bark_collector_thirst.ogg     barks/bark_collector_thirst.ogg
+bark_collector_overboard.ogg  barks/bark_collector_overboard.ogg
+bark_captain_refuse.ogg       barks/bark_captain_refuse.ogg
+bark_captain_thirst.ogg       barks/bark_captain_thirst.ogg
+bark_captain_overboard.ogg    barks/bark_captain_overboard.ogg
+bark_mate_refuse.ogg          barks/bark_mate_refuse.ogg
+bark_mate_thirst.ogg          barks/bark_mate_thirst.ogg
+bark_mate_overboard.ogg       barks/bark_mate_overboard.ogg
+bark_hostess_refuse.ogg       barks/bark_hostess_refuse.ogg
+bark_hostess_thirst.ogg       barks/bark_hostess_thirst.ogg
+bark_hostess_overboard.ogg    barks/bark_hostess_overboard.ogg
+bark_sailor_refuse.ogg        barks/bark_sailor_refuse.ogg
+bark_sailor_thirst.ogg        barks/bark_sailor_thirst.ogg
+bark_sailor_overboard.ogg     barks/bark_sailor_overboard.ogg
+bark_doctor_refuse.ogg        barks/bark_doctor_refuse.ogg
+bark_doctor_thirst.ogg        barks/bark_doctor_thirst.ogg
+bark_doctor_overboard.ogg     barks/bark_doctor_overboard.ogg
+bark_kid_refuse.ogg           barks/bark_kid_refuse.ogg
+bark_kid_thirst.ogg           barks/bark_kid_thirst.ogg
+bark_kid_overboard.ogg        barks/bark_kid_overboard.ogg
+
+未接入音频、候选版本、声线预览、审批原件和完整请求元数据不入库。
+可选 privateAudioJar 构建可扩展音频集合；其独立来源记录不属于默认源码构建。
+上述文件许可与商业使用范围不因构建方式改变；尚未完成游戏内听感验收。
+
+================================================================================
+架构参考（无代码依赖，无需署名，此处仅作记录）
+================================================================================
+
+本项目的「规则逻辑与场地环境正交解耦」思路，参考了社区中一个 Fabric 社交
+推理游戏框架的架构范式。仅借鉴思路，未使用其任何代码，亦不依赖其任何产物。

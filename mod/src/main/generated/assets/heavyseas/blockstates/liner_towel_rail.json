@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_towel_rail/prop/towel_rail",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_towel_rail/prop/towel_rail"
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_towel_rail/prop/towel_rail",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_towel_rail/prop/towel_rail",
+      "y": 270
+    }
+  }
+}

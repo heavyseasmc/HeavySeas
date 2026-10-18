@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/coat_stand_upper",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/coat_stand",
+    "particle": "heavyseas:block/liner/prop/coat_stand"
+  }
+}

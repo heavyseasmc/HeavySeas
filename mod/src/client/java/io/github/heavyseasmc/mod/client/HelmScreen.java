@@ -1,0 +1,306 @@
+package io.github.heavyseasmc.mod.client;
+
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.game.NavCardText;
+import io.github.heavyseasmc.mod.net.HelmActionC2S;
+import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.state.NavCardView;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
+import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+
+/**
+ * 舵手挑牌：划船堆里的牌只摊给舵手，挑 1 张执行，其余面朝下塞回牌堆底（决策 ⑭ · ADR-0018 §7.4）。
+ *
+ * <h2>没人划船时这一面不出现</h2>
+ * 服务端当场翻顶牌，这一面连开都不开 —— ADR-0018 §7.4：不要做成只有一张牌的选择界面。
+ * 客户端不自己判断：划船堆的牌只在该开的时候才进舵手那一包（{@code GameComponent#writeView}）。
+ *
+ * <h2>12 秒，超时认高亮，用「顿」</h2>
+ * 用户 2026-09-15 定，与补给箱同一条规则：高亮一进界面就在第一张（它是「你的默认答案」），每次移动都上报；
+ * 超时时服务端单发一包说替你挑的是第几张，这一面先把高亮挪过去、「顿」一下，播完再关。手动挑的点完就关。
+ *
+ * <h2>界面不能揭穿舵手</h2>
+ * 这一面只在舵手自己的屏幕上。别人的屏幕上只有「划船堆 N 张 · 舵手 X · 倒计时」（HUD），
+ * 结算后只公开被执行的那一张 —— 没挑中的几张不会出现在任何人的屏幕上。
+ *
+ * <h2>牌面是贴图</h2>
+ * 三档按物理像素选（{@link CardTexture#drawNav}）；一排好几张时牌很窄，字会小到读不清 ——
+ * 所以高亮那一张下面另有一行完整说明（{@link NavCardText#describe}），与补给箱「说明只跟高亮走」同一个做法。
+ */
+public final class HelmScreen extends GameScreen {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    private HudView view;
+    /** 打开时的划船堆。结算那一刻投影里就没有了，而「顿」还要画在它上面 —— 所以留一份。 */
+    private final List<NavCardView> offer;
+    /** 这一个挑牌窗口的超时时刻（服务端时钟）。 */
+    private final String decision;
+    private final float[] lift;
+    private final long dealAt;
+    /** 高亮。一进来就在第一张，与服务端开窗时的默认一致。 */
+    private int highlight;
+    /** 服务端替你挑的那张；-1 表示没被替挑。 */
+    private int snapIndex = -1;
+    private long snapAt;
+    /** 你自己挑定了（包已发出，等服务端结算）。 */
+    private boolean committed;
+
+    /** 一帧的版面，全部以 GUI 单位计。 */
+    private record Layout(int w, int h, int left, int cardsTop, int rowW, int seaY, int hintY) {
+
+        int cardX(int i) {
+            return left + i * (w + CARD_GAP);
+        }
+    }
+
+    public HelmScreen(HudView view) {
+        super(Text.translatable("heavyseas.helm.title"));
+        this.view = view;
+        this.offer = view.sea().helmOffer();
+        this.decision = DecisionNavigation.identity(view);
+        this.lift = new float[offer.size()];
+        this.dealAt = System.currentTimeMillis();
+        GuiSound.dealt(dealAt, offer.size());
+    }
+
+    @Override
+    public boolean shouldCloseOnEsc() {
+        return false;                         // 挑牌不能逃 —— 逃了也只是超时替你挑
+    }
+
+    /**
+     * 服务端替你挑了一张（ADR-0018 §6 清单第 4 条：这一下不能省）。
+     *
+     * <p>先把高亮挪到<b>服务端说的那一张</b>再播：服务端拿的是它最后收到的高亮，玩家最后一次移动可能还在路上。
+     */
+    public void autoPicked(int index) {
+        if (index < 0 || index >= offer.size()) {
+            return;
+        }
+        highlight = index;
+        snapIndex = index;
+        snapAt = System.currentTimeMillis();
+        GuiSound.snapped(snapAt);
+        // 验收靠这一行：超时有、手动没有。抓帧看不清 396ms 时，它是第二个来源。
+        LOGGER.info("舵手：第 {} 张是替你挑的（{}），播一次「顿」", index + 1, offer.get(index).id());
+    }
+
+    private boolean decided() {
+        return committed || snapAt > 0L;
+    }
+
+    private boolean snapping() {
+        return snapAt > 0L && GuiLanguage.snap(System.currentTimeMillis(), snapAt) < 1f;
+    }
+
+    /** 窗口关了（结算了）就收；「顿」还没播完时再挂一会儿。收界面只在 tick 里做。 */
+    @Override
+    public void tick() {
+        view = projection();
+        if (!view.active()) {
+            close();
+            return;
+        }
+        if (snapping()) {
+            return;
+        }
+        if (!view.myHelmPick() || !decision.equals(DecisionNavigation.identity(view))) {
+            close();
+        }
+    }
+
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        renderBackdrop(context, mouseX, mouseY, delta);
+        if (offer.isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long dt = frameDelta(now);
+        Bands b = drawChrome(context, view);
+        Layout l = layout(b);
+        Inspect ins = inspect(b, l.seaY() + lineStep());
+        float gathered = gathered(now);
+        float snapP = GuiLanguage.snap(now, snapAt);
+
+        // 划船堆几张 · 舵手是谁：这一面才要，所以排在舞台里，不占共有的带。
+        drawSeaLine(context, view, l.seaY(), offer.size());
+
+        // 鼠标真的动了才把高亮带过去（停着的指针不算指向）。定了之后鼠标与键盘都不再改高亮。
+        // 查看态里不认悬停：牌叠在一起了，命中框却还在摊开那一排的位置上。
+        boolean moved = mouseActuallyMoved(mouseX, mouseY);
+        if (moved && !decided() && !inspecting()) {
+            int hovered = indexAt(mouseX, mouseY, l);
+            if (hovered >= 0) {
+                setHighlight(hovered);
+            }
+        }
+
+        // 高亮那一张最后画：查看态里它在堆顶，与签子说的是同一张（2026-10-13 验收 E02，划船一面同一个毛病）
+        for (int i : io.github.heavyseasmc.mod.ui.DrawOrder.highlightLast(offer.size(), highlight)) {
+            float in = GuiLanguage.deal(now, dealAt, i);
+            if (in <= 0f) {
+                continue;
+            }
+            boolean hi = i == highlight;
+            lift[i] = GuiLanguage.approach(lift[i], hi ? GuiMetrics.units(GuiLanguage.LIFT_PX) : 0f, dt);
+            float rise = (1f - in) * GuiMetrics.units(GuiLanguage.DEAL_RISE);
+            float scale = GuiLanguage.dealScale(in);
+            if (i == snapIndex) {
+                rise += GuiMetrics.units(GuiLanguage.snapRise(snapP));
+                scale *= GuiLanguage.snapScale(snapP);
+            }
+            CardPose pose = cardPose(ins, gathered, l.cardX(i) + l.w() / 2f, l.cardsTop() + l.h(), l.w(), l.h(),
+                    hi ? 0 : 1 + Math.abs(i - Math.max(0, highlight)));
+            context.getMatrices().push();
+            context.getMatrices().translate(pose.cx(), pose.bottom() - lift[i] * (1f - gathered) + rise, 0);
+            context.getMatrices().scale(scale, scale, 1f);
+            context.getMatrices().translate(-pose.w() / 2f, -pose.h(), 0);
+            drawCardShadow(context, pose.w(), pose.h(), Math.abs(rise) + lift[i] * (1f - gathered));
+            CardTexture.drawNav(context, offer.get(i), 0, 0, pose.w(), pose.h());
+            if (hi) {
+                drawCardFrame(context, pose.w(), pose.h());
+            }
+            context.getMatrices().pop();
+        }
+
+        // 说明只写一处：查看态里它在签子上（摊开时牌下面那一行 2026-09-30 用户判去掉）。
+        // 签子上写牌面上印的那个名字（与划船一面同一条，2026-10-13 验收 E02）
+        if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
+            drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
+                    null, navTitle(offer.get(highlight)), NavCardText.describe(offer.get(highlight), view.seats(), Catalog.weatherEffect(view.weather()))
+                            .copy().append("\n").append(Text.translatable("heavyseas.navigation.helm_destination")));
+        }
+        drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
+                new Countdown(view.sea().helmDeadlineMs(), view.sea().helmWindowMs(), l.rowW()));   // 总长取投影（ADR-0099 D8：时限可配）
+    }
+
+    /**
+     * 这一帧舞台里的版面：划船堆那一行在最上、说明三行贴舞台底边，牌吃掉中间剩下的。
+     *
+     * <p>牌顶留的空把「顿」算进去（{@link #snapRoom}），理由同补给箱那一面。
+     */
+    private Layout layout(Bands b) {
+        int n = Math.max(1, offer.size());
+        int seaY = b.stageTop();
+        // 牌下面那一行完整说明（落海 · 口渴…）用户 2026-09-30 判去掉（验收清单第 9 条）：牌整格占满舞台，
+        // 完整内容仍在查看态的签子里（U / 右键）。
+        int hintY = b.stageBottom() + HINT_GAP;
+        int top = seaY + lineStep();
+        int avail = hintY - HINT_GAP - top;
+        // 先按偏大的卡算出留空，再据此定卡高：留空只会偏大一点，卡绝不会反过来压上划船堆那一行。
+        int room = snapRoom(cardHeightFor(n, avail - snapRoom(0)));
+        int h = cardHeightFor(n, avail - room);
+        int w = GuiLanguage.cardWidth(h);
+        int cardsTop = cardsTopIn(top, hintY - HINT_GAP, h, room);
+        int rowW = cardRowWidth(n, w);
+        return new Layout(w, h, (paneW() - rowW) / 2, cardsTop, rowW, seaY, hintY);
+    }
+
+    private int indexAt(int mouseX, int mouseY, Layout l) {
+        return cardIndexAt(mouseX, mouseY, l.left(), l.cardsTop(), l.w(), l.h(), offer.size());
+    }
+
+    /** 移高亮并上报：超时认的是它，服务端不知道的话只能乱挑。 */
+    private void setHighlight(int index) {
+        if (index == highlight || index < 0 || index >= offer.size()) {
+            return;
+        }
+        highlight = index;
+        ClientPlayNetworking.send(new HelmActionC2S(index, false));
+    }
+
+    private void commit() {
+        if (decided()) {
+            return;
+        }
+        committed = true;
+        ClientPlayNetworking.send(new HelmActionC2S(highlight, true));
+        // 验收靠这一行与服务端那行「舵手（界面）」对上。
+        LOGGER.info("舵手：确认第 {} 张（{}）", highlight + 1, offer.get(highlight).id());
+    }
+
+    @Override
+    protected boolean leftClick(double mouseX, double mouseY) {
+        if (!decided() && !inspecting()) {
+            int i = indexAt((int) mouseX, (int) mouseY, layout(bands()));
+            if (i >= 0) {
+                setHighlight(i);
+                commit();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean rightClick(double mouseX, double mouseY) {
+        int i = decided() || inspecting() ? -1 : indexAt((int) mouseX, (int) mouseY, layout(bands()));
+        return inspectClick(i, this::setHighlight);
+    }
+    @Override
+    protected int inspectedIndex() {
+        return highlight;
+    }
+
+
+    @Override
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
+        if (inspectKey(keyCode)) {
+            return true;              // 底栏一直写着「查看」，这一面此前却没接这个键（ADR-0043 §7.0）
+        }
+        if (decided()) {
+            return super.onKey(keyCode, scanCode, modifiers);
+        }
+        switch (keyCode) {
+            case GLFW.GLFW_KEY_LEFT -> {
+                setHighlight(Math.max(0, highlight - 1));
+                return true;
+            }
+            case GLFW.GLFW_KEY_RIGHT -> {
+                setHighlight(Math.min(offer.size() - 1, highlight + 1));
+                return true;
+            }
+            case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_SPACE -> {
+                commit();
+                return true;
+            }
+            default -> {
+                return super.onKey(keyCode, scanCode, modifiers);
+            }
+        }
+    }
+
+    /** 上带左头那一句（ADR-0043 D3 (b)）：只在还没定的时候说。 */
+    @Override
+    protected Text cue() {
+        return Text.translatable("heavyseas.cue.helm");
+    }
+
+    @Override
+    protected boolean decisionFace() {
+        return true;
+    }
+
+    @Override
+    protected boolean ownsDecision(io.github.heavyseasmc.mod.state.HudView v) {
+        return v.myHelmPick();
+    }
+
+    @Override
+    protected String rulesAnchor() {
+        return "navigation-pick";
+    }
+
+    @Override
+    protected Text timeoutText() {
+        return Text.translatable("heavyseas.timeout.highlight");
+    }
+}

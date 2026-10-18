@@ -1,0 +1,177 @@
+{
+  "bark_captain_overboard": {
+    "durationMs": 1754,
+    "path": "barks/bark_captain_overboard",
+    "sha256": "8c88b3576bcc629f732a1df08844d936e7ee54491f06e58fb7c83080cbfb745a"
+  },
+  "bark_captain_refuse": {
+    "durationMs": 2763,
+    "path": "barks/bark_captain_refuse",
+    "sha256": "9d0130d0efcf4e8da526fbec03fac95e9c2853ab447f5d9fd266a905aa552a69"
+  },
+  "bark_captain_thirst": {
+    "durationMs": 2141,
+    "path": "barks/bark_captain_thirst",
+    "sha256": "92f4e83dab0c4eb83fe8f3fa3f14ece17d4cd2d7e498bda6a691c7680f9c271e"
+  },
+  "bark_collector_overboard": {
+    "durationMs": 2748,
+    "path": "barks/bark_collector_overboard",
+    "sha256": "a781413ad4e4f51e9a306555cb595e1c918079c1081abb9a63acdaf755357e03"
+  },
+  "bark_collector_refuse": {
+    "durationMs": 2012,
+    "path": "barks/bark_collector_refuse",
+    "sha256": "f486864e8229f68f2650cc5b147f490e131988bd5e5d6c4d31f732dc0195a45b"
+  },
+  "bark_collector_thirst": {
+    "durationMs": 2308,
+    "path": "barks/bark_collector_thirst",
+    "sha256": "22334a4bdfad4e9077acc3fbeedf638af00633b46a51e0e04386e6e67878aee4"
+  },
+  "bark_doctor_overboard": {
+    "durationMs": 2199,
+    "path": "barks/bark_doctor_overboard",
+    "sha256": "11ca75683443950af96ab65429caba48645f270ff3d18b544da8f2001119166d"
+  },
+  "bark_doctor_refuse": {
+    "durationMs": 1638,
+    "path": "barks/bark_doctor_refuse",
+    "sha256": "78c7f9b4cd8e2dc1ecb6f7882d2d36b90c10da998b9c1abb65c03db76f8bc25e"
+  },
+  "bark_doctor_thirst": {
+    "durationMs": 2097,
+    "path": "barks/bark_doctor_thirst",
+    "sha256": "2ed7a7c9c14e106db58e2905d1e6479257c1cd6348a5e6c9c12316958430df82"
+  },
+  "bark_hostess_overboard": {
+    "durationMs": 2040,
+    "path": "barks/bark_hostess_overboard",
+    "sha256": "54dca8f922e950edd5024fe2d5c22da6cec38c1e483a46a2fbd9d2af54778425"
+  },
+  "bark_hostess_refuse": {
+    "durationMs": 1968,
+    "path": "barks/bark_hostess_refuse",
+    "sha256": "cfe6634e594aacf06c93901c9009a7df13b35ca411cb69887aaae510f70310ee"
+  },
+  "bark_hostess_thirst": {
+    "durationMs": 2151,
+    "path": "barks/bark_hostess_thirst",
+    "sha256": "6578fd8dfccff2bba66b07d425eb4d200c6b52829b04cef8beb2e843a2d34b81"
+  },
+  "bark_jeweler_overboard": {
+    "durationMs": 2641,
+    "path": "barks/bark_jeweler_overboard",
+    "sha256": "e5ee16cce3b11d613aebe9db14be7dd933a8043e46cb7db62b34102104d147ad"
+  },
+  "bark_jeweler_refuse": {
+    "durationMs": 2409,
+    "path": "barks/bark_jeweler_refuse",
+    "sha256": "4ad11f8d058487b0a0115b2d9881e3e1ae4d5474199959e7cb4a5a1e15c87e61"
+  },
+  "bark_jeweler_thirst": {
+    "durationMs": 3046,
+    "path": "barks/bark_jeweler_thirst",
+    "sha256": "c0a3afcf816a706570b8ecdbfd68696ce388e6b6e7e58ba9a1f4c6ee446cd9a3"
+  },
+  "bark_kid_overboard": {
+    "durationMs": 2754,
+    "path": "barks/bark_kid_overboard",
+    "sha256": "80b0bc4fd659b33e14e52640525c05a5da9dbba3c9e37bcfa7fedf48ff8881c0"
+  },
+  "bark_kid_refuse": {
+    "durationMs": 2278,
+    "path": "barks/bark_kid_refuse",
+    "sha256": "6b21d6dbc3c27a78a5d4c2b6b17e203cd1ff488b782de133fa668be5f0473f7e"
+  },
+  "bark_kid_thirst": {
+    "durationMs": 1871,
+    "path": "barks/bark_kid_thirst",
+    "sha256": "5fa42b495f76a369126a35c0049cd97c92998e7ab32f50750fe0330f56b5084d"
+  },
+  "bark_mate_overboard": {
+    "durationMs": 2920,
+    "path": "barks/bark_mate_overboard",
+    "sha256": "d48f25d1cfe6c88cf732e3849719b64a1151c5cd5f6c281b3e9d643e289175c4"
+  },
+  "bark_mate_refuse": {
+    "durationMs": 2986,
+    "path": "barks/bark_mate_refuse",
+    "sha256": "2d0557c2d665f10ee4d18951747d86b95157e1c23a1c713aec63a17b3016510b"
+  },
+  "bark_mate_thirst": {
+    "durationMs": 1728,
+    "path": "barks/bark_mate_thirst",
+    "sha256": "a90d7ca190f7040baad358807100ea4e1ab6dd47e5f50b5afa4e5d9bffaa5ad4"
+  },
+  "bark_sailor_overboard": {
+    "durationMs": 1960,
+    "path": "barks/bark_sailor_overboard",
+    "sha256": "7114d38a9a4a4fb975887c6aae5b5a34c2d768aac93b063a59cddb84dc1e50ae"
+  },
+  "bark_sailor_refuse": {
+    "durationMs": 1399,
+    "path": "barks/bark_sailor_refuse",
+    "sha256": "0f63e6a827cb6558e21b35ac5002dc7893f313e77cc926d4c76271492b596add"
+  },
+  "bark_sailor_thirst": {
+    "durationMs": 2320,
+    "path": "barks/bark_sailor_thirst",
+    "sha256": "1baa5b990324a65febbc18a8843ece19cf90994489d73be4f2ccf392a48fb9c1"
+  },
+  "card_deal": {
+    "durationMs": 457,
+    "path": "ui/card_deal",
+    "sha256": "82868af8632494a8ed6662a5f24e313d2829ac236849b3c85d1e8bdbd288684b"
+  },
+  "card_flip": {
+    "durationMs": 480,
+    "path": "ui/card_flip",
+    "sha256": "b8e2fed455edd1d5a5ddecf4f9f689f4f8cb52f6eafd3f96446ea853fe9ceeb5"
+  },
+  "card_snap": {
+    "durationMs": 480,
+    "path": "ui/card_snap",
+    "sha256": "732b063ee20e9483b9a7287e3745ee2982676e003779dd330c34d1ab66bde9a0"
+  },
+  "drink_gulp": {
+    "durationMs": 1085,
+    "path": "event/drink_gulp",
+    "sha256": "8aa0830025c999acfdbe0e7dcd74cbb0f4af176a91c4b368814bfd3abcae2213"
+  },
+  "fight_clash": {
+    "durationMs": 1480,
+    "path": "event/fight_clash",
+    "sha256": "dc9caea46b83edb94b714205b7ce61616faae3887e4a809679665c591074704d"
+  },
+  "fight_start": {
+    "durationMs": 1760,
+    "path": "event/fight_start",
+    "sha256": "a776d254f152181f381ba4207f32bdc1e3902632b53a41cce4749214d6cc1eac"
+  },
+  "gull_call": {
+    "durationMs": 863,
+    "path": "world/gull_call",
+    "sha256": "1c42d2d9db82c7c2a8d98f22e6bc6f400a48593894c5dd81d9a982a3f3697b49"
+  },
+  "gull_flock_depart": {
+    "durationMs": 1999,
+    "path": "world/gull_flock_depart",
+    "sha256": "f1821e8066cf29fa052fc67fd08c0065cf9fa6cea40e2153a666b7c687411389"
+  },
+  "overboard_fall": {
+    "durationMs": 1480,
+    "path": "event/overboard_fall",
+    "sha256": "27ae8f7d9f58bccce9085529c5d98d84cf37fa899a4fd63a1759b71075ab5dc1"
+  },
+  "taken_by_sea": {
+    "durationMs": 2480,
+    "path": "event/taken_by_sea",
+    "sha256": "972d111eaaddee3d4a5220cb339b7b3a0d3a8da152591476c6e732c354d70b06"
+  },
+  "turn_chime": {
+    "durationMs": 1200,
+    "path": "ui/turn_chime",
+    "sha256": "113463164fe1351b2d8fba036dba813dfa18944cc307a296b789492297464d3c"
+  }
+}

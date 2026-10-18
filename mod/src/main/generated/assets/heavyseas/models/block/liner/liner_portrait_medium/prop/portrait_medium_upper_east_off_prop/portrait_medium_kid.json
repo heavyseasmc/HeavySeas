@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/portrait_medium_upper_east_off",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/portrait_medium",
+    "g": "heavyseas:block/liner/prop/portrait_medium_glow_off",
+    "p": "heavyseas:block/liner/prop/portrait_medium_kid",
+    "particle": "heavyseas:block/liner/prop/portrait_medium"
+  }
+}

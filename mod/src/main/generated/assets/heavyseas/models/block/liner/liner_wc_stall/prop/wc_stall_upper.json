@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/wc_stall_upper",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/wc_stall",
+    "particle": "heavyseas:block/liner/prop/wc_stall"
+  }
+}

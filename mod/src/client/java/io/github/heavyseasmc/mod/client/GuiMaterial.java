@@ -1,0 +1,681 @@
+package io.github.heavyseasmc.mod.client;
+
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.ui.HudPart;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.util.Identifier;
+
+/**
+ * GUI 的材质：界面不再是「模糊背景上的一层半透明黑」，而是一件画出来的东西（ADR-0037）。
+ * 材质只在这里定义 —— 与颜色只在 {@link GuiLanguage}、版面常量只在 {@code GameScreen} 是同一条规矩。
+ *
+ * <p><b>形制只有一套</b>（船舱木作）：上过油的柚木板、金属包角、一汪灯光、玻璃液位管、金属头像圈；
+ * 要印字的地方一律是搪瓷牌，字不直接压在木纹上。两个主题只差颜色 ——
+ * 深色是夜里的舱，浅色是同一条船白天的舱。
+ *
+ * <p>2026-09-23 之前不是这样：浅色照 A 稿（海图纸 · 罗经花 · 三角压角 · 比例尺），深色照 B 稿，
+ * 同一件东西两种画法 —— <b>两套设计各做一半</b>。代价是每次改动都要做两遍，而实拍一次只看得了一个主题，
+ * §7.7「深色液位管看不出水位」就是这么漏过去的。用户 2026-09-22：
+ * 「深色模式和浅色模式不要维护两套 ui，ui 统一用 B，只改变颜色，这样不会乱」。
+ * ❗所以这个类里<b>不应该再出现按主题分叉的形状</b>：分叉只许发生在颜色上（{@link GuiLanguage}）
+ * 与贴图目录名上。GuiConsistencyTest 盯着这一条。
+ *
+ * <p>贴图由内部管线的 {@code build_gui_material.py} 从 {@code art/gui/} 的母版烘出，基准是
+ * <b>4 个贴图像素 = 1 个 GUI 单位</b>，与牌面同一套载入方式（多级纹理 + 线性过滤），缩放是平滑的。
+ * 贴图里不烘字：字一律由 {@link GuiText} 实时排。
+ */
+final class GuiMaterial {
+
+    /** 贴图像素 / GUI 单位（管线里的 {@code UNIT}）。 */
+    private static final int TEXELS_PER_UNIT = 4;
+    private static final int SHEET_TEXELS = 512;
+    private static final int CORNERS_TEXELS = 192;
+    private static final int TAG_TEXELS = 96;
+    /** 九宫格的边，贴图像素。 */
+    private static final int TAG_BORDER_TEXELS = 24;
+    /** 倒计时的框：横向三段（两头各一段不拉伸，中间拉伸）。 */
+    private static final int GAUGE_W_TEXELS = 96;
+    private static final int GAUGE_H_TEXELS = 32;
+    private static final int GAUGE_CAP_TEXELS = 32;
+    /** 框四周各占多少 —— 里面那一块由代码填。管线里的 {@code GAUGE_INSET} 必须与它一致。 */
+    private static final int GAUGE_INSET_TEXELS = 8;
+    /** 头像圈整张多大、其中头像那个圆的直径多大（管线里的 {@code RING_PORTRAIT}）。 */
+    private static final int RING_TEXELS = 192;
+    private static final int RING_PORTRAIT_TEXELS = 152;
+    private static final int KEY_TEXELS = 64;
+    private static final int KEY_BORDER_TEXELS = 16;
+
+    /** 倒计时多高，GUI 单位。版面里的 {@code BAR_H} 取它。 */
+    static final int GAUGE_H = GAUGE_H_TEXELS / TEXELS_PER_UNIT;
+    /**
+     * 上带那一排图标的母版多大（贴图像素）。
+     *
+     * <p>图标是**白线稿透明底**，颜色由调用方给 —— 与 {@code ring_mark} 同一条路数，
+     * 所以它们与主题无关，不放在 {@code material/<主题>/} 下面。
+     */
+    static final int ICON_TEXELS = 64;
+
+    /**
+     * 一枚图标：白线稿按 {@code color} 着色画出来。
+     *
+     * <p>❗尺寸按<b>物理像素</b>判：屏幕上约 12 个 GUI 单位，界面尺寸 3 时 36 物理像素，
+     * 母版 64 给了 5 倍余量，缩下去走与牌面同一套载入方式（多级纹理 + 线性过滤）。
+     */
+    static void icon(DrawContext context, String name, int x, int y, int size, int color) {
+        Identifier id = CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, "textures/gui/icon/" + name + ".png"));
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.setShaderColor(((color >> 16) & 0xFF) / 255f, ((color >> 8) & 0xFF) / 255f,
+                (color & 0xFF) / 255f, ((color >>> 24) & 0xFF) / 255f);
+        context.drawTexture(id, x, y, size, size, 0f, 0f, ICON_TEXELS, ICON_TEXELS, ICON_TEXELS, ICON_TEXELS);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    /** 材质板离舞台四边多远。 */
+    static final int SHEET_MARGIN = 5;
+    /** 材质板的框线从板边往里多远 —— 内容别画到这条线外面去。 */
+    static final int SHEET_FRAME_INSET = 4;
+
+    private GuiMaterial() {
+    }
+
+    private static Identifier texture(String name) {
+        String theme = GuiLanguage.theme() == GuiLanguage.Theme.DARK ? "dark" : "light";
+        return CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, "textures/gui/material/" + theme + "/" + name + ".png"));
+    }
+
+    /**
+     * 压暗整个世界。不调 {@code Screen.renderBackground}：1.21.1 里那一层是模糊加压暗，
+     * 而「模糊 + 半透明黑」正是界面读起来像深色模式应用的原因。暗部带色相，不用中性灰。
+     */
+    static void dimWorld(DrawContext context) {
+        // 2026-09-30 起照样张 b-3 的 .dimmer：整屏一张带色相的径向暗角（HudPart.DIMMER，样张 CSS 渲出来的那一件，ADR-0047）。
+        // ❗铺的是整个窗口（帧缓冲全宽全高），不是收窄后的舞台 —— 侧栏那一侧靠的就是这一层（checkNotificationSidebarIntegration）。
+        var window = net.minecraft.client.MinecraftClient.getInstance().getWindow();
+        int s = Math.max(1, (int) Math.round(window.getScaleFactor()));
+        float f = 1f / s;
+        context.getMatrices().push();
+        context.getMatrices().scale(f, f, 1f);
+        hudPart(context, HudPart.DIMMER, 0, 0, window.getFramebufferWidth(), window.getFramebufferHeight(), 1.0);
+        context.getMatrices().pop();
+    }
+
+    /** 一张材质板：平铺的地、框线、四个角、一处点缀。不透明 —— 聊天从底下透上来的问题由它自然兜住。 */
+    static void sheet(DrawContext context, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        context.fill(x + 2, y + 3, x + w + 2, y + h + 3, 0x66000000);                 // 落在世界上的影子
+        Identifier sheet = texture("sheet");
+        int tile = SHEET_TEXELS / TEXELS_PER_UNIT;
+        for (int ty = 0; ty < h; ty += tile) {
+            for (int tx = 0; tx < w; tx += tile) {
+                int tw = Math.min(tile, w - tx);
+                int th = Math.min(tile, h - ty);
+                context.drawTexture(sheet, x + tx, y + ty, tw, th, 0f, 0f,
+                        tw * TEXELS_PER_UNIT, th * TEXELS_PER_UNIT, SHEET_TEXELS, SHEET_TEXELS);
+            }
+        }
+        accent(context, x, y, w, h);
+        frame(context, x, y, w, h);
+        corners(context, x, y, w, h);
+    }
+
+    /**
+     * 点缀：舱里那盏灯照在桌面中间。很淡，不压字。
+     *
+     * <p>位置与大小两个主题相同 —— 这里是<b>形</b>。只有亮到什么程度按主题：深色底上它是光源，再亮就吃掉
+     * 压在它上面的字（实拍过）；浅色底上它只是一点暖意，同样的亮度会把本就浅的底再提亮一档，
+     * 字与底的差就没了 —— 2026-09-23 用户说浅色读不出来，底上每多一层东西都要按这一条算账。
+     */
+    private static void accent(DrawContext context, int x, int y, int w, int h) {
+        int size = Math.max(w, h);
+        int ax = x + (w - size) / 2;
+        int ay = y + (h - size) / 2;
+        context.enableScissor(x, y, x + w, y + h);
+        context.setShaderColor(1f, 1f, 1f, GuiLanguage.theme() == GuiLanguage.Theme.DARK ? 0.30f : 0.12f);
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.drawTexture(texture("accent"), ax, ay, size, size, 0f, 0f, 1, 1, 1, 1);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+        context.disableScissor();
+    }
+
+    /**
+     * 框线用代码画：整数个 GUI 单位的直线在任何界面尺寸下都是锐利的，不必进贴图。颜色取自调色板，与贴图同源。
+     *
+     * <p>只一道外沿加一道细线（样张 b 的木板就是这样）。2026-09-30 之前是外沿加三道，读起来是「黑白黑」
+     * 一整圈，全屏对比最强的东西成了画框而不是牌（ADR-0045 §1.2 界 1）。
+     */
+    private static void frame(DrawContext context, int x, int y, int w, int h) {
+        int i = SHEET_FRAME_INSET;
+        context.drawBorder(x, y, w, h, GuiLanguage.rim());
+        context.drawBorder(x + i - 1, y + i - 1, w - 2 * (i - 1), h - 2 * (i - 1), GuiLanguage.frame());
+    }
+
+    /** 包角画多大，GUI 单位。贴图一格是 24 个单位的量；稿子上的包角约是它的三分之二，缩下去走平滑过滤。 */
+    private static final int CORNER_UNITS = 16;
+
+    private static void corners(DrawContext context, int x, int y, int w, int h) {
+        Identifier id = texture("corners");
+        int cell = CORNERS_TEXELS / 2;
+        int size = CORNER_UNITS;
+        if (w < 3 * size || h < 3 * size) {
+            return;                                           // 板太小就不压角：角比板还抢眼
+        }
+        int[][] at = {{x - 1, y - 1, 0, 0}, {x + w - size + 1, y - 1, cell, 0},
+                {x - 1, y + h - size + 1, 0, cell}, {x + w - size + 1, y + h - size + 1, cell, cell}};
+        for (int[] c : at) {
+            context.drawTexture(id, c[0], c[1], size, size, c[2], c[3], cell, cell, CORNERS_TEXELS, CORNERS_TEXELS);
+        }
+    }
+
+    /**
+     * 座位轨与舞台之间那一道**通栏线**（样张里是木板之间的一道缝）。
+     *
+     * <p>它取代了第四刀为截图判据加的舞台角标 —— 角标是我加的，稿子里没有（§7.12）。
+     * 这道线稿子里本来就有，而且**只在这一处出现一次**，所以 `band_check.py` 改认它：
+     * 一整行同一个颜色、跨满舞台宽，别的地方不会有。
+     *
+     * <p>用 {@link GuiLanguage#rim()}（板最外一圈那个色）：它不与任何一处的字同色 ——
+     * 与墨色同色的话，每一行正文都会混进判据里。
+     */
+    static void bandRule(DrawContext context, int x, int y, int w) {
+        if (w <= 0) {
+            return;
+        }
+        context.fill(x, y, x + w, y + 1, GuiLanguage.rim());
+    }
+
+    /**
+     * 一块标签（九宫格）：浅色是纸签，深色是搪瓷牌。按钮、提示签、航海日志的底都是它。
+     * ❗标签永远是<b>浅底</b>，印在上面的字要用 {@link GuiLanguage#onTag} 换成深墨。
+     */
+    static void tag(DrawContext context, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        context.fill(x + 1, y + 2, x + w + 1, y + h + 2, 0x55000000);                 // 标签落在板上的影子
+        nineSlice(context, texture("tag"), x, y, w, h, TAG_TEXELS, TAG_BORDER_TEXELS);
+    }
+
+    /** 提示签上那个尖角多高、多宽（宽 = 2 倍高），GUI 单位。 */
+    static final int PLATE_POINT = 5;
+
+    /**
+     * 提示签：一块标签，顶上伸出一个指着牌的尖角（样张里牌下面吊的那张白搪瓷牌）。
+     *
+     * <p>❗尖角不另取颜色，而是<b>一条一条地画标签贴图正中那一个纹素</b> ——
+     * 标签是九宫格贴图，浅深两个主题各一张，另起一个色值迟早与贴图漂开
+     * （「同一件东西两种画法」正是 §7.12 要收掉的毛病）。从贴图上取，换主题时它自己就跟着换。
+     *
+     * @param pointX 尖角尖端的 x（一般是那张牌的横中线），会被夹进签子自己的宽度里；
+     *               {@code < 0} 表示不要尖角（签子在牌<b>旁边</b>而不是下面时就是这样）
+     */
+    static void plate(DrawContext context, int x, int y, int w, int h, int pointX) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        if (pointX < 0) {
+            tag(context, x, y, w, h);
+            return;
+        }
+        int tip = Math.max(x + PLATE_POINT + 1, Math.min(x + w - PLATE_POINT - 1, pointX));
+        Identifier id = texture("tag");
+        int mid = TAG_TEXELS / 2;
+        for (int i = 0; i < PLATE_POINT; i++) {
+            int half = PLATE_POINT - i;
+            context.drawTexture(id, tip - half, y - PLATE_POINT + i, 2 * half, 1, mid, mid, 1, 1, TAG_TEXELS, TAG_TEXELS);
+        }
+        tag(context, x, y, w, h);
+    }
+
+    /**
+     * 一枚键帽（九宫格）：印着键名的小块，底下一道厚边。与标签一样永远是浅底，键名用 {@link GuiLanguage#onTag} 换色。
+     * 厚边占最底下 1 个单位 —— 键名要在它上面那一块里居中。
+     */
+    static void keycap(DrawContext context, int x, int y, int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        nineSlice(context, texture("key"), x, y, w, h, KEY_TEXELS, KEY_BORDER_TEXELS);
+    }
+
+    /** 键帽比它里面的字宽多少、高多少（两边的边与底下那道厚边）。 */
+    static final int KEY_PAD_X = 4;
+    static final int KEY_PAD_TOP = 1;
+    static final int KEY_PAD_BOTTOM = 3;
+
+    private static void nineSlice(DrawContext context, Identifier id, int x, int y, int w, int h, int texels, int bt) {
+        int b = Math.min(bt / TEXELS_PER_UNIT, Math.min(w, h) / 2);
+        int mid = texels - 2 * bt;
+        int[] xs = {x, x + b, x + w - b};
+        int[] ws = {b, w - 2 * b, b};
+        int[] us = {0, bt, texels - bt};
+        int[] uw = {bt, mid, bt};
+        int[] ys = {y, y + b, y + h - b};
+        int[] hs = {b, h - 2 * b, b};
+        for (int r = 0; r < 3; r++) {
+            for (int c = 0; c < 3; c++) {
+                if (ws[c] > 0 && hs[r] > 0) {
+                    context.drawTexture(id, xs[c], ys[r], ws[c], hs[r], us[c], us[r], uw[c], uw[r], texels, texels);
+                }
+            }
+        }
+    }
+
+    /**
+     * 倒计时：玻璃液位管，液面往左退。贴图只是盖在上面的那个金属框；剩多少用代码填在框底下 ——
+     * 整数个 GUI 单位的矩形在任何界面尺寸下都是锐利的，而液体只从管腔里那条<b>整个透明</b>的带子透出来。
+     *
+     * <p>❗语义照旧：平时铜绿，最后一段朱砂（{@code urgent}）—— 朱砂只给紧迫。
+     *
+     * @param frac 还剩多少，0–1
+     */
+    static void gauge(DrawContext context, int x, int y, int w, float frac, boolean urgent) {
+        int inset = GAUGE_INSET_TEXELS / TEXELS_PER_UNIT;
+        int cap = GAUGE_CAP_TEXELS / TEXELS_PER_UNIT;
+        if (w < 2 * cap) {
+            return;                                            // 两头都放不下就不画：画出半个框比不画更怪
+        }
+        int ix = x + inset;
+        int iy = y + inset;
+        int iw = w - 2 * inset;
+        int ih = GAUGE_H - 2 * inset;
+        int left = Math.round(iw * Math.max(0f, Math.min(1f, frac)));
+        context.fill(ix, iy, ix + iw, iy + ih, GuiLanguage.ground());
+        context.fill(ix, iy, ix + left, iy + ih, urgent ? GuiLanguage.cinnabar() : GuiLanguage.verdigris());
+        Identifier id = texture("gauge");
+        int[] xs = {x, x + cap, x + w - cap};
+        int[] ws = {cap, w - 2 * cap, cap};
+        int[] us = {0, GAUGE_CAP_TEXELS, GAUGE_W_TEXELS - GAUGE_CAP_TEXELS};
+        int[] uw = {GAUGE_CAP_TEXELS, GAUGE_W_TEXELS - 2 * GAUGE_CAP_TEXELS, GAUGE_CAP_TEXELS};
+        for (int c = 0; c < 3; c++) {
+            if (ws[c] > 0) {
+                context.drawTexture(id, xs[c], y, ws[c], GAUGE_H, us[c], 0, uw[c], GAUGE_H_TEXELS, GAUGE_W_TEXELS, GAUGE_H_TEXELS);
+            }
+        }
+    }
+
+    /** 头像圈比头像那个圆往外多出多少，GUI 单位。排版要给它留出来。 */
+    static int ringMargin(int diameter) {
+        return Math.round(diameter * (RING_TEXELS - RING_PORTRAIT_TEXELS) / (2f * RING_PORTRAIT_TEXELS));
+    }
+
+    /** 只要那一圈金属（主画面右上的天候舷窗）：与头像同一张贴图，圈里放什么由调用方画。 */
+    static void ringOnly(DrawContext context, int x, int y, int diameter) {
+        int m = ringMargin(diameter);
+        int size = diameter + 2 * m;
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.drawTexture(texture("ring"), x - m, y - m, size, size, 0f, 0f, 1, 1, 1, 1);
+    }
+
+    /**
+     * 系数 {@code k}、当前主题下 HUD 各件用的那一份贴图（{@link #hudPart} · {@link #hudIcon} 挑的那一倍，外加不按件夹的那一倍）。
+     * 进服预载只载这些（审查 2026-10-07 P2，{@code CardTexture#preload}）；挑法与下面画的那几处同一个算法，只此一处。
+     */
+    static java.util.Set<Identifier> hudPartsAt(double k) {
+        String theme = GuiLanguage.theme() == GuiLanguage.Theme.DARK ? "dark" : "light";
+        java.util.Set<Identifier> out = new java.util.HashSet<>();
+        for (HudPart part : HudPart.values()) {
+            out.add(Identifier.of(HeavySeasMod.MOD_ID, part.path(theme, part.bakeFor(k, true))));
+            out.add(Identifier.of(HeavySeasMod.MOD_ID, part.path(theme, HudPart.bakeFor(k))));
+        }
+        return out;
+    }
+
+    /**
+     * 主画面 HUD 的一件装饰件（{@link HudPart}）：样张 B 形制的 CSS 由浏览器渲出来的贴图，按表拼上去。
+     *
+     * <p>❗调用方已经把矩阵缩到 1 / 界面尺寸，这里的坐标是<b>物理像素</b>；{@code x, y, w, h} 是这一件的<b>盒子</b>
+     * （与 {@code HudLayout} 给的矩形同一个），阴影那一圈由这里按 {@code margin × k} 往外补。
+     * 挑不小于 {@code k} 的那一倍：界面尺寸 3 下 k = 1，贴图一个纹素对一个像素，与样张逐像素相同。
+     */
+    static void hudPart(DrawContext context, HudPart part, int x, int y, int w, int h, double k) {
+        String theme = GuiLanguage.theme() == GuiLanguage.Theme.DARK ? "dark" : "light";
+        hudPartIn(context, part, theme, x, y, w, h, k);
+    }
+
+    /**
+     * 同 {@link #hudPart}，但分主题的件钉死取浅色那一份：画在<b>搪瓷</b>上的件（聊天页里的输入槽）——
+     * 搪瓷两个主题共用一张，槽也跟着它走，不跟主题换。
+     */
+    static void hudPartOnEnamel(DrawContext context, HudPart part, int x, int y, int w, int h, double k) {
+        hudPartIn(context, part, "light", x, y, w, h, k);
+    }
+
+    // ---------------------------------------------------------------- 聊天（2026-10-13 样张 C1 · B）
+
+    /** 纸条的纸从状态牌（{@link HudPart#PLAQUE}）里裁：盒子外 30 的影子 + 4 的框之内，304 × 131 一整块纸（稿子像素）。 */
+    private static final int PAPER_INSET = 34;
+    private static final int PAPER_W = 304;
+    private static final int PAPER_H = 131;
+
+    /**
+     * 一张聊天纸条（物理像素）：落影 · 一圈细边 · 纸。浅色主题是状态牌那张海图纸，深色是同一块深木纹配铜边（{@link GuiLanguage.Chat}）。
+     * 纸按 1 纹素 = k 像素从状态牌上<b>裁</b>，不拉伸；纸条比那一块纸宽就一块一块接着铺。
+     *
+     * <p>❗先 {@code fill}（影子、细边）再画纸：{@code fill} 收尾时关掉混合，纸要淡出就得在它之后重新开。
+     *
+     * @param alpha 整张纸条的不透明度（每句各自淡出）
+     */
+    static void chatStrip(DrawContext context, int x, int y, int w, int h, double k, float alpha) {
+        if (w <= 0 || h <= 0 || alpha <= 0f) {
+            return;
+        }
+        int edge = Math.max(1, (int) Math.round(k));
+        int drop = Math.max(1, (int) Math.round(2 * k));
+        // 影子与细边都只画在纸外那一圈：纸淡出时是半透明的，铺在纸底下的整块色会从纸里透出来
+        context.fill(x - edge, y + h + edge, x + w + edge, y + h + edge + drop,
+                GuiLanguage.Hud.alpha(GuiLanguage.Chat.stripShadow(), alpha));
+        int rim = GuiLanguage.Hud.alpha(GuiLanguage.Chat.stripRim(), alpha);
+        context.fill(x - edge, y - edge, x + w + edge, y, rim);
+        context.fill(x - edge, y + h, x + w + edge, y + h + edge, rim);
+        context.fill(x - edge, y, x, y + h, rim);
+        context.fill(x + w, y, x + w + edge, y + h, rim);
+        HudPart part = HudPart.PLAQUE;
+        int bake = part.bakeFor(k, true);
+        String theme = GuiLanguage.theme() == GuiLanguage.Theme.DARK ? "dark" : "light";
+        Identifier id = CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, part.path(theme, bake)));
+        int texW = part.texW(bake);
+        int texH = part.texH(bake);
+        int tileW = Math.max(1, (int) Math.floor(PAPER_W * k));
+        int tileH = Math.max(1, (int) Math.floor(PAPER_H * k));
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.setShaderColor(1f, 1f, 1f, alpha);
+        for (int ty = 0; ty < h; ty += tileH) {
+            for (int tx = 0; tx < w; tx += tileW) {
+                int dw = Math.min(tileW, w - tx);
+                int dh = Math.min(tileH, h - ty);
+                int rw = Math.max(1, (int) Math.round(dw * bake / k));
+                int rh = Math.max(1, (int) Math.round(dh * bake / k));
+                context.drawTexture(id, x + tx, y + ty, dw, dh, PAPER_INSET * bake, PAPER_INSET * bake, rw, rh, texW, texH);
+            }
+        }
+        context.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    /**
+     * 「聊天」小签上的未读角标（物理像素的盒子）：落影 · 一圈墨线 · 朱砂底。字由调用方压上去。
+     * 用 {@link #colorShape} 画（不经 {@code fill}），画完混合照旧开着，紧跟着的字不受影响。
+     */
+    static void unreadBadge(DrawContext context, int x, int y, int w, int h, double k) {
+        float line = Math.max(1f, (float) k);
+        float drop = Math.max(1f, (float) k);
+        colorShape(context, net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLE_FAN,
+                io.github.heavyseasmc.mod.ui.ShapeMesh.capsule(x, y + drop, x + w, y + h + drop), GuiLanguage.Chat.BADGE_SHADOW);
+        colorShape(context, net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLE_FAN,
+                io.github.heavyseasmc.mod.ui.ShapeMesh.capsule(x, y, x + w, y + h), GuiLanguage.Chat.BADGE_LINE);
+        colorShape(context, net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLE_FAN,
+                io.github.heavyseasmc.mod.ui.ShapeMesh.capsule(x + line, y + line, x + w - line, y + h - line),
+                GuiLanguage.Chat.BADGE_FILL);
+    }
+
+    private static void hudPartIn(DrawContext context, HudPart part, String theme, int x, int y, int w, int h, double k) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        int bake = part.bakeFor(k, true);
+        Identifier id = CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, part.path(theme, bake)));
+        int texW = part.texW(bake);
+        int texH = part.texH(bake);
+        int m = (int) Math.round(part.margin() * k);
+        int ox = x - m;
+        int oy = y - m;
+        int ow = w + 2 * m;
+        int oh = h + 2 * m;
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        switch (part.slice()) {
+            case FIXED -> context.drawTexture(id, ox, oy, ow, oh, 0f, 0f, texW, texH, texW, texH);
+            case H3 -> {
+                int capTex = (part.margin() + part.cap()) * bake;
+                int capPx = Math.min(ow / 2, (int) Math.round((part.margin() + part.cap()) * k));
+                int[] mid = middle(ow - 2 * capPx, texW - 2 * capTex, bake, k);
+                context.drawTexture(id, ox, oy, capPx, oh, 0f, 0f, capTex, texH, texW, texH);
+                context.drawTexture(id, ox + capPx, oy, ow - 2 * capPx, oh, capTex + mid[0], 0f, mid[1], texH, texW, texH);
+                context.drawTexture(id, ox + ow - capPx, oy, capPx, oh, texW - capTex, 0f, capTex, texH, texW, texH);
+            }
+            case NINE -> {
+                int capTex = (part.margin() + part.cap()) * bake;
+                int capX = Math.min(ow / 2, (int) Math.round((part.margin() + part.cap()) * k));
+                int capY = Math.min(oh / 2, (int) Math.round((part.margin() + part.cap()) * k));
+                int[] mx = middle(ow - 2 * capX, texW - 2 * capTex, bake, k);
+                int[] my = middle(oh - 2 * capY, texH - 2 * capTex, bake, k);
+                int[] dx = {ox, ox + capX, ox + ow - capX};
+                int[] dw = {capX, ow - 2 * capX, capX};
+                int[] ux = {0, capTex + mx[0], texW - capTex};
+                int[] uw = {capTex, mx[1], capTex};
+                int[] dy = {oy, oy + capY, oy + oh - capY};
+                int[] dh = {capY, oh - 2 * capY, capY};
+                int[] vy = {0, capTex + my[0], texH - capTex};
+                int[] vh = {capTex, my[1], capTex};
+                for (int r = 0; r < 3; r++) {
+                    for (int c = 0; c < 3; c++) {
+                        if (dw[c] > 0 && dh[r] > 0) {
+                            context.drawTexture(id, dx[c], dy[r], dw[c], dh[r], ux[c], vy[r], uw[c], vh[r], texW, texH);
+                        }
+                    }
+                }
+            }
+            case V3 -> {
+                int capTex = (part.margin() + part.cap()) * bake;
+                int capPx = Math.min(oh / 2, (int) Math.round((part.margin() + part.cap()) * k));
+                int[] mid = middle(oh - 2 * capPx, texH - 2 * capTex, bake, k);
+                context.drawTexture(id, ox, oy, ow, capPx, 0f, 0f, texW, capTex, texW, texH);
+                context.drawTexture(id, ox, oy + capPx, ow, oh - 2 * capPx, 0f, capTex + mid[0], texW, mid[1], texW, texH);
+                context.drawTexture(id, ox, oy + oh - capPx, ow, capPx, 0f, texH - capTex, texW, capTex, texW, texH);
+            }
+        }
+    }
+
+    /**
+     * 只画一件的左边 {@code cropW} 像素（倒计时的液面：样张是 {@code overflow: hidden} 裁出来的，右头是直的）。
+     * 只给 margin 为 0、盒子宽恰好是它烘的那个宽乘 k 的件用 —— 贴图按比例对应，不拉伸。
+     */
+    static void hudPartLeft(DrawContext context, HudPart part, int x, int y, int w, int h, int cropW, double k) {
+        if (cropW <= 0 || h <= 0) {
+            return;
+        }
+        int bake = part.bakeFor(k, true);
+        String theme = GuiLanguage.theme() == GuiLanguage.Theme.DARK ? "dark" : "light";
+        Identifier id = CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, part.path(theme, bake)));
+        int texW = part.texW(bake);
+        int texH = part.texH(bake);
+        int cw = Math.min(cropW, w);
+        int u = (int) Math.round(cw * (double) texW / Math.max(1, w));
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.drawTexture(id, x, y, cw, h, 0f, 0f, u, texH, texW, texH);
+    }
+
+    /** 一枚样张图标（{@code HudPart.IC_*}，白色线稿）按 {@code color} 着色画上去，坐标同 {@link #hudPart}。 */
+    /** 「正轮到」那一圈呼吸一周多久（ADR-0048 §5.2，ADR-0045 §5.2 B2 最低成本那一格）。 */
+    static final long BREATH_MS = 2400;
+    /** 呼吸最浅时铜绿那一圈还剩多少（其余透出底下那一圈平常的铜色）。 */
+    static final float BREATH_LOW = 0.35f;
+
+    /**
+     * 座位轨上「正轮到」的那一圈：先画平常那一圈，铜绿那一圈按时间在 {@link #BREATH_LOW} 与 1 之间起伏地叠上去 ——
+     * 等待时屏幕上有一处在动，一眼知道在等谁（ADR-0045 §1 动 4：「静止无动静」）。
+     *
+     * @param plain 底下那一圈（同尺寸的 {@code TOKxx_PLAIN}）
+     * @param act   铜绿那一圈（同尺寸的 {@code TOKxx_ACT}）
+     */
+    static void breathingRing(DrawContext context, HudPart plain, HudPart act, int x, int y, int w, int h, double k) {
+        hudPart(context, plain, x, y, w, h, k);
+        context.setShaderColor(1f, 1f, 1f, breath(System.currentTimeMillis()));
+        hudPart(context, act, x, y, w, h, k);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    /**
+     * 座位轨上被等的那一座：那一圈就是钟（2026-10-13 样张 A）。先画平常那一圈，{@code ring} 那一圈只画还剩下的那一块扇面 ——
+     * 从 12 点起顺时针被吃掉，{@code remaining} 是剩下的比例（{@link io.github.heavyseasmc.mod.ui.SeatClock#remaining}）。
+     * 钟走着时不再呼吸：一处在动就够了。坐标同 {@link #hudPart}，只给 {@code TOKxx_*} 这种 FIXED 的圈用。
+     */
+    static void clockRing(DrawContext context, HudPart plain, HudPart ring, int x, int y, int w, int h, double k,
+                          float remaining) {
+        hudPart(context, plain, x, y, w, h, k);
+        float eaten = io.github.heavyseasmc.mod.ui.SeatClock.eatenDegrees(remaining);
+        int m = (int) Math.round(ring.margin() * k);
+        float ox = x - m;
+        float oy = y - m;
+        float ow = w + 2f * m;
+        float oh = h + 2f * m;
+        float[] pts = io.github.heavyseasmc.mod.ui.SeatClock.sector(ox + ow / 2f, oy + oh / 2f, Math.min(ow, oh) / 2f,
+                eaten, 360f, 4f);
+        if (pts.length == 0) {
+            return;
+        }
+        int bake = ring.bakeFor(k, true);
+        String theme = GuiLanguage.theme() == GuiLanguage.Theme.DARK ? "dark" : "light";
+        Identifier id = CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, ring.path(theme, bake)));
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+        com.mojang.blaze3d.systems.RenderSystem.setShaderTexture(0, id);
+        com.mojang.blaze3d.systems.RenderSystem.setShader(net.minecraft.client.render.GameRenderer::getPositionTexProgram);
+        org.joml.Matrix4f mat = context.getMatrices().peek().getPositionMatrix();
+        net.minecraft.client.render.BufferBuilder buffer = net.minecraft.client.render.Tessellator.getInstance().begin(
+                net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLE_FAN,
+                net.minecraft.client.render.VertexFormats.POSITION_TEXTURE);
+        for (int i = 0; i < pts.length; i += 2) {
+            buffer.vertex(mat, pts[i], pts[i + 1], 0f).texture((pts[i] - ox) / ow, (pts[i + 1] - oy) / oh);
+        }
+        net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(buffer.end());
+    }
+
+    /** 一个实心圆（物理像素，圆心 {@code cx, cy}）。座位轨小圆片的纸底、墨边、影子与准星都由它拼：没有位图可裁，矢量画得准。 */
+    static void disc(DrawContext context, float cx, float cy, float r, int argb) {
+        if (r <= 0) {
+            return;
+        }
+        colorShape(context, net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLE_FAN,
+                io.github.heavyseasmc.mod.ui.ShapeMesh.disc(cx, cy, r), argb);
+    }
+
+    /** 一道圆环（内径 {@code r0} 到外径 {@code r1}）。 */
+    static void annulus(DrawContext context, float cx, float cy, float r0, float r1, int argb) {
+        if (r1 <= r0 || r1 <= 0) {
+            return;
+        }
+        colorShape(context, net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLE_STRIP,
+                io.github.heavyseasmc.mod.ui.ShapeMesh.annulus(cx, cy, r0, r1), argb);
+    }
+
+    /** 一块实色矩形（浮点坐标，不经 {@code fill}：{@code fill} 收尾时关掉混合，紧跟着的贴图就按实色画了）。 */
+    static void rectF(DrawContext context, float x0, float y0, float x1, float y1, int argb) {
+        colorShape(context, net.minecraft.client.render.VertexFormat.DrawMode.TRIANGLE_FAN,
+                io.github.heavyseasmc.mod.ui.ShapeMesh.rect(x0, y0, x1, y1), argb);
+    }
+
+    /** 顶点由 {@link io.github.heavyseasmc.mod.ui.ShapeMesh} 给 —— 绕向在那里定、在那里测（界面这一遍开着背面剔除）。 */
+    private static void colorShape(DrawContext context, net.minecraft.client.render.VertexFormat.DrawMode mode,
+                                   float[] xy, int argb) {
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+        com.mojang.blaze3d.systems.RenderSystem.setShader(net.minecraft.client.render.GameRenderer::getPositionColorProgram);
+        org.joml.Matrix4f mat = context.getMatrices().peek().getPositionMatrix();
+        net.minecraft.client.render.BufferBuilder buffer = net.minecraft.client.render.Tessellator.getInstance().begin(
+                mode, net.minecraft.client.render.VertexFormats.POSITION_COLOR);
+        for (int i = 0; i < xy.length; i += 2) {
+            buffer.vertex(mat, xy[i], xy[i + 1], 0f).color(argb);
+        }
+        net.minecraft.client.render.BufferRenderer.drawWithGlobalProgram(buffer.end());
+    }
+
+    /** 此刻那一圈的不透明度：余弦起伏，周期 {@link #BREATH_MS}，从最亮开始。 */
+    static float breath(long nowMs) {
+        if (ClientPrefs.reducedMotion()) return 1f;
+        double phase = (nowMs % BREATH_MS) / (double) BREATH_MS;
+        return BREATH_LOW + (1f - BREATH_LOW) * (float) (0.5 + 0.5 * Math.cos(2 * Math.PI * phase));
+    }
+
+    static void hudIcon(DrawContext context, HudPart icon, int x, int y, int w, int h, int color, double k) {
+        context.setShaderColor(((color >> 16) & 0xFF) / 255f, ((color >> 8) & 0xFF) / 255f, (color & 0xFF) / 255f,
+                ((color >>> 24) & 0xFF) / 255f);
+        hudPart(context, icon, x, y, w, h, k);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    /**
+     * 三段拼的中间那一段从贴图的哪一截取：{起点（相对中间段）, 长度}，贴图像素。
+     *
+     * <p>❗要画的比贴图那一截短时<b>裁</b>正中那一截，不是把整截压扁：2026-09-30 第一版把 152 行压进 10 个像素，
+     * 显卡按压得最狠的那个方向挑了一层很小的多级纹理，整条横向也跟着糊，说明签两边各拖出一块灰（实拍）。
+     * 木纹是横的、搪瓷的渐变是竖的，沿拉伸方向本来就是均匀的 —— 裁一截与压一整截看上去一样，而裁不糊。
+     * 要画的比贴图长时照旧拉（放大不走多级纹理）。
+     */
+    private static int[] middle(int destPx, int srcTex, int bake, double k) {
+        int want = (int) Math.round(destPx * bake / k);
+        if (want >= srcTex || want <= 0) {
+            return new int[]{0, srcTex};
+        }
+        return new int[]{(srcTex - want) / 2, want};
+    }
+
+    /**
+     * 金签加宽（只给「举着拳头找人」那一态印秒数，样张没画这一态）：五段拼 ——
+     * 两头的圆角与正中吊绳那一段不伸缩，两段直边各拉一半，吊绳因此不会被拉宽。
+     */
+    static void ribbonWide(DrawContext context, int x, int y, int w, int h, double k) {
+        HudPart part = HudPart.RIBBON;
+        int bake = HudPart.bakeFor(k);
+        Identifier id = CardTexture.smooth(Identifier.of(HeavySeasMod.MOD_ID, part.path("", bake)));
+        int texW = part.texW(bake);
+        int texH = part.texH(bake);
+        int m = (int) Math.round(part.margin() * k);
+        // 贴图横向（稿子像素，含两边各 20 的 margin）：左头 · 直边 · 吊绳 · 直边 · 右头
+        int[] cuts = {0, 42, 60, 72, 90, part.w() + 2 * part.margin()};
+        int extra = Math.max(0, w - (int) Math.round(part.w() * k));
+        int[] widths = new int[5];
+        for (int i = 0; i < 5; i++) {
+            widths[i] = (int) Math.round((cuts[i + 1] - cuts[i]) * k);
+        }
+        widths[1] += extra / 2;
+        widths[3] += extra - extra / 2;
+        int px = x - m;
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        for (int i = 0; i < 5; i++) {
+            context.drawTexture(id, px, y - m, widths[i], h + 2 * m, cuts[i] * bake, 0f,
+                    (cuts[i + 1] - cuts[i]) * bake, texH, texW, texH);
+            px += widths[i];
+        }
+    }
+
+    /** 一枚头像，只画圆里那张画（圈由调用方另盖：主画面 HUD 用样张渲出来的那几种圈，{@link HudPart}）。 */
+    static void portrait(DrawContext context, String characterId, int x, int y, int d, float alpha) {
+        if (d <= 0 || characterId.isEmpty()) {
+            return;
+        }
+        Identifier portrait = CardTexture.smooth(
+                Identifier.of(HeavySeasMod.MOD_ID, "textures/gui/portrait/" + characterId + ".png"));
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.setShaderColor(1f, 1f, 1f, alpha);
+        context.drawTexture(portrait, x, y, d, d, 0f, 0f, 1, 1, 1, 1);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    /**
+     * 一枚头像：从角色卡上裁下来的圆，外面一圈。座位轨用它。
+     *
+     * @param x     头像那个圆的左上角（圈还要往外多出 {@link #ringMargin}）
+     * @param mark  圈上的语义色：金 = 你，铜绿 = 正轮到；{@code 0} = 不着色，只有主题自己的那一圈
+     * @param alpha 头像的不透明度：还没轮到的人淡下去
+     */
+    static void avatar(DrawContext context, String characterId, int x, int y, int diameter, int mark, float alpha) {
+        if (diameter <= 0 || characterId.isEmpty()) {
+            return;
+        }
+        Identifier portrait = CardTexture.smooth(
+                Identifier.of(HeavySeasMod.MOD_ID, "textures/gui/portrait/" + characterId + ".png"));
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        context.setShaderColor(1f, 1f, 1f, alpha);
+        context.drawTexture(portrait, x, y, diameter, diameter, 0f, 0f, 1, 1, 1, 1);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+        int m = ringMargin(diameter);
+        int size = diameter + 2 * m;
+        context.drawTexture(texture("ring"), x - m, y - m, size, size, 0f, 0f, 1, 1, 1, 1);
+        if (mark != 0) {
+            context.setShaderColor((mark >> 16 & 0xFF) / 255f, (mark >> 8 & 0xFF) / 255f, (mark & 0xFF) / 255f, 1f);
+            context.drawTexture(texture("ring_mark"), x - m, y - m, size, size, 0f, 0f, 1, 1, 1, 1);
+            context.setShaderColor(1f, 1f, 1f, 1f);
+        }
+    }
+}

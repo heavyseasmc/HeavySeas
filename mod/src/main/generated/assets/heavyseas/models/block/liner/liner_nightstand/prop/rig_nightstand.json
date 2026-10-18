@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/rig_nightstand",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/rig_nightstand",
+    "particle": "heavyseas:block/liner/prop/rig_nightstand"
+  }
+}

@@ -1,0 +1,72 @@
+name: text-check
+
+# 检查模式存放在仓库 Secret `TEXT_CHECK_PATTERN` 里，不写进本文件。
+#
+# 设置：仓库 Settings → Secrets and variables → Actions → New repository secret
+#   Name:  TEXT_CHECK_PATTERN
+#   Value: 用 | 分隔的扩展正则（按大小写不敏感匹配），由维护者提供
+#
+# 局限：来自 fork 的 PR 拿不到 Secret，检查步骤会跳过。fork PR 本来就需要人工评审，
+# 且合并进 main 时的 push 事件会再检查一次。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 文本检查
+        env:
+          PATTERN: ${{ secrets.TEXT_CHECK_PATTERN }}
+          # 取成环境变量而不是在 run: 里内插 ${{ }}：那样 ci-local.sh 取出的 run 块
+          # 会带着没展开的 ${{ }} 跑，本地根本测不了这两个分支。
+          EVENT: ${{ github.event_name }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          if [ -z "$PATTERN" ]; then
+            # 「拿不到 Secret」只在 fork PR 上是正常的。2026-09-14 仓库转入组织后
+            # Secret 没跟过来，于是 main 上每一次都走了这个分支、结论栏照样 success ——
+            # 一道自己关掉的闸门。所以除 fork PR 外，拿不到 Secret 一律判失败。
+            if [ "$EVENT" = "pull_request" ] && [ "$IS_FORK" = "true" ]; then
+              echo "::warning::fork PR 拿不到 Secret，跳过检查（合并进 main 时的 push 会再查一次）"
+              exit 0
+            fi
+            echo "::error::未配置 TEXT_CHECK_PATTERN，而这不是 fork PR（event=$EVENT）—— 这道闸门等于是关的"
+            exit 1
+          fi
+          # 模式连它自己的文本都匹配不上，说明模式无效：写坏了，或者永远不可能命中。
+          # 不先拦下，下面的扫描会「一个都没命中」而打印通过 —— 与「真的干净」输出一模一样。
+          if ! printf '%s' "$PATTERN" | grep -qiE -- "$PATTERN"; then
+            echo "::error::检查模式连它自己的文本都匹配不上，模式无效，这一步等于没在扫"
+            exit 1
+          fi
+          # grep 的退出码：0 = 有命中，1 = 没有命中，其余 = grep 自己出错。
+          # 三种分开处理：只用 if 判断，会把「出错」当成「没有命中」。
+          set +e
+          grep -rIinE --exclude-dir=.git --exclude-dir=build --exclude-dir=.gradle --exclude-dir=run --exclude-dir=docs "$PATTERN" .
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::文本检查未通过，见上方行号"
+            exit 1
+          fi
+          if [ "$rc" -ne 1 ]; then
+            echo "::error::文本检查本身出错（grep 退出码 $rc）"
+            exit 1
+          fi
+          echo "✅ 文本检查通过"
+
+      - name: 校验 docs/ 未被跟踪
+        run: |
+          tracked=$(git ls-files docs/ || true)
+          if [ -n "$tracked" ]; then
+            echo "::error::docs/ 下有文件被跟踪，该目录不入库："
+            echo "$tracked"
+            exit 1
+          fi
+          echo "✅ docs/ 未被跟踪"

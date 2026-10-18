@@ -1,0 +1,244 @@
+{
+  "variants": {
+    "facing=east,floor=0,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_0",
+      "y": 270
+    },
+    "facing=east,floor=0,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 270
+    },
+    "facing=east,floor=1,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_1",
+      "y": 270
+    },
+    "facing=east,floor=1,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 270
+    },
+    "facing=east,floor=2,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_2",
+      "y": 270
+    },
+    "facing=east,floor=2,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 270
+    },
+    "facing=east,floor=3,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_3",
+      "y": 270
+    },
+    "facing=east,floor=3,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 270
+    },
+    "facing=east,floor=4,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 270
+    },
+    "facing=east,floor=4,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_4",
+      "y": 270
+    },
+    "facing=east,floor=5,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 270
+    },
+    "facing=east,floor=5,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_5",
+      "y": 270
+    },
+    "facing=east,floor=6,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 270
+    },
+    "facing=east,floor=6,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_6",
+      "y": 270
+    },
+    "facing=east,floor=7,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 270
+    },
+    "facing=east,floor=7,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_7",
+      "y": 270
+    },
+    "facing=north,floor=0,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_0",
+      "y": 180
+    },
+    "facing=north,floor=0,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 180
+    },
+    "facing=north,floor=1,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_1",
+      "y": 180
+    },
+    "facing=north,floor=1,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 180
+    },
+    "facing=north,floor=2,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_2",
+      "y": 180
+    },
+    "facing=north,floor=2,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 180
+    },
+    "facing=north,floor=3,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_3",
+      "y": 180
+    },
+    "facing=north,floor=3,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 180
+    },
+    "facing=north,floor=4,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 180
+    },
+    "facing=north,floor=4,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_4",
+      "y": 180
+    },
+    "facing=north,floor=5,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 180
+    },
+    "facing=north,floor=5,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_5",
+      "y": 180
+    },
+    "facing=north,floor=6,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 180
+    },
+    "facing=north,floor=6,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_6",
+      "y": 180
+    },
+    "facing=north,floor=7,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 180
+    },
+    "facing=north,floor=7,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_7",
+      "y": 180
+    },
+    "facing=south,floor=0,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_0"
+    },
+    "facing=south,floor=0,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right"
+    },
+    "facing=south,floor=1,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_1"
+    },
+    "facing=south,floor=1,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right"
+    },
+    "facing=south,floor=2,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_2"
+    },
+    "facing=south,floor=2,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right"
+    },
+    "facing=south,floor=3,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_3"
+    },
+    "facing=south,floor=3,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right"
+    },
+    "facing=south,floor=4,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left"
+    },
+    "facing=south,floor=4,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_4"
+    },
+    "facing=south,floor=5,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left"
+    },
+    "facing=south,floor=5,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_5"
+    },
+    "facing=south,floor=6,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left"
+    },
+    "facing=south,floor=6,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_6"
+    },
+    "facing=south,floor=7,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left"
+    },
+    "facing=south,floor=7,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_7"
+    },
+    "facing=west,floor=0,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_0",
+      "y": 90
+    },
+    "facing=west,floor=0,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 90
+    },
+    "facing=west,floor=1,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_1",
+      "y": 90
+    },
+    "facing=west,floor=1,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 90
+    },
+    "facing=west,floor=2,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_2",
+      "y": 90
+    },
+    "facing=west,floor=2,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 90
+    },
+    "facing=west,floor=3,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left_3",
+      "y": 90
+    },
+    "facing=west,floor=3,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right",
+      "y": 90
+    },
+    "facing=west,floor=4,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 90
+    },
+    "facing=west,floor=4,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_4",
+      "y": 90
+    },
+    "facing=west,floor=5,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 90
+    },
+    "facing=west,floor=5,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_5",
+      "y": 90
+    },
+    "facing=west,floor=6,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 90
+    },
+    "facing=west,floor=6,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_6",
+      "y": 90
+    },
+    "facing=west,floor=7,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_left",
+      "y": 90
+    },
+    "facing=west,floor=7,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_dial/lift/dial_right_7",
+      "y": 90
+    }
+  }
+}

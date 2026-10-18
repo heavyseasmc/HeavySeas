@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_wall_white_slab/shape/slab_bottom"
+    },
+    "type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_wall_white_slab/shape/slab_bottom"
+    },
+    "type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_wall_white_slab/cube"
+    },
+    "type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_wall_white_slab/cube"
+    },
+    "type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_wall_white_slab/shape/slab_top"
+    },
+    "type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_wall_white_slab/shape/slab_top"
+    }
+  }
+}

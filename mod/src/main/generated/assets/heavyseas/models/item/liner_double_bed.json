@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/double_bed_item",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/double_bed",
+    "particle": "heavyseas:block/liner/prop/double_bed"
+  }
+}

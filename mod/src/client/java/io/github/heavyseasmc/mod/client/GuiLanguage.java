@@ -1,0 +1,828 @@
+package io.github.heavyseasmc.mod.client;
+
+import net.minecraft.util.math.MathHelper;
+
+/**
+ * ADR-0018 那套 GUI 语言的<b>唯一一份</b>实现：三个语义色、六个动词的时长与距离。
+ *
+ * <h2>为什么必须只有一份</h2>
+ * ADR-0018 §7.2 写着「同一动词在不同界面用不同时长，就又变回十种游戏了」。
+ * 而「同一份东西复制两处、各自维护」在本仓库已经被运行结果证伪过 ——
+ * 两份 textguard 漂移到新版补的洞旧版没有。数字抄进每个 Screen 会走同一条路：
+ * 补给箱那一面调了 300ms，手牌那一面还是 260ms，谁都不会报错。
+ *
+ * <p>所以各面<b>不许自己写这些数</b>，一律从这里取。改一个动词的含义或手感，
+ * 改这里一处，全部界面一起变 —— 这正是 ADR-0018 §8 把「像素值与缓动微调」
+ * 划进「实现中打磨」那一列的前提。
+ *
+ * <h2>动画走墙钟，不走 tick</h2>
+ * {@code Screen.render} 的 {@code delta} 是 partial tick，受服务端 tick 影响；
+ * 而这些动效是<b>显示</b>的一部分，该跑在显示帧率上。所以入场进度直接拿
+ * {@code System.currentTimeMillis()} 算，插值按<b>两帧之间真实过了多少毫秒</b>推，
+ * 不按帧数 —— 按帧数的话同一个动作在 30fps 与 144fps 上快慢不同。
+ */
+public final class GuiLanguage {
+
+    private GuiLanguage() {
+    }
+
+    // ---------------------------------------------------------------- 主题与调色板（ADR-0037）
+
+    /** 浅色 = 海图桌，深色 = 船舱木作。两个主题共用一份版面骨架，只换调色板与 {@link GuiMaterial} 的材质表。 */
+    public enum Theme { LIGHT, DARK }
+
+    /**
+     * 一个主题下的全部颜色。**语义不变**：铜绿 = 正常 · 可选 · 安全；朱砂 = 紧迫 · 伤害 · 不可逆（❗只给这三件事 ——
+     * 当强调色用，真紧迫时就喊不动了）；金 = 你 · 轮到你。换的只是色相与明度：浅色底上压深成「墨」，深色底上提亮。
+     * 中性色取自已交付的卡面 SVG（墨 {@code #241E1A} · 次墨 {@code #55483B} · 纸 {@code #EADFC6}）—— GUI 与牌面必须是同一个世界。
+     *
+     * @param ink    正文
+     * @param muted  次要文字
+     * @param dim    更弱的文字（还没轮到的人、已用完的格）
+     * @param ground 底槽：进度条与轨道没走到的那一段
+     * @param dimmer 压在世界上的那一层暗（带色相，不用中性灰）
+     * @param frame  材质板上的框线
+     * @param rim    材质板最外一圈
+     */
+    private record Palette(int ink, int muted, int dim, int ground, int verdigris, int cinnabar, int gold,
+                           int dimmer, int frame, int rim) {
+    }
+
+    private static final Palette LIGHT_PALETTE = new Palette(0xFF241E1A, 0xFF5A4D3E, 0xFF8A7C62, 0xFFCDBF9C,
+            0xFF2C6E66, 0xFFB83F28, 0xFFB48A2A, 0xD81A1208, 0xFF241E1A, 0xFF8D7C5A);
+    private static final Palette DARK_PALETTE = new Palette(0xFFEDE3CA, 0xFFCFC2A2, 0xFFA39574, 0xFF1C1007,
+            0xFF6FB3A6, 0xFFEC6B4D, 0xFFE6BC50, 0xDC080502, 0xFF120A04, 0xFF5A3D22);
+
+    private static Theme theme = Theme.LIGHT;
+
+    public static Theme theme() {
+        return theme;
+    }
+
+    public static void setTheme(Theme next) {
+        theme = next;
+    }
+
+    private static Palette palette() {
+        return theme == Theme.DARK ? DARK_PALETTE : LIGHT_PALETTE;
+    }
+
+    /** 铜绿：正常 · 可选 · 安全。 */
+    public static int verdigris() {
+        return palette().verdigris();
+    }
+
+    /** 朱砂：紧迫 · 伤害 · 不可逆。 */
+    public static int cinnabar() {
+        return palette().cinnabar();
+    }
+
+    /** 金：你 · 轮到你。 */
+    public static int gold() {
+        return palette().gold();
+    }
+
+    public static int ink() {
+        return palette().ink();
+    }
+
+    public static int muted() {
+        return palette().muted();
+    }
+
+    public static int dim() {
+        return palette().dim();
+    }
+
+    /**
+     * 直接印在<b>板</b>上（海图板 · 账本板）的次要字：座位名 · 底栏键位 · 「时间到……」· 计分副标题 · 返航提示。
+     *
+     * <p>浅色主题是次墨；深色主题取正文那一档浅墨。深色海图板实测是中等明度的橄榄灰（板心约 {@code #645C48}），
+     * 深色那一套次墨 {@code #CFC2A2} 压上去只有 3.8 : 1、{@link Hud#INK2} 只有 2.9 : 1，细字读不出
+     * （2026-10-13 第二轮验收 01 · 06 · 13 · 30 · 81 · 93 的深色版）。{@code BoardTextContrastTest} 拿两套主题的板贴图算对比度。
+     * 板上的字一律问这里，不直接取 {@link #muted()} 或 {@link Hud#ink2()}（同一个测试扫源码）。
+     */
+    public static int secondary() {
+        return theme == Theme.DARK ? DARK_PALETTE.ink() : LIGHT_PALETTE.muted();
+    }
+
+    public static int ground() {
+        return palette().ground();
+    }
+
+    public static int dimmer() {
+        return palette().dimmer();
+    }
+
+    public static int frame() {
+        return palette().frame();
+    }
+
+    public static int rim() {
+        return palette().rim();
+    }
+
+    /**
+     * 印在<b>标签</b>（纸签 · 搪瓷牌）上的字该用什么色。标签永远是浅底，所以深色主题下要把板上的浅色换成浅色主题的深墨；
+     * 不透明度原样保留（按不动的按钮靠它淡下去）。
+     */
+    public static int onTag(int color) {
+        return theme == Theme.LIGHT ? color : swap(color, DARK_PALETTE, LIGHT_PALETTE);
+    }
+
+    /**
+     * 直接压在<b>世界</b>上的字（主画面 HUD）该用什么色。背后是海是天说不准、多半是暗的，所以永远用深色主题那一套浅色 ——
+     * 浅色主题下的「正文」是深墨，印在海上读不出。
+     */
+    public static int onWorld(int color) {
+        return theme == Theme.DARK ? color : swap(color, LIGHT_PALETTE, DARK_PALETTE);
+    }
+
+    private static int swap(int color, Palette from, Palette to) {
+        int rgb = color & 0x00FFFFFF;
+        int[][] map = {{from.ink(), to.ink()}, {from.muted(), to.muted()}, {from.dim(), to.dim()},
+                {from.verdigris(), to.verdigris()}, {from.cinnabar(), to.cinnabar()}, {from.gold(), to.gold()}};
+        for (int[] pair : map) {
+            if ((pair[0] & 0x00FFFFFF) == rgb) {
+                return (color & 0xFF000000) | (pair[1] & 0x00FFFFFF);
+            }
+        }
+        return color;
+    }
+
+    /**
+     * 服务端给播报标的颜色（Minecraft 自带的十六色）归到三个语义色上：偏红 = 朱砂，偏黄 = 金，偏青绿蓝 = 铜绿，其余是正文。
+     * 十六色里的亮青、亮黄印在纸上读不出，也不属于这个世界。
+     */
+    public static int semantic(int rgb) {
+        int r = rgb >> 16 & 0xFF;
+        int g = rgb >> 8 & 0xFF;
+        int bl = rgb & 0xFF;
+        int max = Math.max(r, Math.max(g, bl));
+        int min = Math.min(r, Math.min(g, bl));
+        if (max - min < 40) {
+            return max < 140 ? muted() : ink();
+        }
+        if (r == max && g < 0.6f * r) {
+            return cinnabar();
+        }
+        if (r >= 0.8f * max && g >= 0.6f * max && bl < 0.6f * max) {
+            return gold();
+        }
+        return verdigris();
+    }
+
+    /** 墨 {@code #241E1A}：印在纸色牌面上的字（ADR-0018 §7.3）。与主题无关 —— 牌面永远是纸。 */
+    public static final int CARD_INK = 0xFF241E1A;
+    /** 牌面上的朱砂 {@code #A8402C}（样张 {@code --card-stamp}，牌底印章那一色）：行动一族里会伤人的那几张的牌名（ADR-0050）。 */
+    public static final int CARD_HARM = 0xFFA8402C;
+    /** 牌面上的次墨 {@code #55483B}（样张 {@code --card-ink2}）：「什么都不按就是它」那几张的牌名（ADR-0050）。 */
+    public static final int CARD_QUIET = 0xFF55483B;
+    /** 纸 {@code #EADFC6}：牌面的底（样张 {@code --card-paper}）。舷窗里那一小块天候画、头像的底都是它。 */
+    public static final int CARD_PAPER = 0xFFEADFC6;
+
+    // ---------------------------------------------------------------- 主画面 HUD（样张 b-1 · b-2）
+
+    /**
+     * 主画面 HUD 的颜色：样张 B 形制那几条 CSS 的原值（{@code index.html} 的 {@code .dir-b …}），一个都没有另调。
+     *
+     * <p>用户 2026-09-30：「参考图是唯一的视觉标准……严格还原每个组件的颜色、透明度、描边厚度、阴影」。
+     * 样张只画了深色（B 形制就是夜里的舱），所以按主题分的只有<b>木板本身</b>（浅色主题下木板是白天的纸）与压在木板上的字、点；
+     * 搪瓷、黄铜、金签、铜绿圆底是物件自己的颜色，两个主题相同。
+     */
+    public static final class Hud {
+
+        private Hud() {
+        }
+
+        /** 木板外圈贴着板的那一道深线（{@code .paperbit} 的 {@code #1c1007}）。 */
+        public static int plankLine() {
+            return theme == Theme.DARK ? 0xFF1C1007 : 0xFF241E1A;
+        }
+
+        /** 木板外圈中间那一道木色（{@code #5f4a2b}）。 */
+        public static int plankBand() {
+            return theme == Theme.DARK ? 0xFF5F4A2B : 0xFF8D7C5A;
+        }
+
+        /** 体力点：实心那一枚从左上到右下三段（{@code radial-gradient(#fff5d8, #d8c48e 60%, #8d7a4a)}）。 */
+        public static int[] pipOn() {
+            return theme == Theme.DARK ? new int[]{0xFFFFF5D8, 0xFFD8C48E, 0xFF8D7A4A}
+                    : new int[]{0xFF5A4D3E, 0xFF3A3028, 0xFF241E1A};
+        }
+
+        /** 失去的那一枚：{@code background: rgba(0,0,0,.35); box-shadow: inset 0 0 0 1.5px #b7a98a}。 */
+        public static int pipOffFill() {
+            return theme == Theme.DARK ? 0x59000000 : 0x26000000;
+        }
+
+        public static int pipOffRing() {
+            return theme == Theme.DARK ? 0xFFB7A98A : 0xFF8A7C62;
+        }
+
+        /** 次要的字与线（{@code --ink2}）：日志栏头、自动收回的那道短横。 */
+        public static final int INK2 = 0xFFB7A98A;
+
+        /** 板上的次墨（样张 {@code .mut}）：深色下是 {@link #INK2}，浅色主题（纸板）下取浅色那一套的次要色。 */
+        public static int ink2() {
+            return theme == Theme.DARK ? INK2 : LIGHT_PALETTE.muted();
+        }
+
+        /** 头像外圈：{@code 0 0 0 2px #1c1007, 0 0 0 5px #6a5a39, 0 0 0 6px #1c1007}。 */
+        public static final int TOKEN_LINE = 0xFF1C1007;
+        public static final int TOKEN_BRASS = 0xFF6A5A39;
+        /** 「你」那一圈金外面的一道深金（{@code 0 0 0 7px #4a3608}）。 */
+        public static final int GOLD_EDGE = 0xFF4A3608;
+
+        /** 舷窗外圈：{@code 3px #1c1007 · 9px #74633c · 10px #1c1007}。吊绳也是这个铜色。 */
+        public static final int MEDAL_BRASS = 0xFF74633C;
+
+        /** 阶段那一格亮起来的铜绿圆底（{@code radial-gradient(#8fd0c3, #3f8478)}），外一圈 {@code #10201d}，图标 {@code #0d1f1c}。 */
+        public static final int PHASE_ON_TOP = 0xFF8FD0C3;
+        public static final int PHASE_ON_BOTTOM = 0xFF3F8478;
+        public static final int PHASE_ON_LINE = 0xFF10201D;
+        public static final int PHASE_ON_ICON = 0xFF0D1F1C;
+        /** 没轮到的几格 {@code opacity: .42}，还没飞来的海鸥 {@code opacity: .3}。 */
+        public static final float PHASE_OFF_ALPHA = 0.42f;
+        public static final float GULL_OFF_ALPHA = 0.3f;
+
+        /** 金签：{@code linear-gradient(#f7e3a0, #d3a93f 55%, #9a7420)}，内一圈 1.5px {@code #4a3608}，顶上 2px 亮边。 */
+        public static final int RIBBON_TOP = 0xFFF7E3A0;
+        public static final int RIBBON_MID = 0xFFD3A93F;
+        public static final int RIBBON_BOTTOM = 0xFF9A7420;
+        public static final int RIBBON_SHINE = 0xB3FFFADC;
+        /** 金签上的铃是 {@code #33240a}；键帽反过来：深底 {@code #33240a}、金字 {@code #f7e3a0}。 */
+        public static final int RIBBON_INK = 0xFF33240A;
+
+        /** 搪瓷（日志 · 说明签 · 舵轮 · 未读数的底）：{@code linear-gradient(#f4eedd, #e3dac3)}，内一圈 2px {@code #1f1a15}。 */
+        public static final int ENAMEL_TOP = 0xFFF4EEDD;
+        public static final int ENAMEL_BOTTOM = 0xFFE3DAC3;
+        public static final int ENAMEL_LINE = 0xFF1F1A15;
+        /** 搪瓷与键帽底下那一道 2px 厚边（{@code 0 2px 0 #120b05}）。 */
+        public static final int ENAMEL_EDGE = 0xFF120B05;
+        /** 未读数那枚小圆的底（{@code #efe8d6}）。 */
+        public static final int COUNT_FILL = 0xFFEFE8D6;
+
+        /** 键帽：{@code linear-gradient(#f4eedd, #d9cfb6)}，内一圈 1.5px {@code #1f1a15}，底下 2px {@code #120b05}。 */
+        public static final int KEY_TOP = 0xFFF4EEDD;
+        public static final int KEY_BOTTOM = 0xFFD9CFB6;
+
+        /** 日志里次要的那几个字（图例的说明）{@code opacity: .65}。 */
+        public static final float LOG_LABEL_ALPHA = 0.65f;
+        /** 日志里的朱砂（{@code .cinn}）。 */
+        public static final int LOG_CINNABAR = 0xFFDA5B3E;
+        /**
+         * 日志里认得出的几类字（{@link LogInk}；用户 2026-10-07：「行动或者牌的字应该有主题色」）。搪瓷永远是浅底，
+         * 这几色都压到与搪瓷底对比 ≥ 4.5 : 1，小字也读得出：人名藏青 · 物资牌琥珀 · 天候铜绿。
+         */
+        public static final int LOG_NAME = 0xFF23466E;
+        public static final int LOG_CARD = 0xFF8A5A0A;
+        public static final int LOG_WEATHER = 0xFF2F6E64;
+
+        /** 热栏（样张 {@code .hotbar}）：外圈 {@code rgba(20,20,20,.8)} · 格 {@code rgba(0,0,0,.55)} · 格间线 {@code rgba(140,140,140,.7)}。 */
+        public static final int HOTBAR_EDGE = 0xCC141414;
+        public static final int HOTBAR_CELL = 0x8C000000;
+        public static final int HOTBAR_RULE = 0xB38C8C8C;
+
+        /** 把一个颜色乘上不透明度（样张里的 {@code opacity}）。 */
+        public static int alpha(int color, float a) {
+            int base = (color >>> 24) & 0xFF;
+            return (Math.round(base * a) << 24) | (color & 0x00FFFFFF);
+        }
+
+        /** 两个颜色之间按 {@code t} 插值（渐变逐行画）。 */
+        public static int mix(int a, int b, float t) {
+            float u = Math.max(0f, Math.min(1f, t));
+            int out = 0;
+            for (int shift = 0; shift <= 24; shift += 8) {
+                int ca = (a >>> shift) & 0xFF;
+                int cb = (b >>> shift) & 0xFF;
+                out |= Math.round(ca + (cb - ca) * u) << shift;
+            }
+            return out;
+        }
+
+        /** 三段渐变（{@code a → b 在 mid 处 → c}）。 */
+        public static int mix3(int a, int b, int c, float mid, float t) {
+            return t <= mid ? mix(a, b, t / mid) : mix(b, c, (t - mid) / (1f - mid));
+        }
+    }
+
+    /**
+     * 聊天（2026-10-13 样张 C1 · C2 · A1 · B）：世界里的纸条随主题换纸，搪瓷页与面板里的纸签永远是浅底。
+     * 对比度在样张里按各自的纸算过（≥ 4.5 : 1）：浅纸 墨 10.4 · 人名 6.1 · 次墨 5.2；深木 墨 11.5 · 人名 8.5 · 次墨 8.3；
+     * 朱砂上的数字 4.8。
+     */
+    public static final class Chat {
+
+        private Chat() {
+        }
+
+        /** 深木纸条上的人名（样张新色）：与浅纸上的藏青 {@link Hud#LOG_NAME} 同一个色相。 */
+        public static final int NAME_ON_DARK = 0xFFA9C8EE;
+        /** 深木纸条外那一圈铜色细边：夜里靠它和天分开。 */
+        public static final int RIM_ON_DARK = 0xFF8D6A3E;
+        /** 未读角标：朱砂底 · 米白数字 · 一圈墨线（按用户要求用朱砂；两个主题同一枚）。 */
+        public static final int BADGE_FILL = 0xFFB83F28;
+        public static final int BADGE_DIGIT = 0xFFF4EEDD;
+        public static final int BADGE_LINE = 0xFF241E1A;
+        /** 落影：纸条 {@code 0 2px 0 rgba(0,0,0,.35 / .45)}，角标 {@code 0 1px 0 rgba(0,0,0,.5)}。 */
+        public static final int STRIP_SHADOW_LIGHT = 0x59000000;
+        public static final int STRIP_SHADOW_DARK = 0x73000000;
+        public static final int BADGE_SHADOW = 0x80000000;
+
+        /** 世界里那张纸条上的正文。 */
+        public static int stripInk() {
+            return ink();
+        }
+
+        /** 纸条上的人名。 */
+        public static int stripName() {
+            return theme == Theme.DARK ? NAME_ON_DARK : Hud.LOG_NAME;
+        }
+
+        /** 纸条上的系统句（截图保存、谁上了艇）。 */
+        public static int stripMuted() {
+            return muted();
+        }
+
+        /** 纸条外那一圈细边：浅纸是墨线，深木是铜线。 */
+        public static int stripRim() {
+            return theme == Theme.DARK ? RIM_ON_DARK : LIGHT_PALETTE.ink();
+        }
+
+        public static int stripShadow() {
+            return theme == Theme.DARK ? STRIP_SHADOW_DARK : STRIP_SHADOW_LIGHT;
+        }
+
+        /** 搪瓷页与面板纸签（永远浅底）上的正文 · 人名 · 系统句 · 页头。 */
+        public static final int PAGE_INK = 0xFF241E1A;
+        public static final int PAGE_NAME = Hud.LOG_NAME;
+        public static final int PAGE_MUTED = 0xFF5A4D3E;
+        public static final int PAGE_HEAD = Hud.ENAMEL_LINE;
+        /** 搪瓷页上一句一格的那道细横线（{@code rgba(31,26,21,.16)}）。 */
+        public static final int PAGE_RULE = 0x291F1A15;
+        /** 输入框里的光标（金）。 */
+        public static final int CARET = 0xFFB48A2A;
+    }
+
+    // ---------------------------------------------------------------- 卡面
+
+    /** 卡面的比例基准 5:7。贴图实际按 2 倍烘（600×840），画的时候只看比例。 */
+    public static final int CARD_W = 300;
+    /** 见 {@link #CARD_W}。 */
+    public static final int CARD_H = 420;
+
+    /** 按宽度求卡面高度，保持比例。各面都用它，省得每处自己乘一遍算错。 */
+    public static int cardHeight(int width) {
+        return Math.round(width * (float) CARD_H / CARD_W);
+    }
+
+    /** 按高度求卡面宽度，保持比例。 */
+    public static int cardWidth(int height) {
+        return Math.round(height * (float) CARD_W / CARD_H);
+    }
+
+    // ---------------------------------------------------------------- 时间：倒计时
+
+    // 倒计时从哪一刻起变朱砂：原先在这里按总长的 35 % 算、夹在 1 到 3 秒之间（ADR-0018 §7.3）。
+    // 用户 2026-10-13 改定「整数秒 · 最后 5 秒变朱砂」，判据挪到 mod/ui 的 CountdownDigits（纯函数，有单测），
+    // 各面的倒计时条与秒数都问它 —— 「什么时候算紧迫」仍然只有一句话。
+
+    // ---------------------------------------------------------------- 发 Deal
+
+    /**
+     * 发：新东西到你面前。单张 360ms。
+     *
+     * <p>2026-09-30 从 300 放到 360，并加上落点（ADR-0037 §7.1 第 3 条「发 / 顿 / 翻放慢并加落点」）。
+     * 重量感主要来自落点的三件事（压一下 · 影子收紧 · 一声闷响），不是更慢的曲线 —— 所以只放慢一点。
+     */
+    public static final long DEAL_MS = 360L;
+    /** 进度走到这里算「落桌」：之后是压一下（{@link #dealScale}）。 */
+    private static final float LAND_AT = 0.82f;
+    /** 压一下压多深：比例，一张牌压下去约 3.5%。 */
+    private static final float PRESS = 0.035f;
+    /**
+     * 从开始发到落桌那一刻多少毫秒（缓动是 ease-out cubic，进度到 {@link #LAND_AT} 的时刻由它反推）。
+     * 落桌那一声闷响（{@link GuiSound}）就排在这一刻 —— 声音与画面取自同一个数。
+     */
+    public static final long DEAL_LAND_MS = Math.round(DEAL_MS * (1.0 - Math.cbrt(1.0 - LAND_AT)));
+    /** 相邻两张错开 45ms —— 错开才读得出是「发」而不是「出现」。 */
+    public static final long DEAL_STAGGER_MS = 45L;
+    /** 从下方 26px 升起。 */
+    public static final float DEAL_RISE = 26f;
+
+    /**
+     * 第 {@code index} 张的入场进度，0 → 1。
+     *
+     * @param index 在这一批里的序号（不是在整行里的下标）—— 错开按这个算
+     * @return 0 表示还没轮到它，1 表示已经落位
+     */
+    public static float deal(long now, long dealtAt, int index) {
+        if (ClientPrefs.reducedMotion()) {
+            return now >= dealtAt ? 1f : 0f;
+        }
+        long elapsed = now - dealtAt - index * DEAL_STAGGER_MS;
+        if (elapsed <= 0L) {
+            return 0f;
+        }
+        float p = MathHelper.clamp(elapsed / (float) DEAL_MS, 0f, 1f);
+        return 1f - (1f - p) * (1f - p) * (1f - p);      // ease-out cubic ≈ cubic-bezier(.16,1,.3,1)
+    }
+
+    /**
+     * 入场时的缩放：配合升起，让「发」有从手边推出去的分量；落桌之后<b>压一下</b>再回到原大
+     * （「落牌加重」的第一件，ADR-0037 §7.1 第 3 条）。
+     */
+    public static float dealScale(float progress) {
+        if (ClientPrefs.reducedMotion()) {
+            return 1f;
+        }
+        if (progress < LAND_AT) {
+            return 0.94f + 0.06f * (progress / LAND_AT);
+        }
+        float t = Math.min(1f, (progress - LAND_AT) / (1f - LAND_AT));
+        return 1f - PRESS * (float) Math.sin(Math.PI * t);
+    }
+
+    // ---------------------------------------------------------------- 抬 Lift
+
+    /** 抬：这个是当前选中。180ms 到位。 */
+    public static final long LIFT_MS = 180L;
+    /** 抬起 9px。 */
+    // 2026-09-30 照样张 b-3 的 .lifted（translateY(-16px)，界面尺寸 3 下的物理像素）：16 / 3 个单位。此前是 9。
+    public static final float LIFT_PX = 16f / 3f;
+
+    /**
+     * 向目标插值，<b>按真实经过的毫秒</b>而不是按帧。
+     *
+     * <p>❗这是 ADR-0018 §7.2「抬」那一条里「插值而非跳变」的实现。直接赋值会让悬停显得很硬；
+     * 而按帧插值（{@code lerp(delta * k, …)}）在高刷新率屏幕上会明显更快 ——
+     * 同一个动作在两台机器上不一样快，就不是同一门语言了。
+     *
+     * @param dtMs 距上一帧过了多少毫秒
+     */
+    public static float approach(float current, float target, long dtMs) {
+        if (ClientPrefs.reducedMotion()) {
+            return target;
+        }
+        if (dtMs <= 0L) {
+            return current;
+        }
+        // 时间常数取 LIFT_MS/3：一个 LIFT_MS 之后走完约 95%，肉眼即「到位」。
+        float k = 1f - (float) Math.exp(-dtMs / (LIFT_MS / 3f));
+        return MathHelper.lerp(MathHelper.clamp(k, 0f, 1f), current, target);
+    }
+
+    /**
+     * 「抬」的一次性进度，0 → 1：选中<b>一下子</b>换成了另一个时用（比如手牌大图换了一张）。
+     * 持续跟着目标走的用 {@link #approach}。
+     *
+     * @param startedAt 换的那一刻；0 表示还没换过，直接返回 1（已到位）
+     */
+    public static float lift(long now, long startedAt) {
+        if (ClientPrefs.reducedMotion()) {
+            return 1f;
+        }
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float p = MathHelper.clamp((now - startedAt) / (float) LIFT_MS, 0f, 1f);
+        return 1f - (1f - p) * (1f - p) * (1f - p);      // ease-out，近似 cubic-bezier(.2,.8,.3,1)
+    }
+
+    // ---------------------------------------------------------------- 飞 Fly
+
+    /** 飞：<b>归属变了</b>（牌换了主人）。520ms。 */
+    public static final long FLY_MS = 520L;
+    /** 弧顶抬 54px —— 直线会读成「移动」，弧线才读得出是「交出去」。 */
+    public static final float FLY_ARC = 54f;
+
+    /** 「飞」的缓动：{@code cubic-bezier(.3,.8,.25,1)}。 */
+    private static final float FLY_X1 = .3f;
+    private static final float FLY_Y1 = .8f;
+    private static final float FLY_X2 = .25f;
+    private static final float FLY_Y2 = 1f;
+
+    /**
+     * 「飞」走到哪了，0 → 1（已过缓动）。
+     *
+     * @param startedAt 起飞的时刻；{@code <= 0} 表示没在飞，返回 0（还在原位）
+     */
+    public static float fly(long now, long startedAt) {
+        if (ClientPrefs.reducedMotion()) {
+            return startedAt > 0 && now - startedAt >= FLY_MS ? 1f : 0f;
+        }
+        if (startedAt <= 0L) {
+            return 0f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) FLY_MS, 0f, 1f);
+        return cubicBezier(x, FLY_X1, FLY_Y1, FLY_X2, FLY_Y2);
+    }
+
+    /** 还在飞吗。飞完之前界面不许收：牌离开你手里的那一下不能被截断。 */
+    public static boolean flying(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt < FLY_MS;
+    }
+
+    /** 飞行途中弧线额外抬起多少（GUI 单位，正数向上）：起点与终点为 0，正中是 {@link #FLY_ARC}。 */
+    public static float flyArc(float progress) {
+        if (ClientPrefs.reducedMotion()) {
+            return 0f;
+        }
+        return FLY_ARC * 4f * progress * (1f - progress);
+    }
+
+    // ---------------------------------------------------------------- 滑 Slide
+
+    /** 滑：轮次推进。550ms，带轻微过冲。 */
+    public static final long SLIDE_MS = 550L;
+
+    /**
+     * 「滑」的缓动：{@code cubic-bezier(.34,1.3,.5,1)}。y1 = 1.3 冲出 1 —— 越过终点一点再回来，这就是「过冲」。
+     *
+     * <p>❗数值照交互稿<b>实跑</b>的那一份核对过（{@code slide(el, dx)} 直接用 {@code M.slide.ms}，没有再乘什么），
+     * 不重蹈「顿」印 180、跑 396 那一次。
+     */
+    private static final float SLIDE_X1 = .34f;
+    private static final float SLIDE_Y1 = 1.3f;
+    private static final float SLIDE_X2 = .5f;
+    private static final float SLIDE_Y2 = 1f;
+
+    /**
+     * 「滑」走到哪了：0 → 1，<b>中途会略超过 1</b>（过冲）再落回 1。乘上位移就是这一帧该在的位置。
+     *
+     * @param startedAt 起点；{@code <= 0} 表示没在滑，返回 1（已到位）
+     */
+    public static float slide(long now, long startedAt) {
+        if (ClientPrefs.reducedMotion()) {
+            return 1f;
+        }
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) SLIDE_MS, 0f, 1f);
+        return cubicBezier(x, SLIDE_X1, SLIDE_Y1, SLIDE_X2, SLIDE_Y2);
+    }
+
+    /** 还在滑吗。 */
+    public static boolean sliding(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt < SLIDE_MS;
+    }
+
+    // ---------------------------------------------------------------- 堆 Gather
+
+    /**
+     * 堆：要看清某一张时，其余的牌收成一叠，被看的那张在堆顶。340ms，不过冲。
+     *
+     * <p>为什么另起一个动词：它说的是「这一排暂时收起来了」，与「发」（新东西到你面前）、
+     * 「飞」（牌离开你）都不是一回事。用户 2026-09-22 定下这一层：牌面留给画，
+     * 文字等你要 —— 按 U / 右键才堆起来并在旁边展开说明。
+     *
+     * <p>缓动用「抛」式的 {@code cubic-bezier(.2,.8,.3,1)}：起步快、落定稳，一叠牌落下去应该是“收住”而不是“弹一下”。
+     */
+    public static final long GATHER_MS = 340L;
+
+    private static final float GATHER_X1 = .2f;
+    private static final float GATHER_Y1 = .8f;
+    private static final float GATHER_X2 = .3f;
+    private static final float GATHER_Y2 = 1f;
+
+    /**
+     * 堆到哪了：0 = 还在一排里，1 = 已经收成一叠。
+     *
+     * @param startedAt 这一次切换从什么时候开始；{@code <= 0} 表示没在切，返回 1
+     */
+    public static float gather(long now, long startedAt) {
+        if (ClientPrefs.reducedMotion()) {
+            return 1f;
+        }
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) GATHER_MS, 0f, 1f);
+        return cubicBezier(x, GATHER_X1, GATHER_Y1, GATHER_X2, GATHER_Y2);
+    }
+
+    // ---------------------------------------------------------------- 翻 Flip
+
+    /**
+     * 翻：暗牌变明牌。全局唯一的「信息状态改变」，480ms，中点换面（换面那一下一声纸响，{@link GuiSound}）。
+     * 2026-09-30 从 400 放到 480（ADR-0037 §7.1 第 3 条）；服务端每一步停 2.6 秒，放得下。
+     */
+    public static final long FLIP_MS = 480L;
+
+    /** 胜者揭牌：先蓄势、再翻转、最后回弹，整段 1.4 秒。 */
+    public static final long WINNER_FLIP_MS = 1400L;
+
+    /** 「翻」的缓动：CSS 的 {@code ease-in-out}，即 {@code cubic-bezier(.42,0,.58,1)}（交互稿的 {@code M.flip.ease}）。 */
+    private static final float FLIP_X1 = .42f;
+    private static final float FLIP_Y1 = 0f;
+    private static final float FLIP_X2 = .58f;
+    private static final float FLIP_Y2 = 1f;
+
+    /**
+     * 「翻」此刻的横向缩放：rotateY 0° → 90° → 0° 投影到屏幕上的宽度 |cos θ|。
+     *
+     * <p>GUI 里没有真正的三维旋转，绕竖轴转一张牌在正面看就是宽度收窄再展开 —— 到中点正好侧过来（宽度 0），
+     * 就在那一刻换面。下限夹在一个很小的正数：宽度真为 0 的矩阵在有的驱动上会画出一条闪烁的竖线。
+     *
+     * @param startedAt 起点；{@code <= 0} 表示没在翻，返回 1
+     */
+    public static float flipScaleX(long now, long startedAt) {
+        if (ClientPrefs.reducedMotion()) {
+            return 1f;
+        }
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) FLIP_MS, 0f, 1f);
+        float eased = cubicBezier(x, FLIP_X1, FLIP_Y1, FLIP_X2, FLIP_Y2);
+        float quarter = eased < .5f ? eased / .5f : (1f - eased) / .5f;        // 0 → 1 → 0
+        return Math.max(0.02f, (float) Math.abs(Math.cos(quarter * Math.PI / 2)));
+    }
+
+    /**
+     * 翻到这一刻，露出来的是不是正面。
+     *
+     * <p>❗按<b>墙钟的中点</b>换面（稿子里是 {@code setTimeout(after, M.flip.ms / 2)}），不按缓动后的进度 ——
+     * ease-in-out 两头对称，两者恰好落在同一刻；换一条不对称的缓动时，照这里写的才仍与稿子一致。
+     */
+    public static boolean flipShowsFront(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt >= FLIP_MS / 2;
+    }
+
+    /**
+     * 胜者揭牌的横向缩放。前 18% 向外蓄势，中间 64% 翻面，最后 18% 从 1.08 倍收回原尺寸。
+     * 这不是把普通翻牌简单放慢：胜者会先展开再回弹，连续并列时每个人都能独立走完整段。
+     */
+    public static float winnerFlipScaleX(long now, long startedAt) {
+        if (ClientPrefs.reducedMotion()) {
+            return 1f;
+        }
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        float x = MathHelper.clamp((now - startedAt) / (float) WINNER_FLIP_MS, 0f, 1f);
+        if (x < .18f) {
+            return 1f + .08f * smoothStep(x / .18f);
+        }
+        if (x > .82f) {
+            return 1f + .08f * (1f - smoothStep((x - .82f) / .18f));
+        }
+        float turn = (x - .18f) / .64f;
+        float eased = cubicBezier(turn, FLIP_X1, FLIP_Y1, FLIP_X2, FLIP_Y2);
+        float quarter = eased < .5f ? eased / .5f : (1f - eased) / .5f;
+        return Math.max(0.02f, 1.08f * (float) Math.abs(Math.cos(quarter * Math.PI / 2)));
+    }
+
+    /** 胜者揭牌在整段动画中点换到正面。 */
+    public static boolean winnerFlipShowsFront(long now, long startedAt) {
+        return startedAt > 0L && now - startedAt >= WINNER_FLIP_MS / 2;
+    }
+
+    private static float smoothStep(float x) {
+        float clamped = MathHelper.clamp(x, 0f, 1f);
+        return clamped * clamped * (3f - 2f * clamped);
+    }
+
+    // ---------------------------------------------------------------- 顿 Snap
+
+    /**
+     * 顿：<b>系统替你做的</b>。带过冲 —— 必须与手动看得出不同。
+     *
+     * <h2>为什么是 396 而不是 ADR-0018 §7.2 写的 180</h2>
+     * 交互稿里参数表记的是 {@code snap: { ms: 180 }}，可 {@code snap()} 传给动画的是
+     * {@code M.snap.ms * 2.2}。<b>用户看过并说「就定这版」的是跑出来那个</b>，
+     * 所以实现按 396ms —— 六个动词里只有它这样，其余五个印的与跑的一致。
+     *
+     * <p>ADR 是快照不回头改（文档纪律），这条记在 CURRENT_STATUS 的 O20 与
+     * ENGINEERING 的证伪表里：<b>同源保的是参数，不是数值</b>。
+     */
+    public static final long SNAP_MS = 396L;
+
+    /** 「顿」的缓动：{@code cubic-bezier(.6,-.3,.4,1.3)}，两头都冲出 [0,1]。 */
+    private static final float SNAP_X1 = .6f;
+    private static final float SNAP_Y1 = -.3f;
+    private static final float SNAP_X2 = .4f;
+    private static final float SNAP_Y2 = 1.3f;
+
+    /**
+     * 关键帧：进度 → 上抬（GUI 单位，负号向上）· 缩放。
+     *
+     * <p>交互稿原是上抬 {@code -6 / 2}、缩放 {@code 1.07 / .98}。用户 2026-10-01：补给箱的牌「宁可牌大、『顿』小一点」
+     * （ADR-0050 §3）—— 上抬收到原来的 2/9，缩放收到 1.04；形状（先微沉 · 弹起放大 · 过冲 · 收住）不变，
+     * 「缩放保留」是用户 2026-09-30 判过的。这两个数是 1280×720 下补给箱恰好回到 144 宽的那一档（CardRowTest 钉着）。
+     * 版面按 {@link #SNAP_PEAK_RISE} / {@link #SNAP_PEAK_SCALE} 现算留空，
+     * snap_test 的阈值也从这两行现读，所以改这里不必去别处抄数。
+     */
+    private static final float[] SNAP_STOPS = {0f, .45f, .70f, 1f};
+    private static final float[] SNAP_RISE = {0f, -1.33f, .44f, 0f};
+    private static final float[] SNAP_SCALE = {1f, 1.04f, .99f, 1f};
+
+    /** 「顿」峰值时最多抬起多少（GUI 单位，正数）。 */
+    public static final float SNAP_PEAK_RISE;
+    /** 「顿」峰值时的最大缩放。卡绕底边缩放，所以它同时决定卡顶要多留多少空。 */
+    public static final float SNAP_PEAK_SCALE;
+
+    static {
+        // ❗从关键帧现算，不另写两个常量。今天刚记进证伪表：同源保的是参数不是数值 ——
+        //   把 6 和 1.07 再抄一遍，改了关键帧而版面不跟着改，卡就会压上座位轨而没人报错。
+        //   缓动两头会冲出 [0,1]，外推出的值不会超过这两个峰（外推段都朝静止方向走）。
+        float rise = 0f;
+        float scale = 1f;
+        for (float v : SNAP_RISE) {
+            rise = Math.max(rise, -v);
+        }
+        for (float v : SNAP_SCALE) {
+            scale = Math.max(scale, v);
+        }
+        SNAP_PEAK_RISE = rise;
+        SNAP_PEAK_SCALE = scale;
+    }
+
+    /**
+     * 「顿」走到哪了，0 → 1（线性，未过缓动）。
+     *
+     * @param startedAt 起点；{@code <= 0} 表示没在播，返回 1（已结束）
+     */
+    public static float snap(long now, long startedAt) {
+        if (startedAt <= 0L) {
+            return 1f;
+        }
+        return MathHelper.clamp((now - startedAt) / (float) SNAP_MS, 0f, 1f);
+    }
+
+    /** 「顿」此刻的上抬量（GUI 单位，负号向上）。 */
+    public static float snapRise(float progress) {
+        if (ClientPrefs.reducedMotion()) {
+            return 0f;
+        }
+        return sampleSnap(SNAP_RISE, cubicBezier(progress, SNAP_X1, SNAP_Y1, SNAP_X2, SNAP_Y2));
+    }
+
+    /** 「顿」此刻的缩放。 */
+    public static float snapScale(float progress) {
+        if (ClientPrefs.reducedMotion()) {
+            return 1f;
+        }
+        return sampleSnap(SNAP_SCALE, cubicBezier(progress, SNAP_X1, SNAP_Y1, SNAP_X2, SNAP_Y2));
+    }
+
+    /**
+     * 按缓动后的进度取关键帧。
+     *
+     * <p>❗缓动后的进度会<b>冲出 [0,1]</b>（y1 = -.3、y2 = 1.3 就是为此写的），
+     * 这时按最近的那一段<b>外推</b>而不是夹住 —— 夹住等于把过冲抹掉，
+     * 而过冲正是「顿」与「抬」唯一看得出的区别。
+     */
+    private static float sampleSnap(float[] values, float eased) {
+        int i = 0;
+        while (i < SNAP_STOPS.length - 2 && eased > SNAP_STOPS[i + 1]) {
+            i++;
+        }
+        float span = SNAP_STOPS[i + 1] - SNAP_STOPS[i];
+        float t = (eased - SNAP_STOPS[i]) / span;              // 越界时 t 自然落在 [0,1] 之外
+        return values[i] + (values[i + 1] - values[i]) * t;
+    }
+
+    /**
+     * 三次贝塞尔缓动：给横轴进度，求纵轴。「顿」与「飞」共用。
+     *
+     * <p>CSS 的 {@code cubic-bezier(x1,y1,x2,y2)} 定的是一条参数曲线，横轴不是参数本身 ——
+     * 要先按 x 解出参数 t，再拿 t 求 y。用牛顿迭代解；导数太小时退回二分，
+     * 免得在曲线平坦处除出一个巨大的步长。
+     */
+    private static float cubicBezier(float x, float x1, float y1, float x2, float y2) {
+        if (x <= 0f) {
+            return 0f;
+        }
+        if (x >= 1f) {
+            return 1f;
+        }
+        float t = x;
+        for (int i = 0; i < 8; i++) {
+            float dx = bezier(t, x1, x2) - x;
+            if (Math.abs(dx) < 1e-5f) {
+                break;
+            }
+            float slope = bezierSlope(t, x1, x2);
+            if (Math.abs(slope) < 1e-5f) {
+                break;
+            }
+            t = MathHelper.clamp(t - dx / slope, 0f, 1f);
+        }
+        return bezier(t, y1, y2);
+    }
+
+    /** 首末控制点固定在 0 与 1 的三次贝塞尔。 */
+    private static float bezier(float t, float a, float b) {
+        float u = 1f - t;
+        return 3f * u * u * t * a + 3f * u * t * t * b + t * t * t;
+    }
+
+    private static float bezierSlope(float t, float a, float b) {
+        float u = 1f - t;
+        return 3f * u * u * a + 6f * u * t * (b - a) + 3f * t * t * (1f - b);
+    }
+}

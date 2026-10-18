@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/deck_chair_head",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/deck_chair",
+    "k": "heavyseas:block/liner/prop/deck_chair_cushion",
+    "particle": "heavyseas:block/liner/prop/deck_chair"
+  }
+}

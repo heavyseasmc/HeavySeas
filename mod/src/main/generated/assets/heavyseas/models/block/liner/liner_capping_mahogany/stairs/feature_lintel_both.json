@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/feature_lintel_both",
+  "textures": {
+    "l": "heavyseas:block/liner/stairs/feature_lintel",
+    "particle": "heavyseas:block/liner/stairs/feature_lintel"
+  }
+}

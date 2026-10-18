@@ -1,0 +1,535 @@
+package io.github.heavyseasmc.engine.sim;
+
+import io.github.heavyseasmc.engine.data.TestProvisions;
+import io.github.heavyseasmc.engine.play.Invariants;
+import io.github.heavyseasmc.engine.model.Ability;
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Roster;
+import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.GameState;
+import io.github.heavyseasmc.engine.thirst.ThirstSource;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static io.github.heavyseasmc.engine.data.SyntheticTable.deck;
+import static io.github.heavyseasmc.engine.data.SyntheticTable.roster;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * 随机对局。
+ *
+ * <p>使用共享的合成桌面铺开规则分支；真实数据的跨版本摘要由 {@code RandomSeatsReproduceTest} 核对。
+ */
+class SimulatorTest {
+
+    private static final CharacterId JEWELER = CharacterId.of("jeweler");
+    private static final CharacterId MATE = CharacterId.of("mate");
+    private static final CharacterId HOSTESS = CharacterId.of("hostess");
+    private static final CharacterId SAILOR = CharacterId.of("sailor");
+    private static final CharacterId KID = CharacterId.of("kid");
+
+    // ❗整类加超时：死锁在测试里的表现是**挂死**，不是失败 —— CI 上就是超时，没有任何信号。
+    //   2026-09-14 变异测试实证：把 Simulator 的回合上限改成永不触发，这些用例会一直转下去。
+    //   必须写 SEPARATE_THREAD：@Timeout 默认在同一线程里跑，只在测试**返回之后**才比对耗时，
+    //   对真正的死循环毫无作用 —— 那正是这里要防的东西。
+    @Nested
+    @DisplayName("几千局")
+    @Timeout(value = 120, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    class ManyGames {
+
+        /**
+         * 钉死八个种子的走向。
+         *
+         * <h2>它防的是什么</h2>
+         * 规则从 {@code Simulator} 的私有方法搬到了 {@link io.github.heavyseasmc.engine.play.Session}
+         * （模拟器与模组共用同一份）。那次搬迁**不该改变任何一局的走向**，当时用 900 局
+         * 逐字节对照验过 —— 但那是个一次性脚本，会话一结束就没了。
+         *
+         * <p>❗<b>一次性的对照等于没有对照。</b> 所以把它压成这张表：同时覆盖全灭与靠岸，
+         * 回合数与打架次数都不同，任何一处改动都会让某一行对不上，且失败信息直接点名是哪个种子。
+         *
+         * <p>规则**有意**改动时，这张表当然会红 —— 那时照新值更新它，但必须是个明确的动作。
+         */
+        @Test
+        @DisplayName("❗八个种子的走向钉死：每座独立随机流的回归基线")
+        void pinnedSeeds() {
+            record Pinned(long seed, int turns, int alive, int fights, GameState.Outcome outcome) {
+            }
+            // ❗2026-09-16 同一天整表重钉过三次，三次都<b>不是「搬家」，是规则变了</b>：
+            //   ① ADR-0021 物资建模 —— 此前模拟器发不出物资，口渴时喝的是不存在的水、武器加值是凭空随机的；
+            //   ② ADR-0022 终局 —— 开局发爱恨要消耗随机数（每一局从第一步起就不同），
+            //      水里「恰好等于体型、没救生圈」的人从昏迷着回船改成淹死并移出；
+            //   ③ ADR-0023 换座位与抢夺 —— 换座位从「不问对方」改成要问，打架只从拒绝里来，抢赢了真的拿牌；
+            //   ④ 划船从「逐张决定去留」纠正为「整组只选一张，其余回牌堆底」。
+            //   三次都是「每一局必然不同」，这张表全红说明不了任何事 —— 所以看分布（DistributionDumpTest），
+            //   再照新行为重钉。第二次顺势把靠岸的种子换成四个（全灭四个 · 靠岸四个，两种终局各占一半）；
+            //   第三次靠岸的四个种子全部改掉了 —— 合成牌堆下原先那四个都不再靠岸（真实数据那一侧反而是靠岸变多）。
+            // 2026-10-09 Q4：每座独立随机流，保留同样八个种子、重建全部字段。
+            // 归因对照只恢复共享随机流：旧表八行全过、SeatRandomIsolationTest 两例全红；
+            // 恢复隔离后两例回绿。不是删掉规则断言来接受未知差异；旧表留在 Git 历史。
+            List<Pinned> expected = List.of(
+                    new Pinned(0L, 15, 0, 3, GameState.Outcome.ALL_DEAD),
+                    new Pinned(1L, 12, 0, 9, GameState.Outcome.ALL_DEAD),
+                    new Pinned(2L, 29, 1, 3, GameState.Outcome.LANDED),
+                    new Pinned(3L, 6, 0, 2, GameState.Outcome.ALL_DEAD),
+                    new Pinned(6L, 11, 1, 5, GameState.Outcome.LANDED),
+                    new Pinned(13L, 16, 0, 3, GameState.Outcome.ALL_DEAD),
+                    new Pinned(22L, 8, 0, 4, GameState.Outcome.ALL_DEAD),
+                    new Pinned(24L, 9, 0, 7, GameState.Outcome.ALL_DEAD));
+
+            // 正向对照：两种终局都得在表里，否则这张表只钉住了一条路。
+            assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.LANDED));
+            assertTrue(expected.stream().anyMatch(e -> e.outcome() == GameState.Outcome.ALL_DEAD));
+
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
+            var results = expected.stream().map(e -> {
+                Simulator.Result r = sim.run(e.seed());
+                return new Pinned(e.seed(), r.turns(), r.alive(), r.fights(), r.outcome());
+            }).toList();
+            results.forEach(System.out::println);
+            org.junit.jupiter.api.Assertions.assertAll(java.util.stream.IntStream.range(0, expected.size())
+                    .mapToObj(i -> () -> assertEquals(expected.get(i), results.get(i), "seed=" + expected.get(i).seed())));
+        }
+
+        @Test
+        @DisplayName("同一批 2000 局：终局与战斗均有覆盖、无非法状态，每个角色都有落海机会与命中")
+        void thousandsOfGames() {
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
+            Map<GameState.Outcome, Integer> outcomes = new HashMap<>();
+            Map<CharacterId, Exposure> exposure = new HashMap<>();
+            long totalTurns = 0;
+            int totalFights = 0;
+
+            for (long seed = 0; seed < 2000; seed++) {
+                Simulator.Result r = sim.run(seed);      // 非法状态或死锁会在这里抛
+                outcomes.merge(r.outcome(), 1, Integer::sum);
+                totalTurns += r.turns();
+                totalFights += r.fights();
+                // 与终局检查使用同一组种子，汇总放在这一遍；Exposure.plus 仍检查命中不超过机会。
+                r.exposure().forEach((id, e) -> exposure.merge(id, e, Exposure::plus));
+                assertTrue(r.turns() >= 1 && r.turns() <= Simulator.TURN_LIMIT,
+                        "seed=" + seed + " 回合数越界: " + r.turns());
+            }
+
+            // ❗两种终局都必须出现过。只出现一种说明状态空间没铺开 ——
+            //   那时「2000 局全过」是个假绿，它只证明了走通一条路。
+            assertTrue(outcomes.getOrDefault(GameState.Outcome.LANDED, 0) > 0,
+                    "没有任何一局靠岸获救，牌堆或海鸥逻辑有问题: " + outcomes);
+            assertTrue(outcomes.getOrDefault(GameState.Outcome.ALL_DEAD, 0) > 0,
+                    "没有任何一局全员死亡，伤害链路可能根本没跑起来: " + outcomes);
+            assertTrue(totalFights > 0, "一架都没打过，战斗分支没被覆盖");
+            assertTrue(totalTurns > 0);
+            assertEquals(roster().size(), exposure.size(), "有角色从头到尾没进过统计: " + exposure.keySet());
+            exposure.forEach((id, e) -> {
+                assertTrue(e.overboardTurns() > 0, id + " 一次落海结算都没赶上");
+                assertTrue(e.overboardRate().orElseThrow() > 0, id + " 两千局里一次都没落过水");
+            });
+        }
+
+        @Test
+        @DisplayName("同一个种子跑两次结果完全一致 —— 失败时才复现得了")
+        void seedIsReproducible() {
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
+            for (long seed : new long[]{0, 1, 42, 12345, -7}) {
+                assertEquals(sim.run(seed), sim.run(seed), "seed=" + seed + " 不可复现");
+            }
+        }
+
+        @Test
+        @DisplayName("不同种子会走出不同的局 —— 否则随机没生效")
+        void seedsDiffer() {
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic());
+            Set<Integer> turnCounts = new java.util.HashSet<>();
+            for (long seed = 0; seed < 50; seed++) {
+                turnCounts.add(sim.run(seed).turns());
+            }
+            assertTrue(turnCounts.size() > 1, "50 个种子跑出同样的回合数，随机没生效");
+        }
+    }
+
+    @Nested
+    @DisplayName("不变量本身")
+    class InvariantChecks {
+
+        @Test
+        @DisplayName("干净的开局通过")
+        void freshStateIsValid() {
+            assertTrue(Invariants.check(GameState.start(roster())).isEmpty());
+        }
+
+        @Test
+        @DisplayName("座位撞车会被抓到")
+        void duplicateSeatCaught() {
+            GameState g = GameState.start(roster());
+            g = g.withState(KID, g.stateOf(KID).withSeat(1));     // 与珠宝商同为 1 号位
+            List<String> bad = Invariants.check(g);
+            assertFalse(bad.isEmpty());
+            assertTrue(String.join(";", bad).contains("座位"), bad.toString());
+        }
+
+        @Test
+        @DisplayName("❗「行动过然后死掉」是合法的，不该被判非法")
+        void actedThenDiedIsLegal() {
+            // 这一条是被模拟器逼出来的：原先有一条「死人不该带着行动标记」的不变量，
+            // 2000 局里第 3 回合就红了 —— 而红的是那条不变量本身，不是状态机。
+            // 角色在行动阶段合法行动，随后在同一回合的航海阶段死掉，标记要到回合结束才清。
+            GameState fresh = GameState.start(roster());
+            GameState g = fresh.withState(KID, fresh.stateOf(KID).markActed().hurt(4));
+            assertEquals(Condition.DEAD, g.conditionOf(KID));
+            assertTrue(g.stateOf(KID).actedThisTurn());
+            assertTrue(Invariants.check(g).isEmpty(), "这是正常对局，不该报非法: " + Invariants.check(g));
+        }
+
+        @Test
+        @DisplayName("死亡不可复生 —— 跨状态才看得出来")
+        void resurrectionCaught() {
+            GameState fresh = GameState.start(roster());
+            GameState dead = fresh.withState(KID, fresh.stateOf(KID).hurt(4));
+            GameState revived = dead.withState(KID, dead.stateOf(KID).withDamage(0));
+            assertEquals(Condition.DEAD, dead.conditionOf(KID));
+            String msg = String.join(";", Invariants.checkTransition(dead, revived));
+            assertTrue(msg.contains("复活"), msg);
+            assertTrue(msg.contains("伤害合计降了"), msg);
+            assertTrue(Invariants.checkTransition(fresh, dead).isEmpty(), "受伤加重是正常的");
+
+            // ❗治疗额度只放宽「伤害下降」那一条，<b>不放宽复活</b>：
+            //   治好一具尸体在规则上是不可能的，给多少额度都不行。
+            String healed = String.join(";", Invariants.checkTransition(dead, revived, 4));
+            assertTrue(healed.contains("复活"), healed);
+            assertFalse(healed.contains("伤害合计降了"), "治疗额度够时，伤害下降本身不算违规：" + healed);
+        }
+
+        @Test
+        @DisplayName("回合数倒退会被抓到")
+        void turnRegressionCaught() {
+            GameState t1 = GameState.start(roster());
+            GameState t2 = t1.advancePhase().advancePhase().advancePhase();
+            assertTrue(Invariants.checkTransition(t1, t2).isEmpty());
+            assertTrue(String.join(";", Invariants.checkTransition(t2, t1)).contains("回合数倒退"));
+        }
+
+        @Test
+        @DisplayName("requireValid 报出种子与位置，否则复现不了")
+        void requireValidReportsSeed() {
+            GameState fresh = GameState.start(roster());
+            GameState g = fresh.withState(KID, fresh.stateOf(KID).withSeat(1));
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> Invariants.requireValid(g, 4242L, "测试"));
+            assertTrue(e.getMessage().contains("seed=4242"), e.getMessage());
+            assertTrue(e.getMessage().contains("测试"), e.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("模拟器自身的守卫")
+    @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    class SimulatorGuards {
+
+        @Test
+        @DisplayName("空牌堆拒绝构造 —— 没有牌就永远结束不了")
+        void emptyDeckRejected() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new Simulator(roster(), List.of(), TestProvisions.synthetic()));
+        }
+
+        @Test
+        @DisplayName("一张海鸥都不给的牌堆会撞上回合上限，而不是无声空转")
+        void deadlockIsReported() {
+            List<NavigationCard> harmless = List.of(new NavigationCard(
+                    "calm", 0, new Selector.Nobody(), new Selector.Nobody(), false, false));
+            Simulator sim = new Simulator(roster(), harmless, TestProvisions.synthetic());
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> sim.run(1));
+            assertTrue(e.getMessage().contains("疑似死锁"), e.getMessage());
+            assertTrue(e.getMessage().contains("seed=1"), e.getMessage());
+        }
+
+        @Test
+        @DisplayName("单人阵容也能跑完 —— 只剩一人不是终局条件")
+        void soloRosterFinishes() {
+            Roster solo = new Roster(List.of(
+                    new Survivor(KID, 1, 3, 9, "base", new Ability.None())));
+            Simulator sim = new Simulator(solo, deck(), TestProvisions.synthetic());
+            for (long seed = 0; seed < 200; seed++) {
+                sim.run(seed);
+            }
+        }
+    }
+
+    /**
+     * 划船 → 划船堆 → 舵手挑牌。
+     *
+     * <p>❗这一层是 O1 的关键：牌面上印着谁落水是一回事，<b>实际执行了哪张牌</b>是另一回事。
+     * 中间隔着两道挑选 —— 划船者决定留哪张，舵手再从留下的里面挑一张。
+     */
+    @Nested
+    @DisplayName("划船与挑牌")
+    @Timeout(value = 120, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    class RowingAndPicking {
+
+        private final NavigationCard harmless = new NavigationCard(
+                "harmless", 1, new Selector.Nobody(), new Selector.Nobody(), false, false);
+        private final NavigationCard soaking = new NavigationCard(
+                "soaking", 1, new Selector.Everyone(), new Selector.Nobody(), false, false);
+
+        private Roster solo() {
+            return new Roster(List.of(new Survivor(KID, 1, 3, 9, "base", new Ability.None())));
+        }
+
+        private double overboardRate(NavigationPolicy policy, int games) {
+            Simulator sim = new Simulator(solo(), List.of(harmless, soaking), TestProvisions.synthetic(), policy);
+            Exposure total = Exposure.NONE;
+            for (long seed = 0; seed < games; seed++) {
+                total = total.plus(sim.run(seed).exposure().get(KID));
+            }
+            return total.overboardRate().orElseThrow();
+        }
+
+        @Test
+        @DisplayName("❗舵手会挑牌，所以实际落水频率不等于牌面张数比")
+        void pickingBendsTheDistribution() {
+            // 两张牌，一张淋人一张不淋，牌面张数比恒为 50%。
+            double indifferent = overboardRate(NavigationPolicy.INDIFFERENT, 3000);
+            double selfish = overboardRate(NavigationPolicy.SELF_INTERESTED, 3000);
+
+            assertTrue(indifferent > 0.35 && indifferent < 0.65,
+                    "无所谓的舵手应当落在张数比附近，实际 " + indifferent);
+            assertTrue(selfish < indifferent - 0.05,
+                    "自保的舵手没能把淋人的牌挑掉：自保 %.3f vs 无所谓 %.3f".formatted(selfish, indifferent));
+        }
+
+        @Test
+        @DisplayName("自保策略的取向写在分数里：淋自己的扣分，海鸥加分")
+        void selfInterestScores() {
+            NavigationPolicy.SelfInterested policy =
+                    (NavigationPolicy.SelfInterested) NavigationPolicy.SELF_INTERESTED;
+            GameState g = GameState.start(solo());
+
+            assertTrue(policy.score(soaking, g, KID) < policy.score(harmless, g, KID),
+                    "淋自己的牌不该比不淋的更想要");
+            NavigationCard noGull = new NavigationCard(
+                    "no_gull", 0, new Selector.Nobody(), new Selector.Nobody(), false, false);
+            assertTrue(policy.score(harmless, g, KID) > policy.score(noGull, g, KID),
+                    "海鸥推进靠岸，活着的人应当更想要它");
+        }
+
+        @Test
+        @DisplayName("❗自保遇到同分时均匀地挑：三张同分各约三分之一（原先最后一张拿一半，审查 Q4）；两张同分与原先逐次相同（对照）")
+        void tiesArePickedUniformly() {
+            NavigationPolicy.SelfInterested policy =
+                    (NavigationPolicy.SelfInterested) NavigationPolicy.SELF_INTERESTED;
+            GameState g = GameState.start(solo());
+            List<NavigationCard> three = List.of(
+                    new NavigationCard("a", 0, new Selector.Nobody(), new Selector.Nobody(), false, false),
+                    new NavigationCard("b", 0, new Selector.Nobody(), new Selector.Nobody(), false, false),
+                    new NavigationCard("c", 0, new Selector.Nobody(), new Selector.Nobody(), false, false));
+            int[] rowed = new int[3];
+            int[] steered = new int[3];
+            int games = 6000;
+            java.util.Random rowRng = new java.util.Random(7);
+            java.util.Random steerRng = new java.util.Random(8);
+            for (int i = 0; i < games; i++) {
+                rowed[policy.chooseWhenRowing(three, g, KID, rowRng)]++;
+                steered[three.indexOf(policy.pick(three, g, KID, steerRng))]++;
+            }
+            for (int i = 0; i < 3; i++) {
+                double r = rowed[i] / (double) games;
+                double s = steered[i] / (double) games;
+                assertTrue(r > 0.30 && r < 0.37, "划船留第 %d 张的比例 %.3f，应当约 1/3".formatted(i + 1, r));
+                assertTrue(s > 0.30 && s < 0.37, "舵手挑第 %d 张的比例 %.3f，应当约 1/3".formatted(i + 1, s));
+            }
+            // 对照：两张同分时与原先「同分抛一次硬币」逐次相同 —— 钉死的摘要里只有三张以上同分的局会变
+            List<NavigationCard> two = three.subList(0, 2);
+            for (int seed = 0; seed < 200; seed++) {
+                int coin = new java.util.Random(seed).nextBoolean() ? 1 : 0;
+                assertEquals(coin, policy.chooseWhenRowing(two, g, KID, new java.util.Random(seed)), "seed=" + seed);
+            }
+        }
+
+        @Test
+        @DisplayName("划船的人自己背划船标记，所以带船桨图示的牌对他更糟")
+        void rowerDislikesOarCards() {
+            NavigationPolicy.SelfInterested policy =
+                    (NavigationPolicy.SelfInterested) NavigationPolicy.SELF_INTERESTED;
+            NavigationCard oars = new NavigationCard(
+                    "oars", 0, new Selector.Nobody(), new Selector.Nobody(), true, false);
+            GameState fresh = GameState.start(solo());
+            GameState rowed = fresh.withState(KID, fresh.stateOf(KID).thirstFrom(ThirstSource.ROWED));
+
+            assertEquals(0, policy.score(oars, fresh, KID), "没划船的人不该被船桨图示影响");
+            assertTrue(policy.score(oars, rowed, KID) < 0, "划过船的人该躲开带船桨图示的牌");
+        }
+
+        @Test
+        @DisplayName("牌一张都不会丢：几千局里牌堆 + 划船堆始终等于整副牌")
+        void noCardIsLost() {
+            // 守恒由 Simulator 内部每回合核对，丢牌会当场抛。这里负责把它跑够多次：
+            // 8 个人、31 张牌规模的划船量，才可能让「放回」漏掉一条路径。
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic(), NavigationPolicy.SELF_INTERESTED);
+            for (long seed = 0; seed < 2000; seed++) {
+                sim.run(seed);
+            }
+        }
+
+        @Test
+        @DisplayName("换了策略，同一个种子仍然可复现")
+        void stillReproducible() {
+            Simulator sim = new Simulator(roster(), deck(), TestProvisions.synthetic(), NavigationPolicy.SELF_INTERESTED);
+            for (long seed : new long[]{0, 1, 42, -7}) {
+                assertEquals(sim.run(seed), sim.run(seed), "seed=" + seed + " 不可复现");
+            }
+        }
+    }
+
+    /**
+     * 点名统计 —— O1 要的那条分布曲线的原料。
+     *
+     * <p>这里全部用<b>单人阵容</b>做精确断言：一个人时打不起来、也换不了座位，
+     * 唯一的伤害来源就是落海，于是次数是可以一个一个数出来的。
+     * 多人局里随机战斗会插进来，那时只能断言不等式 —— 那种断言对「分母漏加了」不敏感。
+     */
+    @Nested
+    @DisplayName("点名统计")
+    @Timeout(value = 60, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+    class ExposureStats {
+
+        private Roster solo(CharacterId id, int size) {
+            return new Roster(List.of(new Survivor(id, 1, size, 12 - size, "base", new Ability.None())));
+        }
+
+        private List<NavigationCard> oneCard(int gull, Selector overboard, Selector thirst) {
+            return List.of(new NavigationCard("fixed", gull, overboard, thirst, false, false));
+        }
+
+        @Test
+        @DisplayName("单人局：体型 3 的角色第 3 次落海就淹死；口渴的分母比落海少一次（「死后不再计入分母」看下一条双人局）")
+        void deadStopAccruing() {
+            // 每回合必落海、不点口渴、没有海鸥。
+            // ❗在水里伤害 3 = 体型、没有救生圈就是淹死（ADR-0022）—— 船上那只是昏迷。
+            //   这条原先写的是「第 4 次落海才死」：那是 M1 起一直没接上的水中判定，不是规则。
+            //
+            // ❗这一条证不了「死了就不再计入分母」（审查 2026-10-08 N1）：单人局里他一死局就完了，分母停不停都一样。
+            //   原先的「命中数等于机会数」也是同义反复 —— 只有他一个人可点，每一张牌都必然点到他。那一条已删掉；
+            //   「死后分母停住」由下一条双人局证（变异测试实证：去掉「死者不计」，这一条照样绿，那一条当场红）。
+            //   这里留下的只是它真正量得出的两件事：第几次落海淹死（水中判定）、死在落海那一步时口渴还没轮到。
+            Simulator sim = new Simulator(solo(KID, 3),
+                    oneCard(0, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
+            Simulator.Result r = sim.run(0);
+
+            assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
+            assertEquals(3, r.turns(), "第 3 回合的落海把他淹死 —— 水里伤害正好等于体型、又没有救生圈");
+            Exposure kid = r.exposure().get(KID);
+            assertEquals(3, kid.overboardTurns(), "三回合，三次落海");
+
+            // ❗口渴的分母比落海少一次：第 3 回合他死在落海那一步，口渴结算根本没轮到。
+            //   两个分母分开数，正是为了让这种「死在半途」不被算成「口渴过但没被点」。
+            assertEquals(2, kid.thirstTurns());
+            assertEquals(0, kid.thirsts());
+        }
+
+        @Test
+        @DisplayName("❗死了就不再计入分母，而这只有在「他死了、局还没完」时才看得出来")
+        void deadStopAccruingWhileTheGameGoesOn() {
+            // 单人局里死亡就是终局，分母停不停都一样 —— 那种局面证明不了任何事。
+            // 两人局才分得开：小孩第 3 次落海时淹死（水里恰好等于体型、没救生圈，ADR-0022），
+            // 大副还要再挨 5 次，第 8 次同样淹死。
+            Roster pair = new Roster(List.of(
+                    new Survivor(KID, 1, 3, 9, "base", new Ability.None()),
+                    new Survivor(MATE, 2, 8, 4, "base", new Ability.None())));
+            Simulator sim = new Simulator(pair,
+                    oneCard(0, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
+
+            int clean = 0;
+            for (long seed = 0; seed < 500; seed++) {
+                Simulator.Result r = sim.run(seed);
+                if (r.fights() > 0) {
+                    continue;               // 打过架就有额外伤害，次数数不准，换个种子
+                }
+                clean++;
+                assertEquals(GameState.Outcome.ALL_DEAD, r.outcome());
+                assertEquals(8, r.turns(), "seed=" + seed);
+                assertEquals(3, r.exposure().get(KID).overboardTurns(),
+                        "seed=" + seed + " 小孩死后还在涨分母");
+                assertEquals(8, r.exposure().get(MATE).overboardTurns(), "seed=" + seed);
+            }
+            assertTrue(clean > 0, "500 局里没有一局是零战斗，这条断言其实一次都没执行");
+        }
+
+        @Test
+        @DisplayName("❗水手落水不受伤，但那仍然是落水 —— 统计数的是下水，不是受伤")
+        void immunityDoesNotHideTheSplash() {
+            Roster solo = new Roster(List.of(new Survivor(SAILOR, 1, 6, 6, "base",
+                    new Ability.OverboardImmune(true, List.of("bait_bucket")))));
+            // 每张牌一只海鸥：第 4 只出现时当场结束，那一回合的落海不再结算。
+            Simulator sim = new Simulator(solo,
+                    oneCard(1, new Selector.Everyone(), new Selector.Nobody()), TestProvisions.inert());
+            Simulator.Result r = sim.run(0);
+
+            assertEquals(GameState.Outcome.LANDED, r.outcome());
+            Exposure sailor = r.exposure().get(SAILOR);
+            assertEquals(3, sailor.overboardTurns(), "第 4 回合海鸥先结束了一局，那一次不该计入");
+            assertEquals(3, sailor.overboards(), "免伤不等于没下水");
+            assertEquals(1.0, sailor.overboardRate().orElseThrow());
+        }
+
+        @Test
+        @DisplayName("没点到的人分母照样在涨 —— 否则「没被点到」与「没上过场」分不开")
+        void unnamedStillAccrueChances() {
+            Simulator sim = new Simulator(solo(KID, 3),
+                    oneCard(1, new Selector.Nobody(), new Selector.Everyone()), TestProvisions.inert());
+            Simulator.Result r = sim.run(0);
+
+            Exposure kid = r.exposure().get(KID);
+            assertEquals(0, kid.overboards());
+            assertTrue(kid.overboardTurns() > 0, "一次落海结算都没执行过？那这份统计什么也没测");
+            assertEquals(0.0, kid.overboardRate().orElseThrow());
+            assertEquals(kid.thirstTurns(), kid.thirsts(), "口渴点的是所有人，命中应当等于机会");
+        }
+
+        @Test
+        @DisplayName("多人局：点名只落在名单里的人身上，别人一次都不该有")
+        void onlyNamedAreHit() {
+            Simulator sim = new Simulator(roster(),
+                    oneCard(1, new Selector.Only(Set.of(MATE)), new Selector.Only(Set.of(KID))),
+                    TestProvisions.inert());
+            Simulator.Result r = sim.run(7);
+
+            for (CharacterId id : List.of(JEWELER, HOSTESS, SAILOR)) {
+                Exposure e = r.exposure().get(id);
+                assertEquals(0, e.overboards(), id + " 不在落海名单里却被点到了");
+                assertEquals(0, e.thirsts(), id + " 不在口渴名单里却被点到了");
+                assertTrue(e.overboardTurns() > 0, id + " 的机会数是 0，统计没在数他");
+            }
+            assertTrue(r.exposure().get(MATE).overboards() > 0, "名单上的人一次都没被点到");
+            assertTrue(r.exposure().get(KID).thirsts() > 0, "名单上的人一次都没口渴");
+        }
+
+        @Test
+        @DisplayName("没有观测时频率是空，不是 0 —— 0 会把「没上过场」说成「运气极好」")
+        void noObservationIsEmptyNotZero() {
+            assertTrue(Exposure.NONE.overboardRate().isEmpty());
+            assertTrue(Exposure.NONE.thirstRate().isEmpty());
+            assertEquals(0.0, new Exposure(0, 5, 0, 5).overboardRate().orElseThrow());
+        }
+
+        @Test
+        @DisplayName("命中多于机会直接拒绝构造 —— 那是分母漏加了，算出来的频率会很像有信号")
+        void hitsCannotExceedChances() {
+            assertThrows(IllegalArgumentException.class, () -> new Exposure(3, 2, 0, 0));
+            assertThrows(IllegalArgumentException.class, () -> new Exposure(0, 0, 1, 0));
+            assertThrows(IllegalArgumentException.class, () -> new Exposure(-1, 0, 0, 0));
+        }
+    }
+}

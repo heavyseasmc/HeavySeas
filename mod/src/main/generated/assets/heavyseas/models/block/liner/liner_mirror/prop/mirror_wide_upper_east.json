@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/mirror_wide_upper_east",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/mirror",
+    "particle": "heavyseas:block/liner/prop/mirror"
+  }
+}

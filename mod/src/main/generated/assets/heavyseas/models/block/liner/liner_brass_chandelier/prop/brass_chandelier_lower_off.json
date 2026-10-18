@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/brass_chandelier_lower_off",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/brass_chandelier_lower",
+    "g": "heavyseas:block/liner/prop/brass_chandelier_glow_off",
+    "particle": "heavyseas:block/liner/prop/brass_chandelier_lower"
+  }
+}

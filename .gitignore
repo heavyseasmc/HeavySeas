@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Minecraft 运行目录（M1 起）
+run/
+runs/
+mod/logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 维护者的本地文档与工具目录，不入库
+docs/
+
+# 本地协作配置，不入库
+CLAUDE.md
+AGENTS.md
+# Fabric 批量生成工具（datagen）的缓存：只记上次写了哪些文件的哈希，生成物本身入库
+mod/src/main/generated/.cache/

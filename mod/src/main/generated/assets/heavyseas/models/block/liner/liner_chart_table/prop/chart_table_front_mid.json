@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/chart_table_front_mid",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/chart_table",
+    "c": "heavyseas:block/liner/prop/chart_table_chart_front_mid",
+    "k": "heavyseas:block/liner/prop/chart_table_brass",
+    "particle": "heavyseas:block/liner/prop/chart_table"
+  }
+}

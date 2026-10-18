@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/shower_upper",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/shower",
+    "particle": "heavyseas:block/liner/prop/shower"
+  }
+}

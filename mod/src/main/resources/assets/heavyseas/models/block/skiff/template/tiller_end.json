@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#tiller"},
+  "elements": [
+    {"from": [7, 6.5, 0], "to": [9, 8.5, 6], "faces": {"up": {"texture": "#tiller", "uv": [0, 0, 6, 2]}, "down": {"texture": "#tiller", "uv": [0, 0, 6, 2]}, "west": {"texture": "#tiller", "uv": [0, 0, 6, 2]}, "east": {"texture": "#tiller", "uv": [6, 0, 0, 2]}}},
+    {"from": [6.75, 6.25, 6], "to": [9.25, 8.75, 7], "faces": {"up": {"texture": "#tiller", "uv": [0, 4, 1, 6]}, "west": {"texture": "#tiller", "uv": [0, 4, 1, 6]}, "east": {"texture": "#tiller", "uv": [0, 4, 1, 6]}, "north": {"texture": "#tiller", "uv": [0, 4, 2, 6]}}},
+    {"from": [7, 6.5, 7], "to": [9, 8.5, 12], "faces": {"up": {"texture": "#tiller", "uv": [0, 6, 5, 8]}, "down": {"texture": "#tiller", "uv": [0, 6, 5, 8]}, "west": {"texture": "#tiller", "uv": [0, 6, 5, 8]}, "east": {"texture": "#tiller", "uv": [5, 6, 0, 8]}, "south": {"texture": "#tiller", "uv": [0, 8, 2, 10]}}}
+  ]
+}

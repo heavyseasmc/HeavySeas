@@ -1,0 +1,100 @@
+{
+  "variants": {
+    "east=false,lit=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_none_off"
+    },
+    "east=false,lit=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_w_off"
+    },
+    "east=false,lit=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_s_off"
+    },
+    "east=false,lit=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_sw_off"
+    },
+    "east=false,lit=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_n_off"
+    },
+    "east=false,lit=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nw_off"
+    },
+    "east=false,lit=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_ns_off"
+    },
+    "east=false,lit=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nsw_off"
+    },
+    "east=false,lit=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_none_lit"
+    },
+    "east=false,lit=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_w_lit"
+    },
+    "east=false,lit=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_s_lit"
+    },
+    "east=false,lit=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_sw_lit"
+    },
+    "east=false,lit=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_n_lit"
+    },
+    "east=false,lit=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nw_lit"
+    },
+    "east=false,lit=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_ns_lit"
+    },
+    "east=false,lit=true,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nsw_lit"
+    },
+    "east=true,lit=false,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_e_off"
+    },
+    "east=true,lit=false,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_ew_off"
+    },
+    "east=true,lit=false,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_es_off"
+    },
+    "east=true,lit=false,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_esw_off"
+    },
+    "east=true,lit=false,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_ne_off"
+    },
+    "east=true,lit=false,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_new_off"
+    },
+    "east=true,lit=false,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nes_off"
+    },
+    "east=true,lit=false,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nesw_off"
+    },
+    "east=true,lit=true,north=false,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_e_lit"
+    },
+    "east=true,lit=true,north=false,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_ew_lit"
+    },
+    "east=true,lit=true,north=false,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_es_lit"
+    },
+    "east=true,lit=true,north=false,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_esw_lit"
+    },
+    "east=true,lit=true,north=true,south=false,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_ne_lit"
+    },
+    "east=true,lit=true,north=true,south=false,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_new_lit"
+    },
+    "east=true,lit=true,north=true,south=true,west=false": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nes_lit"
+    },
+    "east=true,lit=true,north=true,south=true,west=true": {
+      "model": "heavyseas:block/liner/liner_newel_lamp/stairs/newel_lamp_nesw_lit"
+    }
+  }
+}

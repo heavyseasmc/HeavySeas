@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/lift/dial_item",
+  "textures": {
+    "d": "heavyseas:block/liner/lift/dial",
+    "p": "heavyseas:block/liner/lift/dial_l",
+    "particle": "heavyseas:block/liner/lift/dial_l",
+    "q": "heavyseas:block/liner/lift/dial_r"
+  }
+}

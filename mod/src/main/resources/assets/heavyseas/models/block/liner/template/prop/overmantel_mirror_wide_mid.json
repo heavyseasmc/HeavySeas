@@ -1,0 +1,10 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {"particle": "#b"},
+  "elements": [
+    {"from": [0, -4.5, 12.75], "to": [16, -2.5, 16], "faces": {"north": {"uv": [2.75, 10.5, 6.75, 11.0], "texture": "#b"}, "up": {"uv": [6.75, 0.0, 10.75, 0.8125], "texture": "#b"}, "down": {"uv": [2.75, 7.5, 6.75, 8.3125], "texture": "#b"}}},
+    {"from": [0, -2.5, 14.0], "to": [16, -1.75, 16], "faces": {"north": {"uv": [2.25, 12.5, 6.25, 12.6875], "texture": "#b"}, "up": {"uv": [2.25, 11.0, 6.25, 11.5], "texture": "#b"}}},
+    {"from": [0, -1.75, 14.75], "to": [16, 16, 15.25], "faces": {"north": {"uv": [2.0625, 2.5625, 6.0625, 7.0], "texture": "#k"}}}
+  ]
+}

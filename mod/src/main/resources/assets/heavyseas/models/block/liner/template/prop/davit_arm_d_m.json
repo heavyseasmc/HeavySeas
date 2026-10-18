@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {"particle": "#b"},
+  "elements": [
+    {"from": [5.75, -0.953, 5.363], "to": [10.25, 17.047, 9.863], "rotation": {"angle": -22.5, "axis": "x", "origin": [8.0, 8.047, 7.613]}, "faces": {"north": {"uv": [3.625, 0.0, 2.5, 4.5], "texture": "#b"}, "south": {"uv": [3.625, 0.0, 2.5, 4.5], "texture": "#b"}, "west": {"uv": [4.875, 0.0, 3.75, 4.5], "texture": "#b"}, "east": {"uv": [4.875, 0.0, 3.75, 4.5], "texture": "#b"}}}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#blade"},
+  "elements": [
+    {"from": [7, 0, 11], "to": [9, 8, 16], "faces": {"west": {"texture": "#blade", "uv": [11, 8, 16, 16]}, "east": {"texture": "#blade", "uv": [16, 8, 11, 16]}, "north": {"texture": "#blade", "uv": [0, 8, 2, 16]}, "up": {"texture": "#blade", "uv": [7, 11, 9, 16]}}, "rotation": {"origin": [8, 8, 16], "axis": "y", "angle": -22.5}},
+    {"from": [6.5, 6, 12.5], "to": [9.5, 9, 15.5], "faces": {"north": {"texture": "#brass"}, "south": {"texture": "#brass"}, "east": {"texture": "#brass"}, "west": {"texture": "#brass"}, "up": {"texture": "#brass"}, "down": {"texture": "#brass"}}, "rotation": {"origin": [8, 8, 16], "axis": "y", "angle": -22.5}},
+    {"from": [7, 6.5, 15.5], "to": [9, 8.5, 16], "faces": {"up": {"texture": "#tiller", "uv": [0, 0, 2, 1]}, "west": {"texture": "#tiller", "uv": [0, 0, 1, 2]}, "east": {"texture": "#tiller", "uv": [0, 0, 1, 2]}}, "rotation": {"origin": [8, 8, 16], "axis": "y", "angle": -22.5}}
+  ]
+}

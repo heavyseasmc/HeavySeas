@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/casing_tall_jamb_right",
+  "textures": {
+    "c": "heavyseas:block/liner/door_casing",
+    "e": "heavyseas:block/liner/door_casing_tall",
+    "h": "heavyseas:block/liner/door_casing_head",
+    "particle": "heavyseas:block/liner/door_casing"
+  }
+}

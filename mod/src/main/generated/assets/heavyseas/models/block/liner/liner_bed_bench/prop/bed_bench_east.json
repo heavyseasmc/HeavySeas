@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/bed_bench_east",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/bed_bench",
+    "particle": "heavyseas:block/liner/prop/bed_bench"
+  }
+}

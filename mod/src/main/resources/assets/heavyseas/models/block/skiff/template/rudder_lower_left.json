@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#blade"},
+  "elements": [
+    {"from": [7, 4, 5], "to": [9, 16, 16], "faces": {"west": {"texture": "#blade", "uv": [5, 0, 16, 12]}, "east": {"texture": "#blade", "uv": [16, 0, 5, 12]}, "down": {"texture": "#blade", "uv": [7, 5, 9, 16]}, "north": {"texture": "#blade", "uv": [0, 0, 2, 12]}, "south": {"texture": "#blade", "uv": [14, 0, 16, 12]}}, "rotation": {"origin": [8, 8, 16], "axis": "y", "angle": -22.5}}
+  ]
+}

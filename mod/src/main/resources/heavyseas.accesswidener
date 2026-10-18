@@ -1,0 +1,6 @@
+accessWidener v2 named
+# Keep Minecraft's pixel blending while owning each allocated mip image before filling it.
+accessible method net/minecraft/client/texture/MipmapHelper blend (IIIIZ)I
+accessible method net/minecraft/client/texture/MipmapHelper hasAlpha (Lnet/minecraft/client/texture/NativeImage;)Z
+# Command replies: console / RCON get plain text without formatting codes (players keep them).
+accessible field net/minecraft/server/command/ServerCommandSource output Lnet/minecraft/server/command/CommandOutput;

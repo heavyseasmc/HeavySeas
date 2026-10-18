@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_stool/prop/stool",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_stool/prop/stool"
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_stool/prop/stool",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_stool/prop/stool",
+      "y": 270
+    }
+  }
+}

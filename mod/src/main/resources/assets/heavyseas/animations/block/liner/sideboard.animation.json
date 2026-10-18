@@ -1,0 +1,289 @@
+{
+ "format_version": "1.8.0",
+ "animations": {
+  "open": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "0.60": {
+       "vector": [
+        0.0,
+        -90.0,
+        0.0
+       ],
+       "easing": "easeOutCubic"
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "0.60": {
+       "vector": [
+        0.0,
+        90.0,
+        0.0
+       ],
+       "easing": "easeOutCubic"
+      }
+     }
+    }
+   },
+   "animation_length": 0.6
+  },
+  "close": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        -90.0,
+        0.0
+       ]
+      },
+      "0.50": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        90.0,
+        0.0
+       ]
+      },
+      "0.50": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    }
+   },
+   "animation_length": 0.5
+  },
+  "opened": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        -90.0,
+        0.0
+       ]
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        90.0,
+        0.0
+       ]
+      }
+     }
+    }
+   }
+  },
+  "closed": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    }
+   }
+  },
+  "open_tight": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "0.60": {
+       "vector": [
+        0.0,
+        -22.5,
+        0.0
+       ],
+       "easing": "easeOutCubic"
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "0.60": {
+       "vector": [
+        0.0,
+        22.5,
+        0.0
+       ],
+       "easing": "easeOutCubic"
+      }
+     }
+    }
+   },
+   "animation_length": 0.6
+  },
+  "close_tight": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        -22.5,
+        0.0
+       ]
+      },
+      "0.50": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        22.5,
+        0.0
+       ]
+      },
+      "0.50": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    }
+   },
+   "animation_length": 0.5
+  },
+  "opened_tight": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        -22.5,
+        0.0
+       ]
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        22.5,
+        0.0
+       ]
+      }
+     }
+    }
+   }
+  },
+  "closed_tight": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "door_l": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    },
+    "door_r": {
+     "rotation": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    }
+   }
+  }
+ }
+}

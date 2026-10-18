@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/writing_table_item",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/writing_table",
+    "particle": "heavyseas:block/liner/prop/writing_table"
+  }
+}

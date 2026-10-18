@@ -1,0 +1,304 @@
+{
+  "variants": {
+    "facing=east,part=corner_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 270
+    },
+    "facing=east,part=corner_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left_cornice",
+      "y": 270
+    },
+    "facing=east,part=corner_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 270
+    },
+    "facing=east,part=corner_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 270
+    },
+    "facing=east,part=corner_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 270
+    },
+    "facing=east,part=corner_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right_cornice",
+      "y": 270
+    },
+    "facing=east,part=corner_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 270
+    },
+    "facing=east,part=corner_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 270
+    },
+    "facing=east,part=head,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 270
+    },
+    "facing=east,part=head,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head_cornice",
+      "y": 270
+    },
+    "facing=east,part=head,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 270
+    },
+    "facing=east,part=head,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 270
+    },
+    "facing=east,part=jamb_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_chair_rail",
+      "y": 270
+    },
+    "facing=east,part=jamb_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_cornice",
+      "y": 270
+    },
+    "facing=east,part=jamb_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left",
+      "y": 270
+    },
+    "facing=east,part=jamb_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_skirting",
+      "y": 270
+    },
+    "facing=east,part=jamb_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_chair_rail",
+      "y": 270
+    },
+    "facing=east,part=jamb_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_cornice",
+      "y": 270
+    },
+    "facing=east,part=jamb_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right",
+      "y": 270
+    },
+    "facing=east,part=jamb_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_skirting",
+      "y": 270
+    },
+    "facing=north,part=corner_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 180
+    },
+    "facing=north,part=corner_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left_cornice",
+      "y": 180
+    },
+    "facing=north,part=corner_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 180
+    },
+    "facing=north,part=corner_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 180
+    },
+    "facing=north,part=corner_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 180
+    },
+    "facing=north,part=corner_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right_cornice",
+      "y": 180
+    },
+    "facing=north,part=corner_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 180
+    },
+    "facing=north,part=corner_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 180
+    },
+    "facing=north,part=head,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 180
+    },
+    "facing=north,part=head,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head_cornice",
+      "y": 180
+    },
+    "facing=north,part=head,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 180
+    },
+    "facing=north,part=head,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 180
+    },
+    "facing=north,part=jamb_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_chair_rail",
+      "y": 180
+    },
+    "facing=north,part=jamb_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_cornice",
+      "y": 180
+    },
+    "facing=north,part=jamb_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left",
+      "y": 180
+    },
+    "facing=north,part=jamb_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_skirting",
+      "y": 180
+    },
+    "facing=north,part=jamb_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_chair_rail",
+      "y": 180
+    },
+    "facing=north,part=jamb_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_cornice",
+      "y": 180
+    },
+    "facing=north,part=jamb_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right",
+      "y": 180
+    },
+    "facing=north,part=jamb_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_skirting",
+      "y": 180
+    },
+    "facing=south,part=corner_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left"
+    },
+    "facing=south,part=corner_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left_cornice"
+    },
+    "facing=south,part=corner_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left"
+    },
+    "facing=south,part=corner_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left"
+    },
+    "facing=south,part=corner_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right"
+    },
+    "facing=south,part=corner_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right_cornice"
+    },
+    "facing=south,part=corner_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right"
+    },
+    "facing=south,part=corner_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right"
+    },
+    "facing=south,part=head,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head"
+    },
+    "facing=south,part=head,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head_cornice"
+    },
+    "facing=south,part=head,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head"
+    },
+    "facing=south,part=head,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head"
+    },
+    "facing=south,part=jamb_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_chair_rail"
+    },
+    "facing=south,part=jamb_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_cornice"
+    },
+    "facing=south,part=jamb_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left"
+    },
+    "facing=south,part=jamb_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_skirting"
+    },
+    "facing=south,part=jamb_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_chair_rail"
+    },
+    "facing=south,part=jamb_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_cornice"
+    },
+    "facing=south,part=jamb_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right"
+    },
+    "facing=south,part=jamb_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_skirting"
+    },
+    "facing=west,part=corner_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 90
+    },
+    "facing=west,part=corner_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left_cornice",
+      "y": 90
+    },
+    "facing=west,part=corner_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 90
+    },
+    "facing=west,part=corner_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_left",
+      "y": 90
+    },
+    "facing=west,part=corner_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 90
+    },
+    "facing=west,part=corner_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right_cornice",
+      "y": 90
+    },
+    "facing=west,part=corner_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 90
+    },
+    "facing=west,part=corner_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_corner_right",
+      "y": 90
+    },
+    "facing=west,part=head,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 90
+    },
+    "facing=west,part=head,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head_cornice",
+      "y": 90
+    },
+    "facing=west,part=head,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 90
+    },
+    "facing=west,part=head,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_head",
+      "y": 90
+    },
+    "facing=west,part=jamb_left,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_chair_rail",
+      "y": 90
+    },
+    "facing=west,part=jamb_left,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_cornice",
+      "y": 90
+    },
+    "facing=west,part=jamb_left,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left",
+      "y": 90
+    },
+    "facing=west,part=jamb_left,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_left_skirting",
+      "y": 90
+    },
+    "facing=west,part=jamb_right,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_chair_rail",
+      "y": 90
+    },
+    "facing=west,part=jamb_right,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_cornice",
+      "y": 90
+    },
+    "facing=west,part=jamb_right,trim=none": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right",
+      "y": 90
+    },
+    "facing=west,part=jamb_right,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_door_casing/casing_jamb_right_skirting",
+      "y": 90
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/skiff/template/hull_block",
+  "textures": {
+    "in": "heavyseas:block/skiff/hull_inner",
+    "out": "heavyseas:block/skiff/hull_boot",
+    "particle": "heavyseas:block/skiff/hull_boot",
+    "top": "heavyseas:block/skiff/hull_top"
+  }
+}

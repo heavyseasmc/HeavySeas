@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/chest_of_drawers",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/chest_of_drawers",
+    "particle": "heavyseas:block/liner/prop/chest_of_drawers"
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "variants": {
+    "facing=east,open=false,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_0",
+      "y": 90
+    },
+    "facing=east,open=false,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_1",
+      "y": 90
+    },
+    "facing=east,open=false,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_0",
+      "y": 90
+    },
+    "facing=east,open=false,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_1",
+      "y": 90
+    },
+    "facing=east,open=false,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0",
+      "y": 90
+    },
+    "facing=east,open=false,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1",
+      "y": 90
+    },
+    "facing=east,open=true,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_0",
+      "y": 90
+    },
+    "facing=east,open=true,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_1",
+      "y": 90
+    },
+    "facing=east,open=true,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_0",
+      "y": 90
+    },
+    "facing=east,open=true,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_1",
+      "y": 90
+    },
+    "facing=east,open=true,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0",
+      "y": 90
+    },
+    "facing=east,open=true,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1",
+      "y": 90
+    },
+    "facing=north,open=false,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_0"
+    },
+    "facing=north,open=false,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_1"
+    },
+    "facing=north,open=false,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_0"
+    },
+    "facing=north,open=false,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_1"
+    },
+    "facing=north,open=false,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0"
+    },
+    "facing=north,open=false,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1"
+    },
+    "facing=north,open=true,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_0"
+    },
+    "facing=north,open=true,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_1"
+    },
+    "facing=north,open=true,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_0"
+    },
+    "facing=north,open=true,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_1"
+    },
+    "facing=north,open=true,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0"
+    },
+    "facing=north,open=true,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1"
+    },
+    "facing=south,open=false,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_0",
+      "y": 180
+    },
+    "facing=south,open=false,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_1",
+      "y": 180
+    },
+    "facing=south,open=false,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_0",
+      "y": 180
+    },
+    "facing=south,open=false,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_1",
+      "y": 180
+    },
+    "facing=south,open=false,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0",
+      "y": 180
+    },
+    "facing=south,open=false,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1",
+      "y": 180
+    },
+    "facing=south,open=true,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_0",
+      "y": 180
+    },
+    "facing=south,open=true,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_1",
+      "y": 180
+    },
+    "facing=south,open=true,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_0",
+      "y": 180
+    },
+    "facing=south,open=true,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_1",
+      "y": 180
+    },
+    "facing=south,open=true,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0",
+      "y": 180
+    },
+    "facing=south,open=true,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1",
+      "y": 180
+    },
+    "facing=west,open=false,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_0",
+      "y": 270
+    },
+    "facing=west,open=false,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_closed_hull/buff_1",
+      "y": 270
+    },
+    "facing=west,open=false,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_0",
+      "y": 270
+    },
+    "facing=west,open=false,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_closed_hull/buff_1",
+      "y": 270
+    },
+    "facing=west,open=false,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0",
+      "y": 270
+    },
+    "facing=west,open=false,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1",
+      "y": 270
+    },
+    "facing=west,open=true,part=door_lower,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_0",
+      "y": 270
+    },
+    "facing=west,open=true,part=door_lower,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_lower_open_hull/buff_1",
+      "y": 270
+    },
+    "facing=west,open=true,part=door_upper,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_0",
+      "y": 270
+    },
+    "facing=west,open=true,part=door_upper,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_door_upper_open_hull/buff_1",
+      "y": 270
+    },
+    "facing=west,open=true,part=shaft,row=0": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_0",
+      "y": 270
+    },
+    "facing=west,open=true,part=shaft,row=1": {
+      "model": "heavyseas:block/liner/liner_hollow_mast/prop/hollow_mast_shaft_hull/buff_1",
+      "y": 270
+    }
+  }
+}

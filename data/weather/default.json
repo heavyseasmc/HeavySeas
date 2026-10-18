@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "heavyseas:default",
+  "total": 10,
+  "_comment": [
+    "牌名与规则逐张来自规则基线和仓库内 art/cards/weather 卡面。",
+    "effect 是封闭枚举；展示文本由 lang 提供，不在规则数据里维护第二份。"
+  ],
+  "cards": [
+    { "id": "huge_wave", "effect": "fighters_overboard" },
+    { "id": "sweltering", "effect": "double_water" },
+    { "id": "becalmed", "effect": "skip_navigation" },
+    { "id": "scorching_heat", "effect": "all_thirst" },
+    { "id": "clear_skies", "effect": "reshuffle_discard" },
+    { "id": "dense_fog", "effect": "ignore_gulls" },
+    { "id": "storm", "effect": "rowers_overboard" },
+    { "id": "gale", "effect": "extra_navigation" },
+    { "id": "rain", "effect": "ignore_thirst" },
+    { "id": "sunday", "effect": "extra_provision" }
+  ]
+}

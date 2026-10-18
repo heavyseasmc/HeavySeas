@@ -1,0 +1,184 @@
+{
+  "variants": {
+    "facing=east,part=foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_east",
+      "y": 90
+    },
+    "facing=east,part=foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_west",
+      "y": 90
+    },
+    "facing=east,part=head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_east",
+      "y": 90
+    },
+    "facing=east,part=head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_west",
+      "y": 90
+    },
+    "facing=east,part=top_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_east",
+      "y": 90
+    },
+    "facing=east,part=top_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_west",
+      "y": 90
+    },
+    "facing=east,part=top_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_east",
+      "y": 90
+    },
+    "facing=east,part=top_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_west",
+      "y": 90
+    },
+    "facing=east,part=upper_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_east",
+      "y": 90
+    },
+    "facing=east,part=upper_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_west",
+      "y": 90
+    },
+    "facing=east,part=upper_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_east",
+      "y": 90
+    },
+    "facing=east,part=upper_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_west",
+      "y": 90
+    },
+    "facing=north,part=foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_east"
+    },
+    "facing=north,part=foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_west"
+    },
+    "facing=north,part=head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_east"
+    },
+    "facing=north,part=head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_west"
+    },
+    "facing=north,part=top_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_east"
+    },
+    "facing=north,part=top_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_west"
+    },
+    "facing=north,part=top_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_east"
+    },
+    "facing=north,part=top_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_west"
+    },
+    "facing=north,part=upper_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_east"
+    },
+    "facing=north,part=upper_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_west"
+    },
+    "facing=north,part=upper_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_east"
+    },
+    "facing=north,part=upper_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_west"
+    },
+    "facing=south,part=foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_east",
+      "y": 180
+    },
+    "facing=south,part=foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_west",
+      "y": 180
+    },
+    "facing=south,part=head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_east",
+      "y": 180
+    },
+    "facing=south,part=head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_west",
+      "y": 180
+    },
+    "facing=south,part=top_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_east",
+      "y": 180
+    },
+    "facing=south,part=top_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_west",
+      "y": 180
+    },
+    "facing=south,part=top_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_east",
+      "y": 180
+    },
+    "facing=south,part=top_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_west",
+      "y": 180
+    },
+    "facing=south,part=upper_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_east",
+      "y": 180
+    },
+    "facing=south,part=upper_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_west",
+      "y": 180
+    },
+    "facing=south,part=upper_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_east",
+      "y": 180
+    },
+    "facing=south,part=upper_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_west",
+      "y": 180
+    },
+    "facing=west,part=foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_east",
+      "y": 270
+    },
+    "facing=west,part=foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_foot_west",
+      "y": 270
+    },
+    "facing=west,part=head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_east",
+      "y": 270
+    },
+    "facing=west,part=head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_head_west",
+      "y": 270
+    },
+    "facing=west,part=top_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_east",
+      "y": 270
+    },
+    "facing=west,part=top_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_foot_west",
+      "y": 270
+    },
+    "facing=west,part=top_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_east",
+      "y": 270
+    },
+    "facing=west,part=top_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_top_head_west",
+      "y": 270
+    },
+    "facing=west,part=upper_foot_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_east",
+      "y": 270
+    },
+    "facing=west,part=upper_foot_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_foot_west",
+      "y": 270
+    },
+    "facing=west,part=upper_head_east": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_east",
+      "y": 270
+    },
+    "facing=west,part=upper_head_west": {
+      "model": "heavyseas:block/liner/liner_four_poster_bed/prop/four_poster_bed_upper_head_west",
+      "y": 270
+    }
+  }
+}

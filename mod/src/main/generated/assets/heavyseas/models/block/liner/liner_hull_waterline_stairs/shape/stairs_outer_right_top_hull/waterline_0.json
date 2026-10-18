@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/shape/stairs_outer_right_top",
+  "textures": {
+    "down": "heavyseas:block/liner/hull/red_top",
+    "particle": "heavyseas:block/liner/hull/waterline_0",
+    "side": "heavyseas:block/liner/hull/waterline_0",
+    "up": "heavyseas:block/liner/hull/red_top"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/block", "ambientocclusion": false, "textures": {"particle": "#f"},
+  "elements": [
+    {"from": [5, 3, 0], "to": [11, 13, 0.75], "faces": {"south": {"texture": "#f", "uv": [0, 0, 8, 8]}, "east": {"texture": "#f", "uv": [8, 0, 16, 1]}, "west": {"texture": "#f", "uv": [8, 0, 16, 1]}, "up": {"texture": "#f", "uv": [8, 0, 16, 1]}, "down": {"texture": "#f", "uv": [8, 0, 16, 1]}, "north": {"texture": "#f", "uv": [0, 0, 8, 8], "cullface": "north"}}},
+    {"from": [6, 5, 0.75], "to": [10, 11, 1.25], "faces": {"south": {"texture": "#f", "uv": [8, 1, 16, 3]}, "east": {"texture": "#f", "uv": [8, 0, 16, 1]}, "west": {"texture": "#f", "uv": [8, 0, 16, 1]}, "up": {"texture": "#f", "uv": [8, 0, 16, 1]}, "down": {"texture": "#f", "uv": [8, 0, 16, 1]}}},
+    {"from": [7, 6.5, 1.25], "to": [9, 9.5, 2.25], "faces": {"south": {"texture": "#f", "uv": [8, 3, 12, 6]}, "east": {"texture": "#f", "uv": [8, 0, 16, 1]}, "west": {"texture": "#f", "uv": [8, 0, 16, 1]}, "up": {"texture": "#f", "uv": [8, 0, 16, 1]}, "down": {"texture": "#f", "uv": [8, 0, 16, 1]}}}
+  ]
+}

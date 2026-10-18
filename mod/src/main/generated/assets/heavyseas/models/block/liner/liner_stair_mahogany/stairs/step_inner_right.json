@@ -1,0 +1,11 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/step_inner_right",
+  "textures": {
+    "n": "heavyseas:block/liner/stairs/nosing",
+    "particle": "heavyseas:block/liner/stairs/string",
+    "r": "heavyseas:block/liner/stairs/riser_mahogany",
+    "s": "heavyseas:block/liner/stairs/string",
+    "t": "heavyseas:block/liner/stairs/tread_mahogany",
+    "u": "heavyseas:block/liner/stairs/soffit"
+  }
+}

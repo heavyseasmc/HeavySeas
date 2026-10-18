@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/skirting_outer_right",
+  "textures": {
+    "k": "heavyseas:block/liner/skirting",
+    "particle": "heavyseas:block/liner/skirting"
+  }
+}

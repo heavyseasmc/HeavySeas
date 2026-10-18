@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "facing=east,oar=false,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 90
+    },
+    "facing=east,oar=false,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 90
+    },
+    "facing=east,oar=false,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 270
+    },
+    "facing=east,oar=false,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 270
+    },
+    "facing=east,oar=true,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar",
+      "y": 90
+    },
+    "facing=east,oar=true,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_l",
+      "y": 90
+    },
+    "facing=east,oar=true,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar",
+      "y": 270
+    },
+    "facing=east,oar=true,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_r",
+      "y": 270
+    },
+    "facing=north,oar=false,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock"
+    },
+    "facing=north,oar=false,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock"
+    },
+    "facing=north,oar=false,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 180
+    },
+    "facing=north,oar=false,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 180
+    },
+    "facing=north,oar=true,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar"
+    },
+    "facing=north,oar=true,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_l"
+    },
+    "facing=north,oar=true,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar",
+      "y": 180
+    },
+    "facing=north,oar=true,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_r",
+      "y": 180
+    },
+    "facing=south,oar=false,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 180
+    },
+    "facing=south,oar=false,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 180
+    },
+    "facing=south,oar=false,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock"
+    },
+    "facing=south,oar=false,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock"
+    },
+    "facing=south,oar=true,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar",
+      "y": 180
+    },
+    "facing=south,oar=true,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_l",
+      "y": 180
+    },
+    "facing=south,oar=true,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar"
+    },
+    "facing=south,oar=true,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_r"
+    },
+    "facing=west,oar=false,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 270
+    },
+    "facing=west,oar=false,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 270
+    },
+    "facing=west,oar=false,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 90
+    },
+    "facing=west,oar=false,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock",
+      "y": 90
+    },
+    "facing=west,oar=true,side=left,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar",
+      "y": 270
+    },
+    "facing=west,oar=true,side=left,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_l",
+      "y": 270
+    },
+    "facing=west,oar=true,side=right,stroke=false": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar",
+      "y": 90
+    },
+    "facing=west,oar=true,side=right,stroke=true": {
+      "model": "heavyseas:block/skiff/skiff_rowlock/rowlock_oar_stroke_r",
+      "y": 90
+    }
+  }
+}

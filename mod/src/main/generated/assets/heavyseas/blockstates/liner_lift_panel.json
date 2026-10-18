@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_lift_panel/lift/panel",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_lift_panel/lift/panel",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_lift_panel/lift/panel"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_lift_panel/lift/panel",
+      "y": 90
+    }
+  }
+}

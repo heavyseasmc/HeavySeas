@@ -1,0 +1,586 @@
+{
+  "schema_version": 1,
+  "id": "heavyseas:default",
+  "total": 31,
+  "_comment": [
+    "航海牌。结算顺序固定：海鸥 → 落海 → 口渴，不可颠倒。",
+    "gull：+1 放一只海鸥，-1 移除一只，0 无海鸥。攒满 4 只，游戏当场结束。",
+    "名单模式：list 所列之人 / except 除所列之外的所有人 / all 所有人 / none 无人 / conditional 满足 condition 的人。",
+    "thirst_fighters：本回合参与过战斗者口渴；thirst_rowers：本回合划过船者口渴。",
+    "角色 id 与 data/roster 共用主键；condition 里的物资 id 与 data/provisions 共用主键。"
+  ],
+  "cards": [
+    {
+      "id": "nav_00",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "captain"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "sailor"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_01",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "captain"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_02",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "captain"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "collector"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_03",
+      "gull": 1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "collector"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "kid"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_04",
+      "gull": 0,
+      "overboard": {
+        "mode": "conditional",
+        "condition": "used_rum"
+      },
+      "thirst": {
+        "mode": "except",
+        "characters": [
+          "mate",
+          "jeweler",
+          "collector"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_05",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "doctor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "doctor"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_06",
+      "gull": 1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "sailor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate",
+          "collector"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_07",
+      "gull": 1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "doctor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_08",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "sailor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate",
+          "sailor",
+          "collector"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_09",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "kid"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate",
+          "sailor",
+          "kid"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_10",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "hostess"
+        ]
+      },
+      "thirst": {
+        "mode": "except",
+        "characters": [
+          "captain",
+          "doctor",
+          "hostess",
+          "kid"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_11",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "mate"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "sailor"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_12",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "doctor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "doctor",
+          "mate"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_13",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "collector"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate",
+          "sailor"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_14",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "collector"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "collector"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_15",
+      "gull": 1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "captain"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "mate"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_16",
+      "gull": 1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "hostess"
+        ]
+      },
+      "thirst": {
+        "mode": "except",
+        "characters": [
+          "jeweler",
+          "hostess",
+          "collector",
+          "kid"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_17",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "mate"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_18",
+      "gull": 1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "mate"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "kid"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_19",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "sailor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate",
+          "kid"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_20",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "sailor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate",
+          "jeweler"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_21",
+      "gull": -1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "jeweler"
+        ]
+      },
+      "thirst": {
+        "mode": "except",
+        "characters": [
+          "kid"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_22",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "doctor"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "sailor",
+          "collector"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_23",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "kid"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "mate",
+          "sailor",
+          "jeweler"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_24",
+      "gull": 1,
+      "overboard": {
+        "mode": "all"
+      },
+      "thirst": {
+        "mode": "all"
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_25",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "mate"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "jeweler"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_26",
+      "gull": 1,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "kid"
+        ]
+      },
+      "thirst": {
+        "mode": "except",
+        "characters": [
+          "jeweler"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": true
+    },
+    {
+      "id": "nav_27",
+      "gull": 0,
+      "overboard": {
+        "mode": "all"
+      },
+      "thirst": {
+        "mode": "all"
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_28",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "collector"
+        ]
+      },
+      "thirst": {
+        "mode": "list",
+        "characters": [
+          "captain",
+          "jeweler"
+        ]
+      },
+      "thirst_fighters": true,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_29",
+      "gull": 1,
+      "overboard": {
+        "mode": "none"
+      },
+      "thirst": {
+        "mode": "none"
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": false
+    },
+    {
+      "id": "nav_30",
+      "gull": 0,
+      "overboard": {
+        "mode": "list",
+        "characters": [
+          "kid"
+        ]
+      },
+      "thirst": {
+        "mode": "except",
+        "characters": [
+          "kid"
+        ]
+      },
+      "thirst_fighters": false,
+      "thirst_rowers": true
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {"particle": "#b"},
+  "elements": [
+    {"from": [2, 0, 6.5], "to": [5, 16, 10.5], "faces": {"north": {"uv": [1.0, 3.0, 1.75, 7.0], "texture": "#b"}, "south": {"uv": [1.0, 3.0, 1.75, 7.0], "texture": "#b"}, "east": {"uv": [0.0, 3.0, 1.0, 7.0], "texture": "#b"}, "west": {"uv": [0.0, 3.0, 1.0, 7.0], "texture": "#b"}}}
+  ]
+}

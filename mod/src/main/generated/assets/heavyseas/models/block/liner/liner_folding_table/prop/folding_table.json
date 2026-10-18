@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/folding_table",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/folding_table",
+    "particle": "heavyseas:block/liner/prop/folding_table"
+  }
+}

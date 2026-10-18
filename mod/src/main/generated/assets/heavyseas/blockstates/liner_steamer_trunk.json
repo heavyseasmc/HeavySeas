@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=east,open=false": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk",
+      "y": 90
+    },
+    "facing=east,open=true": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk",
+      "y": 90
+    },
+    "facing=north,open=false": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk"
+    },
+    "facing=north,open=true": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk"
+    },
+    "facing=south,open=false": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk",
+      "y": 180
+    },
+    "facing=south,open=true": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk",
+      "y": 180
+    },
+    "facing=west,open=false": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk",
+      "y": 270
+    },
+    "facing=west,open=true": {
+      "model": "heavyseas:block/liner/liner_steamer_trunk/prop/rig_steamer_trunk",
+      "y": 270
+    }
+  }
+}

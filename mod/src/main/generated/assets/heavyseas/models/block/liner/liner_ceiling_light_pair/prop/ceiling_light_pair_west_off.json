@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/ceiling_light_pair_west_off",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/ceiling_light",
+    "g": "heavyseas:block/liner/prop/ceiling_light_glass_off",
+    "particle": "heavyseas:block/liner/prop/ceiling_light"
+  }
+}

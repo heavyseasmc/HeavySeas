@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/cornice_thin_inner_right",
+  "textures": {
+    "n": "heavyseas:block/liner/cornice_thin",
+    "particle": "heavyseas:block/liner/cornice_thin"
+  }
+}

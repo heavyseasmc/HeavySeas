@@ -1,0 +1,139 @@
+{
+  "variants": {
+    "facing=east,part=wide_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_east",
+      "y": 90
+    },
+    "facing=east,part=wide_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_mid",
+      "y": 90
+    },
+    "facing=east,part=wide_top_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_east",
+      "y": 90
+    },
+    "facing=east,part=wide_top_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_mid",
+      "y": 90
+    },
+    "facing=east,part=wide_top_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_west",
+      "y": 90
+    },
+    "facing=east,part=wide_upper_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_east",
+      "y": 90
+    },
+    "facing=east,part=wide_upper_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_mid",
+      "y": 90
+    },
+    "facing=east,part=wide_upper_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_west",
+      "y": 90
+    },
+    "facing=east,part=wide_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_west",
+      "y": 90
+    },
+    "facing=north,part=wide_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_east"
+    },
+    "facing=north,part=wide_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_mid"
+    },
+    "facing=north,part=wide_top_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_east"
+    },
+    "facing=north,part=wide_top_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_mid"
+    },
+    "facing=north,part=wide_top_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_west"
+    },
+    "facing=north,part=wide_upper_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_east"
+    },
+    "facing=north,part=wide_upper_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_mid"
+    },
+    "facing=north,part=wide_upper_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_west"
+    },
+    "facing=north,part=wide_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_west"
+    },
+    "facing=south,part=wide_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_east",
+      "y": 180
+    },
+    "facing=south,part=wide_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_mid",
+      "y": 180
+    },
+    "facing=south,part=wide_top_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_east",
+      "y": 180
+    },
+    "facing=south,part=wide_top_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_mid",
+      "y": 180
+    },
+    "facing=south,part=wide_top_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_west",
+      "y": 180
+    },
+    "facing=south,part=wide_upper_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_east",
+      "y": 180
+    },
+    "facing=south,part=wide_upper_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_mid",
+      "y": 180
+    },
+    "facing=south,part=wide_upper_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_west",
+      "y": 180
+    },
+    "facing=south,part=wide_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_west",
+      "y": 180
+    },
+    "facing=west,part=wide_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_east",
+      "y": 270
+    },
+    "facing=west,part=wide_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_mid",
+      "y": 270
+    },
+    "facing=west,part=wide_top_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_east",
+      "y": 270
+    },
+    "facing=west,part=wide_top_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_mid",
+      "y": 270
+    },
+    "facing=west,part=wide_top_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_top_west",
+      "y": 270
+    },
+    "facing=west,part=wide_upper_east": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_east",
+      "y": 270
+    },
+    "facing=west,part=wide_upper_mid": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_mid",
+      "y": 270
+    },
+    "facing=west,part=wide_upper_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_upper_west",
+      "y": 270
+    },
+    "facing=west,part=wide_west": {
+      "model": "heavyseas:block/liner/liner_mirror/prop/mirror_wide_west",
+      "y": 270
+    }
+  }
+}

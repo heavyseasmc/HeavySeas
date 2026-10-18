@@ -1,0 +1,328 @@
+{
+  "variants": {
+    "cell=0,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0_hull/red_0_hull/red_0_hull/red_0"
+    },
+    "cell=0,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0_hull/red_0_hull/red_0_hull/red_0"
+    },
+    "cell=0,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0_hull/red_0_hull/red_0_hull/red_0"
+    },
+    "cell=0,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0_hull/red_0_hull/red_0_hull/red_0"
+    },
+    "cell=0,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0_hull/red_0_hull/red_0_hull/red_0"
+    },
+    "cell=0,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0_hull/red_0_hull/red_0_hull/red_0"
+    },
+    "cell=1,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1_hull/red_1_hull/red_1_hull/red_1"
+    },
+    "cell=1,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1_hull/red_1_hull/red_1_hull/red_1"
+    },
+    "cell=1,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1_hull/red_1_hull/red_1_hull/red_1"
+    },
+    "cell=1,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1_hull/red_1_hull/red_1_hull/red_1"
+    },
+    "cell=1,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1_hull/red_1_hull/red_1_hull/red_1"
+    },
+    "cell=1,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1_hull/red_1_hull/red_1_hull/red_1"
+    },
+    "cell=10,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0l_hull/red_0r_hull/red_0r_hull/red_0l"
+    },
+    "cell=10,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0l_hull/red_0r_hull/red_0r_hull/red_0l"
+    },
+    "cell=10,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0l_hull/red_0r_hull/red_0r_hull/red_0l"
+    },
+    "cell=10,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0l_hull/red_0r_hull/red_0r_hull/red_0l"
+    },
+    "cell=10,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0l_hull/red_0r_hull/red_0r_hull/red_0l"
+    },
+    "cell=10,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0l_hull/red_0r_hull/red_0r_hull/red_0l"
+    },
+    "cell=11,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1l_hull/red_1r_hull/red_1r_hull/red_1l"
+    },
+    "cell=11,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1l_hull/red_1r_hull/red_1r_hull/red_1l"
+    },
+    "cell=11,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1l_hull/red_1r_hull/red_1r_hull/red_1l"
+    },
+    "cell=11,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1l_hull/red_1r_hull/red_1r_hull/red_1l"
+    },
+    "cell=11,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1l_hull/red_1r_hull/red_1r_hull/red_1l"
+    },
+    "cell=11,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1l_hull/red_1r_hull/red_1r_hull/red_1l"
+    },
+    "cell=12,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0_hull/red_0_hull/red_0l_hull/red_0r"
+    },
+    "cell=12,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0_hull/red_0_hull/red_0l_hull/red_0r"
+    },
+    "cell=12,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0_hull/red_0_hull/red_0l_hull/red_0r"
+    },
+    "cell=12,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0_hull/red_0_hull/red_0l_hull/red_0r"
+    },
+    "cell=12,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0_hull/red_0_hull/red_0l_hull/red_0r"
+    },
+    "cell=12,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0_hull/red_0_hull/red_0l_hull/red_0r"
+    },
+    "cell=13,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1_hull/red_1_hull/red_1l_hull/red_1r"
+    },
+    "cell=13,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1_hull/red_1_hull/red_1l_hull/red_1r"
+    },
+    "cell=13,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1_hull/red_1_hull/red_1l_hull/red_1r"
+    },
+    "cell=13,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1_hull/red_1_hull/red_1l_hull/red_1r"
+    },
+    "cell=13,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1_hull/red_1_hull/red_1l_hull/red_1r"
+    },
+    "cell=13,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1_hull/red_1_hull/red_1l_hull/red_1r"
+    },
+    "cell=14,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0r_hull/red_0l_hull/red_0l_hull/red_0r"
+    },
+    "cell=14,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0r_hull/red_0l_hull/red_0l_hull/red_0r"
+    },
+    "cell=14,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0r_hull/red_0l_hull/red_0l_hull/red_0r"
+    },
+    "cell=14,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0r_hull/red_0l_hull/red_0l_hull/red_0r"
+    },
+    "cell=14,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0r_hull/red_0l_hull/red_0l_hull/red_0r"
+    },
+    "cell=14,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0r_hull/red_0l_hull/red_0l_hull/red_0r"
+    },
+    "cell=15,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1r_hull/red_1l_hull/red_1l_hull/red_1r"
+    },
+    "cell=15,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1r_hull/red_1l_hull/red_1l_hull/red_1r"
+    },
+    "cell=15,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1r_hull/red_1l_hull/red_1l_hull/red_1r"
+    },
+    "cell=15,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1r_hull/red_1l_hull/red_1l_hull/red_1r"
+    },
+    "cell=15,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1r_hull/red_1l_hull/red_1l_hull/red_1r"
+    },
+    "cell=15,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1r_hull/red_1l_hull/red_1l_hull/red_1r"
+    },
+    "cell=16,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0l_hull/red_0r_hull/red_0l_hull/red_0r"
+    },
+    "cell=16,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0l_hull/red_0r_hull/red_0l_hull/red_0r"
+    },
+    "cell=16,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0l_hull/red_0r_hull/red_0l_hull/red_0r"
+    },
+    "cell=16,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0l_hull/red_0r_hull/red_0l_hull/red_0r"
+    },
+    "cell=16,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0l_hull/red_0r_hull/red_0l_hull/red_0r"
+    },
+    "cell=16,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0l_hull/red_0r_hull/red_0l_hull/red_0r"
+    },
+    "cell=17,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1l_hull/red_1r_hull/red_1l_hull/red_1r"
+    },
+    "cell=17,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1l_hull/red_1r_hull/red_1l_hull/red_1r"
+    },
+    "cell=17,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1l_hull/red_1r_hull/red_1l_hull/red_1r"
+    },
+    "cell=17,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1l_hull/red_1r_hull/red_1l_hull/red_1r"
+    },
+    "cell=17,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1l_hull/red_1r_hull/red_1l_hull/red_1r"
+    },
+    "cell=17,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1l_hull/red_1r_hull/red_1l_hull/red_1r"
+    },
+    "cell=2,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0r_hull/red_0l_hull/red_0_hull/red_0"
+    },
+    "cell=2,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0r_hull/red_0l_hull/red_0_hull/red_0"
+    },
+    "cell=2,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0r_hull/red_0l_hull/red_0_hull/red_0"
+    },
+    "cell=2,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0r_hull/red_0l_hull/red_0_hull/red_0"
+    },
+    "cell=2,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0r_hull/red_0l_hull/red_0_hull/red_0"
+    },
+    "cell=2,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0r_hull/red_0l_hull/red_0_hull/red_0"
+    },
+    "cell=3,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1r_hull/red_1l_hull/red_1_hull/red_1"
+    },
+    "cell=3,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1r_hull/red_1l_hull/red_1_hull/red_1"
+    },
+    "cell=3,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1r_hull/red_1l_hull/red_1_hull/red_1"
+    },
+    "cell=3,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1r_hull/red_1l_hull/red_1_hull/red_1"
+    },
+    "cell=3,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1r_hull/red_1l_hull/red_1_hull/red_1"
+    },
+    "cell=3,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1r_hull/red_1l_hull/red_1_hull/red_1"
+    },
+    "cell=4,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0l_hull/red_0r_hull/red_0_hull/red_0"
+    },
+    "cell=4,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0l_hull/red_0r_hull/red_0_hull/red_0"
+    },
+    "cell=4,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0l_hull/red_0r_hull/red_0_hull/red_0"
+    },
+    "cell=4,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0l_hull/red_0r_hull/red_0_hull/red_0"
+    },
+    "cell=4,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0l_hull/red_0r_hull/red_0_hull/red_0"
+    },
+    "cell=4,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0l_hull/red_0r_hull/red_0_hull/red_0"
+    },
+    "cell=5,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1l_hull/red_1r_hull/red_1_hull/red_1"
+    },
+    "cell=5,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1l_hull/red_1r_hull/red_1_hull/red_1"
+    },
+    "cell=5,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1l_hull/red_1r_hull/red_1_hull/red_1"
+    },
+    "cell=5,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1l_hull/red_1r_hull/red_1_hull/red_1"
+    },
+    "cell=5,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1l_hull/red_1r_hull/red_1_hull/red_1"
+    },
+    "cell=5,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1l_hull/red_1r_hull/red_1_hull/red_1"
+    },
+    "cell=6,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0_hull/red_0_hull/red_0r_hull/red_0l"
+    },
+    "cell=6,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0_hull/red_0_hull/red_0r_hull/red_0l"
+    },
+    "cell=6,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0_hull/red_0_hull/red_0r_hull/red_0l"
+    },
+    "cell=6,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0_hull/red_0_hull/red_0r_hull/red_0l"
+    },
+    "cell=6,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0_hull/red_0_hull/red_0r_hull/red_0l"
+    },
+    "cell=6,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0_hull/red_0_hull/red_0r_hull/red_0l"
+    },
+    "cell=7,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1_hull/red_1_hull/red_1r_hull/red_1l"
+    },
+    "cell=7,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1_hull/red_1_hull/red_1r_hull/red_1l"
+    },
+    "cell=7,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1_hull/red_1_hull/red_1r_hull/red_1l"
+    },
+    "cell=7,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1_hull/red_1_hull/red_1r_hull/red_1l"
+    },
+    "cell=7,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1_hull/red_1_hull/red_1r_hull/red_1l"
+    },
+    "cell=7,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1_hull/red_1_hull/red_1r_hull/red_1l"
+    },
+    "cell=8,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0r_hull/red_0l_hull/red_0r_hull/red_0l"
+    },
+    "cell=8,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_0r_hull/red_0l_hull/red_0r_hull/red_0l"
+    },
+    "cell=8,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0r_hull/red_0l_hull/red_0r_hull/red_0l"
+    },
+    "cell=8,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_0r_hull/red_0l_hull/red_0r_hull/red_0l"
+    },
+    "cell=8,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0r_hull/red_0l_hull/red_0r_hull/red_0l"
+    },
+    "cell=8,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_0r_hull/red_0l_hull/red_0r_hull/red_0l"
+    },
+    "cell=9,type=bottom,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1r_hull/red_1l_hull/red_1r_hull/red_1l"
+    },
+    "cell=9,type=bottom,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_bottom_hull/red_1r_hull/red_1l_hull/red_1r_hull/red_1l"
+    },
+    "cell=9,type=double,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1r_hull/red_1l_hull/red_1r_hull/red_1l"
+    },
+    "cell=9,type=double,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/hull/plate_hull/red_1r_hull/red_1l_hull/red_1r_hull/red_1l"
+    },
+    "cell=9,type=top,waterlogged=false": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1r_hull/red_1l_hull/red_1r_hull/red_1l"
+    },
+    "cell=9,type=top,waterlogged=true": {
+      "model": "heavyseas:block/liner/liner_hull_red_slab/shape/slab_top_hull/red_1r_hull/red_1l_hull/red_1r_hull/red_1l"
+    }
+  }
+}

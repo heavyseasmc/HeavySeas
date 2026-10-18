@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/skiff/template/yard_furled",
+  "textures": {
+    "f": "heavyseas:block/skiff/sail_furled",
+    "particle": "heavyseas:block/skiff/teak_rail",
+    "r": "heavyseas:block/skiff/teak_rail"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/longcase_clock_upper",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/longcase_clock",
+    "particle": "heavyseas:block/liner/prop/longcase_clock"
+  }
+}

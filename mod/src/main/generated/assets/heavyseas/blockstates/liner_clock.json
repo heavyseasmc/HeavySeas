@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/liner/liner_clock/stairs/clock",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/liner/liner_clock/stairs/clock",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/liner/liner_clock/stairs/clock"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/liner/liner_clock/stairs/clock",
+      "y": 90
+    }
+  }
+}

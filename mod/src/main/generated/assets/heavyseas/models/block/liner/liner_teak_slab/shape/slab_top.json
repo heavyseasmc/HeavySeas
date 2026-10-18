@@ -1,0 +1,12 @@
+{
+  "parent": "heavyseas:block/liner/template/shape/slab_top",
+  "textures": {
+    "down": "heavyseas:block/liner/teak_side",
+    "east": "heavyseas:block/liner/teak_side",
+    "north": "heavyseas:block/liner/teak_side",
+    "particle": "heavyseas:block/liner/teak_deck",
+    "south": "heavyseas:block/liner/teak_side",
+    "up": "heavyseas:block/liner/teak_deck",
+    "west": "heavyseas:block/liner/teak_side"
+  }
+}

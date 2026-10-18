@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/lift/call_off",
+  "textures": {
+    "f": "heavyseas:block/liner/lift/fitting",
+    "particle": "heavyseas:block/liner/lift/fitting"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "variants": {
+    "facing=east,part=arm": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_arm",
+      "y": 270
+    },
+    "facing=east,part=pole": {
+      "model": "heavyseas:block/skiff/skiff_mast/pole",
+      "y": 270
+    },
+    "facing=east,part=top": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_top",
+      "y": 270
+    },
+    "facing=north,part=arm": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_arm",
+      "y": 180
+    },
+    "facing=north,part=pole": {
+      "model": "heavyseas:block/skiff/skiff_mast/pole",
+      "y": 180
+    },
+    "facing=north,part=top": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_top",
+      "y": 180
+    },
+    "facing=south,part=arm": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_arm"
+    },
+    "facing=south,part=pole": {
+      "model": "heavyseas:block/skiff/skiff_mast/pole"
+    },
+    "facing=south,part=top": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_top"
+    },
+    "facing=west,part=arm": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_arm",
+      "y": 90
+    },
+    "facing=west,part=pole": {
+      "model": "heavyseas:block/skiff/skiff_mast/pole",
+      "y": 90
+    },
+    "facing=west,part=top": {
+      "model": "heavyseas:block/skiff/skiff_mast/mast_top",
+      "y": 90
+    }
+  }
+}

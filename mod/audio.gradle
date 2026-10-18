@@ -1,0 +1,281 @@
+// Explicit private assembly only. Never wired to build, sourceSets, resources, or sourcesJar.
+// Streams remapJar + allowlisted resources directly, avoiding zipTree extraction of private bytes.
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+
+tasks.register('privateAudioJar') {
+    group = 'private distribution'
+    description = 'Assemble approved private audio with remapJar; requires -PheavyseasAudioDir=<prepared pack>'
+    dependsOn tasks.named('remapJar')
+    // No private input/output snapshots, incremental reuse, build cache, or configuration cache.
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+    notCompatibleWithConfigurationCache('Private resources are read only during explicit task execution')
+    doLast {
+        def fail = { String message -> throw new GradleException("privateAudioJar: ${message}") }
+        def explicit = providers.gradleProperty('heavyseasAudioDir').orNull
+        if (!explicit?.trim()) { fail('Explicit -PheavyseasAudioDir=<prepared pack> is required; no default') }
+        File supplied = new File(explicit)
+        if (!supplied.isAbsolute() || !supplied.isDirectory()) { fail('Audio directory must be an existing absolute path') }
+        File root = supplied.canonicalFile
+        if (root.toPath().startsWith(rootProject.projectDir.canonicalFile.toPath())) { fail('Audio must remain outside the source repository') }
+        def safeName = { String name ->
+            if (!name || name.contains('\\') || name.contains(':') ||
+                    name.split('/', -1).any { !it || it in ['.', '..'] || it.endsWith('.') || it.endsWith(' ') }) {
+                fail("Unsafe entry path: ${name}")
+            }
+        }
+        def fileAt = { String name ->
+            safeName(name)
+            File f = new File(root, name)
+            def cursor = f.toPath()
+            while (cursor != root.toPath()) {
+                if (Files.isSymbolicLink(cursor) || Files.readAttributes(cursor, java.nio.file.attribute.BasicFileAttributes,
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS).isOther()) { fail("Link/reparse point: ${name}") }
+                cursor = cursor.parent
+            }
+            if (!f.isFile() || !f.canonicalFile.toPath().startsWith(root.toPath())) { fail("Missing/escaped file: ${name}") }
+            f
+        }
+        def shaBytes = { byte[] bytes -> MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString() }
+        def shaFile = { File f ->
+            def md = MessageDigest.getInstance('SHA-256')
+            f.withInputStream { stream ->
+                byte[] buffer = new byte[65536]
+                int count
+                while ((count = stream.read(buffer)) != -1) { md.update(buffer, 0, count) }
+            }
+            md.digest().encodeHex().toString()
+        }
+        // JsonSlurper alone silently accepts duplicate keys. Scan decoded keys at each object depth first.
+        def strictJson = { byte[] bytes ->
+            String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+            def stack = []
+            def matcher = (text =~ /"(?:[^"\\]|\\.)*"|[{}\[\]:,]/)
+            while (matcher.find()) {
+                String token = matcher.group()
+                if (token == '{') { stack.add(new HashSet<String>()) }
+                else if (token == '[') { stack.add(null) }
+                else if (token in ['}', ']']) {
+                    if (stack.isEmpty()) { fail('Unbalanced JSON') }
+                    stack.remove(stack.size() - 1)
+                } else if (token.startsWith('"')) {
+                    int after = matcher.end()
+                    while (after < text.length() && Character.isWhitespace(text.charAt(after))) { after++ }
+                    if (after < text.length() && text.charAt(after) == ':'.charAt(0)) {
+                        String key = new JsonSlurper().parseText("[${token}]")[0]
+                        if (stack.isEmpty() || stack.last() == null || !stack.last().add(key)) { fail("Duplicate/invalid JSON key: ${key}") }
+                    }
+                }
+            }
+            if (!stack.isEmpty()) { fail('Unbalanced JSON') }
+            new JsonSlurper().parseText(text)
+        }
+        def jsonAt = { String name -> strictJson(fileAt(name).bytes) }
+        String assets = 'assets/heavyseas/'
+        String provenance = 'META-INF/heavyseas-audio/'
+        String manifestName = provenance + 'manifest.json'
+        byte[] manifestBytes = fileAt(manifestName).bytes
+        def manifest = strictJson(manifestBytes)
+        if (manifest.schema != 'heavyseas.audio.pack' || manifest.version != 1) { fail('Unsupported pack schema') }
+        def approval = jsonAt(provenance + 'approvals.json')
+        if (approval.schema != 'heavyseas.audio.approvals' || approval.version != 1) { fail('Unsupported approval schema') }
+        if (shaFile(fileAt(provenance + 'approvals.json')) != manifest.approvalSha256) { fail('Approval archive hash mismatch') }
+        def index = jsonAt(assets + 'audio-index.json')
+        def sounds = jsonAt(assets + 'sounds.json')
+        def records = manifest.records
+        def decisions = approval.decisions.findAll { k, v -> v.kind == 'audio' && v.status == 'approved' }
+        def ids = decisions.values().collect { it.id } as Set
+        if (index.size() != 162 || index.keySet() != ids || sounds.keySet() != ids || records.keySet() != ids) {
+            fail('Expected matching sets of exactly 162 approved audio events')
+        }
+        if (records.values().count { it.kind == 'sfx' } != 64 || records.values().count { it.kind == 'vo' } != 98) {
+            fail('Expected 64 SFX and 98 English VO')
+        }
+        // Full preparation archive verification is independent of the smaller jar distribution.
+        Set<String> privateAllowed = [assets + 'audio-index.json', assets + 'sounds.json', manifestName,
+                provenance + 'approvals.json', provenance + 'input-manifest.json', provenance + 'NOTICE-audio.txt',
+                'subtitle-proposals/en_us.json', 'subtitle-proposals/zh_cn.json', 'preparation-report.json'] as Set
+        Set<String> distributionFiles = [assets + 'audio-index.json', assets + 'sounds.json',
+                provenance + 'approvals.json', provenance + 'NOTICE-audio.txt'] as Set
+        Set<String> categories = ['ui', 'event', 'ambient', 'world', 'liner', 'vo', 'barks'] as Set
+        index.each { id, item ->
+            if (!(id ==~ /[a-z0-9_]+/) || id.endsWith('_zh') ||
+                    (id.toUpperCase(Locale.ROOT) ==~ /CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9]/)) { fail("Unsafe/non-English id: ${id}") }
+            if (!(item instanceof Map) || item.keySet() != (['path', 'durationMs', 'sha256'] as Set)) { fail("Invalid index schema: ${id}") }
+            def parts = item.path instanceof String ? item.path.split('/', -1) : []
+            if (parts.size() != 2 || !categories.contains(parts[0]) || parts[1] != id) { fail("Invalid resource path: ${id}") }
+            if (!(item.durationMs instanceof Integer || item.durationMs instanceof Long) ||
+                    item.durationMs <= 0 || item.durationMs >= 3600000 || !(item.sha256 ==~ /[0-9a-f]{64}/)) { fail("Invalid index data: ${id}") }
+            def record = records[id]
+            def decision = decisions["audio:${id}".toString()]
+            if (!decision || decision.id != id || decision.kind != 'audio' ||
+                    !(decision.variant instanceof Integer) || decision.variant <= 0 ||
+                    !(decision.sha256 ==~ /[0-9a-f]{64}/) || !(decision.format in ['processed-ogg', 'raw-mp3'])) { fail("Invalid approval: ${id}") }
+            String extension = decision.format == 'processed-ogg' ? 'ogg' : 'mp3'
+            if (decision.src != "candidates/${parts[0]}/${id}/${id}__v${decision.variant}.${extension}") { fail("Approval source mismatch: ${id}") }
+            if (item.any { k, v -> record[k] != v } || record.sourceSha256 != decision.sha256 ||
+                    record.source != decision.src || record.format != decision.format) { fail("Provenance mismatch: ${id}") }
+            if (decision.format == 'processed-ogg' && item.sha256 != decision.sha256) { fail("Approved OGG modified: ${id}") }
+            if (!(record.stream instanceof Boolean) || (id.startsWith('bed_') && !record.stream)) { fail("Invalid streaming flag: ${id}") }
+            def sound = [name: "heavyseas:${item.path}".toString()]
+            if (record.stream) { sound.stream = true }
+            if (sounds[id] != [subtitle: "subtitles.heavyseas.${id}".toString(), sounds: [sound]]) { fail("Sound mapping mismatch: ${id}") }
+            String relative = assets + "sounds/${item.path}.ogg"
+            File audio = fileAt(relative)
+            if (shaFile(audio) != item.sha256) { fail("Audio index hash mismatch: ${id}") }
+            audio.withInputStream { stream ->
+                byte[] magic = new byte[4]
+                if (stream.read(magic) != 4 || new String(magic, 'US-ASCII') != 'OggS') { fail("Not OGG: ${id}") }
+            }
+            String metadata = provenance + "source-metadata/${id}.json"
+            if (record.metadata != metadata) { fail("Invalid metadata path: ${id}") }
+            privateAllowed.add(relative)
+            privateAllowed.add(metadata)
+            distributionFiles.add(relative)
+        }
+        privateAllowed = Collections.unmodifiableSet(new HashSet<String>(privateAllowed))
+        distributionFiles = Collections.unmodifiableSet(new HashSet<String>(distributionFiles))
+        if (!privateAllowed.containsAll(distributionFiles)) { fail('Distribution is not a subset of the verified private archive') }
+        if (manifest.files.keySet() != (privateAllowed - [manifestName])) { fail('Manifest file allowlist mismatch') }
+        Set<String> actual = [] as Set
+        Files.walk(root.toPath()).withCloseable { paths ->
+            paths.forEach { path ->
+                if (path == root.toPath()) { return }
+                def attr = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                if (attr.isSymbolicLink() || attr.isOther()) { fail('Pack contains link/reparse point') }
+                if (attr.isRegularFile()) {
+                    String relative = root.toPath().relativize(path).collect { segment -> segment.toString() }.join('/')
+                    safeName(relative)
+                    actual.add(relative)
+                }
+            }
+        }
+        Set<String> unexpected = actual - privateAllowed
+        Set<String> missing = privateAllowed - actual
+        def duplicateNames = actual.groupBy { it.toLowerCase(Locale.ROOT) }.findAll { name, matches -> matches.size() > 1 }
+        if (!unexpected.isEmpty() || !missing.isEmpty() || !duplicateNames.isEmpty()) {
+            fail("Private archive allowlist mismatch: unexpected=${unexpected.sort()}, missing=${missing.sort()}, " +
+                    "caseDuplicates=${duplicateNames.values()}. Do not run preparation tests concurrently against this pack.")
+        }
+        manifest.files.each { name, expected ->
+            if (!(expected ==~ /[0-9a-f]{64}/) || shaFile(fileAt(name)) != expected) { fail("Manifest hash mismatch: ${name}") }
+        }
+        def proposals = [:]
+        ['en_us', 'zh_cn'].each { locale ->
+            def proposal = jsonAt("subtitle-proposals/${locale}.json")
+            if (proposal.keySet() != ids.collect { "subtitles.heavyseas.${it}".toString() }.toSet() ||
+                    proposal.values().any { !(it instanceof String) || !it.trim() }) { fail("Invalid subtitle proposal: ${locale}") }
+            proposals[assets + "lang/${locale}.json"] = proposal
+        }
+        // The preparation archive stays private. Ship concise provenance, not raw request/plan
+        // metadata, input scripts, local ffmpeg paths, or a manifest referencing absent files.
+        def distributionRecords = [:]
+        records.each { id, record ->
+            def metadata = jsonAt(record.metadata)
+            distributionRecords[id] = [kind: record.kind,
+                generatedAt: metadata.generated_at, model: metadata.model,
+                requestId: (metadata.response ?: [:])['request-id'],
+                path: record.path, source: record.source, sourceSha256: record.sourceSha256,
+                sha256: record.sha256, durationMs: record.durationMs, channels: record.channels,
+                format: record.format, treatment: record.treatment, stream: record.stream]
+        }
+        def cleanProvenance = { String text ->
+            String lower = text.toLowerCase(Locale.ROOT)
+            if (lower.contains('heavyseas-internal') || lower.contains('c:\\users\\') || lower.contains('c:/users/') ||
+                    (text =~ /[A-Za-z]:[\\\/]/).find() || lower.contains('/users/') || lower.contains('/home/')) {
+                fail('Distribution provenance contains a private filesystem path')
+            }
+        }
+        cleanProvenance(JsonOutput.toJson(distributionRecords))
+        cleanProvenance(new String(fileAt(provenance + 'approvals.json').bytes, 'UTF-8'))
+        cleanProvenance(new String(fileAt(provenance + 'NOTICE-audio.txt').bytes, 'UTF-8'))
+        def distributionManifest = [schema: 'heavyseas.audio.distribution', version: 1,
+            approvalSha256: manifest.approvalSha256, counts: [sfx: 64, vo: 98],
+            records: distributionRecords, files: [:]]
+        File publicJar = tasks.named('remapJar').get().archiveFile.get().asFile
+        File destination = layout.buildDirectory.dir('private-audio').get().asFile
+        destination.mkdirs()
+        File target = new File(destination, publicJar.name.replaceFirst(/\.jar$/, '-private-audio.jar'))
+        File partial = new File(destination, target.name + '.partial')
+        Set<String> seen = [] as Set
+        def addEntry = { ZipOutputStream zip, String name, byte[] bytes ->
+            safeName(name)
+            if (!seen.add(name.toLowerCase(Locale.ROOT))) { fail("Duplicate archive entry: ${name}") }
+            def entry = new ZipEntry(name)
+            entry.time = 0L
+            zip.putNextEntry(entry)
+            zip.write(bytes)
+            zip.closeEntry()
+        }
+        try {
+            new ZipFile(publicJar).withCloseable { original ->
+                def entries = Collections.list(original.entries()).findAll { !it.directory }.sort { it.name }
+                Set<String> originalNames = [] as Set
+                entries.each { entry ->
+                    safeName(entry.name)
+                    if (!originalNames.add(entry.name.toLowerCase(Locale.ROOT))) { fail("Duplicate public jar entry: ${entry.name}") }
+                    if (entry.name.startsWith(provenance)) { fail("Public remapJar contains private provenance: ${entry.name}") }
+                    if (entry.name.startsWith(assets + 'sounds/')) {
+                        if (!distributionFiles.contains(entry.name) || original.getInputStream(entry).withCloseable { shaBytes(it.bytes) } != manifest.files[entry.name]) {
+                            fail("Bundled audio differs from approved extension: ${entry.name}")
+                        }
+                    }
+                    if (entry.name in [assets + 'sounds.json', assets + 'audio-index.json']) {
+                        def base = original.getInputStream(entry).withCloseable { strictJson(it.bytes) }
+                        def expanded = entry.name.endsWith('sounds.json') ? sounds : index
+                        if (base.any { k, v -> expanded[k] != v }) { fail("Bundled audio mapping differs: ${entry.name}") }
+                    }
+                }
+                if (!proposals.keySet().every { original.getEntry(it) != null }) { fail('Current public jar is missing language files') }
+                new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(partial))).withCloseable { zip ->
+                    entries.each { entry ->
+                        // Approved shared resources are written once from the validated extension.
+                        if (distributionFiles.contains(entry.name)) { return }
+                        byte[] bytes = original.getInputStream(entry).withCloseable { it.bytes }
+                        if (proposals.containsKey(entry.name)) {
+                            def language = strictJson(bytes)
+                            def originalLanguage = new LinkedHashMap(language)
+                            proposals[entry.name].each { key, value ->
+                                if (language.containsKey(key) && language[key] != value) { fail("Subtitle/public key conflict: ${key}") }
+                                language[key] = value
+                            }
+                            if (originalLanguage.any { key, value -> language[key] != value }) { fail('Public language key changed') }
+                            bytes = (JsonOutput.prettyPrint(JsonOutput.toJson(language)) + '\n').getBytes('UTF-8')
+                            distributionManifest.files[entry.name] = shaBytes(bytes)
+                        }
+                        addEntry(zip, entry.name, bytes)
+                    }
+                    distributionFiles.toList().sort().each { name ->
+                        byte[] bytes = fileAt(name).bytes
+                        if (shaBytes(bytes) != manifest.files[name]) { fail("File changed while packaging: ${name}") }
+                        if (name == provenance + 'NOTICE-audio.txt') {
+                            // Keep the historic preparation record private; distribution uses current scope.
+                            String notice = 'Heavy Seas audio\n\n' +
+                                    'Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0),\n' +
+                                    'to the extent the project holds the necessary rights. Credit: Heavy Seas contributors.\n' +
+                                    'See META-INF/heavyseas-licenses/LICENSE-ASSETS for the full license.\n' +
+                                    'Approval records identify reviewed files, not additional third-party rights.\n\n' +
+                                    records.keySet().sort().collect { id -> "${id}.ogg  ${records[id].path}.ogg  SHA-256 ${records[id].sha256}" }.join('\n') + '\n'
+                            bytes = notice.getBytes('UTF-8')
+                        }
+                        addEntry(zip, name, bytes)
+                        distributionManifest.files[name] = shaBytes(bytes)
+                    }
+                    String provenanceJson = JsonOutput.prettyPrint(JsonOutput.toJson(distributionManifest)) + '\n'
+                    cleanProvenance(provenanceJson)
+                    addEntry(zip, manifestName, provenanceJson.getBytes('UTF-8'))
+                }
+            }
+            Files.move(partial.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(partial.toPath())
+        }
+        logger.lifecycle("Private audio jar (not a public/release artifact): ${target}")
+    }
+}

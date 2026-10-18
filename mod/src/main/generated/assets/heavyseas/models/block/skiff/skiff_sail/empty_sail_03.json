@@ -1,0 +1,6 @@
+{
+  "parent": "heavyseas:block/skiff/template/empty",
+  "textures": {
+    "particle": "heavyseas:block/skiff/sail_03"
+  }
+}

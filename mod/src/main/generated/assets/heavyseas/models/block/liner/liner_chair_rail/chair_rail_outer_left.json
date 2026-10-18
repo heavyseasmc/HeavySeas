@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/chair_rail_outer_left",
+  "textures": {
+    "particle": "heavyseas:block/liner/chair_rail",
+    "t": "heavyseas:block/liner/chair_rail"
+  }
+}

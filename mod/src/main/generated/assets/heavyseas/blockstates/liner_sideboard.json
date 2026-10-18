@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,open=false,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east",
+      "y": 90
+    },
+    "facing=east,open=false,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west",
+      "y": 90
+    },
+    "facing=east,open=true,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east",
+      "y": 90
+    },
+    "facing=east,open=true,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west",
+      "y": 90
+    },
+    "facing=north,open=false,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east"
+    },
+    "facing=north,open=false,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west"
+    },
+    "facing=north,open=true,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east"
+    },
+    "facing=north,open=true,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west"
+    },
+    "facing=south,open=false,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east",
+      "y": 180
+    },
+    "facing=south,open=false,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west",
+      "y": 180
+    },
+    "facing=south,open=true,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east",
+      "y": 180
+    },
+    "facing=south,open=true,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west",
+      "y": 180
+    },
+    "facing=west,open=false,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east",
+      "y": 270
+    },
+    "facing=west,open=false,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west",
+      "y": 270
+    },
+    "facing=west,open=true,part=east": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_east",
+      "y": 270
+    },
+    "facing=west,open=true,part=west": {
+      "model": "heavyseas:block/liner/liner_sideboard/prop/rig_sideboard_west",
+      "y": 270
+    }
+  }
+}

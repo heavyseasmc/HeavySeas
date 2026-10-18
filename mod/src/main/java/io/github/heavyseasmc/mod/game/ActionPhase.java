@@ -1,0 +1,580 @@
+package io.github.heavyseasmc.mod.game;
+
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Provision;
+import io.github.heavyseasmc.engine.model.ProvisionEffect;
+import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.play.Contest;
+import io.github.heavyseasmc.engine.play.Session;
+import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
+import io.github.heavyseasmc.mod.net.RowDecisionC2S;
+import io.github.heavyseasmc.mod.net.UseProvisionC2S;
+import io.github.heavyseasmc.mod.state.GameComponent;
+import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.state.ExperienceView;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * 行动阶段「界面那一条路」：玩家在行动一面与划船一面上按下的那一下，变成 {@link Session} 上的调用。
+ *
+ * <h2>规则不在这里</h2>
+ * 谁能行动、划船抽几张、选中哪张、行动完轮到谁，全在引擎里 —— 与 {@link ProvisionPhase} 同一条分工。
+ * 本类只做三件事：<b>认人、调用、播报</b>，然后交给 {@link GameFlow#finishAction} 推进。
+ *
+ * <h2>掉线保底</h2>
+ * 行动选择给较长窗口，超时按「什么也不做」；划船给较短窗口，超时把这一组牌全部塞回牌堆底。
+ * 截止时间只在服务端判，客户端显示同一份投影，掉线或关界面都不会把整局永久卡住。
+ *
+ * <h2>划船分两步</h2>
+ * 点「划船」时服务端抽 2 张，只写进划船者那一包（{@code GameComponent#writeView}）；他选中一张后，
+ * 服务端把它放进划船堆、其余塞回牌堆底，这次行动随即结束。
+ *
+ * <h2>替身</h2>
+ * 自动推进开着时，轮到替身由 {@link #autoPass} 替它「什么也不做」（ADR-0019）；关着时照旧由 {@code /seas} 驱动 ——
+ * 出口验收（{@code playthrough-check.sh}）关着开关打的那一局靠的就是它。替身的脑子换成随机 / 动脑 / 大模型时，
+ * 它走的也是下面这几个「…ForStandIn」—— 与真人那条路同一套播报、窗口与收尾（{@link StandInPlay} · {@link StandInMinds}）。
+ */
+public final class ActionPhase {
+
+    /** 行动主界面：留一分钟谈判，超时按 Pass。默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。 */
+    public static final long ACTION_MILLIS = 60_000L;
+
+    /** 划船选一张：牌已经看见，只给较短的保底窗口。默认值，同上。 */
+    public static final long ROW_MILLIS = 20_000L;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    private ActionPhase() {
+    }
+
+    /** 客户端来的一下。不是轮到他、不在行动阶段、包里的编码不认识 —— 一律当作没按。 */
+    public static void onChoice(ServerPlayerEntity player, ActionChoiceC2S choice) {
+        Optional<ActionChoiceC2S.Kind> kind = choice.kind();
+        ServerWorld world = player.getServerWorld();
+        GameComponent component = GameComponents.of(world);
+        if (kind.isEmpty() || component.session().isEmpty()) {
+            return;
+        }
+        Session session = component.requireSession();
+        if (session.state().phase() != Phase.ACTION) {
+            return;                       // 包与阶段擦肩而过（比如刚被指令推进了）：忽略
+        }
+        if (session.rower().isPresent()) {
+            return;                       // 划船抽到的牌还没选完：行动一面上再按一次不作数（改过的客户端发得出来）
+        }
+        if (component.provisionTargeter().isPresent()) {
+            return;                       // 医疗箱正在挑目标；旧界面或改过的客户端不能趁机再做一个行动
+        }
+        if (component.designating().isPresent()) {
+            // 举着拳头时只认「取消」这一下；别的一律当作没按（改过的客户端发得出任何东西）。
+            Optional<CharacterId> raised = component.seatOf(player.getUuid());
+            if (kind.get() == ActionChoiceC2S.Kind.CANCEL && raised.isPresent()
+                    && component.designating().get().equals(raised.get())) {
+                DesignationPhase.cancel(world, component, raised.get());
+            }
+            return;
+        }
+        if (kind.get() == ActionChoiceC2S.Kind.CANCEL) {
+            return;                       // 没在举着拳头，没什么可取消的
+        }
+        if (session.contest().isPresent()) {
+            // ❗这一场还没收场：引擎照样会抛（requireNoContest），但抛出来的是一句堆栈 ——
+            //   而这条路上没有「指令出错」那句人话可说，静默丢掉才是对的（ADR-0023）。
+            return;
+        }
+        Optional<CharacterId> actor = session.nextActor();
+        Optional<CharacterId> seat = component.seatOf(player.getUuid());
+        // ❗只认正轮到的那个人本人。不校验的话，任何人都能替别人划船。
+        if (actor.isEmpty() || seat.isEmpty() || !seat.get().equals(actor.get())) {
+            return;
+        }
+        CharacterId who = actor.get();
+        // 与语言无关的一行：验收要从日志里判「界面那条路真的走通了」（专用服务端不加载 lang）。
+        LOGGER.info("行动（界面）：{} 选了 {}", who.value(), kind.get());
+        switch (kind.get()) {
+            case ROW -> beginRow(world, component, player, who);
+            case PASS -> {
+                GameFlow.broadcast(world, Text.translatable("heavyseas.command.passed", GameFlow.characterName(who)), ExperienceView.Source.PLAYER, who.value());
+                GameFlow.finishAction(world, component, who);
+            }
+            // ❗这两件**不是当场生效**：进指定模式，回到世界里看着那个人右键（ADR-0025 · 决策 ⑦）。
+            //   那个预告窗口本身就是谈判游戏的内容 —— GUI 里选目标是瞬发的，那一幕就没有了。
+            case SWAP -> DesignationPhase.begin(world, component, who, Contest.Kind.SWAP);
+            case STEAL -> DesignationPhase.begin(world, component, who, Contest.Kind.STEAL);
+        }
+    }
+
+    /**
+     * 手牌一面上的「打出」，以及医疗箱目标一面的第二步。
+     *
+     * <p>这条路不再借聊天指令：客户端只说「我按了什么」，服务端重新核对阶段、行动者、持牌与效果。
+     * 医疗箱先进入一个只投影给本人的目标菜单；其余特殊行动仍是一键完成。
+     */
+    public static void onUseProvision(ServerPlayerEntity player, UseProvisionC2S action) {
+        ServerWorld world = player.getServerWorld();
+        handleUse(PlayerFeedback.Requester.of(player), PlayerFeedback.Room.of(world), GameComponents.of(world), action);
+    }
+
+    /**
+     * 收包的整条路（生产与单测走同一份）。次序：认人与编号 → 可用性（判据是引擎的 Legal）→ 交给引擎。
+     * 拒绝一律只回给本人（{@link PlayerFeedback#reject}）。
+     */
+    static void handleUse(PlayerFeedback.Requester who, PlayerFeedback.Room room, GameComponent component,
+                          UseProvisionC2S action) {
+        Optional<UseProvisionC2S.Kind> kind = action.kind();
+        if (kind.isEmpty() || component.session().isEmpty()) {
+            return;
+        }
+        Optional<CharacterId> seat = component.seatOf(who.id());
+        if (seat.isEmpty()) {
+            return;
+        }
+        Session session = component.requireSession();
+        if (!PlayerFeedback.admit(who, component, action.stamp(), drinks(session, kind.get(), action.card()))) {
+            return;
+        }
+        CharacterId actor = seat.get();
+        if (kind.get() == UseProvisionC2S.Kind.CANCEL) {
+            if (component.provisionTargeter().map(actor::equals).orElse(false)) {
+                component.clearProvisionTarget();
+                room.sync();
+            }
+            return;
+        }
+
+        if (kind.get() == UseProvisionC2S.Kind.PLAY) {
+            CardAvailability.Block availability = CardAvailability.check(component, actor, action.card(),
+                    ExperienceView.Action.PLAY);
+            if (availability != CardAvailability.Block.NONE) {
+                PlayerFeedback.reject(who, component, availability.text());
+                return;
+            }
+        }
+        if (drinks(session, kind.get(), action.card())) {
+            try {
+                var beforePower = PlayerFeedback.powers(component);
+                session.drinkRum(actor, action.card());
+                PlayerFeedback.drank(room, component, actor, beforePower, ExperienceView.Source.PLAYER);
+                room.sync();
+            } catch (IllegalArgumentException | IllegalStateException rejected) {
+                LOGGER.info("喝酒（界面）：{} 被引擎拒绝：{}", actor.value(), clipForLog(rejected.getMessage()));
+                PlayerFeedback.reject(who, component, CardActions.refusal(rejected).text());
+            }
+            return;
+        }
+        if (session.state().phase() != Phase.ACTION || session.rower().isPresent()
+                || session.contest().isPresent() || component.designating().isPresent()
+                || !session.nextActor().map(actor::equals).orElse(false)) {
+            PlayerFeedback.reject(who, component, CardAvailability.Block.NOT_YOUR_TURN.text());
+            return;
+        }
+
+        try {
+            switch (kind.get()) {
+                case PLAY -> beginOrUse(room, component, actor, action.card());
+                case TARGET -> finishTargetedUse(who, room, component, actor, action.card(), action.target());
+                case CANCEL -> { /* handled above */ }
+            }
+        } catch (RuntimeException e) {
+            // 与指令层同一条：规则拒绝要让真人知道，不把一次无效点击伪装成「包没到」。
+            // ❗异常信息里带着客户端发来的牌 id —— 原样进日志的话，3 万字的乱串一包一行（审查 2026-10-07 L5）：截短、去换行
+            LOGGER.info("特殊物资（界面）：{} 的操作被拒绝：{}", actor.value(), clipForLog(e.getMessage()));
+            // 引擎的异常信息是给日志看的（中文、带 world= 前缀）：给玩家一句按语言走的话（ADR-0095 A8），按异常类型分
+            PlayerFeedback.reject(who, component, CardActions.refusal(e).text());
+            if (component.provisionTargeter().map(actor::equals).orElse(false)) {
+                component.clearProvisionTarget();
+            }
+            room.sync();
+        }
+    }
+
+    /** 这一包是不是喝酒：喝酒随时可以（不占行动），编号只核对局与连接，不认窗口（{@link PlayerFeedback#admit}）。 */
+    private static boolean drinks(Session session, UseProvisionC2S.Kind kind, String card) {
+        return kind == UseProvisionC2S.Kind.PLAY && card != null && session.provisions().has(card)
+                && session.provisions().get(card).effect() instanceof ProvisionEffect.BuffSize;
+    }
+
+    /**
+     * 被抢的人在挑牌那一刻不能喝<b>手里</b>的酒（审查 2026-10-07 C1）：喝酒会先把那瓶亮到面前，与引擎那道
+     * 「挑牌那一刻不能亮牌」（规则 §5 抢夺）是同一个躲法。面前本来就有的那瓶照喝 —— 它不从手里走。
+     * 根上那一道在引擎的 {@code drinkRum}；收包那一侧由 {@link CardAvailability}（Legal.drinks）先拦下。
+     */
+    static boolean drinkRefusedDuringPick(Session session, CharacterId who, String card) {
+        return session.contest().map(c -> c.stage() == Contest.Stage.PICK && c.target().equals(who)).orElse(false)
+                && session.state().stateOf(who).hasInHand(card);
+    }
+
+    /** 客户端带来的字串进日志之前：去掉换行（不让它伪造日志行）、截到 {@value #LOG_CLIP} 字（审查 2026-10-07 L5）。 */
+    static String clipForLog(String text) {
+        if (text == null) {
+            return "null";
+        }
+        String flat = text.replace('\r', ' ').replace('\n', ' ');
+        return flat.length() <= LOG_CLIP ? flat : flat.substring(0, LOG_CLIP) + "…（共 " + flat.length() + " 字）";
+    }
+
+    private static final int LOG_CLIP = 160;
+
+    /** 可用性已经核过（{@link CardAvailability}：Legal.plays 管「有没有伤员 · 有没有尸体 · 伞撑没撑开」），这里只分派。 */
+    private static void beginOrUse(PlayerFeedback.Room room, GameComponent component, CharacterId actor, String cardId) {
+        Session session = component.requireSession();
+        if (component.provisionTargeter().isPresent()) {
+            return;                           // 已经在挑目标；第一步的重包不能把它改成另一张牌
+        }
+        Provision card = session.provisions().get(cardId);
+        if (card.effect() instanceof ProvisionEffect.Heal) {
+            component.beginProvisionTarget(actor, cardId);
+            LOGGER.info("特殊物资（界面）：{} 用 {}，等他挑治疗目标", actor.value(), cardId);
+            room.sync();
+            return;
+        }
+        useUntargeted(room.world(), component, actor, cardId, card.effect());
+    }
+
+    private static void finishTargetedUse(PlayerFeedback.Requester who, PlayerFeedback.Room room, GameComponent component,
+                                          CharacterId actor, String cardId, String targetId) {
+        if (!component.provisionTargeter().map(actor::equals).orElse(false)
+                || !component.provisionTargetCard().equals(cardId)) {
+            PlayerFeedback.reject(who, component, CardAvailability.Block.WINDOW_CLOSED.text());
+            return;
+        }
+        Session session = component.requireSession();
+        CharacterId target = CharacterId.of(targetId);
+        boolean legal = session.state().bySeat().contains(target)
+                && !session.state().isRemoved(target)
+                && session.state().conditionOf(target) != Condition.DEAD
+                && session.state().stateOf(target).damage() > 0;
+        if (!legal) {
+            component.clearProvisionTarget();
+            PlayerFeedback.reject(who, component, Text.translatable("heavyseas.target.no_longer_valid"));
+            room.sync();
+            return;
+        }
+        session.useMedicalKit(actor, target, cardId);
+        component.clearProvisionTarget();
+        room.broadcast(Text.translatable("heavyseas.command.healed",
+                GameFlow.characterName(actor), GameFlow.characterName(target)), ExperienceView.Source.PLAYER, actor.value());
+        LOGGER.info("特殊物资（界面）：{} 用 {} 治了 {}", actor.value(), cardId, target.value());
+        GameFlow.finishAction(room.world(), component, actor);
+    }
+
+    private static void useUntargeted(ServerWorld world, GameComponent component, CharacterId actor,
+                                      String cardId, ProvisionEffect effect) {
+        Session session = component.requireSession();
+        if (effect instanceof ProvisionEffect.PreventThirst) {
+            session.openParasol(actor, cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.opened",
+                    GameFlow.characterName(actor), provisionName(cardId)));
+        } else if (effect instanceof ProvisionEffect.HealAll) {
+            // 绝境不是按一下就生效：其余清醒角色要逐个有机会反对，反对后复用完整战斗状态机。
+            ContestPhase.beginRation(world, component, actor, cardId);
+            return;
+        } else if (effect instanceof ProvisionEffect.WeaponOrSpecial) {
+            int before = session.state().gulls();
+            session.fireSignal(actor, cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.signalled",
+                    GameFlow.characterName(actor), session.state().gulls() - before));
+        } else {
+            throw new IllegalArgumentException("这张特殊物资还没有行动阶段处理器: " + cardId);
+        }
+        LOGGER.info("特殊物资（界面）：{} 打出 {}", actor.value(), cardId);
+        GameFlow.finishAction(world, component, actor);
+    }
+
+    private static Text provisionName(String cardId) {
+        return Text.translatable("heavyseas.provision." + cardId);
+    }
+
+    /**
+     * 划船第一步：抽 2 张到他手上，推一次投影 —— 两张牌只进他那一包，划船一面由此弹出。
+     *
+     * <p>牌堆空到一张都抽不出来时，引擎当场结束这次划船（照样领标记），这里就直接算行动结束。
+     */
+    private static void beginRow(ServerWorld world, GameComponent component, ServerPlayerEntity player,
+                                 CharacterId who) {
+        try {
+            Session session = component.requireSession();
+            List<NavigationCard> drawn = session.beginRow(who);
+            if (session.rower().isPresent()) {
+                component.openActionWindow(component.humanWindow(component.timing().rowMs()));   // 演示局里等真人不限时（用户 2026-10-07）
+            }
+            GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
+            if (session.rower().isEmpty()) {
+                finishRow(world, component, who);
+                return;
+            }
+            LOGGER.info("划船：{} 抽了 {} 张，等他选一张", who.value(), drawn.size());
+            GameComponents.sync(world);
+        } catch (RuntimeException failure) {
+            LOGGER.info("划船（界面）：{} 的操作被拒绝：{}", who.value(), failure.getMessage());
+            // 引擎的异常信息留在日志里；给玩家一句按语言走的话（ADR-0095 A8）
+            player.sendMessage(Text.translatable("heavyseas.action.rejected").formatted(Formatting.RED), true);
+        }
+    }
+
+    /** 划船一面上选中的一张。不是划船者本人、不是这组里的待选牌 —— 一律当作没按。 */
+    public static void onRowDecision(ServerPlayerEntity player, RowDecisionC2S decision) {
+        ServerWorld world = player.getServerWorld();
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            return;
+        }
+        Session session = component.requireSession();
+        Optional<CharacterId> rower = session.rower();
+        Optional<CharacterId> seat = component.seatOf(player.getUuid());
+        // ❗只认划船者本人。不校验的话，任何人都能替别人决定哪张进划船堆。
+        if (rower.isEmpty() || seat.isEmpty() || !seat.get().equals(rower.get())) {
+            return;
+        }
+        List<Session.RowCard> cards = session.rowing();
+        int index = decision.index();
+        if (index < 0 || index >= cards.size() || cards.get(index).fate() != Session.RowFate.UNDECIDED) {
+            return;                       // 同一张按了两下、包与状态擦肩而过：忽略
+        }
+        CharacterId who = rower.get();
+        int returned = session.chooseRow(index);
+        LOGGER.info("划船（界面）：{} 选第 {} 张留进划船堆，其余 {} 张塞回牌堆底", who.value(), index + 1, returned);
+        finishRow(world, component, who);
+    }
+
+    private static void finishRow(ServerWorld world, GameComponent component, CharacterId who) {
+        Session session = component.requireSession();
+        SkiffProps.onRow(world, component);                       // 两舷插着的桨扫一下（只是样子，ADR-0057）
+        GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowed", GameFlow.characterName(who),
+                session.table().rowStack().size()));
+        GameFlow.finishAction(world, component, who);
+    }
+
+    /** 每 tick 检查行动与划船窗口。0 表示没有窗口，不能被当成已超时。经 {@link GameFlow#guarded} 挂上：出错只结束这一局。 */
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        if (!windowExpired(component.actionDeadline(), now)) {
+            return;
+        }
+        if (component.session().isEmpty()) {
+            component.clearActionWindow();
+            return;
+        }
+        Session session = component.requireSession();
+        if (session.state().isOver() || session.state().phase() != Phase.ACTION) {
+            component.clearActionWindow();
+            return;
+        }
+        if (component.designating().isPresent() || session.contest().isPresent()) {
+            component.clearActionWindow();
+            return;
+        }
+        Optional<CharacterId> rower = session.rower();
+        if (rower.isPresent()) {
+            int returned = returnUndecided(session);
+            component.clearActionWindow();
+            LOGGER.info("划船超时：{} 有 {} 张未决定，全部塞回牌堆底", rower.get().value(), returned);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.row.timed_out",
+                    GameFlow.characterName(rower.get()), returned).formatted(Formatting.GRAY),
+                    GameFlow.defaultedSource(component, rower.get()), rower.get().value());
+            finishRow(world, component, rower.get());
+            return;
+        }
+        Optional<CharacterId> actor = session.nextActor();
+        component.clearActionWindow();
+        if (actor.isEmpty()) {
+            return;
+        }
+        component.clearProvisionTarget();
+        LOGGER.info("行动超时：{} 什么也不做", actor.get().value());
+        GameFlow.broadcast(world, Text.translatable("heavyseas.action.timed_out",
+                GameFlow.characterName(actor.get())).formatted(Formatting.GRAY),
+                GameFlow.defaultedSource(component, actor.get()), actor.get().value());
+        GameFlow.finishAction(world, component, actor.get());
+    }
+
+    static boolean windowExpired(long deadline, long now) {
+        return deadline > 0L && now >= deadline;
+    }
+
+    /** 超时没有选中任何牌：整组塞回牌堆底。 */
+    static int returnUndecided(Session session) {
+        return session.cancelRow();
+    }
+
+    /**
+     * 替身自动推进（ADR-0019）：轮到替身时「什么也不做」。由排程在下一 tick 调用。
+     *
+     * <p>❗先核对局面还是不是排下它时的样子：这中间指令可能已经替这个替身行动过了，
+     * 不核对的话，它会替<b>下一个人</b>什么也不做；开关也可能刚被关掉，关了就该等指令。
+     */
+    public static void autoPass(ServerWorld world, GameComponent component, CharacterId dummy) {
+        Session session = component.requireSession();
+        if (!component.dummyAutoplay() || session.state().phase() != Phase.ACTION || session.rower().isPresent()
+                || session.contest().isPresent() || component.designating().isPresent()
+                || !session.nextActor().map(dummy::equals).orElse(false)) {
+            return;
+        }
+        if (component.dummyRandom()) {
+            StandInPlay.takeTurn(world, component, dummy);   // 演示局：随机做一件事（用户 2026-10-07）
+            return;
+        }
+        if (StandInMinds.thinks(component)) {
+            // 动脑 / 大模型：通常轮到它那一刻就开始想了（GameFlow.announceTurn）；走到这里的是开关刚打开时补排的那一位
+            StandInMinds.beginTurn(world, component, dummy, System.currentTimeMillis());
+            return;
+        }
+        passForStandIn(world, component, dummy);
+    }
+
+    /** 替身喝一口酒（动脑 / 大模型）：与手牌一面「打出」一瓶酒同一个调用（{@link #onUseProvision}），之后推一次投影。 */
+    static void drinkForStandIn(ServerWorld world, GameComponent component, CharacterId who, String cardId) {
+        var beforePower = PlayerFeedback.powers(component);
+        component.requireSession().drinkRum(who, cardId);
+        PlayerFeedback.drank(world, component, who, beforePower, ExperienceView.Source.STAND_IN);
+        LOGGER.info("喝酒（替身）：{} 喝了 {}", who.value(), cardId);
+        GameComponents.sync(world);
+    }
+
+    /**
+     * 替身划船第一步（动脑 / 大模型）：抽 2 张，开划船那一扇窗，等它想好留哪一张（{@link #chooseRowForStandIn}）。
+     * 与界面那条路（{@link #beginRow}）同一套播报与收尾；窗口按局里的划船时限开（不是「等真人」的那一种）——
+     * 想不出来到点照旧整组塞回牌堆底。
+     *
+     * @return 还在等它挑（牌堆空到一张都抽不出来时，引擎当场结束这次划船，这里已经收尾，返回 {@code false}）
+     */
+    static boolean beginRowForStandIn(ServerWorld world, GameComponent component, CharacterId who) {
+        Session session = component.requireSession();
+        List<NavigationCard> drawn = session.beginRow(who);
+        if (session.rower().isPresent()) {
+            component.openActionWindow(component.timing().rowMs());
+        }
+        GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
+        if (session.rower().isEmpty()) {
+            finishRow(world, component, who);
+            return false;
+        }
+        LOGGER.info("划船（替身）：{} 抽了 {} 张，在想留哪一张", who.value(), drawn.size());
+        GameComponents.sync(world);
+        return true;
+    }
+
+    /** 替身划船第二步：留第 {@code index} 张，其余塞回牌堆底，这次行动随即结束。与界面那条路（{@link #onRowDecision}）同一套。 */
+    static void chooseRowForStandIn(ServerWorld world, GameComponent component, CharacterId who, int index) {
+        Session session = component.requireSession();
+        int returned = session.chooseRow(index);
+        LOGGER.info("划船（替身）：{} 选第 {} 张留进划船堆，其余 {} 张塞回牌堆底", who.value(), index + 1, returned);
+        finishRow(world, component, who);
+    }
+
+    /** 替身「什么也不做」：自动推进的默认，也是随机行动里那一格与被拒之后的退路。 */
+    static void passForStandIn(ServerWorld world, GameComponent component, CharacterId dummy) {
+        GameFlow.broadcast(world, Text.translatable("heavyseas.command.passed", GameFlow.characterName(dummy)));
+        LOGGER.info("行动（替身自动）：{} 什么也不做", dummy.value());
+        GameFlow.finishAction(world, component, dummy);
+    }
+
+    /**
+     * 替身划船（{@link StandInPlay}）：抽 2 张、随机留 1 张，一次走完。播报与收尾与真人那条路相同（{@link #finishRow}）。
+     *
+     * @return 划了没有（风平浪静没有航海阶段时引擎会拒，那时返回前什么都没动）
+     */
+    static boolean rowForStandIn(ServerWorld world, GameComponent component, CharacterId who, java.util.Random rng) {
+        Session session = component.requireSession();
+        List<NavigationCard> drawn = session.row(who, (cards, state, rower) -> rng.nextInt(cards.size()));
+        GameFlow.broadcast(world, Text.translatable("heavyseas.game.rowing", GameFlow.characterName(who)));
+        LOGGER.info("划船（替身随机）：{} 抽了 {} 张，随机留一张", who.value(), drawn.size());
+        finishRow(world, component, who);
+        return true;
+    }
+
+    /**
+     * 替身打一张特殊行动牌（{@link StandInPlay}）。与界面那条路同一套处理器（{@link #useUntargeted}）；
+     * 医疗箱治第一个受了伤、还活着的人（模拟器同一条），不进挑目标那一面。
+     *
+     * @return 前提满足、真的打出去了吗（没人受伤 · 伞已撑开 · 绝境没有尸体，都返回 {@code false} 且什么都没动）
+     */
+    static boolean playForStandIn(ServerWorld world, GameComponent component, CharacterId actor, String cardId) {
+        Session session = component.requireSession();
+        var g = session.state();
+        ProvisionEffect effect = session.provisions().get(cardId).effect();
+        if (effect instanceof ProvisionEffect.Heal) {
+            Optional<CharacterId> target = g.bySeat().stream()
+                    .filter(id -> !g.isRemoved(id) && g.conditionOf(id) != Condition.DEAD && g.stateOf(id).damage() > 0)
+                    .findFirst();
+            if (target.isEmpty()) {
+                return false;
+            }
+            session.useMedicalKit(actor, target.get(), cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.healed",
+                    GameFlow.characterName(actor), GameFlow.characterName(target.get())));
+            LOGGER.info("特殊物资（替身随机）：{} 用 {} 治了 {}", actor.value(), cardId, target.get().value());
+            GameFlow.finishAction(world, component, actor);
+            return true;
+        }
+        if (effect instanceof ProvisionEffect.PreventThirst && g.stateOf(actor).isOpen(cardId)) {
+            return false;                     // 已经撑开了，再撑一次只是白花一个行动
+        }
+        if (effect instanceof ProvisionEffect.HealAll heal && heal.requiresCorpse()
+                && g.onBoatBySeat().stream().noneMatch(id -> g.conditionOf(id) == Condition.DEAD)) {
+            return false;
+        }
+        useUntargeted(world, component, actor, cardId, effect);
+        return true;
+    }
+
+    /**
+     * 动脑 / 大模型的替身打一张特殊行动牌：医疗箱治<b>它挑的</b>那个人（{@code Legal#actions} 给的每一种用法各一项），
+     * 其余与 {@link #playForStandIn(ServerWorld, GameComponent, CharacterId, String)} 同一套处理器。
+     * 随机替身那一条不动（它照模拟器治第一个受了伤的人）。
+     *
+     * @return 前提满足、真的打出去了吗（目标已不能治 · 伞已撑开 · 绝境没有尸体，都返回 {@code false} 且什么都没动）
+     */
+    static boolean playForStandIn(ServerWorld world, GameComponent component, CharacterId actor, String cardId,
+                                  Optional<CharacterId> target) {
+        Session session = component.requireSession();
+        var g = session.state();
+        ProvisionEffect effect = session.provisions().get(cardId).effect();
+        if (effect instanceof ProvisionEffect.Heal) {
+            if (target.isEmpty()) {
+                return false;
+            }
+            CharacterId t = target.get();
+            if (!g.bySeat().contains(t) || g.isRemoved(t) || g.conditionOf(t) == Condition.DEAD
+                    || g.stateOf(t).damage() <= 0) {
+                return false;
+            }
+            session.useMedicalKit(actor, t, cardId);
+            GameFlow.broadcast(world, Text.translatable("heavyseas.command.healed",
+                    GameFlow.characterName(actor), GameFlow.characterName(t)));
+            LOGGER.info("特殊物资（替身）：{} 用 {} 治了 {}", actor.value(), cardId, t.value());
+            GameFlow.finishAction(world, component, actor);
+            return true;
+        }
+        if (effect instanceof ProvisionEffect.PreventThirst && g.stateOf(actor).isOpen(cardId)) {
+            return false;
+        }
+        if (effect instanceof ProvisionEffect.HealAll heal && heal.requiresCorpse()
+                && g.onBoatBySeat().stream().noneMatch(id -> g.conditionOf(id) == Condition.DEAD)) {
+            return false;
+        }
+        useUntargeted(world, component, actor, cardId, effect);
+        return true;
+    }
+
+    /**
+     * 划船一次走完：抽 {@link Session#CARDS_DRAWN_WHEN_ROWING} 张，选中给定下标的牌。{@code /seas row} 用它。
+     *
+     * <p>界面那条路不走这里：真人先看整组牌，走的是 {@link Session#beginRow} 加 {@link Session#chooseRow} 两步。
+     * 两条路底下是同一份规则 —— {@link Session#row} 本身就是那两步的简写。
+     */
+    public static List<NavigationCard> rowChoosing(Session session, CharacterId rower, int selected) {
+        return session.row(rower, (cards, state, who) -> selected);
+    }
+}

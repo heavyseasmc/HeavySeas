@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/oar_handle_stroke_l",
+  "textures": {
+    "oar": "heavyseas:block/skiff/oar",
+    "particle": "heavyseas:block/skiff/oar"
+  }
+}

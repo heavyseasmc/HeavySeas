@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/sideboard_item",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/sideboard",
+    "particle": "heavyseas:block/liner/prop/sideboard"
+  }
+}

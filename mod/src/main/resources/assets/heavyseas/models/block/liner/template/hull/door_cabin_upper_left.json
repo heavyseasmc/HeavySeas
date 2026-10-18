@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/block", "ambientocclusion": false, "textures": {"particle": "#f"},
+  "elements": [
+    {"from": [0, 0, 0], "to": [3, 16, 3], "faces": {"north": {"texture": "#f", "uv": [13, 0, 16, 16]}, "south": {"texture": "#f", "uv": [0, 0, 3, 16]}, "east": {"texture": "#f", "uv": [13, 0, 16, 16]}, "west": {"texture": "#f", "uv": [0, 0, 3, 16]}, "up": {"texture": "#f", "uv": [0, 0, 3, 3]}, "down": {"texture": "#f", "uv": [0, 13, 3, 16]}}},
+    {"from": [0, 0, 13], "to": [3, 16, 16], "faces": {"north": {"texture": "#f", "uv": [13, 0, 16, 16]}, "south": {"texture": "#f", "uv": [0, 0, 3, 16]}, "east": {"texture": "#f", "uv": [0, 0, 3, 16]}, "west": {"texture": "#f", "uv": [13, 0, 16, 16]}, "up": {"texture": "#f", "uv": [0, 13, 3, 16]}, "down": {"texture": "#f", "uv": [0, 0, 3, 3]}}},
+    {"from": [0, 13, 3], "to": [3, 16, 13], "faces": {"east": {"texture": "#f", "uv": [3, 0, 13, 3]}, "west": {"texture": "#f", "uv": [3, 0, 13, 3]}, "up": {"texture": "#f", "uv": [0, 3, 3, 13]}, "down": {"texture": "#f", "uv": [0, 3, 3, 13]}}},
+    {"from": [0.5, 0, 3], "to": [2.5, 13, 13], "faces": {"east": {"texture": "#f", "uv": [3, 3, 13, 16]}, "west": {"texture": "#f", "uv": [3, 3, 13, 16]}, "down": {"texture": "#f", "uv": [0.5, 3, 2.5, 13]}}},
+    {"from": [0.25, 2, 5], "to": [2.75, 11, 11], "faces": {"north": {"texture": "#f", "uv": [13.25, 5, 15.75, 14]}, "south": {"texture": "#f", "uv": [0.25, 5, 2.75, 14]}, "east": {"texture": "#f", "uv": [5, 5, 11, 14]}, "west": {"texture": "#f", "uv": [5, 5, 11, 14]}, "up": {"texture": "#f", "uv": [0.25, 5, 2.75, 11]}, "down": {"texture": "#f", "uv": [0.25, 5, 2.75, 11]}}},
+    {"from": [-0.25, 8, 6], "to": [0.25, 10, 10], "faces": {"north": {"texture": "#m", "uv": [10, 14, 10.5, 16]}, "south": {"texture": "#m", "uv": [10, 14, 10.5, 16]}, "east": {"texture": "#m", "uv": [10, 14, 14, 16]}, "west": {"texture": "#m", "uv": [4, 14, 8, 16]}, "up": {"texture": "#m", "uv": [10, 14, 10.5, 16]}, "down": {"texture": "#m", "uv": [10, 14, 10.5, 16]}}}
+  ]
+}

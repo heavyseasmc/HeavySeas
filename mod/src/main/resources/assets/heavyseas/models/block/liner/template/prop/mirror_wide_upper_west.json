@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": true,
+  "textures": {"particle": "#b"},
+  "elements": [
+    {"from": [8.0, 0, 12.0], "to": [9.5, 16, 14.5], "faces": {"west": {"uv": [4.5, 0.8125, 4.8125, 2.8125], "texture": "#b"}, "east": {"uv": [4.875, 0.8125, 5.1875, 2.8125], "texture": "#b"}, "north": {"uv": [6.0, 0.8125, 6.1875, 2.8125], "texture": "#b"}}},
+    {"from": [9.5, 0, 12.5], "to": [11.0, 16, 14.5], "faces": {"east": {"uv": [9.5, 0.625, 9.75, 2.625], "texture": "#b"}, "north": {"uv": [9.75, 0.625, 9.9375, 2.625], "texture": "#b"}}},
+    {"from": [11.0, 0, 13.0], "to": [12.0, 16, 14.5], "faces": {"east": {"uv": [10.5, 0.5, 10.6875, 2.5], "texture": "#b"}, "north": {"uv": [11.0, 0.5, 11.125, 2.5], "texture": "#b"}}},
+    {"from": [12.0, 0, 14.0], "to": [16, 16, 14.5], "faces": {"north": {"uv": [9.0, 1.1875, 9.5, 3.1875], "texture": "#b"}}},
+    {"from": [8.0, 0, 14.5], "to": [16, 16, 16.0], "faces": {"west": {"uv": [4.0, 1.0, 4.1875, 3.0], "texture": "#b"}, "south": {"uv": [0.0, 1.0, 1.0, 3.0], "texture": "#b", "cullface": "south"}}}
+  ]
+}

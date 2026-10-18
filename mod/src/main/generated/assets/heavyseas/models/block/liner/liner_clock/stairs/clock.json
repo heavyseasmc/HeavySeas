@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/clock",
+  "textures": {
+    "b": "heavyseas:block/liner/stairs/clock",
+    "particle": "heavyseas:block/liner/stairs/clock"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "parent": "heavyseas:block/liner/template/glass/window_item_1x3",
+  "textures": {
+    "frame": "heavyseas:block/liner/glass/window_frame",
+    "glass_blr": "heavyseas:block/liner/glass/window_glass_blr",
+    "glass_lr": "heavyseas:block/liner/glass/window_glass_lr",
+    "glass_tlr": "heavyseas:block/liner/glass/window_glass_tlr",
+    "particle": "heavyseas:block/liner/glass/window_frame"
+  }
+}

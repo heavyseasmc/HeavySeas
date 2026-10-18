@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/steamer_trunk",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/steamer_trunk",
+    "particle": "heavyseas:block/liner/prop/steamer_trunk"
+  }
+}

@@ -1,0 +1,914 @@
+package io.github.heavyseasmc.mod.client;
+
+import io.github.heavyseasmc.mod.world.liner.LinerGlass;
+import io.github.heavyseasmc.mod.world.liner.LinerDoors;
+import io.github.heavyseasmc.mod.world.liner.LinerHull;
+import io.github.heavyseasmc.mod.world.liner.LinerProps;
+import io.github.heavyseasmc.mod.world.skiff.SkiffBlocks;
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.net.ActionChoiceC2S;
+import io.github.heavyseasmc.mod.net.HelmAutoPickS2C;
+import io.github.heavyseasmc.mod.net.ProvisionAutoPickS2C;
+import io.github.heavyseasmc.mod.net.ProvisionUpdateS2C;
+import io.github.heavyseasmc.mod.net.CatalogS2C;
+import io.github.heavyseasmc.mod.net.SkyS2C;
+import io.github.heavyseasmc.mod.net.RosterConfigS2C;
+import io.github.heavyseasmc.mod.state.ContestView;
+import io.github.heavyseasmc.mod.state.EndgameProgress;
+import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.ui.DecisionWindows;
+import io.github.heavyseasmc.mod.world.SeatEntity;
+import io.github.heavyseasmc.mod.world.GullEntity;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.render.entity.EmptyEntityRenderer;
+import net.minecraft.client.util.InputUtil;
+import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.ref.WeakReference;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
+
+/**
+ * 客户端入口。
+ *
+ * <h2>为什么这些类必须待在 src/client</h2>
+ * {@code MinecraftClient} 这类只在客户端存在。写进 {@code main} 的话，专用服务端一加载就崩，
+ * 而<b>开发环境与单人游戏都测不出来</b>（那里两边的类都在）。源码集拆开之后，
+ * 这种引用在**编译期**就失败 —— 拆之前实测过，main 里能直接编译过。见 ADR-0013。
+ */
+public final class HeavySeasClient implements ClientModInitializer {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    /**
+     * 打开手牌。
+     *
+     * <h2>为什么是键位不是指令</h2>
+     * ADR-0017 定了 GUI 第一位、指令退出玩家路径。手牌是玩家整局最常回头看的东西
+     * （「我还有没有水」决定敢不敢答应别人），让它挂在一条要打字的指令上等于没做。
+     *
+     * <p>❗默认给 R，但界面里<b>不写死 R</b>：显示与关界面都走
+     * {@link KeyBinding#getBoundKeyLocalizedText()} 与 {@link KeyBinding#matchesKey}，
+     * 否则玩家改了键位，提示就开始说谎。
+     */
+    private static KeyBinding handKey;
+
+    /** 给 HUD 与手牌界面用：它们要显示「按哪个键」，也要认这个键收起界面。 */
+    public static KeyBinding handKey() {
+        return handKey;
+    }
+
+    /**
+     * 打开行动一面（决策 ⑦）；划船抽到的牌还没选完时，打开的是划船一面。默认 G；
+     * 显示与关界面同样走绑定的那个键，理由同 {@link #handKey}。
+     */
+    private static KeyBinding actKey;
+    private static KeyBinding rulesKey;
+
+    public static KeyBinding rulesKey() { return rulesKey; }
+
+    private static KeyBinding themeKey;
+    private static KeyBinding logKey;
+    /** 世界里翻航海日志：↑ 往前（更早）· ↓ 往后（更新）· End 回到最新（用户 2026-10-07）。界面里用滚轮与 End。 */
+    private static KeyBinding logOlderKey;
+    private static KeyBinding logNewerKey;
+    private static KeyBinding logLatestKey;
+
+    public static KeyBinding logLatestKey() {
+        return logLatestKey;
+    }
+
+    /** 主画面状态牌下面那块图例展开 / 收起（用户 2026-10-07，默认 H）。 */
+    private static KeyBinding legendKey;
+
+    public static KeyBinding legendKey() {
+        return legendKey;
+    }
+
+    /** 换界面主题的键。界面开着时 {@link GameScreen} 用它认按键。 */
+    /** 航海日志（右栏）钉住 / 放开。界面开着时按键不走按键绑定，由 GameScreen 接。 */
+    public static KeyBinding logKey() {
+        return logKey;
+    }
+
+    public static KeyBinding themeKey() {
+        return themeKey;
+    }
+
+    /** 本模组注册的全部按键：对局进行中它们先于 Minecraft 自带的绑定与别的模组接键（{@link KeyPriority}）。还没注册时为空。 */
+    static List<KeyBinding> ownKeys() {
+        return Stream.of(handKey, actKey, themeKey, logKey, logOlderKey, logNewerKey, logLatestKey, legendKey, rulesKey,
+                        switchPersonKey)
+                .filter(Objects::nonNull).toList();
+    }
+
+    /**
+     * 撞了键就让给别的绑定的那几个：日志翻页（↑ ↓ End）· 世界里换人（默认左 Ctrl，与疾跑同键）。默认键保持方向键（用户认过），
+     * 而把移动绑在方向键上的玩家按 ↑ 不能被截走（审查 2026-10-07 U4，判据在 {@link KeyRoute}）。
+     */
+    static List<KeyBinding> yieldingKeys() {
+        return Stream.of(logOlderKey, logNewerKey, logLatestKey, switchPersonKey).filter(Objects::nonNull).toList();
+    }
+
+    /**
+     * 世界里按住它再滚轮：在附近的人里换一个（指人菜单开着时；不按住时滚轮换动作）。原先写死 Ctrl（2026-10-13 验收），
+     * 现在是按键绑定，控制设置里可改。默认左 Ctrl 与疾跑同键，所以它<b>会让</b>（{@link #yieldingKeys}）：
+     * 一个键只存一个绑定，按住与否不读绑定的按下状态，直接问窗口那个键此刻按着没有（{@link #switchPersonHeld}）。
+     */
+    private static KeyBinding switchPersonKey;
+
+    static KeyBinding switchPersonKey() {
+        return switchPersonKey;
+    }
+
+    /** 「换人」键此刻按着没有：问窗口（键盘键 · 鼠标键各一条路），不问绑定 —— 与疾跑同键时绑定的按下状态归疾跑。 */
+    static boolean switchPersonHeld(MinecraftClient client) {
+        if (switchPersonKey == null || switchPersonKey.isUnbound()) {
+            return false;
+        }
+        InputUtil.Key key = KeyBindingHelper.getBoundKeyOf(switchPersonKey);
+        long window = client.getWindow().getHandle();
+        if (key.getCategory() == InputUtil.Type.MOUSE) {
+            return GLFW.glfwGetMouseButton(window, key.getCode()) == GLFW.GLFW_PRESS;
+        }
+        return key.getCategory() == InputUtil.Type.KEYSYM && InputUtil.isKeyPressed(window, key.getCode());
+    }
+
+    /** 上一次记过的「别的界面」：窗口改尺寸会让同一个界面再 init 一次，同一个实例只记一次。 */
+    private static WeakReference<Screen> lastOtherScreen = new WeakReference<>(null);
+
+    /**
+     * 轮到你了、但行动一面还没弹出来。
+     *
+     * <p>轮到你的那一刻可能正开着别的界面（补给箱的「顿」还没播完、聊天打到一半）。那时不抢，
+     * 记一笔，等它关了再弹 —— 只弹这一次：Esc 收起行动一面之后，它不会再自己冒出来。
+     */
+    private static boolean actionPending;
+    private static boolean wasMyTurn;
+
+    /** 划船抽到的牌到了、划船一面还没弹出来。与 {@link #actionPending} 同一个道理：只弹一次。 */
+    private static boolean rowPending;
+    private static boolean wasRowing;
+
+    /** 已经为哪一个挑牌窗口弹过舵手一面（以窗口的超时时刻认）。 */
+    private static String helmWindowShown = "";
+
+    /** 上一次弹出口渴一面的那个窗口。同一个窗口只弹一次。 */
+    private static String thirstWindowShown = "";
+    private static String overboardWindowShown = "";
+
+    /**
+     * 换座位 / 抢夺那一场里，已经为哪一个窗口弹过界面（以窗口的超时时刻认，与口渴、舵手同一个写法）。
+     *
+     * <p>❗窗口会在一段中途<b>重置</b>：有人加入把站队那 15 秒重置成 8 秒、有人押牌把 10 秒重置成 6 秒。
+     * 重置就是一个新窗口 —— 局面变了（多了一个人、多了一张暗牌），该再问一次。
+     */
+    private static String contestWindowShown = "";
+
+    /**
+     * 终局的哪一个阶段已经弹过（恨 · 爱 · 计分）。每个阶段只自己弹一次：Esc 收起之后按行动键再开。
+     * <b>真的弹出来了才记</b> —— 阶段开始时聊天正开着，关掉聊天之后照样要弹。
+     */
+    private static EndgameProgress.Stage endgameStageShown;
+
+    public static KeyBinding actKey() {
+        return actKey;
+    }
+
+    @Override
+    public void onInitializeClient() {
+        GameClock.register();
+        WorldInteraction.register();
+        HudRenderCallback.EVENT.register(GameHud::render);
+        // 字体与纹理应用完之后，一并作废牌面、布局与量字缓存。
+        net.fabricmc.fabric.api.resource.ResourceManagerHelper.get(net.minecraft.resource.ResourceType.CLIENT_RESOURCES)
+                .registerReloadListener(new net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener() {
+                    @Override
+                    public net.minecraft.util.Identifier getFabricId() {
+                        return net.minecraft.util.Identifier.of(HeavySeasMod.MOD_ID, "gui_text_measurements");
+                    }
+
+                    @Override
+                    public java.util.Collection<net.minecraft.util.Identifier> getFabricDependencies() {
+                        return List.of(net.fabricmc.fabric.api.resource.ResourceReloadListenerKeys.FONTS,
+                                net.fabricmc.fabric.api.resource.ResourceReloadListenerKeys.TEXTURES);
+                    }
+
+                    @Override
+                    public void reload(net.minecraft.resource.ResourceManager manager) {
+                        CardTexture.resourcesReloaded();
+                        MinecraftClient.getInstance().execute(VoyageSound::resourcesReloaded);
+                    }
+                });
+        // 救生艇方块里只有帆（四角帆的斜边）与星徽（圆牌）的贴图有透明像素：按镂空画，其余照实心
+        BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getCutout(), SkiffBlocks.SAIL, SkiffBlocks.EMBLEM);
+        // 大邮轮的灯与家具（ADR-0063）一律按镂空画：灯柱横担、灯罩流苏、台灯拉链是镂空片；别的件没有透明像素，按镂空画也一样
+        LinerProps.all().values().forEach(b -> BlockRenderLayerMap.INSTANCE.putBlock(b, RenderLayer.getCutout()));
+        // 柜子开合（ADR-0109 §2 第二版）：门 · 抽屉 · 箱盖由 GeckoLib 画（方块实体在每件柜子的原点那一格）
+        net.minecraft.client.render.block.entity.BlockEntityRendererFactories.register(
+                io.github.heavyseasmc.mod.world.liner.LinerCabinets.TYPE, ctx -> new LinerCabinetRenderer());
+        // 玻璃一批（ADR-0074）：窗与穹顶玻璃是半透明的（窗 20 %、穹顶 65 %），框与肋的像素是实的 —— 同一层画
+        LinerGlass.windows().forEach(w -> BlockRenderLayerMap.INSTANCE.putBlock(w, RenderLayer.getTranslucent()));
+        BlockRenderLayerMap.INSTANCE.putBlock(LinerGlass.DOME_GLASS, RenderLayer.getTranslucent());
+        // 舷窗与双开门有半透明的玻璃（ADR-0069 §2；要改成镂空：这一行换 getCutout()，并按 liner_hull.py 的 GLASS_MODE 重出玻璃贴图）
+        BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getTranslucent(), LinerHull.PORTHOLE_BLACK, LinerHull.PORTHOLE_WHITE,
+                LinerHull.PORTHOLE_INNER, LinerHull.PORTHOLE_INNER_PLAIN, LinerDoors.DOUBLE);
+        BlockRenderLayerMap.INSTANCE.putBlock(LinerDoors.CABIN, RenderLayer.getCutout());
+        // 夜里亮着灯的舱室，从船外看舷窗与大窗是暖的（ADR-0082）：建网格时按屋里那一侧的光换上亮着的玻璃
+        GlassGlow.register();
+        GameScreenSidebar.register();
+        DesignNotes.register();                 // 装修标注 /hsnote：只在测试客户端里开（-DhsDesignNotes=true）
+        // C3 第二轮 · c3-gallery：肖像画框右键看牌 —— 方块在 main，界面在这里；钩子由客户端塞进去，main 里从不引用客户端类（ADR-0013）。
+        //   方块的 onUse 在客户端那一侧（渲染线程）调它
+        io.github.heavyseasmc.mod.world.liner.PortraitView.install(sitter ->
+                MinecraftClient.getInstance().setScreen(new PortraitScreen(sitter)));
+        // 讲台右键开规则书（ADR-0087 §2）：同一个形状的钩子
+        io.github.heavyseasmc.mod.rulebook.RulebookView.install(() -> RulebookBook.open(MinecraftClient.getInstance()));
+        // 望远镜柜右键进望远镜视角（ADR-0109 ③）：同一个形状的钩子；每 tick 判该不该退出（界面 · 潜行 · 走开 · 换世界 · 开局……）
+        io.github.heavyseasmc.mod.world.liner.TelescopeView.install(TelescopeEyepiece::look);
+        ClientTickEvents.END_CLIENT_TICK.register(TelescopeEyepiece::tick);
+        // 书柜右键开书柜里那一本（ADR-0109 ③）：与规则书分开的另一个钩子，参数是书的 id
+        io.github.heavyseasmc.mod.rulebook.ShelfBook.install(id -> ShelfBookScreen.open(MinecraftClient.getInstance(), id));
+        // 别的界面（Minecraft 自带的进度 · 游戏菜单 · 聊天……）打开时也记一行，与 GameScreen 的「界面：打开 X」配对：
+        // 回归脚本据此分得开「本模组那一面没弹」与「被别的界面盖住了」—— 此前两次都要截图才看出来
+        // （2026-09-25 游戏菜单盖住各面 · 同日 L 打开 Minecraft 自带的进度界面、吞掉 F8）。类名在开发环境是 yarn 名、生产 jar 里是中间名。
+        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+            if (!(screen instanceof GameScreen) && lastOtherScreen.get() != screen) {
+                lastOtherScreen = new WeakReference<>(screen);
+                LOGGER.debug("Screen opened: {}", screen.getClass().getSimpleName());
+            }
+        });
+
+        // ❗注册了实体类型却没给渲染器，客户端第一次看见座位时会崩 —— 而专用服务端测不出来。
+        EntityRendererRegistry.register(SeatEntity.TYPE, SeatEntityRenderer::new);
+        // 甲板躺椅的座位（C3 第二轮 · c3-deck）：同样什么都不画（游戏自带的空渲染器：不画名牌、不画影子）
+        EntityRendererRegistry.register(io.github.heavyseasmc.mod.world.liner.DeckChairSeat.TYPE,
+                net.minecraft.client.render.entity.EmptyEntityRenderer::new);
+        // 海鸥：自绘模型（ADR-0034 §5.4），模型层要先登记，渲染器构造时按层取部件。
+        EntityModelLayerRegistry.registerModelLayer(GullModel.LAYER, GullModel::getTexturedModelData);
+        EntityRendererRegistry.register(GullEntity.TYPE, GullRenderer::new);
+        // 替身的人形：玩家模型 + Minecraft 自带的默认皮肤（用户 2026-10-07「座位上坐一个人形」）
+        EntityRendererRegistry.register(io.github.heavyseasmc.mod.world.StandInEntity.TYPE, StandInRenderer::new);
+
+        handKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.hand", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_R,
+                "key.categories.heavyseas"));
+        ClientLifecycleEvents.CLIENT_STARTED.register(HeavySeasClient::migrateLegacyHandKey);
+        ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollHandKey);
+        actKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.act", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_G,
+                "key.categories.heavyseas"));
+        ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollTurn);
+        rulesKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.rules", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "key.categories.heavyseas"));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (rulesKey.wasPressed()) {
+                if (client.currentScreen == null) RulebookBook.open(client);
+            }
+            AccessibilityFeedback.tick(client);
+        });
+        // 指定模式里「指着谁」：候选、按方向重挑（ADR-0095 F2）
+        ClientTickEvents.END_CLIENT_TICK.register(DesignationAim::tick);
+        // 界面主题（ADR-0037）：浅色海图桌 / 深色船舱木作。没开界面时由这里接；开着界面时按键不走按键绑定，由 GameScreen 接。
+        // 偏好存在 heavyseas-client.toml（ADR-0099 D1：交给 Forge Config API Port，老的 .properties 自动迁过去）
+        ClientPrefs.load();
+        // 服务端设置的快照与存盘包（ADR-0099 D6）：设置菜单（cut 2）从这里读写
+        ServerSettingsClient.register();
+        themeKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.theme", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F8,
+                "key.categories.heavyseas"));
+        // 航海日志（右栏）钉住 / 放开。❗不在屏幕上给提示：按键在 Minecraft 的控制设置里看得见，
+        // 而 GUI 上的字不是用来教玩家怎么玩的（用户 2026-09-22）—— 与换主题那个键同一条路数。
+        logKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_L,
+                "key.categories.heavyseas"));
+        logOlderKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log_older", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UP, "key.categories.heavyseas"));
+        logNewerKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log_newer", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_DOWN, "key.categories.heavyseas"));
+        logLatestKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.log_latest", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_END, "key.categories.heavyseas"));
+        // 图例（用户 2026-10-07：「可以按 H 收起」）：H 在 Minecraft 自带的键位与本模组里都没人用（1.21.1 GameOptions 字节码核过）
+        legendKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.legend", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_H, "key.categories.heavyseas"));
+        switchPersonKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.heavyseas.switch_person", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_CONTROL, "key.categories.heavyseas"));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (themeKey.wasPressed()) {
+                ClientPrefs.toggleTheme();
+            }
+            while (legendKey.wasPressed()) {
+                if (client.world != null && client.currentScreen == null
+                        && GameComponents.of(client.world).hudView().active()) {
+                    ClientPrefs.toggleLegend();
+                }
+            }
+            CardTexture.tick(client);
+            CardComposite.tick(client);      // 一 tick 合成一张牌；渲染中途不动帧缓冲
+            VoyageSound.tick(client);
+            OverboardCue.tick(client);       // 有人落海：溅水一声 · 四边朱砂一闪（ADR-0048）
+            while (logKey.wasPressed()) {
+                // Shift + L：拉伸（日志占满整条右栏，用户 2026-10-07）；L：钉住 / 放开
+                if (net.minecraft.client.gui.screen.Screen.hasShiftDown()) {
+                    SidebarReveal.toggleExpanded();
+                    LOGGER.info("航海日志：{}", SidebarReveal.expanded() ? "拉伸" : "收回原宽");
+                } else {
+                    SidebarReveal.togglePin();
+                    LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");
+                }
+            }
+            // 世界里翻日志用 ↑ ↓（用户 2026-10-07：「在世界里的时候使用上下键控制日志滚动，在 gui 界面才使用滚轮」）
+            // 没钉住时按 ↑ 就顺手钉上再往回翻一条：只是自己滑出来的那几秒里按 ↑ 没反应，等于「世界里翻不了」
+            boolean voyage = GameHud.voyageHud() && client.currentScreen == null;
+            while (logOlderKey.wasPressed()) {
+                if (voyage) {
+                    if (!SidebarReveal.pinned()) {
+                        SidebarReveal.togglePin();
+                        LOGGER.info("航海日志：钉住（↑ 往回翻）");
+                    }
+                    SidebarReveal.scroll(1);
+                }
+            }
+            while (logNewerKey.wasPressed()) {
+                if (voyage && SidebarReveal.pinned()) {
+                    SidebarReveal.scroll(-1);
+                }
+            }
+            while (logLatestKey.wasPressed()) {
+                if (voyage && SidebarReveal.pinned()) {
+                    SidebarReveal.toLatest();
+                }
+            }
+        });
+
+        // 进服就把卡面载好：补给箱第一次打开时现场载，「发」的动画会在那一帧卡掉一截。
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
+                client.execute(() -> {
+                    CardTexture.preload(client);
+                    // 每种语言 × 每张牌的名字，都要放得进牌上那一格。截断了的名字与短名字在屏幕上
+                    // 长得一样，没有任何机器判据看得见它 —— 所以在这里用 MC 自己的度量当场查一遍。
+                    CardNameFit.check();
+                }));
+
+        // ❗必须在客户端也注册接收器：类型只在一端注册的话，包会被安静地丢掉，不报错。
+        ClientPlayNetworking.registerGlobalReceiver(io.github.heavyseasmc.mod.net.AudioCueS2C.ID, (payload, context) ->
+                context.client().execute(() -> VoyageSound.receive(payload)));
+        ClientPlayNetworking.registerGlobalReceiver(ProvisionUpdateS2C.ID, (payload, context) ->
+                context.client().execute(() -> onProvisionUpdate(context.client(), payload)));
+        // 「这张是替你选的」。服务端先发它、后发留牌那一包，两者都排进同一条主线程队列，
+        // 所以到这里时次序是有保证的 —— 先立住「顿」，再由下面那一包决定什么时候关。
+        ClientPlayNetworking.registerGlobalReceiver(ProvisionAutoPickS2C.ID, (payload, context) ->
+                context.client().execute(() -> {
+                    if (context.client().currentScreen instanceof ProvisionScreen screen) {
+                        screen.autoPicked(payload.index());
+                    }
+                }));
+        // 牌的目录（类别 · 张数 · 角标）：进服时来一次。收不到只是提示签上少两栏、角标空着，不影响别的。
+        ClientPlayNetworking.registerGlobalReceiver(CatalogS2C.ID, (payload, context) ->
+                context.client().execute(() -> {
+                    Catalog.accept(payload);
+                    LOGGER.debug("Card catalog received: provisions={} characters={} weather={} weatherWithGlyphs={}",
+                            Catalog.size(), Catalog.characters(), Catalog.weathers(), Catalog.weathersWithGlyph());
+                }));
+        // 这个人的天该画成什么样（ADR-0054 §9.8 D12 第 4 条 (a)）；掉线就不再接管。
+        ClientPlayNetworking.registerGlobalReceiver(SkyS2C.ID, (payload, context) ->
+                context.client().execute(() -> SkyOverride.accept(payload)));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
+            VoyageSound.reset();
+            GuiSound.cancel();
+            SkyOverride.clear();
+            CardTexture.cancelPreload();
+            LiftRideEffect.reset();
+            TelescopeEyepiece.reset();
+        }));
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING
+                .register(client -> CardTexture.stopPreload());
+        ClientPlayNetworking.registerGlobalReceiver(RosterConfigS2C.ID, (payload, context) ->
+                context.client().execute(() -> context.client().setScreen(new RosterScreen(payload))));
+        // 北辰号的电梯：右键轿厢面板之后服务端发来这一列的楼层表，弹楼层面板（点一层回 LiftTravelC2S）；
+        //   出发时发来这一趟多少 tick，画面渐暗、镜头轻晃（LiftRideEffect · CameraMixin）
+        ClientPlayNetworking.registerGlobalReceiver(io.github.heavyseasmc.mod.net.LiftFloorsS2C.ID, (payload, context) ->
+                context.client().execute(() -> context.client().setScreen(new LiftScreen(payload))));
+        ClientPlayNetworking.registerGlobalReceiver(io.github.heavyseasmc.mod.net.LiftRideS2C.ID, (payload, context) ->
+                context.client().execute(() -> LiftRideEffect.start(payload)));
+        HudRenderCallback.EVENT.register(LiftRideEffect::render);
+        // 「这张是替你挑的」（舵手超时）。次序的道理与上面相同：先到，结算后的那一次投影后到。
+        ClientPlayNetworking.registerGlobalReceiver(HelmAutoPickS2C.ID, (payload, context) ->
+                context.client().execute(() -> {
+                    if (context.client().currentScreen instanceof HelmScreen screen) {
+                        screen.autoPicked(payload.index());
+                    }
+                }));
+    }
+
+    /** Moves the former H default only when another action still occupies H. */
+    private static void migrateLegacyHandKey(MinecraftClient client) {
+        if (!handKey.getBoundKeyTranslationKey().equals("key.keyboard.h")) {
+            return;                           // 玩家已经改过，尊重他的设置
+        }
+        KeyBinding conflict = null;
+        for (KeyBinding binding : client.options.allKeys) {
+            if (binding != handKey && binding.getBoundKeyTranslationKey().equals("key.keyboard.h")) {
+                conflict = binding;
+                break;
+            }
+        }
+        if (conflict == null) {
+            return;                           // 没装占用 H 的模组时，旧绑定仍可继续用
+        }
+        client.options.setKeyCode(handKey, InputUtil.Type.KEYSYM.createFromCode(GLFW.GLFW_KEY_R));
+        KeyBinding.updateKeysByCode();
+        client.options.write();
+        LOGGER.debug("Key binding migration: hand key H conflicts with {}; moved to R", conflict.getTranslationKey());
+    }
+
+    /**
+     * 按键抬起后才算一次。
+     *
+     * <p>{@code wasPressed()} 每次只消一次按下，所以用 while 排空 —— 一 tick 内按两下也认两下。
+     * 手上没牌、也还没发爱恨时什么都不做：开一个空界面比不开更让人以为坏了。
+     * 爱恨发下来之后空手也开 —— 自己爱谁恨谁就写在那一面里（ADR-0022）。
+     */
+    private static void pollHandKey(MinecraftClient client) {
+        boolean pressed = false;
+        while (handKey.wasPressed()) {
+            pressed = true;
+        }
+        if (!pressed || client.world == null || client.currentScreen != null) {
+            return;                           // 已经有界面开着（比如补给箱）时不抢
+        }
+        HudView view = GameComponents.of(client.world).hudView();
+        // 面前有牌、手里空了也开（审查 2026-10-07 Z1）：面前的酒、医疗箱、伞、信号枪要在这一面上打
+        boolean front = view.active() && view.seated() && !view.front().isEmpty();
+        if (view.hasHand() || front || (view.active() && view.seated() && !view.love().isEmpty())) {
+            client.setScreen(new HandScreen());
+        }
+    }
+
+    /**
+     * 轮到你的几面：行动、划船、舵手挑牌；对局结束之后是终局的翻牌与计分（ADR-0022）。
+     *
+     * <p>❗行动与划船只在「刚轮到」时弹一次，之后按行动键再开。服务端倒计时不会因 Esc 暂停；
+     * 每 tick 都弹的话，玩家仍然收不起来回世界谈判。
+     *
+     * <p>舵手一面有倒计时，与补给箱同一个优先级：窗口一开就弹，顶掉不计时的界面；被什么顶掉了，窗口还开着就回来。
+     */
+    private static void pollTurn(MinecraftClient client) {
+        boolean pressed = false;
+        while (actKey.wasPressed()) {
+            pressed = true;
+        }
+        pollTurn(client, pressed);
+    }
+
+    static void requestDecision(MinecraftClient client) { pollTurn(client, true); }
+
+    private static void pollTurn(MinecraftClient client, boolean pressed) {
+        HudView view = client.world == null ? HudView.IDLE : GameComponents.of(client.world).hudView();
+
+        boolean mine = view.myTurnToAct();
+        if (mine && !wasMyTurn) {
+            // 轮到你的那一刻行动一面已经开着（没轮到时按 G 开的只读那一版，它就地变成可按的），或者开着的是它的二级页面：
+            // 这一次「弹」已经算弹过了（审查 2026-10-07 U5）。原先照样记一笔，Esc 收起之后下一 tick 它又弹回来，违背「只弹这一次」
+            Screen open = client.currentScreen;
+            actionPending = !(open instanceof ActionScreen
+                    || (open instanceof GameScreen screen && screen.parent() instanceof ActionScreen));
+            // 轮到你时开着别的对局界面（手牌 · 座位面板……）：行动一面不会弹出来顶掉它，所以在最上层说一句
+            // （ADR-0095 B1）；窗口不在前台时让任务栏闪一下 —— 原先 60 秒在后台无声走完
+            // 医疗箱挑人那一步是这一次行动的延续：从它退回来时不算「刚轮到你」，不说这一句（2026-10-13 验收 C05）
+            if (client.currentScreen instanceof GameScreen && !(client.currentScreen instanceof ActionScreen)
+                    && !(client.currentScreen instanceof ProvisionTargetScreen)) {
+                ActionBarEcho.record(net.minecraft.text.Text.translatable("heavyseas.hud.turn_banner",
+                        actKey.getBoundKeyLocalizedText()));
+            }
+            if (!client.isWindowFocused()) {
+                org.lwjgl.glfw.GLFW.glfwRequestWindowAttention(client.getWindow().getHandle());
+            }
+        }
+        if (!mine) {
+            actionPending = false;
+        }
+        wasMyTurn = mine;
+
+        boolean rowing = view.myRowPending();
+        if (rowing && !wasRowing) {
+            rowPending = true;
+            // 与语言无关的一行：GUI 回归靠它判「抽到的牌进了我这一包」。
+            LOGGER.info("划船：收到抽到的 {} 张", view.sea().rowing().size());
+        }
+        if (!rowing) {
+            rowPending = false;
+        }
+        wasRowing = rowing;
+
+        // World menus suppress automatic action-page opening, not turn bookkeeping or urgent decisions.
+        // A new response window takes priority. Preserve an open chat until its draft is sent or closed.
+        if (WorldInteraction.active()) {
+            boolean urgent = view.myEndgame() || (!mine && !view.experience().decisionId().isEmpty());
+            if (urgent) {
+                if (!(client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen)) {
+                    WorldInteraction.handleActionKey(true);
+                    client.setScreen(null);
+                    pressed = false; // A key meant to leave the old menu must not cancel the new decision.
+                }
+            } else if (WorldInteraction.handleActionKey(pressed)) {
+                return;
+            }
+        }
+
+        // 终局排在所有决策面前面：对局已经结束，决策面开着也没有东西可选了。
+        if (view.myEndgame()) {
+            EndgameProgress.Stage stage = view.endgame().stage();
+            if (stage == EndgameProgress.Stage.ARRIVAL) {
+                if (client.currentScreen instanceof GameScreen && !(client.currentScreen instanceof HandScreen)) {
+                    client.setScreen(null); // the first act belongs to the world, not an overlay
+                }
+                endgameStageShown = stage;
+                return;
+            }
+            boolean scores = stage == EndgameProgress.Stage.SCORES;
+            Screen current = client.currentScreen;
+            if (scores ? current instanceof ScoreScreen : current instanceof RevealScreen) {
+                endgameStageShown = stage;
+                return;
+            }
+            boolean fresh = endgameStageShown != stage;
+            // 决策面一律顶掉；手牌是玩家自己按开的，只在换阶段时顶掉 —— 不然终局里就再也看不了手牌。
+            // ❗聊天等别的界面开着时不抢：终局正是全船在聊天里喊「最后一张是谁」的时候。
+            boolean stale = current instanceof GameScreen && !(current instanceof HandScreen);
+            if (stale || (current instanceof HandScreen && fresh) || (current == null && (fresh || pressed))) {
+                endgameStageShown = stage;
+                client.setScreen(scores ? new ScoreScreen() : new RevealScreen());
+            }
+            return;
+        }
+        endgameStageShown = null;
+
+        // 正在聊天框里打字时不弹任何一面（ADR-0095 D2）：站队、表态那几秒正是靠聊天谈判，弹出来会把没发出去的那句关掉。
+        // 聊天一关，下一 tick 照常弹；窗口的倒计时在服务端照走，所以只是晚几秒看到，不会错过结算。
+        if (client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
+            return;
+        }
+        if (!pressed && DecisionNavigation.browsing(client.currentScreen, view)) return;
+
+        if (pollProvision(client, pressed)) {
+            return;
+        }
+
+        var table = client.world == null ? io.github.heavyseasmc.mod.state.TableView.EMPTY
+                : GameComponents.of(client.world).tableView();
+        if (table.overboardOpen() && !table.plays().isEmpty()) {
+            String window = windowKey(view, table.deadline());
+            boolean fresh = DecisionWindows.fresh(view.experience().decisionId(), window, overboardWindowShown);
+            overboardWindowShown = window;
+            if (!(client.currentScreen instanceof CardChoiceScreen) && (fresh || pressed)) {
+                client.setScreen(new CardChoiceScreen(table.token()));
+            }
+            return;
+        }
+
+        // 医疗箱的目标一面：它由手牌一面的 U 触发，服务端确认效果与持牌后才会出现在投影里。
+        if (view.myProvisionTarget()) {
+            if (!(client.currentScreen instanceof ProvisionTargetScreen)) {
+                client.setScreen(new ProvisionTargetScreen(view));
+            }
+            return;
+        }
+
+        // 举着拳头找人时（ADR-0025）：行动一面不该弹（投影里 yourTurn 已经排掉了），
+        // 按行动键是**取消**，退回行动一面 —— 决策 ⑦ 的「退回 GUI 重选」由它提供。
+        if (view.myDesignating()) {
+            if (pressed) {
+                ClientPlayNetworking.send(ActionChoiceC2S.of(ActionChoiceC2S.Kind.CANCEL));
+                LOGGER.info("指定模式：按了取消");
+            }
+            return;
+        }
+
+        // 换座位 / 抢夺的四面（ADR-0023）。排在这里是因为它属于行动阶段，而下面那两面属于航海与口渴 ——
+        // 同一帧里不会两者都为真，排序只是让「轮到我表态」不被后面任何一条 return 截在半路。
+        if (pollContest(client, view, pressed)) {
+            return;
+        }
+
+        // ❗口渴排在舵手前面判：这两面都在航海阶段，但口渴是舵手挑完之后的事 ——
+        //   同一帧里两者不会同时为真，排序只是让「后来的那一面」不被前面那条 return 截在半路。
+        if (view.myThirstChoice()) {
+            String window = windowKey(view, view.thirstPrompt().deadlineMs());
+            boolean fresh = DecisionWindows.fresh(view.experience().decisionId(), window, thirstWindowShown);
+            if (fresh) {
+                thirstWindowShown = window;
+                // 与语言无关的一行：GUI 回归靠它判「口渴一面真的问到了我」。
+                LOGGER.info("口渴：轮到我决定，还需化解 {} 次 · 手上 {} 张水",
+                        view.thirstPrompt().remaining(), view.myWaters());
+            }
+            if (client.currentScreen instanceof ThirstScreen) {
+                return;
+            }
+            if (fresh || client.currentScreen == null) {
+                client.setScreen(new ThirstScreen(view));
+            }
+            return;
+        }
+
+        // 不是我口渴，但我能替他打水。第一次自动弹；Esc 收起后不纠缠，按行动键还能再打开。
+        if (view.myWaterDonation()) {
+            String window = windowKey(view, view.thirstPrompt().deadlineMs());
+            boolean fresh = DecisionWindows.fresh(view.experience().decisionId(), window, thirstWindowShown);
+            if (fresh) {
+                thirstWindowShown = window;
+                LOGGER.info("口渴：我能替 {} 打水 · 可用 {} 张",
+                        view.thirstPrompt().who(), view.myWaters() - view.myDonatedWater());
+            }
+            if (client.currentScreen instanceof WaterDonationScreen) {
+                return;
+            }
+            if (fresh || (pressed && client.currentScreen == null)) {
+                client.setScreen(new WaterDonationScreen(view));
+            }
+            return;
+        }
+
+        if (view.myHelmPick()) {
+            String window = windowKey(view, view.sea().helmDeadlineMs());
+            boolean fresh = DecisionWindows.fresh(view.experience().decisionId(), window, helmWindowShown);
+            if (fresh) {
+                helmWindowShown = window;
+                // ❗这一行是「划船堆的牌只进舵手那一包」在接收端的证据：不是舵手的客户端上永远不该出现。
+                LOGGER.info("舵手：收到划船堆 {} 张", view.sea().helmOffer().size());
+            }
+            if (client.currentScreen instanceof HelmScreen || client.currentScreen instanceof ProvisionScreen) {
+                return;
+            }
+            if (client.currentScreen instanceof RowScreen row && row.flying()) {
+                return;                       // 划船的最后一张还在飞：飞完再弹，不截断
+            }
+            if (fresh || client.currentScreen == null) {
+                client.setScreen(new HelmScreen(view));
+            }
+            return;
+        }
+
+        if (client.currentScreen != null) {
+            return;                           // 已经有界面开着（补给箱、聊天……）时不抢
+        }
+        if (rowing && (rowPending || pressed)) {
+            rowPending = false;
+            client.setScreen(new RowScreen());
+            return;
+        }
+        if (mine && (actionPending || pressed)) {
+            actionPending = false;
+            client.setScreen(new ActionScreen());
+        } else if (pressed && view.active() && view.seated()) {
+            // 没轮到你也能打开行动一面，只能看（用户 2026-10-07：「行动页面要能随时打开」）
+            LOGGER.info("行动：没轮到我，打开只能看的那一版");
+            client.setScreen(new ActionScreen());
+        }
+    }
+
+    /**
+     * 换座位 / 抢夺那一场里轮到我的四面（ADR-0023 · 决策 ④）。返回 {@code true} 表示这一帧归它，别的界面别再抢。
+     *
+     * <h2>一场只停在一段上，而每一段只问一种人</h2>
+     * 所以下面四条至多一条为真 —— 判据全在 {@link HudView} 那四个谓词里，这里只回答「什么时候弹」。
+     *
+     * <h2>两种优先级，分界线是「不答会怎样」</h2>
+     * <b>表态与挑牌不答也有后果</b>（超时按同意算 · 超时替你从他手牌里抽一张），所以它们与口渴、舵手同一条：
+     * 被什么顶掉了，只要窗口还开着就回来。
+     *
+     * <p><b>站队与挂武器不答就是不参与</b> —— 那本身就是一个正当答案（规则里没有「宣布中立」这种状态）。
+     * 所以它们与行动一面同一条：窗口刚开（或被重置）时弹一次，收起来之后不再自己冒出来，按行动键随时能再开。
+     * 收不起来的话，站队那十几秒会被一个界面整个占掉 —— 而在世界里谈判正是这一段的全部意义。
+     */
+    private static boolean pollContest(MinecraftClient client, HudView view, boolean pressed) {
+        ContestView contest = view.contest();
+        if (!contest.waiting()) {
+            return false;                     // 没有这一场，或这一段没人要等（全是替身时由排程一步一步推）
+        }
+        String window = windowKey(view, contest.deadlineMs());
+        boolean fresh = DecisionWindows.fresh(view.experience().decisionId(), window, contestWindowShown);
+        Screen open = client.currentScreen;
+
+        if (view.myConsent()) {
+            if (fresh) {
+                contestWindowShown = window;
+                // 与语言无关的一行：GUI 回归靠它判「表态这一面真的问到了我」。
+                LOGGER.info("表态：{} 对我发起了 {}", contest.attacker(), contest.kind());
+            }
+            if (open instanceof ConsentScreen) {
+                return true;                  // 已经开着：窗口没重置过，这里不会走到，写着是为了不重开
+            }
+            if (fresh || pressed || open == null) {
+                client.setScreen(new ConsentScreen(view));
+            }
+            return true;
+        }
+
+        // ❗「窗口换了」不全是新窗（审查 2026-10-07 U14）：该答的真人都答完时服务端把这一段<b>收短</b>（ContestPhase#endIfAllDecided），
+        //   超时时刻跟着变，客户端看起来与「重开」一样。刚选了旁观的人，若那一包在「顿」+ 合上（约 0.6 秒）之后才到，
+        //   站队一面会被重新弹出来。投影里没有「我答过了」，所以客户端自己记：这一场的这一段答过了，就只认 G。
+        boolean answered = contestKey(view).equals(contestAnswered);
+
+        if (view.myStance()) {
+            if (fresh) {
+                contestWindowShown = window;
+                LOGGER.info("站队：打起来了 · 进攻 {} 人（体型和 {}） · 防守 {} 人（体型和 {}）",
+                        contest.attackSide().size(), contest.attackPower(),
+                        contest.defendSide().size(), contest.defendPower());
+            }
+            if (open instanceof StanceScreen) {
+                return true;                  // 有人加入把窗口重置了：界面照旧开着，它自己会读到新的投影
+            }
+            if ((fresh && !answered) || pressed) {
+                client.setScreen(new StanceScreen(view));
+            }
+            return true;
+        }
+
+        // 参了战却没东西可押的人按 G 也能开（只看公开战力，最后一张「什么也不做」）；说过「不押了」之后这一段不再给开 ——
+        // 原先 G 照开不误，重开的那一面又能再按一次「不押了」（2026-10-13 验收）
+        if (view.myWeaponChoice() || (pressed && !answered && contest.stage() == io.github.heavyseasmc.engine.play.Contest.Stage.WEAPONS
+                && contest.isCombatant(view.character()))) {
+            if (fresh) {
+                contestWindowShown = window;
+                // ❗只写张数，不写是哪几张 —— 暗牌（决策 ④），而开服的人往往也是玩家。
+                LOGGER.info("挂武器：轮到我 · 还押得出 {} 张 · 已押 {} 张",
+                        contest.myWeapons().size(), contest.myCommitted());
+            }
+            if (open instanceof WeaponScreen) {
+                return true;                  // 自己押下一张也会重置窗口：不重开，那会把「抬」打断
+            }
+            // 「不押了」是这一段的最后答案：之后按 G 也不再开（站队不同 —— 旁观之后窗口里还能回来加入）
+            if (!answered && (fresh || pressed)) {
+                client.setScreen(new WeaponScreen(view));
+            }
+            return true;
+        }
+
+        if (view.myPick()) {
+            if (fresh) {
+                contestWindowShown = window;
+                LOGGER.info("挑牌：轮到我 · 他面前 {} 张 · 手上 {} 张",
+                        contest.victimFront().size(), contest.victimHand());
+            }
+            if (open instanceof PickScreen) {
+                return true;
+            }
+            if (fresh || pressed || open == null) {
+                client.setScreen(new PickScreen(view));
+            }
+            return true;
+        }
+        return false;                         // 这一场在等的是别人：HUD 上看得见，但什么也不弹
+    }
+
+    /** 我已经答过的那一场的那一段（{@link #contestKey}）；站队选了加入或旁观、挂武器说了押完时记下（U14）。 */
+    private static String contestAnswered = "";
+
+    /** 站队 / 挂武器一面发出「我定了」的那一包时调：这一段之后的窗口变化（收短、别人加入）不再自己把这一面弹回来。 */
+    static void answeredContest(HudView view) {
+        contestAnswered = contestKey(view);
+    }
+
+    /** 押武器这一段我已经说过「不押了」：押武器一面不再开，金签也不再催（{@link GameHud}）。 */
+    static boolean weaponsDone(HudView view) {
+        return view.contest().stage() == io.github.heavyseasmc.engine.play.Contest.Stage.WEAPONS
+                && contestKey(view).equals(contestAnswered);
+    }
+
+    /** 一场的一段：回合 · 种类 · 谁对谁 · 哪一段。一个人一回合只有一次行动，同一回合不会有第二场一模一样的。 */
+    private static String contestKey(HudView view) {
+        ContestView c = view.contest();
+        return view.experience().matchId() + "|" + view.turn() + "|" + c.kind() + "|" + c.attacker() + "|" + c.target() + "|" + c.stage();
+    }
+
+    /**
+     * 一扇窗口的身份：决定编号 + 到点时刻（{@link DecisionWindows}）。截止时刻一变（有人加入 · 有人押牌把窗口重置）就是新的一扇，
+     * 该再弹一次 —— 与 {@link #contestWindowShown} 的注释一致；只认决定编号的那一版（2026-10-13 试合入）重置后不再弹。
+     */
+    private static String windowKey(HudView view, long deadlineMs) {
+        return DecisionWindows.key(view.experience().matchId(), view.experience().decisionId(), deadlineMs);
+    }
+
+    /**
+     * 补给箱的包到了。
+     *
+     * <p>只有轮到自己时 {@code offer} 才有内容（服务端按收件人裁剪过），
+     * 所以「该不该开界面」直接看它空不空，客户端不需要也不应该自己判断轮到谁。
+     */
+    private static void onProvisionUpdate(MinecraftClient client, ProvisionUpdateS2C payload) {
+        boolean mine = payload.active() && !payload.offer().isEmpty();
+        // 每传一手服务端都给每个人发一包：不是给我的那一包一到，上一包（如果是我的）就作废了
+        lastProvision = mine ? payload : null;
+        provisionDeferred = false;
+        if (client.currentScreen instanceof ProvisionScreen screen) {
+            if (mine) {
+                screen.apply(payload);
+            } else if (screen.beginPass() || screen.snapping()) {
+                // 传走了：留下的那张「飞」进你的座位、其余「滑」到下一位（O21），播完再关。
+                // ❗替你选的那一下（「顿」）还没播完时也一样：这里要是照常关掉，界面在「顿」的第一帧就消失了 ——
+                //   和手动点完就关**长得一模一样**，等于这一条又回到 ADR-0018 §6 清单第 4 条的反面。
+                screen.closeAfterSnap();
+            } else {
+                client.setScreen(null);      // 没有牌可传（不该发生）：直接关，别让界面挂在那儿
+            }
+            return;
+        }
+        if (mine) {
+            if (DecisionNavigation.browsing(client.currentScreen, DecisionNavigation.view())) {
+                GameScreen origin = client.currentScreen instanceof GameScreen game
+                        ? game.decisionContext().owner()
+                        : ((DecisionNavigation.Child) client.currentScreen).decisionContext().owner();
+                if (origin instanceof ProvisionScreen provision) {
+                    provision.apply(payload);
+                    return;
+                }
+            }
+            // 聊天框（含指令输入）开着时先不弹（审查 2026-10-07 U1）：原先直接把它换掉，打了一半的字丢失，
+            // 接着敲下的第一个空格就替玩家把高亮的第 1 张留下了。包存着，聊天一关 pollTurn 当场开（ADR-0095 D2 同一条）。
+            if (client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen) {
+                provisionDeferred = true;
+                LOGGER.info("补给箱：聊天框开着，等它关上再开");
+                return;
+            }
+            // ❗补给箱是有倒计时的决策，优先级高于正开着的手牌界面：直接顶掉。
+            client.setScreen(new ProvisionScreen(payload));
+        }
+    }
+
+    /**
+     * 最后一包「轮到我」的补给箱；箱子从我手上传走（不是给我的下一包到了）、或对局没了就清掉（审查 2026-10-07 K3）。
+     *
+     * <p>补给箱只在收到包时打开。原先它一旦被关掉（窗口太小时 Esc 被接成「关掉这一面」）就再也找不回来：
+     * 正常局等超时替选，演示局（等真人不限时）整桌卡在补给阶段，直到这个人重连。现在收着最后一包，按 G 重开。
+     */
+    private static ProvisionUpdateS2C lastProvision;
+    /** 那一包到的时候聊天框开着：聊天一关就开（U1）。 */
+    private static boolean provisionDeferred;
+
+    /** 箱子在我手上，而补给箱那一面没开着 —— 主画面挂金签、按 G 重开。 */
+    static boolean provisionWaiting() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        return lastProvision != null && !(client.currentScreen instanceof ProvisionScreen);
+    }
+
+    static GameScreen.Countdown provisionCountdown() {
+        return lastProvision == null ? null : new GameScreen.Countdown(lastProvision.deadlineMs(), lastProvision.windowMs(), 0);
+    }
+
+    /** 补给箱那一面自己留完了（或「顿」完了）：这一包不必再重开。 */
+    static void provisionSettled(ProvisionUpdateS2C data) {
+        if (data != null && data == lastProvision) {
+            lastProvision = null;
+            provisionDeferred = false;
+        }
+    }
+
+    /**
+     * 补给箱的两条回头路：聊天框关上后补开（U1）· 收起之后按 G 重开（K3）。返回 {@code true} = 这一帧归它。
+     *
+     * <p>G 本来是「行动」：补给阶段里行动一面只有只读的那一版可开，箱子在我手上时按 G 开箱子 ——
+     * 「G 在哪儿都表示『轮到你要做的那件事』」，金签上印的也是它。
+     */
+    private static boolean pollProvision(MinecraftClient client, boolean pressed) {
+        if (lastProvision == null) {
+            return false;
+        }
+        if (client.world == null || !GameComponents.of(client.world).hudView().active()) {
+            lastProvision = null;
+            provisionDeferred = false;
+            return false;
+        }
+        if (client.currentScreen instanceof ProvisionScreen) {
+            provisionDeferred = false;
+            return true;
+        }
+        if (provisionDeferred || (pressed && client.currentScreen == null)) {
+            LOGGER.info("补给箱：{}", provisionDeferred ? "聊天框关上了，补开" : "按 G 重开");
+            provisionDeferred = false;
+            client.setScreen(ProvisionScreen.reopen(lastProvision));
+            return true;
+        }
+        return false;
+    }
+}

@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#t"},
+  "elements": [
+    {"from": [-0.4497474683058327, 2.75, 0.0], "to": [9.449747468305834, 4.25, 1.0], "faces": {"south": {"texture": "#t", "uv": [0, 0, 16, 2]}, "up": {"texture": "#t", "uv": [0, 2, 16, 3]}, "down": {"texture": "#t", "uv": [0, 3, 16, 4]}}, "rotation": {"origin": [4.5, 3.5, 0.0], "axis": "z", "angle": -45}},
+    {"from": [-1.8994949366116654, 7.25, 0.0], "to": [17.899494936611667, 8.75, 1.0], "faces": {"south": {"texture": "#t", "uv": [0, 0, 16, 2]}, "up": {"texture": "#t", "uv": [0, 2, 16, 3]}, "down": {"texture": "#t", "uv": [0, 3, 16, 4]}}, "rotation": {"origin": [8.0, 8.0, 0.0], "axis": "z", "angle": -45}},
+    {"from": [6.550252531694167, 11.75, 0.0], "to": [16.449747468305834, 13.25, 1.0], "faces": {"south": {"texture": "#t", "uv": [0, 0, 16, 2]}, "up": {"texture": "#t", "uv": [0, 2, 16, 3]}, "down": {"texture": "#t", "uv": [0, 3, 16, 4]}}, "rotation": {"origin": [11.5, 12.5, 0.0], "axis": "z", "angle": -45}},
+    {"from": [-0.4497474683058327, 11.75, 1.0], "to": [9.449747468305834, 13.25, 2.0], "faces": {"south": {"texture": "#t", "uv": [0, 0, 16, 2]}, "up": {"texture": "#t", "uv": [0, 2, 16, 3]}, "down": {"texture": "#t", "uv": [0, 3, 16, 4]}}, "rotation": {"origin": [4.5, 12.5, 1.0], "axis": "z", "angle": 45}},
+    {"from": [-1.8994949366116654, 7.25, 1.0], "to": [17.899494936611667, 8.75, 2.0], "faces": {"south": {"texture": "#t", "uv": [0, 0, 16, 2]}, "up": {"texture": "#t", "uv": [0, 2, 16, 3]}, "down": {"texture": "#t", "uv": [0, 3, 16, 4]}}, "rotation": {"origin": [8.0, 8.0, 1.0], "axis": "z", "angle": 45}},
+    {"from": [6.550252531694167, 2.75, 1.0], "to": [16.449747468305834, 4.25, 2.0], "faces": {"south": {"texture": "#t", "uv": [0, 0, 16, 2]}, "up": {"texture": "#t", "uv": [0, 2, 16, 3]}, "down": {"texture": "#t", "uv": [0, 3, 16, 4]}}, "rotation": {"origin": [11.5, 3.5, 1.0], "axis": "z", "angle": 45}},
+    {"from": [0.0, 0.0, 0], "to": [2.0, 16.0, 2.5], "faces": {"south": {"texture": "#t", "uv": [0, 4, 2.0, 6]}, "west": {"texture": "#t", "uv": [0, 6, 2.5, 8]}, "east": {"texture": "#t", "uv": [0, 6, 2.5, 8]}}},
+    {"from": [14.0, 0.0, 0], "to": [16.0, 16.0, 2.5], "faces": {"south": {"texture": "#t", "uv": [0, 4, 2.0, 6]}, "west": {"texture": "#t", "uv": [0, 6, 2.5, 8]}, "east": {"texture": "#t", "uv": [0, 6, 2.5, 8]}}}
+  ]
+}

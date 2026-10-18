@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#p"},
+  "elements": [
+    {"from": [6.5, 0, 6.5], "to": [9.5, 12, 9.5], "faces": {"north": {"texture": "#p", "uv": [6, 4, 9, 16]}, "south": {"texture": "#p", "uv": [6, 4, 9, 16]}, "east": {"texture": "#p", "uv": [6, 4, 9, 16]}, "west": {"texture": "#p", "uv": [6, 4, 9, 16]}}},
+    {"from": [6, 12, 6], "to": [10, 14, 10], "faces": {"north": {"texture": "#brass"}, "south": {"texture": "#brass"}, "east": {"texture": "#brass"}, "west": {"texture": "#brass"}, "up": {"texture": "#brass"}, "down": {"texture": "#brass"}}},
+    {"from": [7, 14, 7], "to": [9, 16, 9], "faces": {"north": {"texture": "#brass"}, "south": {"texture": "#brass"}, "east": {"texture": "#brass"}, "west": {"texture": "#brass"}, "up": {"texture": "#brass"}, "down": {"texture": "#brass"}}}
+  ]
+}

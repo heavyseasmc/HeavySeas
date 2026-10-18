@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/shape/stairs_outer_right",
+  "textures": {
+    "down": "heavyseas:block/liner/teak_side",
+    "particle": "heavyseas:block/liner/teak_side",
+    "side": "heavyseas:block/liner/teak_side",
+    "up": "heavyseas:block/liner/shape/teak_tread"
+  }
+}

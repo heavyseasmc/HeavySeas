@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/overmantel_picture_wide_mid",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/overmantel_picture",
+    "k": "heavyseas:block/liner/prop/overmantel_picture_detail",
+    "particle": "heavyseas:block/liner/prop/overmantel_picture"
+  }
+}

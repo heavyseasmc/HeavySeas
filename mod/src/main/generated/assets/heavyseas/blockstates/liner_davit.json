@@ -1,0 +1,304 @@
+{
+  "variants": {
+    "boat_side=left,facing=east,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in_m",
+      "y": 90
+    },
+    "boat_side=left,facing=east,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant_m",
+      "y": 90
+    },
+    "boat_side=left,facing=north,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a_m"
+    },
+    "boat_side=left,facing=north,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b_m"
+    },
+    "boat_side=left,facing=north,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c_m"
+    },
+    "boat_side=left,facing=north,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d_m"
+    },
+    "boat_side=left,facing=north,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e_m"
+    },
+    "boat_side=left,facing=north,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f_m"
+    },
+    "boat_side=left,facing=north,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head_m"
+    },
+    "boat_side=left,facing=north,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_m"
+    },
+    "boat_side=left,facing=north,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in_m"
+    },
+    "boat_side=left,facing=north,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant_m"
+    },
+    "boat_side=left,facing=south,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in_m",
+      "y": 180
+    },
+    "boat_side=left,facing=south,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant_m",
+      "y": 180
+    },
+    "boat_side=left,facing=west,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in_m",
+      "y": 270
+    },
+    "boat_side=left,facing=west,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant_m",
+      "y": 270
+    },
+    "boat_side=right,facing=east,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in",
+      "y": 90
+    },
+    "boat_side=right,facing=east,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant",
+      "y": 90
+    },
+    "boat_side=right,facing=north,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a"
+    },
+    "boat_side=right,facing=north,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b"
+    },
+    "boat_side=right,facing=north,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c"
+    },
+    "boat_side=right,facing=north,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d"
+    },
+    "boat_side=right,facing=north,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e"
+    },
+    "boat_side=right,facing=north,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f"
+    },
+    "boat_side=right,facing=north,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head"
+    },
+    "boat_side=right,facing=north,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base"
+    },
+    "boat_side=right,facing=north,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in"
+    },
+    "boat_side=right,facing=north,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant"
+    },
+    "boat_side=right,facing=south,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in",
+      "y": 180
+    },
+    "boat_side=right,facing=south,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant",
+      "y": 180
+    },
+    "boat_side=right,facing=west,part=arm_a": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_a",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=arm_b": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_b",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=arm_c": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_c",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=arm_d": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_d",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=arm_e": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_e",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=arm_f": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_f",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=arm_head": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_arm_head",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=base": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=base_in": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_base_in",
+      "y": 270
+    },
+    "boat_side=right,facing=west,part=quadrant": {
+      "model": "heavyseas:block/liner/liner_davit/prop/davit_quadrant",
+      "y": 270
+    }
+  }
+}

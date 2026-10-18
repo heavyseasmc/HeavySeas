@@ -1,0 +1,2599 @@
+package io.github.heavyseasmc.mod.client;
+
+import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.GameState;
+import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.state.HudView;
+import io.github.heavyseasmc.mod.ui.HudLayout.Rect;
+import io.github.heavyseasmc.mod.ui.HudPart;
+import io.github.heavyseasmc.mod.ui.SheetLayout;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
+import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 对局里的界面（补给箱、手牌……）共用的底子。
+ *
+ * <h2>为什么要有这一层</h2>
+ * 2026-09-15 第一次在真实客户端上看，有几处毛病都出在「每一面各自处理」上：
+ * HUD 那几行字从界面后面透出来、跟座位轨叠在一起；两面各铺一次底色；两面各算一次卡面能画多大。
+ * 这些是每一面都要、而且必须一致的东西，放一处。HUD 认的也是这个类型（见 {@link GameHud}）。
+ *
+ * <h2>版面的数只在这里写一次</h2>
+ * 2026-09-18 一次风格审查抓到：{@code TOP_BAND_Y = 12} 在 10 个界面各写一遍，卡高上限三种值、
+ * 金框两种粗细、倒计时条两份实现 —— 没有一处报错，只是已经各自漂开了。
+ * {@link GuiLanguage} 为动词与色做过的事，这里为带位、卡的留空与命中、按钮与倒计时再做一次：
+ * <b>各面只许引用，不许再声明</b>。{@code GuiConsistencyTest} 扫源码，又写一份就红（ADR-0033）。
+ */
+public abstract class GameScreen extends Screen {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    /**
+     * 卡面画到多高（物理像素）还算清楚：烘出来的贴图高 840，允许放大一成。
+     * 再大就是插值放大，又糊了。贴图不低于 600×840 由构建期的 checkCardTextures 守着。
+     */
+    private static final double SHARP_CARD_PX_H = 840 * 1.1;
+
+    // ---------------------------------------------------------------- 带位（ADR-0037 §7.10：一套带位版面）
+
+    /** 上带（回合 · 阶段 · 海鸥）画在哪一行。 */
+    protected static final int TOP_BAND_Y = 12;
+    /**
+     * 上带里那一行字<b>下面</b>还要多少：到海鸥格 3 · 海鸥格 7 · 留白 4。
+     *
+     * <p>原先这里是写死的 34，而实际用掉的只有「一行字 + 10」—— 界面尺寸自动时白白空掉 15 个单位，
+     * 而舞台正缺这 15 个（总纲 §7.8：牌是主体）。改成按实际行高算，上带于是只占它真正用到的那么高。
+     */
+    protected static final int TOP_BAND_H = 8;
+    /**
+     * 上带那一排图标多高（GUI 单位）。
+     *
+     * <p>❗2026-09-23 实拍从 12 提到 16：一行字换成一排图标之后，12 个单位的线稿在 1280×720 上
+     * 只有 36 物理像素，整条带读起来是几个灰点 —— <b>图标替掉字，就得占到字那一档的分量</b>，
+     * 否则「少说」变成了「说不清」。
+     */
+    protected static final int ICON_H = 16;
+
+    /**
+     * 密度档：小窗<b>少说</b>，不是<b>缩小</b>（用户 2026-09-22，ADR-0037 §7.13）。
+     *
+     * <p>原话：「适配分辨率不是说适配缩放，而是说在小窗下我们要简化或者藏起来多少信息，
+     * 玩家想看更详细信息，自然要放大窗口」。取舍次序取自 §7.8：
+     * <b>牌 → 你能按的 → 公开状态 → 说明</b>，小窗从后往前砍。
+     *
+     * <p>这一档哪些件出场，只此一处：
+     * <table>
+     *   <tr><th></th><th>FULL</th><th>MEDIUM</th><th>COMPACT</th></tr>
+     *   <tr><td>牌 · 阶段轮盘 · 确认那一件</td><td>有</td><td>有</td><td>有</td></tr>
+     *   <tr><td>次要按键提示（查看 / 收起）</td><td>有</td><td>—</td><td>—</td></tr>
+     *   <tr><td>上带的天候与海鸥</td><td>有</td><td>有</td><td>—</td></tr>
+     *   <tr><td>座位轨上的名字</td><td>有</td><td>有</td><td>—</td></tr>
+     * </table>
+     *
+     * <p>❗<b>带位不许随档变</b>：{@link #bands()} 一个字都不问密度。
+     * 档只改「某一格里画不画某件」，不改格子本身 —— 否则跨过档的边界那一下整屏都会跳，
+     * 而割裂感正是来自东西挪了位置，不是来自东西少了。判据在 GuiConsistencyTest。
+     */
+    protected enum Density {
+        FULL, MEDIUM, COMPACT;
+
+        /** 这一档够不够格显示「至少要 {@code least} 档才给看」的那件东西。 */
+        boolean atLeast(Density least) {
+            return ordinal() <= least.ordinal();
+        }
+    }
+
+    /**
+     * 这一帧属于哪一档。
+     *
+     * <p>❗按<b>物理像素</b>切，不按 GUI 单位 —— 与「清晰度按物理像素判」同一条：
+     * 界面尺寸设成 1 时一个单位是一个像素，设成 4 时是四个，同样的单位数在屏幕上差四倍。
+     */
+    protected Density density() {
+        int physical = net.minecraft.client.MinecraftClient.getInstance().getWindow().getFramebufferHeight();
+        if (physical >= DENSITY_FULL_PX) {
+            return Density.FULL;
+        }
+        return physical >= DENSITY_MEDIUM_PX ? Density.MEDIUM : Density.COMPACT;
+    }
+
+    /** 物理高到这个数才是满档（1280×720 正好落在这一档）。 */
+    private static final int DENSITY_FULL_PX = 720;
+    /** 物理高到这个数才是中档（854×480 落在这一档）。 */
+    private static final int DENSITY_MEDIUM_PX = 480;
+    /** 同一组图标之间（四只海鸥之间）。 */
+    private static final int ICON_GAP = 4;
+    /** 三组之间：天候 | 阶段轮盘 | 海鸥。比组内宽，才读得出是三件事。 */
+    private static final int ICON_GROUP_GAP = 14;
+    /** 相邻两条带之间。 */
+    protected static final int BAND_GAP = 5;
+    /**
+     * 座位轨最多吃掉「轨 + 舞台」那一段的几成。
+     *
+     * <p>❗<b>舞台先给牌，轨拿剩下的</b>（总纲 §7.8）。反过来（轨先按窗口取高、内容再挤剩下的）
+     * 就是第二刀收尾那次实拍的病根：轨一变高，行动一面的按钮被顶出去盖在说明那一行上（§7.7）。
+     */
+    protected static final float RAIL_MAX_SHARE = 0.32f;
+    /** 两侧留白。 */
+    protected static final int SIDE = 20;
+    /** 一排卡里相邻两张之间。 */
+    protected static final int CARD_GAP = 6;
+    /** 一排按钮里相邻两个之间。 */
+    protected static final int BTN_GAP = 6;
+    /** 横杠到秒数。 */
+    protected static final int BAR_TO_TEXT = 3;
+    /** 舞台里两段内容之间。 */
+    protected static final int HINT_GAP = 5;
+    /** 最下面那一栏里，最高的那一件上下各留多少。 */
+    protected static final int FOOT_PAD = 4;
+    /**
+     * 倒计时有多高。**会超时的界面都画它，不会超时的界面一律不画**（ADR-0018 §7.4）。
+     * 它现在是一件材质（比例尺 / 液位管，ADR-0037），高度由材质定 —— 各面的版面照旧只引用这一个数。
+     */
+    protected static final int BAR_H = GuiMaterial.GAUGE_H;
+    /** 座位轨：一行字，下面一条线。行动一面与补给箱都画它。 */
+    protected static final int RAIL_H = 12;
+
+    /** 选中金框画在卡外几像素。手牌与补给箱曾一个 1、一个 2 —— 同一个标记两种粗细（审查抓到的）。 */
+    protected static final int CARD_FRAME = 2;
+    /** 卡顶要留的空里，金框加余量占多少。 */
+    protected static final int BORDER_ROOM = CARD_FRAME + 4;
+    /** 窗口小到离谱时卡也不能缩没了 —— 缩没了与「没有牌」长得一样。 */
+    protected static final int MIN_CARD_H = 24;
+    /**
+     * 卡最高占屏幕高的这个比例。可调（ADR-0018 §8 右列），但只此一处。
+     *
+     * <p>2026-09-25 从 0.5 提到 0.75：原先的理由是「再高就把上下带挤没了」，而第四刀之后带位只由窗口算（§7.11），
+     * 牌再大也挤不动带 —— 舞台的高度本身就是上限。界面尺寸 1 时舞台占窗口约七成，0.5 这条于是把牌卡在
+     * 舞台的三分之二，上下各空一截（O32 记的「舞台空了一大半」，总纲 §7.8：舞台先给牌）。
+     */
+    protected static final float MAX_CARD_H_RATIO = 0.75f;
+
+    /** 按钮的内边距与两侧留白。按钮长什么样也是「必须一致」的那一类，所以同样放在这里。 */
+    protected static final int BTN_PAD_X = 10;
+    protected static final int BTN_PAD_Y = 6;
+    protected static final int BTN_SIDE = 20;
+
+    /** 上一帧的鼠标位置。见 {@link #mouseActuallyMoved}。 */
+    private boolean mouseSeen;
+    private int lastMouseX;
+    private int lastMouseY;
+
+    /** 上一帧的墙钟。见 {@link #frameDelta}。 */
+    private long lastFrameMs = System.currentTimeMillis();
+
+    /** 这一面打开过了没有。见 {@link #init()}。 */
+    private boolean announced;
+    private final List<SeatHit> seatHits = new ArrayList<>();
+    private final List<DetailHit> detailHits = new ArrayList<>();
+    private Text detail;
+    private int detailX;
+    private int detailY;
+
+    private record SeatHit(Box box, String character) {
+    }
+
+    private record DetailHit(Box box, java.util.function.Supplier<Text> source) {
+        private DetailHit(Box box, Text text) {
+            this(box, () -> text);
+        }
+
+        Text text() {
+            return source.get();
+        }
+    }
+
+    protected GameScreen(Text title) {
+        super(title);
+    }
+
+    /**
+     * 打开时、以及窗口或界面尺寸每改一次，Minecraft 都会调它。
+     *
+     * <p>坐标系一变，鼠标没动也会换一个数，所以在这里把鼠标位置忘掉、重新起算。
+     * 子类覆写时要先调 {@code super.init()}。
+     *
+     * <p>第一次调时打一行「界面：打开 X」—— GUI 回归靠它判「这一面到底弹没弹」：
+     * 截图里看不到它，与「没弹」和「弹了但被别的顶掉」长得一样（与语言无关，用类名）。
+     */
+    @Override
+    protected void init() {
+        mouseSeen = false;
+        // 确认键的闸：第一次显示起算宽限；每次显示都重新看哪些确认键此刻按着（ConfirmGate 的类注释）
+        long windowHandle = client == null ? 0L : client.getWindow().getHandle();
+        confirmGate.shown(System.currentTimeMillis(),
+                key -> windowHandle != 0L && net.minecraft.client.util.InputUtil.isKeyPressed(windowHandle, key));
+        if (!announced) {
+            announced = true;
+            LOGGER.info("界面：打开 {}", getClass().getSimpleName());
+        }
+        if (openedAt == 0L) {
+            long now = System.currentTimeMillis();
+            openedAt = now - lastRemovedAt < SWAP_MS ? now - foldMs() : now;
+        }
+    }
+
+    /**
+     * 收起时也打一行，与「界面：打开 X」成对。
+     *
+     * <p>GUI 回归要知道「拍的那一刻这一面还开着没有」：会自己超时收起的面（口渴 · 替人打水 · 舵手……）
+     * 拍到一半没了，截图里就是世界 —— 只看「打开」那一行，分不出「拍到了」与「拍晚了」（2026-09-25 实拍）。
+     */
+    @Override
+    public void removed() {
+        super.removed();
+        lastRemovedAt = System.currentTimeMillis();
+        GuiSound.cancel();                   // 没响的全部作废：牌已经不在桌上了
+        LOGGER.info("界面：收起 {}", getClass().getSimpleName());
+    }
+
+    /** 这一面开着时 Minecraft 自带的聊天栏不画（{@code InGameHudMixin}）：对局各面一律如此，按 T 开的聊天不在其列。 */
+    public static boolean hidesChat(Object screen) {
+        return screen instanceof GameScreen;
+    }
+
+    /** 当前世界的对局投影；没有世界时是 {@link HudView#IDLE}。 */
+    protected HudView projection() {
+        return client == null || client.world == null ? HudView.IDLE : GameComponents.of(client.world).hudView();
+    }
+
+    /**
+     * 上带下面那一行：划船堆几张 · 舵手是谁（决策 ⑭）。全船都知道的数 —— 划船与舵手两面都画，放在这里。
+     */
+    protected void drawSeaLine(DrawContext context, HudView view, int y) {
+        drawSeaLine(context, view, y, view.sea().rowStack());
+    }
+
+    /**
+     * 同上，但张数由调用方给。
+     *
+     * <p>舵手一面用它：挑中那一刻服务端就把划船堆整堆收回了，投影里的张数<b>当场变 0</b>，
+     * 而屏幕上那几张还在（「顿」要播完 396ms）。照投影画的话，这段时间里这一行说 0 张、底下摆着 2 张
+     * —— 实拍到的。这一面该说的是<b>它正摊开的那一叠</b>。
+     */
+    protected void drawSeaLine(DrawContext context, HudView view, int y, int rowStack) {
+        Text helm = view.sea().helmsman().isEmpty()
+                ? Text.literal("—")
+                : Text.translatable("heavyseas.character." + view.sea().helmsman());
+        drawLine(context, Text.translatable("heavyseas.hud.sea", rowStack, helm),
+                paneW() / 2, y, GuiLanguage.secondary());
+    }
+
+    /**
+     * 和上一帧比，鼠标有没有真的动过。第一帧只记下位置，不算移动。
+     *
+     * <p>❗悬停跟随只能看<b>移动</b>，不能看<b>位置</b>。停着不动的指针不算「指向」：
+     * 界面弹出来时指针恰好停在某张牌上，默认答案就被它悄悄换掉；按方向键移走的选中，
+     * 下一帧又被停着的指针拽回去，键盘等于失灵。2026-09-15 真实客户端上看到的是前一种 ——
+     * 窗口最大化时指针几乎总停在窗口里，补给箱一开，高亮就在第 4 张而不是第 1 张。
+     */
+    protected boolean mouseActuallyMoved(int x, int y) {
+        boolean moved = mouseSeen && (x != lastMouseX || y != lastMouseY);
+        mouseSeen = true;
+        lastMouseX = x;
+        lastMouseY = y;
+        return moved;
+    }
+
+    /**
+     * 两帧之间真实过了多少毫秒，夹在 0–200。
+     *
+     * <p>插值按真实毫秒推，不按帧 —— 否则高刷新率屏幕上「抬」会明显更快（{@link GuiLanguage#approach}）。
+     * 上限 200：掉帧时别让插值一步跳到底。每一面原先各记一份 {@code lastFrameMs}，现在只在这里记。
+     */
+    protected long frameDelta(long now) {
+        long dt = Math.max(0L, Math.min(200L, now - lastFrameMs));
+        lastFrameMs = now;
+        return dt;
+    }
+
+    /**
+     * 键盘只在这里先拦一道，再分派给各面的 {@link #onKey}（审查 2026-10-07 U7 · U1；与 {@link #mouseClicked} 同一个办法）。
+     *
+     * <p>❗<b>{@code final}</b>：「正在合上」的拦截原先只在这里，而各面是先自己处理、最后才调 super ——
+     * 合上那 200 ms 里按键照样生效：阵容面板开航后连按回车发出第二个开航包，设置菜单关的那一下按 R 又生出一条改动。
+     * 确认键的闸（{@link ConfirmGate}：弹出后 300 ms 内 · 弹出前就按着的 · 按住的系统重复）也必须在各面之前。
+     * {@code GuiConsistencyTest} 守「子类不许覆写 keyPressed」。
+     */
+    @Override
+    public final boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (closingAt > 0L) {
+            return true;                     // 正在合上：这一面已经说了再见，按键不再算数
+        }
+        if (redirectExpiredDecision()) return true;
+        if (!confirmGate.press(keyCode, System.currentTimeMillis())) {
+            return true;                     // 刚弹出来 / 弹出前就按着 / 按住的重复：这一下不替玩家确认任何事
+        }
+        if (navigationKey(keyCode, scanCode)) {
+            return true;                     // 正在收字的面（capturingText）这一组一个都不接，见 NavigationKeys
+        }
+        return onKey(keyCode, scanCode, modifiers);
+    }
+
+    /**
+     * 这一面此刻在收字（设置界面的文字项正在编辑）：每一个键都先归它，规则书 · 聊天 · 手牌这一组快捷键一个都不接
+     * （2026-10-13 验收：输字时按 T、/ 被拽进了聊天）。
+     */
+    protected boolean capturingText() {
+        return false;
+    }
+
+    @Override
+    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        confirmGate.release(keyCode);
+        return super.keyReleased(keyCode, scanCode, modifiers);
+    }
+
+    /** 确认键的闸（{@link ConfirmGate}），每一面一份。 */
+    private final ConfirmGate confirmGate = new ConfirmGate();
+
+    /**
+     * 窗口小于支持尺寸时（各面只画「窗口太小」）按下的 Esc（审查 2026-10-07 K3 · Z6）。
+     *
+     * <p>原先 {@code GameScreenSidebar} 把它直接接成 {@link #close()}，不问这一面关不关得：补给箱（不许 Esc 关）一按就关、
+     * 再也找不回来；医疗箱选目标那一面不发取消包，下一 tick 又被弹回来。现在照这一面自己按 Esc 时的样子走一遍 ——
+     * 关得掉的关，关不掉的不关，Esc 另有用处的（取消挑目标）照它的用处。设置菜单另有覆写（看不见「存不存」那一问）。
+     */
+    void escapeInSmallWindow() {
+        keyPressed(GLFW.GLFW_KEY_ESCAPE, 0, 0);
+    }
+
+    /** 界面开着时按键不经按键绑定的轮询，所以换主题在这里接一次；各面的 onKey 最后都会落到 super。 */
+    protected boolean onKey(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && detail != null) {
+            detail = null;
+            return true;
+        }
+        // 背包键（默认 E）与 Esc 同义：只收起（用户 2026-10-07 定）。Minecraft 自带的箱子、背包里就是这样 ——
+        // 它在 HandledScreen.keyPressed 里认 inventoryKey 就 close（字节码核过），左手不用去够 Esc。
+        // 读玩家自己绑的背包键，不写死 E；收不得的面（补给箱、口渴……）照旧不收。
+        if (shouldCloseOnEsc() && client != null && client.options.inventoryKey.matchesKey(keyCode, scanCode)) {
+            close();
+            return true;
+        }
+        if (HeavySeasClient.themeKey() != null && HeavySeasClient.themeKey().matchesKey(keyCode, scanCode)) {
+            ClientPrefs.toggleTheme();
+            return true;
+        }
+        if (HeavySeasClient.logKey() != null && HeavySeasClient.logKey().matchesKey(keyCode, scanCode)) {
+            if ((modifiers & GLFW.GLFW_MOD_SHIFT) != 0) {
+                SidebarReveal.toggleExpanded();   // Shift + L：拉伸，日志占满整条右栏（用户 2026-10-07）
+                LOGGER.info("航海日志：{}", SidebarReveal.expanded() ? "拉伸" : "收回原宽");
+                return true;
+            }
+            SidebarReveal.togglePin();       // 钉住 / 放开右栏：界面开着时按键不走按键绑定
+            LOGGER.info("航海日志：{}", SidebarReveal.pinned() ? "钉住" : "放开");
+            return true;
+        }
+        if (SidebarReveal.paused() && HeavySeasClient.logLatestKey() != null
+                && HeavySeasClient.logLatestKey().matchesKey(keyCode, scanCode)) {
+            SidebarReveal.toLatest();        // 往回翻过之后回到最新（用户 2026-10-07）
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    /**
+     * 鼠标只在这里分左右键，各面只实现 {@link #leftClick} 与 {@link #rightClick}。
+     *
+     * <p>❗<b>{@code final}</b>：此前各面各自覆写 {@code mouseClicked}，而其中七面不看是哪个键 —— 右键在行动 · 站队 ·
+     * 同意 · 医疗目标 · 阵容 · 替人打水 · 口渴里<b>等于左键确认</b>（2026-09-25 核出）。用户要「右键 = 详情」，
+     * 靠每一面各自记得判键是靠不住的，所以把分键收到这一处，右键从结构上就到不了「确认」（与 {@code drawFootBand}
+     * 把两件合成一次调用同一个路数）。{@code GuiConsistencyTest} 守「子类不许覆写 mouseClicked」。
+     */
+    @Override
+    public final boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (closingAt > 0L) {
+            return true;
+        }
+        if (redirectExpiredDecision()) return true;
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            for (NavigationHit hit : navigationHits) {
+                if (hit.box().contains((int) mouseX, (int) mouseY)) {
+                    hit.action().run();
+                    return true;
+                }
+            }
+            if (footerConfirm != null && footerConfirm.contains((int) mouseX, (int) mouseY)) {
+                pressFooterPrimary();
+                return true;
+            }
+        }
+        detail = null;
+        // 右键座位开那个人的座位面板，每一面都行：它是<b>二级页面</b>（openChild），Esc 回到原来这一面，
+        // 原来那个决定的倒计时在底栏照走（drawFootBand 取上一页的倒计时）。ADR-0095 A6 当时只让关得掉的面开，
+        // 是因为补给箱一被顶掉就再也找不回来；有了「上一页」之后它回得来，那条限制随试合入去掉了。
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && inspectSeat(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+            for (DetailHit hit : detailHits) {
+                if (hit.box().contains((int) mouseX, (int) mouseY)) {
+                    detail = hit.text();
+                    if (detail == null) {
+                        continue;
+                    }
+                    detailX = (int) mouseX;
+                    detailY = (int) mouseY;
+                    return true;
+                }
+            }
+        }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && leftClick(mouseX, mouseY)) {
+            return true;
+        }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && rightClick(mouseX, mouseY)) {
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean inspectSeat(double x, double y) {
+        for (SeatHit hit : seatHits) {
+            if (hit.box().contains((int) x, (int) y)) {
+                GameScreen next = new TableScreen(hit.character());
+                if (this instanceof TableScreen) {
+                    openSibling(next);                // 已经在看一个人：换成看下一个人，Esc 一次回到看之前那一面
+                } else {
+                    openChild(next);                  // 二级页面：Esc 回到这一面
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    final void renderDetails(DrawContext context, int mouseX, int mouseY) {
+        Text shown = detail;
+        int x = detailX;
+        int y = detailY;
+        if (shown == null) {
+            for (DetailHit hit : detailHits) {
+                if (hit.box().contains(mouseX, mouseY)) {
+                    shown = hit.text();
+                    if (shown == null) {
+                        continue;
+                    }
+                    x = mouseX;
+                    y = mouseY;
+                    break;
+                }
+            }
+        }
+        if (shown != null) {
+            // 一段一段排（换行分段）：头像说明签是「名字 · 状态」一段 + 规则书里那个人的几段（CharacterNotes），
+            // 折行归 GuiText，它不认换行。说明签比一句状态长，框放宽一些。
+            String[] paras = shown.getString().split("\n");
+            int w = Math.max(60, Math.min(paras.length > 1 ? 260 : 220, paneW() - 2 * SIDE));
+            int pad = 6;
+            int gap = 2;
+            int[] hs = new int[paras.length];
+            int h = 2 * pad;
+            for (int i = 0; i < paras.length; i++) {
+                hs[i] = GuiText.height(paras[i], w - 2 * pad, GuiText.BODY, false, 6);
+                h += hs[i] + (i > 0 ? gap : 0);
+            }
+            x = MathHelper.clamp(x + pad, SIDE, Math.max(SIDE, paneW() - w - SIDE));
+            y = MathHelper.clamp(y + pad, pad, Math.max(pad, height - h - pad));
+            context.getMatrices().push();
+            context.getMatrices().translate(0, 0, 400);
+            GuiMaterial.plate(context, x, y, w, h, -1);
+            int ty = y + pad;
+            for (int i = 0; i < paras.length; i++) {
+                GuiText.draw(context, paras[i], x + pad, ty, w - 2 * pad, GuiText.BODY, false,
+                        GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT, 6);
+                ty += hs[i] + gap;
+            }
+            context.getMatrices().pop();
+        }
+    }
+
+    /** 这一帧在 {@code box} 上停着就显示 {@code text}（悬停说明签）。各面在 {@code drawChrome} 之后调；每帧随 drawChrome 清空。 */
+    protected void addDetail(Box box, Text text) {
+        detailHits.add(new DetailHit(box, text));
+    }
+
+    /** 只在悬停/查看命中时构造签文，座位未被指到时不做规则书拼接和翻译。 */
+    protected void addDetail(Box box, java.util.function.Supplier<Text> text) {
+        detailHits.add(new DetailHit(box, text));
+    }
+
+    /**
+     * 一个角色的说明：名字一段 + 规则书里那个人底下的几段（{@link CharacterNotes}）。阵容一面挑人时停在头像上看它
+     * （用户 2026-10-07：「全靠脑子记记不住」）。
+     */
+    protected static Text characterDetail(String characterId) {
+        List<String> notes = CharacterNotes.of(characterId);
+        return notes.isEmpty() ? nameOf(characterId)
+                : Text.literal(nameOf(characterId).getString() + "\n" + String.join("\n", notes));
+    }
+
+    /**
+     * 滚轮：查看态里翻说明签；日志钉住、界面给它让出右栏时，别处的滚轮翻日志（用户 2026-10-07：「在 gui 界面才使用滚轮」；
+     * 2026-10-13 起日志在界面开着时画在让出来的那一栏里，翻得到、看得见）。日志收起（窗口太窄）时不翻：翻一份看不见的日志，
+     * 界面一收起就停在莫名其妙的地方。各面自己用滚轮的（设置的右栏）先在覆写里接走。
+     */
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (inspecting() && plateBox != null && plateBox.contains((int) mouseX, (int) mouseY) && verticalAmount != 0) {
+            plateFirstLine = Math.max(0, Math.min(plateLastLine, plateFirstLine + (verticalAmount > 0 ? -1 : 1)));
+            return true;
+        }
+        if (verticalAmount != 0 && budget().logShown()) {
+            SidebarReveal.scroll(verticalAmount);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    /** 左键：选 / 按。返回 {@code true} = 这一下已经处理了。 */
+    protected boolean leftClick(double mouseX, double mouseY) {
+        return false;
+    }
+
+    /**
+     * 右键：看，<b>永不确认</b>。有查看态的面用 {@link #inspectClick} 实现；没有的面默认什么都不做
+     * （座位、图标、按钮的说明签是 ADR-0043 的下一步）。
+     */
+    protected boolean rightClick(double mouseX, double mouseY) {
+        return false;
+    }
+
+    @Override
+    public boolean shouldPause() {
+        return false;                  // 多人游戏里暂停毫无意义：别人还在等你，服务端的计时也不会停
+    }
+
+    /**
+     * 铺底：压暗的世界上放一张材质板（ADR-0037）。取代原先的「模糊背景 + 半透明黑」——
+     * 那一套正是界面读起来像深色模式应用的原因。板是不透明的，聊天从底下透上来的问题由它自然兜住
+     * （原先靠把黑加到 0xE4）。压暗铺满整窗；板只铺在界面那一块里（{@link #budget}）：日志钉住时右边让出一栏，
+     * 日志自己的几块珐琅签作底。
+     */
+    protected void renderBackdrop(DrawContext context, int mouseX, int mouseY, float delta) {
+        long now = System.currentTimeMillis();
+        footLeftPx = Integer.MAX_VALUE;            // 这一帧的底栏还没画：聊天窄条要让的那一处由它重新报
+        GuiSound.pump(now);
+        // 照样张 b-3：整屏压暗（.dimmer，带色相的径向暗角）上放一块板（.sheet，四边各离窗口 50 · 34 稿子像素、四个包角），
+        // 两件都是样张 CSS 由浏览器渲出来的贴图（ADR-0046）。在物理像素里画，界面尺寸 3 下与样张逐像素相同。
+        float open = easeOut(unfolded(now));
+        context.setShaderColor(1f, 1f, 1f, open);
+        GuiMaterial.dimWorld(context);
+        context.setShaderColor(1f, 1f, 1f, 1f);
+        SheetLayout l = sheet();
+        beginFold(context, l, open);
+        pxBegin(context);
+        Rect s = l.sheet();
+        GuiMaterial.hudPart(context, boardPart(), s.x(), s.y(), s.w(), s.h(), l.k());
+        pxEnd(context);
+    }
+
+    /**
+     * 铺哪一块板：对局各面是海图板；设置一面换账本板（ADR-0100 S-A）。同一个盒子，只换贴图 ——
+     * 这是「按界面」分，不是「按主题」分，两张板各有浅 / 深两份。
+     */
+    protected HudPart boardPart() {
+        return HudPart.SHEET;
+    }
+
+    // ------------------------------------------------------------------ 纸板开合（ADR-0048 · ADR-0045 §5.2 B7 最低成本那一格）
+
+    /** 纸板从一条线竖着翻开 / 合回一条线，各多久（ADR-0045 动 2：此前开合都是一帧硬切）。 */
+    static final long FOLD_MS = 200;
+    /** 上一面收起之后这么快就有下一面顶上来，算「换面」：不再翻开一次，免得两面之间露出世界闪一下。 */
+    private static final long SWAP_MS = 80;
+    private static long lastRemovedAt;
+    private long openedAt;
+    private long closingAt;
+    /** 这一帧推过矩阵：{@link #endFold} 要弹回。 */
+    private boolean folding;
+    private boolean closeQueued;
+
+    /** 此刻纸板翻开了几成：0 = 一条线，1 = 全开。 */
+    private float unfolded(long now) {
+        float span = foldMs();
+        if (closingAt > 0L) {
+            return 1f - Math.min(1f, (now - closingAt) / span);
+        }
+        return openedAt == 0L ? 1f : Math.min(1f, Math.max(0f, (now - openedAt) / span));
+    }
+
+    /** 这一次开合多久：{@link #FOLD_MS}，评审时按偏好放慢（{@code motionSlow}）。 */
+    private static long foldMs() {
+        return ClientPrefs.reducedMotion() ? 1L : FOLD_MS * ClientPrefs.motionSlow();
+    }
+
+    private static float easeOut(float t) {
+        float u = 1f - t;
+        return 1f - u * u * u;
+    }
+
+    /** 没全开时，以板的竖向中线为轴把这一面整个压扁：板与板上的一切一起展开 / 合上。弹回在 {@link #endFold}。 */
+    private void beginFold(DrawContext context, SheetLayout l, float open) {
+        if (open >= 1f) {
+            return;
+        }
+        Rect s = l.sheet();
+        float cy = (s.y() + s.h() / 2f) / guiScale();
+        context.getMatrices().push();
+        context.getMatrices().translate(0f, cy, 0f);
+        context.getMatrices().scale(1f, Math.max(0.02f, open), 1f);
+        context.getMatrices().translate(0f, -cy, 0f);
+        folding = true;
+    }
+
+    /**
+     * 这一面画完（{@code GameScreenSidebar} 的 afterRender，侧栏之前）：弹回 {@link #beginFold} 推的矩阵；
+     * 合上满了 {@link #FOLD_MS} 就真的收起 —— 放到这一帧之后做，不在渲染途中换界面。
+     */
+    void endFold(DrawContext context) {
+        if (folding) {
+            context.getMatrices().pop();
+            folding = false;
+        }
+        if (closingAt > 0L && !closeQueued && System.currentTimeMillis() - closingAt >= foldMs() && client != null) {
+            closeQueued = true;
+            client.execute(this::finishClose);
+        }
+    }
+
+    private void finishClose() {
+        if (client != null && client.currentScreen == this) {
+            super.close();
+        }
+    }
+
+    /**
+     * 收起：先合上 {@link #FOLD_MS}，再真的收。各面超时、轮次走了、Esc 都走这里；被另一面直接顶掉的不经这里（那是换面）。
+     * 重复调（各面的 tick 每一拍都会调）只认第一次。
+     */
+    @Override
+    public void close() {
+        if (closingAt > 0L) {
+            return;
+        }
+        if (client == null || client.currentScreen != this) {
+            super.close();
+            return;
+        }
+        // 二级页面：回到打开它的那一面，不合上（用户 2026-10-07：「在二级页面时 esc 应该返回上一页而不是直接关闭页面」）。
+        // 那一面已经没意义了（对局结束、轮次走了而它只在轮到时才有用……）就照常收起。
+        if (parent != null && parent.canReturnTo(projection())) {
+            GameScreen back = parent;
+            parent = null;
+            LOGGER.info("界面：返回 {}", back.getClass().getSimpleName());
+            client.setScreen(back);
+            return;
+        }
+        if (parent != null) {
+            parent = null;
+            DecisionNavigation.back(null, decisionContext);
+            return;
+        }
+        closingAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 打开它的那一面（二级页面的「上一页」）；直接从世界里打开的为 {@code null}。只记一层：
+     * 回到上一页时上一页自己的 {@code parent} 还在，所以连着返回也成立（手牌 → 赠送 → Esc 回手牌 → Esc 回行动）。
+     */
+    private GameScreen parent;
+    private DecisionNavigation.Context decisionContext;
+
+    final DecisionNavigation.Context decisionContext() {
+        if (decisionContext == null) {
+            decisionContext = DecisionNavigation.capture(this);
+        }
+        return decisionContext;
+    }
+
+    final boolean canReturnTo(HudView view) {
+        DecisionNavigation.Context context = decisionContext();
+        return closingAt == 0 && stillWanted() && (context == null || context.valid(view) || keepsOpenAfterExpiry());
+    }
+
+    /**
+     * 这一面代表的决定过期之后，这一面自己留着、变成只能看的那一版（行动一面：没轮到你时照样能开）。
+     * 这种面上按键不必「收起 → 去开欠着的决定」：开出来的还是同一面，那一下按键却被吃掉了（2026-10-13 验收 47：
+     * 行动超时后在只读的行动一面按 R，重开的是行动一面，不是手牌）。
+     */
+    protected boolean keepsOpenAfterExpiry() {
+        return false;
+    }
+
+    private boolean redirectExpiredDecision() {
+        HudView view = projection();
+        if (DecisionNavigation.redirects(decisionContext, this, keepsOpenAfterExpiry(), view)) {
+            client.setScreen(null);
+            HeavySeasClient.requestDecision(client);
+            return true;
+        }
+        if (decisionContext != null && decisionContext.owner() == this && !decisionContext.valid(view)) {
+            decisionContext = null;          // 留着的这一面放下过期的那一笔：从它开出去的二级页不再挂着一个已经过去的决定
+        }
+        return false;
+    }
+
+    /** 以「上一页是我」打开另一面：它收起时回到我这里（{@link #close}）。 */
+    protected void openChild(GameScreen child) {
+        if (client == null) {
+            return;
+        }
+        child.parent = this;
+        child.decisionContext = decisionContext();
+        LOGGER.info("界面：从 {} 打开 {}", getClass().getSimpleName(), child.getClass().getSimpleName());
+        client.setScreen(child);
+    }
+
+    /**
+     * 换成<b>同一层</b>的另一面：它收起时回到我的上一页，不回到我。
+     *
+     * <p>连着看几个人的亮牌：在一个人的座位面板里点另一个人的头像，原先是一层叠一层，看了几个人就要按几次 Esc
+     * （用户 2026-10-07：「我看了几个人就要按几次 esc，这要特殊处理的吧，很反直觉」）。看下一个人是「换一页」，不是「往里走一层」。
+     */
+    protected void openSibling(GameScreen next) {
+        if (client == null) {
+            return;
+        }
+        next.parent = parent;
+        next.decisionContext = decisionContext();
+        parent = null;
+        LOGGER.info("界面：{} 换成同一层的 {}", getClass().getSimpleName(), next.getClass().getSimpleName());
+        client.setScreen(next);
+    }
+
+    /** 上一页（没有就是 {@code null}）。 */
+    protected GameScreen parent() {
+        return parent;
+    }
+
+    /** 从二级页面回来时，这一面还值不值得回来。默认值得；只在某个时刻才有意义的面覆写它。 */
+    protected boolean stillWanted() {
+        return client != null && client.world != null
+                && io.github.heavyseasmc.mod.state.GameComponents.of(client.world).hudView().active();
+    }
+
+    private record NavigationHit(Box box, Runnable action) { }
+    private final List<NavigationHit> navigationHits = new ArrayList<>();
+    private Box footerConfirm;
+    /** 底栏那枚「确认」上印的键（Enter · 设置界面是 S）：点它就做那个键的事。 */
+    private String footerConfirmKey = "Enter";
+
+    /**
+     * 底栏那枚「确认」被点了：直接做这一面那一键的事（{@link #confirmPrimary}）。
+     *
+     * <p>原先是伪造一次 Enter 的按下与抬起、走一遍 {@code keyPressed}：经过确认键的闸与快捷键那一组，
+     * 设置界面那枚印着「S 存」的按钮点下去却是 Enter（激活了焦点那一项）。
+     */
+    private void pressFooterPrimary() {
+        String key = footerConfirmKey;
+        int code = key.length() == 1 && Character.isLetter(key.charAt(0))
+                ? Character.toUpperCase(key.charAt(0))      // GLFW 的字母键码就是大写字母的 ASCII
+                : GLFW.GLFW_KEY_ENTER;
+        confirmPrimary(code);
+    }
+
+    /** 各面「确认」那一下：默认交给这一面认那个键的那一支（{@link #onKey}）；有直接入口的面可以覆写。 */
+    protected boolean confirmPrimary(int keyCode) {
+        return onKey(keyCode, 0, 0);
+    }
+
+    /** 规则书 · 回到决定 · 手牌 · 聊天 · 指令这一组键（判据在 {@link NavigationKeys}）。返回 {@code true} = 这一下归它了。 */
+    private boolean navigationKey(int key, int scan) {
+        if (client == null) {
+            return false;
+        }
+        HudView view = projection();
+        DecisionNavigation.Context origin = decisionContext();
+        boolean handOrAction = handlesHandKey();
+        NavigationKeys.Press press = new NavigationKeys.Press(
+                capturingText(),
+                HeavySeasClient.rulesKey() != null && HeavySeasClient.rulesKey().matchesKey(key, scan),
+                HeavySeasClient.actKey().matchesKey(key, scan),
+                HeavySeasClient.handKey().matchesKey(key, scan),
+                client.options.chatKey.matchesKey(key, scan),
+                client.options.commandKey.matchesKey(key, scan),
+                key == GLFW.GLFW_KEY_T && giftKeyHere(),
+                view.active(), view.seated(), decisionFace(), handOrAction,
+                origin != null && origin.owner() != this);
+        switch (NavigationKeys.route(press)) {
+            case RULES -> RulebookBook.open(client, this, rulesAnchor());
+            case BACK_TO_DECISION -> DecisionNavigation.back(null, origin);
+            case REQUEST_DECISION -> {
+                client.setScreen(null);
+                HeavySeasClient.requestDecision(client);
+            }
+            case OPEN_HAND -> openChild(new HandScreen());
+            case CHAT -> openChatAfterThisKey(false);
+            case COMMAND -> openChatAfterThisKey(true);
+            case NONE -> {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 聊天等这一下按键的字符事件过去再开。
+     *
+     * <p>GLFW 一次取事件里先到「按下 T」、紧跟着到字符「t」，两者都在同一轮里直接交给当前界面。
+     * 在按键回调里就换上聊天框，紧随其后的「t」便打进了输入框（2026-10-13 截图验收：表态一面按 T，输入框里多一个 t；
+     * 按 / 开指令同理会多一个 /）。Minecraft 自己在世界里开聊天是在下一个 tick 里开的，字符早已过去 ——
+     * 这里同样排到下一轮任务里开。到那时这一面若已经换掉（窗口被服务端收了），就不开。
+     */
+    private void openChatAfterThisKey(boolean command) {
+        MinecraftClient mc = client;
+        mc.send(() -> {
+            if (mc.currentScreen == this) {
+                mc.setScreen(new DecisionChatScreen(this, command));
+            }
+        });
+    }
+
+    /**
+     * 此刻屏幕上的那一面对局界面：开着的就是它；聊天叠在一面上（{@link DecisionChatScreen}）时是底下那一面；都不是就 {@code null}。
+     *
+     * <p>「让不让出日志栏」「世界视图 HUD 画不画」「日志算不算露面」都按它问。原先只认 {@code currentScreen instanceof GameScreen}：
+     * 行动一面按 T 开聊天之后，底下露出来的是世界视图 HUD（图例板压在聊天页底下），刚才那一面不见了（2026-10-13 总截图 12）。
+     */
+    static GameScreen shownFace(MinecraftClient client) {
+        if (client.currentScreen instanceof GameScreen screen) {
+            return screen;
+        }
+        if (client.currentScreen instanceof DecisionChatScreen chat) {
+            return chat.faceBelow();
+        }
+        return null;
+    }
+
+    /**
+     * 聊天开在这一面上：这一面照样画在底下（聊天页、输入框画在它之上），连同导航那一排与钉住时的日志栏。
+     * 指针按这一面最后一次见到的位置给 —— 聊天开着时它不该因为指针挪了就换高亮。
+     */
+    final void renderUnderChat(DrawContext context, float delta) {
+        int x = mouseSeen ? lastMouseX : -1;
+        int y = mouseSeen ? lastMouseY : -1;
+        render(context, x, y, delta);
+        endFold(context);
+        if (WindowNotice.required()) {
+            return;
+        }
+        drawNavigation(context);
+        GameHud.renderInScreen(context, client);
+    }
+
+    /**
+     * 聊天叠在这一面上时，聊天页留给自己的那一角（物理像素）：右沿不过倒计时横杠左边那一道空，上沿不过舞台下沿 ——
+     * 牌、倒计时、确认键都露在外面。返回 {右沿, 上沿}。
+     */
+    final int[] chatRoom() {
+        SheetLayout l = sheet();
+        return new int[]{l.countBar().x() - l.len(12), bands().stageBottom() * guiScale()};
+    }
+
+    /** 这一面上 T 另有意思（手牌与座位面板：赠送），聊天走左上角那一枚按钮。 */
+    protected boolean giftKeyHere() {
+        return false;
+    }
+
+    /** 这一面自己接手牌键（手牌一面收起 · 行动一面切到手牌），共有的「开手牌」不再接。 */
+    protected boolean handlesHandKey() {
+        return false;
+    }
+
+    // ------------------------------------------------------------------ 决策面各自报的事（2026-10-13：原先四份按类型分派的清单）
+
+    /**
+     * 这一面是不是一个<b>决策面</b>：它代表一个服务端在等我答的决定（行动 · 划船 · 舵手 · 表态 · 站队 · 押武器 · 挑牌 ·
+     * 口渴 · 替人打水 · 补给箱 · 医疗箱目标 · 落海）。决策面上 G 是「收起 / 回到这一面」，不是「去开欠着的决定」。
+     *
+     * <p>原先「哪些是决策面」「它代表的决定还在不在」「规则书翻到哪一节」「超时会怎样」是四份按界面类型分派的清单，
+     * 分在 {@code DecisionNavigation} 与这里；加一面要改四处、漏一处不报错。现在各面自己报，加一面只在那一面里写。
+     */
+    protected boolean decisionFace() {
+        return false;
+    }
+
+    /** 这一面代表的那个决定，此刻是不是还欠着我的（决策面覆写）。从二级页回来认它（{@link DecisionNavigation#capture}）。 */
+    protected boolean ownsDecision(HudView view) {
+        return false;
+    }
+
+    /** 底栏画不画那一条倒计时。列表一直排到底栏上沿的那一面（设置）不画，把秒数写在别处。 */
+    protected boolean countdownInFootBand() {
+        return true;
+    }
+
+    /** 「规则」按钮与规则键翻到规则书哪一节（规则书里的锚点）。 */
+    protected String rulesAnchor() {
+        return "actions";
+    }
+
+    /** 这一面的决定到点会怎样（底栏倒计时下面那一行）；{@code null} = 不写。决策面覆写。 */
+    protected Text timeoutText() {
+        return null;
+    }
+
+    /** Small secondary tools live in the board's outer margin, never over cards. */
+    final void drawNavigation(DrawContext context) {
+        navigationHits.clear();
+        HudView view = projection();
+        boolean playing = view.active();
+        if (!playing && !view.experience().lastResult().present()) {
+            return;
+        }
+        var l = sheet();
+        pxBegin(context);
+        int x = l.sheet().x();
+        // 板外沿上方那一条：按钮高 = 一行字 + 上下各一圈内边距，贴着板顶往上排，窗口再矮也不出屏幕
+        int y = Math.max(1, l.sheet().y() - navigationButtonH(l) - l.len(NAV_GAP));
+        x = navigationButton(context, x, y, Text.translatable("heavyseas.navigation.rules"),
+                () -> RulebookBook.open(client, this, rulesAnchor()));
+        if (playing) {
+            int next = navigationButton(context, x, y, Text.translatable("heavyseas.navigation.chat"),
+                    () -> client.setScreen(new DecisionChatScreen(this, false)));
+            x = unreadBadge(context, l, next - l.len(NAV_GAP), y, next);
+        }
+        if (DecisionNavigation.offersLastResult(view, this instanceof ScoreScreen)) {
+            x = navigationButton(context, x, y, Text.translatable("heavyseas.navigation.last_result"), () -> {
+                if (ScoreScreen.openLast(client) && client.currentScreen instanceof GameScreen child) {
+                    child.parent = this;
+                    child.decisionContext = decisionContext();
+                }
+            });
+        }
+        if (playing && !handlesHandKey() && view.seated()) {
+            x = navigationButton(context, x, y, Text.translatable("heavyseas.navigation.hand",
+                            HeavySeasClient.handKey().getBoundKeyLocalizedText()),
+                    () -> openChild(new HandScreen()));
+        }
+        // 那个决定已经过去了（超时 · 轮次走了）就不再给「返回决定」：按下去只会打开一面「没轮到你」（2026-10-13 验收 09/10）
+        if (playing && DecisionNavigation.offersReturn(decisionContext(), this, view)) {
+            x = navigationButton(context, x, y, Text.translatable("heavyseas.navigation.back",
+                            HeavySeasClient.actKey().getBoundKeyLocalizedText()),
+                    () -> DecisionNavigation.back(null, decisionContext()));
+        }
+        // 日志钉着、窗口却窄到让不出那一栏：日志收起（不盖界面），这里挂一枚只看不按的小签说一声（用户 2026-10-13）
+        if (playing && PaneWindow.folded()) {
+            navigationTag(context, x, y, Text.translatable("heavyseas.navigation.log_folded",
+                    HeavySeasClient.logKey().getBoundKeyLocalizedText()));
+        }
+        pxEnd(context);
+        if (playing) {
+            drawChatStrip(context);
+        }
+        footLeftPx = Integer.MAX_VALUE;            // 下一帧由底栏重新报
+    }
+
+    /**
+     * 这一帧底栏那一行最左从哪儿起（物理像素；{@link #drawHintsPx} 报，{@link #drawNavigation} 用完清掉）。
+     * 聊天窄条的右沿让到它左边：样张只量过十几面，行动一面打头那句「选一件事」实拍时从 x 325 起，压到了窄条（352）。
+     */
+    private int footLeftPx = Integer.MAX_VALUE;
+
+    /**
+     * 「聊天」小签上的未读数（2026-10-13 样张 B）：朱砂小圆片、米白数字；0 不画、100 起写「99+」。
+     * 角标比小签宽出去的那一截，后面的签往右让（返回下一枚签的起点）。在物理像素里画（调用方已 {@link #pxBegin}）。
+     */
+    private int unreadBadge(DrawContext context, SheetLayout l, int tagRight, int tagTop, int nextX) {
+        String label = io.github.heavyseasmc.mod.ui.ChatFeed.badge(ChatSkin.FEED.unread());
+        if (label.isEmpty()) {
+            return nextX;
+        }
+        int px = l.len(io.github.heavyseasmc.mod.ui.ChatFeed.BADGE_PX);
+        int lineH = GuiText.linePxAt(px, true);
+        Rect b = io.github.heavyseasmc.mod.ui.ChatFeed.badgeBox(tagRight, tagTop, GuiText.widthPx(label, px, true, 0), lineH, l.k());
+        GuiMaterial.unreadBadge(context, b.x(), b.y(), b.w(), b.h(), l.k());
+        // 数字比汉字矮：按汉字的字面框居中会偏下，往上提一点（不提出圆片、不提出窗口顶：ChatFeed#badgeTextTop）
+        GuiText.drawPx(context, label, b.x(), io.github.heavyseasmc.mod.ui.ChatFeed.badgeTextTop(b, lineH, l.k()), b.w(), px, true,
+                GuiLanguage.Chat.BADGE_DIGIT, GuiText.Align.CENTER, 0);
+        return io.github.heavyseasmc.mod.ui.ChatFeed.nextAfterBadge(nextX, b, l.k());
+    }
+
+    /** 终局计分一面左下有一行返航提示、设置一面的列表排到底栏 —— 这两面不摆聊天窄条（样张 A1 的例外）。 */
+    protected boolean showsChatStrip() {
+        return true;
+    }
+
+    /**
+     * 面板左下那张纸签：最近两句聊天（2026-10-13 样张 A1）。人名藏青、正文墨、系统句次墨，一行一句、放不下打「…」；
+     * 新来一句时旧的上一行上移淡出、新的淡入（{@link io.github.heavyseasmc.mod.ui.ChatFeed#SLIDE_MS}，「减少动效」时直接换）。
+     * 点它打开聊天。位置从骨架取（{@link SheetLayout#chatStrip}），板随日志让位收窄时跟着走。
+     */
+    private void drawChatStrip(DrawContext context) {
+        long now = System.currentTimeMillis();
+        // 聊天页就叠在这一面上：同样的几句已经在页里，窄条不再画一份
+        if (!showsChatStrip() || closingAt > 0L || unfolded(now) < 1f || client.currentScreen instanceof DecisionChatScreen) {
+            return;
+        }
+        boolean reduced = ClientPrefs.reducedMotion();
+        List<io.github.heavyseasmc.mod.ui.ChatFeed.Entry> lines = ChatSkin.FEED.strip(now, reduced);
+        if (lines.isEmpty()) {
+            return;
+        }
+        SheetLayout l = sheet();
+        Rect strip = io.github.heavyseasmc.mod.ui.ChatFeed.yieldTo(l.chatStrip(), footLeftPx, l.k());
+        if (strip == null) {
+            return;                                // 底栏铺得太开，让完只剩一截：这一面不摆
+        }
+        Box tag = unitBox(strip);
+        GuiMaterial.tag(context, tag.x(), tag.y(), tag.w(), tag.h());
+        navigationHits.add(new NavigationHit(tag, () -> client.setScreen(new DecisionChatScreen(this, false))));
+        Rect full = l.chatStripText();
+        Rect t = new Rect(full.x(), full.y(), full.w() - (l.chatStrip().w() - strip.w()), full.h());
+        int s = guiScale();
+        // 裁剪框按 GUI 单位（1.21.1 的 enableScissor 不跟矩阵走，乘的是界面缩放），往里取整
+        context.enableScissor(Math.floorDiv(t.x() + s - 1, s), Math.floorDiv(t.y() + s - 1, s),
+                Math.floorDiv(t.right(), s), Math.floorDiv(t.bottom(), s));
+        pxBegin(context);
+        float p = ChatSkin.FEED.slide(now, reduced);
+        int step = l.len(SheetLayout.CHAT_LINE);
+        int size = l.len(SheetLayout.CHAT_PX);
+        String sep = Text.translatable("heavyseas.chat.name_sep").getString();
+        boolean sliding = lines.size() > io.github.heavyseasmc.mod.ui.ChatFeed.STRIP_LINES;
+        for (int i = 0; i < lines.size(); i++) {
+            var e = lines.get(i);
+            String text = e.system() ? e.body() : e.speaker() + sep + e.body();
+            int nameLen = e.system() ? 0 : e.speaker().length();
+            var fit = GuiText.fitFixedPx(text, t.w(), size, 1);
+            if (fit.lines().isEmpty()) {
+                continue;
+            }
+            String line = fit.lines().get(0).text();
+            int[] idx = GuiText.lineIndices(text, List.of(line))[0];
+            float alpha = !sliding ? 1f : i == 0 ? 1f - p : i == lines.size() - 1 ? p : 1f;
+            int[] colors = new int[idx.length];
+            int last = e.system() ? GuiLanguage.Chat.PAGE_MUTED : GuiLanguage.Chat.PAGE_INK;
+            for (int j = 0; j < idx.length; j++) {
+                if (idx[j] >= 0) {
+                    last = e.system() ? GuiLanguage.Chat.PAGE_MUTED
+                            : idx[j] < nameLen ? GuiLanguage.Chat.PAGE_NAME : GuiLanguage.Chat.PAGE_INK;
+                }
+                colors[j] = GuiLanguage.Hud.alpha(last, alpha);
+            }
+            int rowTop = t.y() + Math.round(((sliding ? i - p : i)) * step);
+            GuiText.drawRowRunsPx(context, line, colors, t.x(), rowTop, step, fit.size());
+        }
+        pxEnd(context);
+        context.disableScissor();
+    }
+
+    /** 导航那一排上一枚只看不按的小签：与按钮同一件牌、同一种字，不进命中。 */
+    private void navigationTag(DrawContext context, int x, int y, Text text) {
+        var l = sheet();
+        int px = l.len(NAV_TEXT_PX);
+        int pad = l.len(NAV_PAD_X);
+        int w = Math.min(GuiText.widthPx(text.getString(), px, false, 0) + 2 * pad, Math.max(1, l.width() - x));
+        int h = navigationButtonH(l);
+        GuiMaterial.hudPart(context, HudPart.BTN, x, y, w, h, l.k());
+        GuiText.drawPx(context, text.getString(), x + pad, y + (h - GuiText.linePxAt(px, false)) / 2,
+                Math.max(1, w - 2 * pad), px, false, GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT, 0);
+    }
+
+    /**
+     * 板外沿上的一枚小按钮（规则 · 聊天 · 手牌 · 返回）：与各面的按钮同一件切角米色牌（{@link HudPart#BTN}，ADR-0100），
+     * 字照牌上的字走 {@link GuiLanguage#onTag}。原先是 {@code fill} 底色 + 一像素描边、写死尺寸 —— 换主题、换字号都不跟（2026-10-13 验收）。
+     */
+    private int navigationButton(DrawContext context, int x, int y, Text text, Runnable action) {
+        var l = sheet();
+        int px = l.len(NAV_TEXT_PX);
+        int pad = l.len(NAV_PAD_X);
+        int w = GuiText.widthPx(text.getString(), px, false, 0) + 2 * pad;
+        int h = navigationButtonH(l);
+        GuiMaterial.hudPart(context, HudPart.BTN, x, y, w, h, l.k());
+        GuiText.drawPx(context, text.getString(), x + pad, y + (h - GuiText.linePxAt(px, false)) / 2,
+                w - 2 * pad, px, false, GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT, 0);
+        navigationHits.add(new NavigationHit(unitBox(new Rect(x, y, w, h)), action));
+        return x + w + l.len(NAV_GAP);
+    }
+
+    /** 那一枚小按钮多高（物理像素）：一行字（按夹过梯子的真实行高）+ 上下内边距。 */
+    private static int navigationButtonH(SheetLayout l) {
+        return GuiText.linePxAt(l.len(NAV_TEXT_PX), false) + 2 * l.len(NAV_PAD_Y);
+    }
+
+    /** 板外沿那一排小按钮：字号 · 左右与上下内边距 · 按钮之间与离板顶（稿子像素，随 {@code SheetLayout.k} 缩放）。 */
+    private static final double NAV_TEXT_PX = 13;
+    private static final double NAV_PAD_X = 10;
+    private static final double NAV_PAD_Y = 3;
+    private static final double NAV_GAP = 6;
+
+    // ------------------------------------------------------------------ 骨架：照样张的物理像素（ADR-0046 · SheetLayout）
+
+    /**
+     * 这一帧的骨架。每帧现算：窗口与界面尺寸随时会变，日志也随时会钉上、放开。
+     * 骨架排在 {@link #budget} 给的那一块里：日志钉住时右边让出一栏，纸板往左收（用户 2026-10-13）。
+     */
+    protected SheetLayout sheet() {
+        return budget().sheet();
+    }
+
+    /** 这一帧界面那一块多宽、日志那一栏画不画（{@link PaneWindow}，唯一入口）。 */
+    protected io.github.heavyseasmc.mod.ui.PaneBudget budget() {
+        return PaneWindow.current();
+    }
+
+    /**
+     * 这一面排在多宽里（GUI 单位）：整窗宽减去钉住的日志让出来的那一栏。<b>各面横向排版一律用它</b>，不用 Screen 的整窗宽 ——
+     * 日志钉住时用整窗宽居中的东西会落到日志底下（{@code checkNotificationSidebarIntegration} 查）。
+     */
+    protected final int paneW() {
+        var b = budget();
+        return b.logShown() ? Math.floorDiv(b.paneWidth(), guiScale()) : this.width;
+    }
+
+    /** 整窗宽（GUI 单位）：只给「飞出屏幕」这种要越过日志那一栏的目标用，版面一律 {@link #paneW}。 */
+    protected final int windowW() {
+        return this.width;
+    }
+
+    /** 界面尺寸（整数）：物理像素 ÷ 它 = GUI 单位。 */
+    protected int guiScale() {
+        var window = client == null ? net.minecraft.client.MinecraftClient.getInstance().getWindow() : client.getWindow();
+        return Math.max(1, (int) Math.round(window.getScaleFactor()));
+    }
+
+    /** Screen 的统一绘制入口调用：窗口太小时跳过整面，放大后仍是原来的界面和选中项。 */
+    public final boolean renderWindowNotice(DrawContext context) {
+        if (!WindowNotice.required()) {
+            return false;
+        }
+        endFold(context);
+        WindowNotice.render(context, windowNoticeExtra());
+        return true;
+    }
+
+    /** 窗口太小、整面换成那张提示时，这一面还要多说的一句（朱砂）；{@code null} = 没有。 */
+    protected Text windowNoticeExtra() {
+        return null;
+    }
+
+    /** 往下画物理像素（骨架那几件）：矩阵缩到 1 / 界面尺寸。与 {@link #pxEnd} 成对。 */
+    protected void pxBegin(DrawContext context) {
+        float f = 1f / guiScale();
+        context.getMatrices().push();
+        context.getMatrices().scale(f, f, 1f);
+    }
+
+    protected void pxEnd(DrawContext context) {
+        context.getMatrices().pop();
+    }
+
+    /** 物理像素的矩形换成 GUI 单位的命中框（往外取整，宁大勿小）。 */
+    protected Box unitBox(Rect r) {
+        int s = guiScale();
+        int x0 = Math.floorDiv(r.x(), s);
+        int y0 = Math.floorDiv(r.y(), s);
+        return new Box(x0, y0, Math.floorDiv(r.right() + s - 1, s) - x0, Math.floorDiv(r.bottom() + s - 1, s) - y0);
+    }
+
+    /**
+     * 卡面最多画多高（GUI 单位）。
+     *
+     * <p>❗按<b>物理像素</b>算，不按 GUI 单位：视频设置里的界面尺寸设成 1 时一个单位是一个像素，
+     * 设成 4 时是四个 —— 同样 150 个单位高的卡，前者 150 像素、后者 600 像素。清不清楚只看像素。
+     * 界面尺寸不一定是「自动」，所以版面里别的上限也不能写成固定的单位数。
+     */
+    protected int sharpCardHeight() {
+        double scale = client == null ? 1.0 : client.getWindow().getScaleFactor();
+        return (int) Math.floor(SHARP_CARD_PX_H / Math.max(1.0, scale));
+    }
+
+    /**
+     * N 张一排时卡能画多高：竖着剩下的、横着一行放得下 N 张的、像素上限以内还清楚的、
+     * 不超过屏幕高的 {@link #MAX_CARD_H_RATIO} —— 四者取小，再不低于 {@link #MIN_CARD_H}。
+     *
+     * @param availH 竖着剩给这一排卡的高度（调用方已经减掉上下各行与留空）
+     */
+    protected int cardHeightFor(int n, int availH) {
+        return cardHeightFor(n, availH, paneW() - 2 * SIDE);
+    }
+
+    /** 同上，但这一排横着只有 {@code availW} 宽（舞台里另有一块被别的东西占了，比如手牌一面的爱恨两张）。 */
+    protected int cardHeightFor(int n, int availH, int availW) {
+        int count = Math.max(1, n);
+        int byWidth = GuiLanguage.cardHeight((availW - (count - 1) * CARD_GAP) / count);
+        int cap = Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO));
+        return Math.max(MIN_CARD_H, Math.min(Math.min(availH, byWidth), cap));
+    }
+
+    /** 一排 N 张、每张 w 宽时整排多宽。 */
+    protected static int cardRowWidth(int n, int w) {
+        return n * w + (n - 1) * CARD_GAP;
+    }
+
+    /**
+     * 一排高 {@code h} 的牌在 {@code [top, bottom)} 里排在哪一行。
+     *
+     * <p>牌顶要留一段 {@code room}（「抬」9 像素 · 「顿」的位移与放大 —— 牌绕<b>底边</b>缩放，
+     * 长出来的那一截全在上面）。❗留空<b>只在真的不够时</b>才把牌往下推：
+     * 先按整格居中，再保证抬起来的那一截不越过 {@code top}。
+     *
+     * <p>原先写的是 {@code top + room + (余下的)/2} —— 留空先扣、牌再在<b>剩下的</b>里居中，
+     * 于是整排恒比这一格的正中低半个留空（补给箱实测低 7 个单位，1280×720 下约 21 物理像素）。
+     * 用户 2026-09-22 看第四刀实拍时问的就是这个。与「牌是余数」是同一个毛病的小号版本。
+     */
+    protected static int cardsTopIn(int top, int bottom, int h, int room) {
+        return Math.max(top + room, top + Math.max(0, (bottom - top - h) / 2));
+    }
+
+    /** 一排卡里，指针落在第几张上；都不在时 {@code -1}。上边界把「抬」起来的那几像素算进去。 */
+    protected static int cardIndexAt(int mouseX, int mouseY, int left, int top, int w, int h, int count) {
+        if (mouseY < top - GuiMetrics.units(GuiLanguage.LIFT_PX) || mouseY > top + h) {
+            return -1;
+        }
+        for (int i = 0; i < count; i++) {
+            int x = left + i * (w + CARD_GAP);
+            if (mouseX >= x && mouseX < x + w) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** 只会「抬」的卡，顶上要留多少空：抬起的距离加金框与余量。 */
+    protected static int liftRoom() {
+        return (int) Math.ceil(GuiMetrics.units(GuiLanguage.LIFT_PX)) + BORDER_ROOM;
+    }
+
+    /** 只会「抬」的按钮，顶上要留多少空：抬起的距离加 1 像素的框与余量。抬起来的金框不能切进上面那一行字。 */
+    protected static int buttonLiftRoom() {
+        return (int) Math.ceil(GuiMetrics.units(GuiLanguage.LIFT_PX)) + 1 + 2;
+    }
+
+    /**
+     * 会「顿」的卡，顶上要留多少空，才让最高的那一帧碰不到上面那一行。
+     *
+     * <p>三件事叠起来：「抬」9 像素 · 「顿」的位移 · 「顿」放大那一截 —— 卡是绕<b>底边</b>缩放的，
+     * 所以长出来的 {@code (scale-1)×h} 全在上面。只算「抬」的那一版在真实客户端上实拍到了：
+     * 超时那一下弹起时，金框的上边切进了座位轨上「珠宝商」那几个字。
+     */
+    protected static int snapRoom(int cardHeight) {
+        return (int) Math.ceil(GuiMetrics.units(GuiLanguage.LIFT_PX + GuiLanguage.SNAP_PEAK_RISE)
+                + (GuiLanguage.SNAP_PEAK_SCALE - 1f) * cardHeight) + BORDER_ROOM;
+    }
+
+    /**
+     * 选中金框（金 =「你 · 你选的那张」）。在卡自己的矩阵里画：它是这张卡的一部分，得跟着卡一起升起、一起缩放
+     * —— 画在矩阵外面的那一版，发牌那 300ms 里框停在落点、卡还在下面往上走（2026-09-15 真实客户端上看到的）。
+     */
+    protected static void drawCardFrame(DrawContext context, int w, int h) {
+        // 照样张 .sel（外 3 深金 · 4 金 · 1 深金，样张 CSS 渲出来的那一件）：在卡自己的矩阵里、换到物理像素画，跟着卡一起抬、一起缩放。
+        var window = net.minecraft.client.MinecraftClient.getInstance().getWindow();
+        int s = Math.max(1, (int) Math.round(window.getScaleFactor()));
+        SheetLayout l = PaneWindow.current().sheet();
+        float f = 1f / s;
+        context.getMatrices().push();
+        context.getMatrices().scale(f, f, 1f);
+        GuiMaterial.hudPart(context, HudPart.CARD_SEL, 0, 0, w * s, h * s, l.k());
+        context.getMatrices().pop();
+    }
+
+    /**
+     * 五条带的 y，<b>只由窗口算出来</b>：与这一面有什么内容无关，所以同一个窗口下每一面都一样。
+     *
+     * <p>❗这是第四刀的全部要点（ADR-0037 §7.10 第 4 条）。此前十五个 {@code Screen} 各自从零算版面 ——
+     * 上带 · 座位轨 · 倒计时 · 身份行在每一面的 y 都不同，换面时整屏都在跳，用户判「每个阶段页面感觉像独立的」。
+     * 现在共有的四条带一个像素都不动，<b>连续感来自它们没动</b>，不来自动效；各面只填舞台那一格。
+     *
+     * <p>顺带治「文字太多」：带位一定，每面能放多少字就有了上限 —— 放不下的只能删，不能再往下挤。
+     *
+     * @param avatar 座位轨上头像的直径；{@code 0} = 这一档窗口放不下头像（退回只有名字的轨）
+     */
+    protected record Bands(int topY, int railY, int railH, int avatar, int ruleY, int stageTop, int stageBottom,
+                           int gaugeY) {
+
+        /** 舞台那一格有多高。 */
+        int stageH() {
+            return Math.max(0, stageBottom - stageTop);
+        }
+
+        /**
+         * 最下面那一栏多高。
+         *
+         * <p>❗它装的不只是横杠与秒数，还有两头的键帽 —— 而键帽行比一行字高
+         * （{@link #keyHintRowH()} = 行高 + 键帽自己的上下边）。原先只按「横杠与秒数谁高」算，
+         * 键帽两头各顶出去 2 个单位，读起来就是挤（用户 2026-09-23：「下方那一栏太拥挤了，
+         * 中间太空了」）。现在按最高的那一件算，再加一圈留白 —— 多出来的高度从舞台里出，
+         * 那正是空着的地方。
+         */
+        int gaugeH() {
+            return Math.max(Math.max(BAR_H, textH()), keyHintRowH()) + 2 * FOOT_PAD;
+        }
+    }
+
+    /**
+     * 这一帧的带位。每帧重算，不缓存：窗口与界面尺寸随时会变（与各面的版面同一条规矩）。
+     *
+     * <p>排法是<b>两头往中间</b>：上带钉在顶上、身份行贴底、倒计时压在身份行上面，
+     * 剩下的一段由座位轨与舞台分 —— 轨最多拿 {@link #RAIL_MAX_SHARE}，舞台拿剩下的全部。
+     */
+    protected Bands bands() {
+        // 照样张 b-3 的骨架（SheetLayout，物理像素）换成 GUI 单位：上带在板顶 +22，座位轨 +84，
+        // 倒计时锚在板底 −112，提示那一行贴板底 −20。舞台 = 座位轨名字那一行之下 · 倒计时之上。
+        SheetLayout l = sheet();
+        int s = guiScale();
+        int topY = Math.floorDiv(l.phase(0).y(), s);
+        int railY = Math.floorDiv(l.seatToken(0, 8).y(), s);
+        int ruleY = Math.floorDiv(l.railBottom() + s - 1, s);
+        int railH = Math.max(0, ruleY - railY);
+        int avatar = Math.max(1, l.seatToken(0, 8).w() / s);
+        int gaugeY = Math.floorDiv(l.countBar().y(), s);
+        int stageTop = ruleY + Math.max(1, l.len(12) / s);
+        int stageBottom = gaugeY - Math.max(1, l.len(14) / s);
+        return new Bands(topY, railY, railH, avatar, ruleY, stageTop, stageBottom, gaugeY);
+    }
+
+    /**
+     * 舞台里贴着底边往上排 {@code lines} 行说明时，第一行在哪。
+     *
+     * <p>说明贴舞台底边，所以<b>最后一行永远压在倒计时上面同一个位置</b> —— 各面说明行数不同，
+     * 但它们与倒计时之间的距离一样，换面时下半屏同样不跳。
+     */
+    protected int footerTop(Bands b, int lines) {
+        return b.stageBottom() - lines * lineStep();
+    }
+
+    /** 舞台里相邻两行说明之间隔多远（一行字加 2）。 */
+    protected static int lineStep() {
+        return textH() + 2;
+    }
+
+    /**
+     * 四条共有的带一次画完：上带 · 座位轨 · 身份行（倒计时归 {@link #drawCountdown}，
+     * 只有会超时的面才画它 —— ADR-0018 §7.4），外加舞台四角的角标。
+     *
+     * <p>各面在 {@code render} 的开头调它一次，拿回来的 {@link Bands} 就是这一帧唯一的版面来源。
+     */
+    protected Bands drawChrome(DrawContext context, HudView view) {
+        seatHits.clear();
+        detailHits.clear();
+        edgeLeftW = 0;
+        edgeRightW = 0;                        // 每帧清零：这一面这一帧到底放没放边上的提示，只认它自己说的
+        Bands b = bands();
+        drawTopBand(context, view, b);
+        drawRailBand(context, view, b);
+        // 2026-09-30 之前这里还有两道通栏线把舞台夹出来；样张 b-3 没有它们（板上只有木纹与板缝），照样张收掉（ADR-0046）。
+        return b;
+    }
+
+    /** 上带画什么。默认是「回合 · 阶段 · 海鸥」；对局已经结束的那两面写别的（计分写结局，阵容写标题）。 */
+    protected void drawTopBand(DrawContext context, HudView view, Bands b) {
+        drawPublicBand(context, view, b.topY());
+    }
+
+    /**
+     * 座位轨画什么。默认是这一局的座位，与主画面的座位轨同一套标记（{@link #railMark}）：
+     * 金圈 = 你 · 朱砂圈 = 被指的人 · 被等的那一圈就是钟 · 右上小圆片（补给箱 · 准星）。
+     *
+     * <p>补给箱与终局翻牌两面覆写它：那两面的轨是<b>这一条链</b>与<b>翻到谁</b>，不是座位序。
+     */
+    protected void drawRailBand(DrawContext context, HudView view, Bands b) {
+        List<String> seats = view.seats();
+        if (seats.isEmpty() || b.railH() == 0) {
+            return;
+        }
+        RailMarks marks = railMarks(view);
+        for (int i = 0; i < seats.size(); i++) {
+            String id = seats.get(i);
+            io.github.heavyseasmc.mod.ui.SeatClock.Mark mark = marks.of(view, id);
+            boolean lit = mark.ring() != io.github.heavyseasmc.mod.ui.SeatClock.Ring.PLAIN;
+            drawSeatAt(context, id, i, seats.size(), mark, false, lit);
+        }
+    }
+
+    /** 这一帧座位轨上各座的标记：在等谁与被指的人一帧算一次，各座共用（与主画面 {@code GameHud#drawRail} 同一个算法）。 */
+    protected static RailMarks railMarks(HudView view) {
+        return new RailMarks(io.github.heavyseasmc.mod.ui.SeatClock.waiting(view),
+                io.github.heavyseasmc.mod.ui.SeatClock.aimed(view), GameClock.now(), ClientPrefs.reducedMotion());
+    }
+
+    /** {@link #railMarks} 的结果。 */
+    protected record RailMarks(java.util.Map<String, HudView.Rail.Wait> waiting, String aimed, long now, boolean stepped) {
+
+        io.github.heavyseasmc.mod.ui.SeatClock.Mark of(HudView view, String id) {
+            return io.github.heavyseasmc.mod.ui.SeatClock.mark(view, id, waiting, aimed, now, stepped);
+        }
+    }
+
+    /**
+     * 座位轨上第 {@code i} 格（共 {@code n} 格），照样张 b-3 的 {@code .srail}：头像 46 · 外圈 · 名字 15px。
+     * 那一圈与右上的小圆片与主画面同一份画法（{@link SeatToken}）。
+     *
+     * @param mark    这一座的标记（{@link io.github.heavyseasmc.mod.ui.SeatClock#mark}）
+     * @param faded   还没轮到：头像淡下去
+     * @param lit     名字亮着（你 · 正轮到）；否则是样张 {@code .mut} 的次墨
+     */
+    protected void drawSeatAt(DrawContext context, String characterId, int i, int n,
+                              io.github.heavyseasmc.mod.ui.SeatClock.Mark mark, boolean faded, boolean lit) {
+        SheetLayout l = sheet();
+        Box hit = unitBox(l.seatCell(i, n));
+        seatHits.add(new SeatHit(hit, characterId));
+        addDetail(hit, () -> seatDetail(characterId).orElse(null));
+        pxBegin(context);
+        Rect t = l.seatToken(i, n);
+        var seat = SeatMarks.seat(characterId);
+        GuiMaterial.portrait(context, characterId, t.x(), t.y(), t.w(), faded ? SEAT_FADED : 1f);
+        seat.ifPresent(s -> SeatMarks.shade(context, t, SeatMarks.Kit.TOKEN46, s, l.k()));
+        SeatToken.ring(context, SeatToken.Kit.TOKEN46, t, l.k(), mark);
+        // D1 (a)：体力印章 · 昏迷 · 移出 · 死亡（ADR-0048）。各面的轨上没有舵轮，印章一律在右下
+        seat.ifPresent(s -> SeatMarks.marks(context, t, s, l.k()));
+        Rect nm = l.seatName(i, n);
+        GuiText.drawPx(context, nameOf(characterId).getString(), nm.x(), nm.y(), nm.w(), l.len(SheetLayout.NAME_PX),
+                false, lit ? GuiLanguage.ink() : GuiLanguage.secondary(), GuiText.Align.CENTER, 0);
+        SeatToken.chip(context, l.seatChip(i, n), l.k(), mark.chip());
+        pxEnd(context);
+    }
+
+    /** 座位轨一格多宽：整条铺到舞台两边，格子按人数均分。 */
+    protected int railCell(int seats) {
+        return (paneW() - 2 * SIDE) / Math.max(1, seats);
+    }
+
+    /** 一个按钮排在哪。 */
+    protected record Box(int x, int y, int w, int h) {
+
+        public boolean contains(int mx, int my) {
+            return mx >= x && mx < x + w && my >= y && my < y + h;
+        }
+    }
+
+    /**
+     * 倒计时：一条细横杠加一行秒数。
+     *
+     * <p>❗<b>总长由调用方给，而且要给「这一段本来有多长」</b>，不是某个常量：站队段有人加入会把
+     * 15 秒重置成 8 秒，照 15 秒画的杠会从一半开始走 —— 而它看起来完全正常。
+     *
+     * <p>「什么时候算紧迫」取自 {@link io.github.heavyseasmc.mod.ui.CountdownDigits#urgent}：朱砂只给最后 5 秒，
+     * 一直红着就喊不动了。
+     */
+    private void drawCountdown(DrawContext context, Bands b, long now, long deadlineMs, long totalMs, int stageW) {
+        long left = GameClock.remaining(deadlineMs);
+        long total = Math.max(1L, totalMs);
+        boolean infinite = total >= UNLIMITED_THRESHOLD_MS || left >= UNLIMITED_THRESHOLD_MS;   // 演示局不限时：满条、∞
+        float frac = infinite ? 1f : MathHelper.clamp(left / (float) total, 0f, 1f);
+        boolean urgent = !infinite && io.github.heavyseasmc.mod.ui.CountdownDigits.urgent(left);
+        // ❗秒数排在横杠**旁边**，不排在它下面：叠成两行时这一条带要 21 个单位，并排只要一行字那么高。
+        //   省下来的十几个单位全归舞台（总纲 §7.8）。
+        // 样张里这个数是墨色的、没有 s 后缀 —— 它是这一条带上唯一要读的东西，不该比刻度还淡。
+        Text seconds = infinite ? Text.translatable("heavyseas.hud.unlimited")
+                : Text.literal(Long.toString(io.github.heavyseasmc.mod.ui.CountdownDigits.seconds(left)));
+        // ❗秒数占的宽按**这一局最宽的那一种写法**算，不按这一帧真正要印的那几个字：
+        //   「12」比「9」宽，而整块是居中的 —— 按当帧宽度算，每跨过一个数位整根管子就横着跳一下
+        //   （用户 2026-09-23：「在倒计时的时候管子会左右横移」）。定宽之后管子一动不动，只有数字在变。
+        int textW = secondsFieldW(total);
+        int gap = 2 * BAR_TO_TEXT;
+        // 两头的按键提示先占位：倒计时绝不压到它们。
+        // ❗最后这一下 min 不能省：countdownWidth 里有个 MIN_COUNTDOWN_W 的下限，
+        //   光把窄一点的宽度传进去是拦不住的 —— 实拍到秒数压在「U 收起」那枚键帽上（2026-09-22）。
+        //   宁可横杠短一截，也不许两件东西叠在一起。
+        // ❗在**两头让出的那一段里**居中，不是按全屏居中：左右两头的提示不一样宽，
+        //   按全屏居中会整块偏向窄的那一头，压上另一头（实拍：秒数压在「U 收起」上）。
+        int from = SIDE + edgeLeftW + (edgeLeftW > 0 ? FOOT_GUTTER : 0);
+        int to = paneW() - SIDE - edgeRightW - (edgeRightW > 0 ? FOOT_GUTTER : 0);
+        int free = Math.max(0, to - from);
+        int barW = Math.min(countdownWidth(Math.max(0, stageW - textW - gap)), Math.max(0, free - textW - gap));
+        int x = from + Math.max(0, (free - (barW + gap + textW)) / 2);
+        int mid = footMidY(b);
+        GuiMaterial.gauge(context, x, mid - BAR_H / 2, barW, frac, urgent);
+        drawLineLeft(context, seconds, x + barW + gap, mid - textH() / 2,
+                urgent ? GuiLanguage.cinnabar() : GuiLanguage.ink());
+    }
+
+    /**
+     * 秒数那一栏留多宽：把这一局的总秒数每一位都换成最宽的那个数字去量。
+     *
+     * <p>不直接量「12」，是因为哪个数字最宽取决于字体 —— 量一遍十个数字，别猜。
+     */
+    private int secondsFieldW(long totalMs) {
+        int digit = 0;
+        for (char c = '0'; c <= '9'; c++) {
+            digit = Math.max(digit, textW(Text.literal(String.valueOf(c))));
+        }
+        String widest = io.github.heavyseasmc.mod.ui.CountdownDigits.widest(totalMs);
+        int w = 0;
+        for (int i = 0; i < widest.length(); i++) {
+            char c = widest.charAt(i);
+            w += Character.isDigit(c) ? digit : textW(Text.literal(String.valueOf(c)));
+        }
+        return w;
+    }
+
+    /**
+     * 倒计时多宽。它是「这一排牌」的时间，所以跟着舞台走；但**不通栏**。
+     *
+     * <p>❗右栏收起之后舞台就是整屏，倒计时于是横跨一千多像素去表达「还剩几秒」这一个标量 ——
+     * 全屏信息量对面积比最差的一件，而且一条通栏的横线会把版面切断（用户 2026-09-22：
+     * 「横向利用得很满，纵向是否能分担一些」，指的是 GUI 元素的排布）。
+     * 上限按舞台的比例写，不写死像素：界面尺寸与窗口都会变。
+     */
+    protected int countdownWidth(int stageW) {
+        int cap = Math.max(MIN_COUNTDOWN_W, Math.round((paneW() - 2 * SIDE) * COUNTDOWN_MAX_SHARE));
+        return Math.min(Math.min(paneW() - 2 * SIDE, cap), Math.max(MIN_COUNTDOWN_W, stageW));
+    }
+
+    /** 倒计时最多占舞台的几成宽，以及它的下限（GUI 单位）。 */
+    private static final float COUNTDOWN_MAX_SHARE = 0.46f;
+    private static final int MIN_COUNTDOWN_W = 160;
+
+    /**
+     * 一排按钮排在哪：一行放得下就并排居中，放不下就一行一个。
+     *
+     * <p>❗宽度按 {@code textRenderer} 量出来的字宽算，不写死 —— 译名长度各语言不同，
+     * 写死的那一版只在中文下看着是居中的（英文的「Join the defending side」在窄窗口里一行放不下三个）。
+     */
+    protected java.util.List<Box> layoutButtonRow(java.util.List<Text> labels, int top, int gap) {
+        int h = buttonHeight();
+        int[] w = new int[labels.size()];
+        int total = -gap;
+        for (int i = 0; i < labels.size(); i++) {
+            w[i] = buttonWidth(labels.get(i));
+            total += w[i] + gap;
+        }
+        java.util.List<Box> out = new ArrayList<>(labels.size());
+        if (total <= paneW() - 2 * BTN_SIDE) {
+            int x = (paneW() - total) / 2;
+            for (int i = 0; i < labels.size(); i++) {
+                out.add(new Box(x, top, w[i], h));
+                x += w[i] + gap;
+            }
+            return out;
+        }
+        int y = top;
+        for (int i = 0; i < labels.size(); i++) {
+            out.add(new Box((paneW() - w[i]) / 2, y, w[i], h));
+            y += h + gap;
+        }
+        return out;
+    }
+
+    /**
+     * 一片等宽的按钮排成几列：阵容页那种「八个角色勾选」用它。
+     *
+     * <p>每个按钮取最宽的那个标签的宽度，列数放不下时减到放得下为止（最少一列）。
+     * 行与行之间多留 {@link #buttonLiftRoom()}：抬起来的金框不能切进上一行。
+     */
+    protected java.util.List<Box> layoutButtonGrid(java.util.List<Text> labels, int top, int gap, int columns) {
+        int h = buttonHeight();
+        int w = 0;
+        for (Text label : labels) {
+            w = Math.max(w, buttonWidth(label));
+        }
+        int cols = Math.max(1, Math.min(columns, labels.size()));
+        while (cols > 1 && cols * w + (cols - 1) * gap > paneW() - 2 * BTN_SIDE) {
+            cols--;
+        }
+        int rowW = cols * w + (cols - 1) * gap;
+        int left = (paneW() - rowW) / 2;
+        int rowStep = h + gap + buttonLiftRoom();
+        java.util.List<Box> out = new ArrayList<>(labels.size());
+        for (int i = 0; i < labels.size(); i++) {
+            out.add(new Box(left + (i % cols) * (w + gap), top + (i / cols) * rowStep, w, h));
+        }
+        return out;
+    }
+
+    /** 一个按钮多高：一行字加上下内边距。 */
+    protected int buttonHeight() {
+        // 样张 .btn：padding 9 · 18px × 行高 1.7 ≈ 48.6 稿子像素，换成 GUI 单位
+        SheetLayout l = sheet();
+        return Math.max(1, Math.round(l.len(SheetLayout.HINTS_H) / (float) guiScale()));
+    }
+
+    /** 按钮多宽：左右各 20 稿子像素，字按 18px、字距 2 量（样张 .btn）。 */
+    protected int buttonWidth(Text label) {
+        SheetLayout l = sheet();
+        int px = l.len(BTN_TEXT_PX);
+        int w = 2 * l.len(20) + GuiText.widthPx(label.getString(), px, false, l.len(BTN_TEXT_SPACING));
+        return Math.max(1, (w + guiScale() - 1) / guiScale());
+    }
+
+    /** 按钮上的字（样张 .btn { font-size: 18px; letter-spacing: 2px }）。 */
+    private static final double BTN_TEXT_PX = 18;
+    private static final double BTN_TEXT_SPACING = 2;
+
+    /**
+     * 指针落在第几个按钮上；都不在时 {@code -1}。
+     *
+     * <p>上边界把「抬」起来的那几像素算进去：抬起来的按钮，指针停在它顶上那一截时仍然算指着它。
+     */
+    protected static int indexAt(java.util.List<Box> boxes, int mouseX, int mouseY) {
+        for (int i = 0; i < boxes.size(); i++) {
+            Box b = boxes.get(i);
+            if (mouseX >= b.x() && mouseX < b.x() + b.w()
+                    && mouseY >= b.y() - GuiMetrics.units(GuiLanguage.LIFT_PX) && mouseY < b.y() + b.h()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** 这一排按钮从最左到最右多宽。座位轨与倒计时跟着它排，别让轨铺满全屏、按钮缩在中间一小截。 */
+    protected static int rowWidth(java.util.List<Box> boxes) {
+        int left = Integer.MAX_VALUE;
+        int right = 0;
+        for (Box b : boxes) {
+            left = Math.min(left, b.x());
+            right = Math.max(right, b.x() + b.w());
+        }
+        return boxes.isEmpty() ? 0 : right - left;
+    }
+
+    /** 这一排（或这一片）按钮总共占多高。版面按它往下排，免得下一行压上来。 */
+    protected static int rowHeight(java.util.List<Box> boxes) {
+        int bottom = 0;
+        int top = Integer.MAX_VALUE;
+        for (Box b : boxes) {
+            top = Math.min(top, b.y());
+            bottom = Math.max(bottom, b.y() + b.h());
+        }
+        return boxes.isEmpty() ? 0 : bottom - top;
+    }
+
+    /** 一个按钮：底 · 金框（选中 =「你选的那个」）· 居中的字。与行动一面同一个样子。 */
+    protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color, float lift) {
+        drawButton(context, b, label, focused, color, GuiLanguage.ground(), -lift, 1f);
+    }
+
+    /**
+     * 同上，但底色、位移与缩放由调用方给：行动一面用它画「顿」（绕底边放大）与按不动的淡底。
+     *
+     * @param fill  底色。按不动的按钮把底一起淡下去 —— 只淡字的话与本来就淡字的「什么也不做」分不开（实拍过）
+     * @param rise  竖向位移，负号向上（「抬」就是 {@code -lift}）
+     * @param scale 绕底边中点缩放：「顿」长出来的那一截全在上面，版面留空才算得准
+     */
+    protected void drawButton(DrawContext context, Box b, Text label, boolean focused, int color,
+                              int fill, float rise, float scale) {
+        // 2026-09-30 之前这里还给每颗按钮登记一张写着它自己名字的悬停签（停在「划船」上再弹一次「划船」）——
+        // 用户判收掉（验收清单第 10 条）：签子只该说按钮上没写的东西。
+        context.getMatrices().push();
+        context.getMatrices().translate(b.x() + b.w() / 2f, b.y() + b.h() + rise, 0);
+        context.getMatrices().scale(scale, scale, 1f);
+        context.getMatrices().translate(-b.w() / 2f, -b.h(), 0);
+        // 切角米色牌（ADR-0100），焦点那一颗外加铜框与四角铆钉；字 18px、字距 2（ADR-0046）。
+        // 按不动的连底一起淡下去（fill 的不透明度就是那个「淡」）。
+        SheetLayout l = sheet();
+        int s = guiScale();
+        float alpha = (fill >>> 24) / 255f;
+        float f = 1f / s;
+        context.getMatrices().scale(f, f, 1f);
+        context.setShaderColor(1f, 1f, 1f, alpha);
+        GuiMaterial.hudPart(context, focused ? HudPart.BTN_FOCUS : HudPart.BTN, 0, 0, b.w() * s, b.h() * s, l.k());
+        context.setShaderColor(1f, 1f, 1f, 1f);
+        int px = l.len(BTN_TEXT_PX);
+        GuiText.drawPx(context, label.getString(), 0, (b.h() * s - GuiText.linePxAt(px, false)) / 2, b.w() * s, px, false,
+                GuiLanguage.onTag(color), GuiText.Align.CENTER, l.len(BTN_TEXT_SPACING));
+        context.getMatrices().pop();
+    }
+
+    // ------------------------------------------------------------------ 字：只经 GuiText（ADR-0037）
+
+    /** 版面常量当初是按「一行字 9 个单位」定的；字的实际行高随界面尺寸变，凡含一行字的高度都要补上这个差。 */
+    private static final int BASE_TEXT_H = 9;
+
+    // ------------------------------------------------------------------ 座位：头像 · 名字 · 一道线（ADR-0037）
+
+    /** 头像最小、最大画多少<b>物理像素</b>，以及取窗口高的几分之一。上限按像素写：GUI 单位随界面尺寸差出好几倍。 */
+    private static final double AVATAR_MIN_PX = 36;
+    private static final double AVATAR_MAX_PX = 72;
+    private static final double AVATAR_WINDOW_RATIO = 1 / 12.0;
+    /** 头像最小画几个 GUI 单位：再小就只剩一团色，不如不画圈。 */
+    private static final int AVATAR_FLOOR = 8;
+    /** 还没轮到的人，头像淡到多少。 */
+    protected static final float SEAT_FADED = 0.5f;
+
+    /**
+     * 座位上的头像画多大（直径，GUI 单位）：先按窗口高取，再缩到 {@code room} 以内；一枚都放不下就是 {@code 0}。
+     *
+     * <p>❗<b>缩的是头像，不是舞台。</b> 第二刀收尾那次实拍：轨换成头像之后高出约 28 个单位，
+     * 行动一面的按钮被顶出去盖在说明那一行上（§7.7）。带位版面里轨只拿 {@link #RAIL_MAX_SHARE}，
+     * 这个方法负责把头像塞进那点高度里；缩到看不清还硬画不如不画，而把舞台挤掉是绝不允许的。
+     */
+    private int avatarDiameter(int room) {
+        var window = net.minecraft.client.MinecraftClient.getInstance().getWindow();
+        double scale = Math.max(1.0, window.getScaleFactor());
+        double px = Math.max(AVATAR_MIN_PX, Math.min(AVATAR_MAX_PX, window.getHeight() * AVATAR_WINDOW_RATIO));
+        int d = Math.max(AVATAR_FLOOR, (int) Math.round(px / scale));
+        while (d > AVATAR_FLOOR && blockOf(d) > room) {
+            d--;
+        }
+        return blockOf(d) <= room ? d : 0;
+    }
+
+    /** 头像连圈占多高，外加到名字的 1 个单位；这一档不画头像时是 0。 */
+    private static int blockOf(int diameter) {
+        return diameter <= 0 ? 0 : diameter + 2 * GuiMaterial.ringMargin(diameter) + 1;
+    }
+
+    /**
+     * {@link #drawSeat} 画到的最低处（名字底下那道线的下沿），GUI 单位。
+     *
+     * <p>❗它按正文行高排名字，比共有座位轨那一行小字高：1280×720 下线落在稿子轨底之下 9 个单位，
+     * 舞台第一行若从 {@link Bands#stageTop} 起就压在名字与线上（2026-10-13 实拍「揭晓 · 爱」，G03 / G05 / G06）。
+     * 用它的那一面，舞台第一行从这里往下排。
+     */
+    protected int seatBottom(Bands b) {
+        return b.railY() + blockOf(b.avatar()) + textH() + 2;
+    }
+
+    /**
+     * 座位轨上的一格：头像、名字、名字底下一道线。三面的座位轨（补给箱 · 行动 · 终局）都画它 ——
+     * 各面只决定「这一格现在是什么状态」，长什么样只此一处。
+     *
+     * @param mark      头像圈上的语义色（金 = 你 · 铜绿 = 正轮到），{@code 0} 不着色
+     * @param faded     还没轮到：头像淡下去
+     * @param lineColor 名字底下那道线
+     * @return 名字那一行的 y —— 终局那一面还要在线下面再写一行
+     */
+    protected int drawSeat(DrawContext context, String characterId, int x, int y, int cell, Bands b,
+                           int mark, boolean faded, int nameColor, int lineColor) {
+        seatHits.add(new SeatHit(new Box(x, y, cell, b.railH()), characterId));
+        addDetail(new Box(x, y, cell, b.railH()), () -> seatDetail(characterId).orElse(null));
+        int full = b.avatar();
+        if (full > 0) {
+            int m = GuiMaterial.ringMargin(full);
+            int d = Math.max(1, Math.min(full, cell - 2 * m - 2));   // 格子比头像还窄（界面尺寸 1、八个人）就跟着格子缩，绝不压到邻座
+            GuiMaterial.avatar(context, characterId, x + (cell - d) / 2, y + m + (full - d) / 2, d, mark,
+                    faded ? SEAT_FADED : 1f);
+        }
+        int nameY = y + blockOf(full);
+        if (density().atLeast(Density.MEDIUM)) {
+            drawLineIn(context, nameOf(characterId), x + 2, nameY, cell - 4, nameColor);
+        }
+        context.fill(x + 2, nameY + textH() + 1, x + cell - 2, nameY + textH() + 2, lineColor);
+        return nameY;
+    }
+
+    /**
+     * 停在座位上时那张签：名字 · 体力 · 清醒与否（离线就写离线）· 右键能看他面前的牌。
+     *
+     * <p>全是公开的（体型与伤势全船可见，决策 ③；面前那一区本来就摊在桌上），数据取自 {@code TableView}。
+     * 右键进公开区那一面（协作者 {@code 2adbbe4}）原先屏幕上没有任何提示 —— 这张签就是它的入口
+     * （ADR-0045 §1.5 N1）。也是 ADR-0043 D4 排好的「L1 悬停签」。
+     */
+    private java.util.Optional<Text> seatDetail(String characterId) {
+        if (client == null || client.world == null) {
+            return java.util.Optional.empty();
+        }
+        for (var seat : io.github.heavyseasmc.mod.state.GameComponents.of(client.world).tableView().seats()) {
+            if (seat.id().equals(characterId)) {
+                Text state = seat.offline() ? Text.translatable("heavyseas.table.offline") : conditionName(seat.condition());
+                // 「右键看面前的牌」每一面都写：右键座位现在哪一面都开得了那个人的座位面板（二级页面，见 mouseClicked）
+                Text line = Text.translatable("heavyseas.seat.detail",
+                        nameOf(characterId), Math.max(0, seat.health()), seat.size(), state);
+                // 下面接规则书里这个人的本事（用户 2026-10-07：「鼠标移动到角色头像上是浮窗气泡显示角色介绍」）
+                List<String> notes = CharacterNotes.of(characterId);
+                return java.util.Optional.of(notes.isEmpty() ? line
+                        : Text.literal(line.getString() + "\n" + String.join("\n", notes)));
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    /**
+     * 上带多高：一排图标加上下留白。
+     *
+     * <p>2026-09-23 之前这里是「一行字 + 海鸥格」—— 稿子上的上带<b>一个字没有</b>：
+     * 天候 · 阶段轮盘 · 四只海鸥。回合数与阶段名仍在主画面 HUD 上，
+     * 界面里再印一遍只是把舞台让出去（用户 2026-09-22：「整体偏离设计稿」）。
+     */
+    protected static int topBandH() {
+        return ICON_H + TOP_BAND_H;
+    }
+
+    /** 一行正文多高，GUI 单位。版面里凡是「一行字」都用它 —— 界面尺寸小的时候有字号地板，一行不止 9 个单位。 */
+    protected static int textH() {
+        return GuiText.lineHeight(GuiText.BODY, false);
+    }
+
+    /** 一行正文多宽，GUI 单位。 */
+    protected static int textW(Text text) {
+        return GuiText.width(text.getString(), GuiText.BODY, false);
+    }
+
+    protected static int textW(String text) {
+        return GuiText.width(text, GuiText.BODY, false);
+    }
+
+    /** 以 {@code cx} 为中心画一行正文。框取到舞台两边里较近的那一边为止：放不下就缩，绝不出舞台。 */
+    protected void drawLine(DrawContext context, Text text, int cx, int y, int color) {
+        drawLine(context, text, cx, y, color, GuiText.BODY, false);
+    }
+
+    protected void drawLine(DrawContext context, String text, int cx, int y, int color) {
+        drawLine(context, Text.literal(text), cx, y, color, GuiText.BODY, false);
+    }
+
+    protected void drawLine(DrawContext context, Text text, int cx, int y, int color, int size, boolean bold) {
+        int half = Math.max(1, Math.min(cx, paneW() - cx) - 2);
+        GuiText.line(context, text, cx - half, y, 2 * half, size, bold, color, GuiText.Align.CENTER);
+    }
+
+    /** 在 {@code [x, x + w]} 这一格里居中画一行正文：格子窄就缩字号，绝不压到邻格。 */
+    protected void drawLineIn(DrawContext context, Text text, int x, int y, int w, int color) {
+        GuiText.line(context, text, x, y, Math.max(1, w), GuiText.BODY, false, color, GuiText.Align.CENTER);
+    }
+
+    /**
+     * 在舞台宽里居中画一段正文，最多 {@code maxLines} 行（折行归 {@link GuiText}）。
+     *
+     * @return 实际画了几行
+     */
+    protected int drawParagraph(DrawContext context, Text text, int y, int maxLines, int color) {
+        int used = GuiText.draw(context, text.getString(), SIDE, y, paneW() - 2 * SIDE, GuiText.BODY, false, color,
+                GuiText.Align.CENTER, maxLines);
+        return Math.max(1, Math.round(used / (float) textH()));
+    }
+
+    /** 从 {@code x} 起左对齐画一行正文，最宽到舞台右边。 */
+    protected void drawLineLeft(DrawContext context, Text text, int x, int y, int color) {
+        GuiText.line(context, text, x, y, Math.max(1, paneW() - x - 2), GuiText.BODY, false, color, GuiText.Align.LEFT);
+    }
+
+    protected void drawLineLeft(DrawContext context, String text, int x, int y, int color) {
+        drawLineLeft(context, Text.literal(text), x, y, color);
+    }
+
+    // ------------------------------------------------------------------ 按键提示：键帽 + 一句话（ADR-0037）
+
+    /** 一条按键提示：几枚键帽，后面跟一句话。{@code keys} 为空就只是一句话 —— 它与带键帽的提示排在同一行里。 */
+    /**
+     * 一条按键提示。{@code primary} 那一条画成**搪瓷按钮**：键帽与那句话一起印在一块搪瓷牌上，
+     * 外面一圈金（金 = 你 · 轮到你）。
+     *
+     * <p>稿子上「确认」本来就是一枚按钮，而不是一枚裸键帽加两个字 —— 一屏上总要有一件东西
+     * 看上去是<b>可以按下去的那一件</b>，其余只是说明。
+     */
+    protected record KeyHint(List<String> keys, Text label, boolean primary) {
+    }
+
+    /** 同一条提示里相邻两枚键帽之间、键帽与那句话之间。 */
+    private static final int KEY_GAP = 2;
+    private static final int KEY_TO_LABEL = 4;
+    /** 相邻两条提示之间。 */
+    private static final int HINT_SPACING = 12;
+    /** 两头的提示与中间倒计时之间 —— 比提示之间更宽，才分得出「这是两件事」。 */
+    private static final int FOOT_GUTTER = 24;
+
+    /**
+     * 下面那一栏里，那一行字的中线 —— 栏里每一件东西都按它对齐，而不是各按各的盒子居中。
+     *
+     * <p>❗键帽的盒子底下带一道暗边（{@link GuiMaterial#KEY_PAD_BOTTOM} 比上边厚），
+     * 所以「盒子居中」与「看上去居中」差着一两个单位：三件东西各按自己的盒子算，
+     * 横杠就比旁边的键帽低一截（用户 2026-09-23：「管子的位置太偏下了」）。
+     * 按字线对齐之后，字、键帽上的字、秒数、横杠的中心都落在同一条线上。
+     */
+    protected int footMidY(Bands b) {
+        return b.gaugeY() + (b.gaugeH() - keyHintRowH()) / 2 + GuiMaterial.KEY_PAD_TOP + textH() / 2;
+    }
+
+    /** 一枚键帽多高：一行字加键帽自己的边与底下那道厚边。按键提示那一行就这么高。 */
+    protected static int keyHintRowH() {
+        return textH() + GuiMaterial.KEY_PAD_TOP + GuiMaterial.KEY_PAD_BOTTOM;
+    }
+
+    private static int keycapW(String key) {
+        // 单个字符的键帽至少是方的：「←」比「Enter」窄得多，照字宽画出来是一根竖条。
+        return Math.max(keyHintRowH(), textW(key) + 2 * GuiMaterial.KEY_PAD_X);
+    }
+
+    private int keyHintW(KeyHint hint) {
+        int w = hint.primary() ? 2 * PRIMARY_PAD_X : 0;
+        for (String key : hint.keys()) {
+            w += keycapW(key) + KEY_GAP;
+        }
+        if (!hint.keys().isEmpty()) {
+            w += KEY_TO_LABEL - KEY_GAP;
+        }
+        return Math.min(paneW() - 2 * SIDE, w + textW(hint.label()));
+    }
+
+    /** 这几条提示排成几行：一行放不下就在两条提示之间折行，一条提示绝不拆开。 */
+    private List<List<KeyHint>> flowKeyHints(List<KeyHint> hints) {
+        int avail = paneW() - 2 * SIDE;
+        List<List<KeyHint>> rows = new ArrayList<>();
+        List<KeyHint> row = new ArrayList<>();
+        int used = 0;
+        for (KeyHint hint : hints) {
+            int w = keyHintW(hint);
+            if (!row.isEmpty() && used + HINT_SPACING + w > avail) {
+                rows.add(row);
+                row = new ArrayList<>();
+                used = 0;
+            }
+            used += (row.isEmpty() ? 0 : HINT_SPACING) + w;
+            row.add(hint);
+        }
+        if (!row.isEmpty()) {
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    /** 这几条提示总共占多高。版面要先问它 —— 窄窗口下会折成两行。 */
+    protected int keyHintsH(List<KeyHint> hints) {
+        int rows = flowKeyHints(hints).size();
+        return rows * keyHintRowH() + Math.max(0, rows - 1) * KEY_GAP;
+    }
+
+    /** 在舞台宽里居中画一排按键提示；放不下就折行，单条太长就缩字号（归 {@link GuiText}），绝不出舞台。 */
+    protected void drawKeyHints(DrawContext context, List<KeyHint> hints, int y, int color) {
+        int rowH = keyHintRowH();
+        for (List<KeyHint> row : flowKeyHints(hints)) {
+            int total = -HINT_SPACING;
+            for (KeyHint hint : row) {
+                total += keyHintW(hint) + HINT_SPACING;
+            }
+            drawHintRun(context, row, (paneW() - total) / 2, y, color);
+            y += rowH + KEY_GAP;
+        }
+    }
+
+    /** 一串提示从 {@code x} 起往右画一行。 */
+    private void drawHintRun(DrawContext context, List<KeyHint> hints, int x, int y, int color) {
+        int rowH = keyHintRowH();
+        for (KeyHint hint : hints) {
+            int end = x + keyHintW(hint);
+            if (hint.primary()) {
+                GuiMaterial.plate(context, x, y - PLATE_PAD_Y, end - x, rowH + 2 * PLATE_PAD_Y, -1);
+                context.drawBorder(x, y - PLATE_PAD_Y, end - x, rowH + 2 * PLATE_PAD_Y, GuiLanguage.gold());
+                x += PRIMARY_PAD_X;
+            }
+            for (String key : hint.keys()) {
+                int w = keycapW(key);
+                GuiMaterial.keycap(context, x, y, w, rowH);
+                GuiText.line(context, Text.literal(key), x + 1, y + GuiMaterial.KEY_PAD_TOP, w - 2, GuiText.BODY, false,
+                        GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.CENTER);
+                x += w + KEY_GAP;
+            }
+            if (!hint.keys().isEmpty()) {
+                x += KEY_TO_LABEL - KEY_GAP;
+            }
+            // ❗牌上的字一律走 onTag：搪瓷牌永远是浅底，深色主题那一档的浅字压上去就糊（实拍过）。
+            GuiText.line(context, hint.label(), x, y + GuiMaterial.KEY_PAD_TOP,
+                    Math.max(1, end - x - (hint.primary() ? PRIMARY_PAD_X : 0)), GuiText.BODY, false,
+                    hint.primary() ? GuiLanguage.onTag(GuiLanguage.ink()) : color, GuiText.Align.LEFT);
+            x = end + HINT_SPACING;
+        }
+    }
+
+    /** 一串提示排成一行有多宽。 */
+    private int runWidth(List<KeyHint> hints) {
+        int total = -HINT_SPACING;
+        for (KeyHint hint : hints) {
+            total += keyHintW(hint) + HINT_SPACING;
+        }
+        return Math.max(0, total);
+    }
+
+    /** 这一帧按键提示在倒计时那一条带的两头各占多宽。{@link #drawChrome} 每帧清零。 */
+    private int edgeLeftW;
+    private int edgeRightW;
+
+    /**
+     * 按键提示排在<b>倒计时那一条带的两头</b>：左边怎么选，右边怎么定，中间是倒计时。
+     *
+     * <p>❗它不占舞台一行。原先这几句挤在舞台底边居中的一排里，把牌往上顶
+     * （用户 2026-09-22：「文字也可以拿掉了，按钮示范拿到左下角，或者左右两边…这样空间就省出来了，
+     * 牌可以大一点，底部也不拥挤了」）。而倒计时按舞台的比例只占中间不到一半，两头本来就空着 ——
+     * 键位是<b>常驻的操作说明</b>，不是这一面的内容，放边上正好。
+     *
+     * <p>文案一律短到两个字（{@code heavyseas.keys.*} 一处定义）：动效已经把「依次传、选一张」演出来了，
+     * 不必再用一句话讲一遍。
+     */
+    private void drawEdgeHints(DrawContext context, Bands b, List<KeyHint> left, List<KeyHint> right) {
+        edgeLeftW = runWidth(left);
+        edgeRightW = runWidth(right);
+        int y = footMidY(b) - GuiMaterial.KEY_PAD_TOP - textH() / 2;
+        drawHintRun(context, left, SIDE, y, GuiLanguage.secondary());
+        drawHintRun(context, right, paneW() - SIDE - edgeRightW, y, GuiLanguage.secondary());
+    }
+
+    /** 一段倒计时要知道的三件事。{@code null} = 这一面不会超时，那一格只有两头的提示。 */
+    protected record Countdown(long deadlineMs, long totalMs, int stageW) {
+    }
+
+    /**
+     * 倒计时那一条带<b>一次画完</b>：左边怎么选、右边怎么定，中间是倒计时。
+     *
+     * <p>❗为什么合成一个方法：倒计时要为两头的提示让位，而让多少只有画过提示才知道。
+     * 拆成两次调用就多了一条「先画提示、再画倒计时」的约定 —— 2026-09-23 实拍到挂武器一面写反了，
+     * 秒数与「Esc 不押」叠在一起。<b>靠调用顺序才成立的约定，迟早有人写反，而屏幕上不报错。</b>
+     * 合成一个之后顺序在结构上不可能错。
+     */
+    protected void drawFootBand(DrawContext context, Bands b, List<KeyHint> left, List<KeyHint> right,
+                                long now, Countdown countdown) {
+        // 照样张 b-3：倒计时一条（.count，锚在板底 −112、居中 540 宽）· 下面一行提示（.hints，贴板底 −20、居中）——
+        // 打头一句次墨的说明（这一面的那句短语，ADR-0043 D3 (b)），然后「键帽 + 一句话」，确认那一件是一枚按钮。
+        SheetLayout l = sheet();
+        footerConfirm = null;
+        // 二级页（座位面板 · 手牌……）画它上一页那个决定的倒计时；这一面自己没有倒计时时也画此刻欠着的那一个
+        boolean child = decisionContext() != null && decisionContext().owner() != this;
+        if (child || countdown == null) {
+            countdown = DecisionNavigation.countdown(projection());
+        }
+        if (!countdownInFootBand()) {
+            countdown = null;                  // 这一面把秒数写在别处（设置一面：上带右边）
+        }
+        pxBegin(context);
+        if (countdown != null) {
+            drawCountdownPx(context, l, now, countdown.deadlineMs(), countdown.totalMs());
+            Text timeout = timeoutHint();
+            if (timeout != null && countdown.totalMs() < UNLIMITED_THRESHOLD_MS) {
+                int px = l.len(13);
+                int y = l.countBar().y() + l.countBar().h() + l.len(7);
+                GuiText.drawPx(context, timeout.getString(), l.sheet().x(), y, l.sheet().w(), px, false,
+                        GuiLanguage.secondary(), GuiText.Align.CENTER, 0);
+            }
+        }
+        List<KeyHint> all = new ArrayList<>(left);
+        all.addAll(right);
+        // 能按 Esc 关的面一律写上「Esc 收起」，窗口多小都不省（用户 2026-10-07：「能按 Esc 关的面都写上」——
+        // 行动 · 划船 · 站队几面按 Esc 能关、底下却没写）。这一面自己已经写了 Esc（不押 · 取消 · 收起）就不再加。
+        // 收在这一处而不是各面各写：靠每一面记得写，新加的一面迟早忘。
+        if (shouldCloseOnEsc() && all.stream().noneMatch(h -> h.keys().contains("Esc"))) {
+            all.add(keys("close", "Esc"));
+        }
+        drawHintsPx(context, l, cue(), all);
+        pxEnd(context);
+    }
+
+    /** 倒计时（物理像素）：外三圈的横杠里铜绿的液面往左退，最后一段朱砂；秒数 22px 右对齐（定宽，数位变了不横跳）。 */
+    private void drawCountdownPx(DrawContext context, SheetLayout l, long now, long deadlineMs, long totalMs) {
+        long left = GameClock.remaining(deadlineMs);
+        long total = Math.max(1L, totalMs);
+        // 演示局里等真人不限时（用户 2026-10-07：「demo 局玩家时间显示直接改成 ∞，倒计时条不动」）：
+        // 窗口长过一天就是不限时 —— 条画满、不动，秒数写 ∞
+        if (total >= UNLIMITED_THRESHOLD_MS || left >= UNLIMITED_THRESHOLD_MS) {
+            Rect bar = l.countBar();
+            GuiMaterial.hudPart(context, HudPart.COUNT_BAR, bar.x(), bar.y(), bar.w(), bar.h(), l.k());
+            GuiMaterial.hudPartLeft(context, HudPart.COUNT_FILL, bar.x(), bar.y(), bar.w(), bar.h(), bar.w(), l.k());
+            Rect sec = l.countSeconds();
+            int px = l.len(SheetLayout.SEC_PX);
+            GuiText.drawPx(context, Text.translatable("heavyseas.hud.unlimited").getString(), sec.x(), sec.y() + (sec.h() - GuiText.linePxAt(px, true)) / 2,
+                    sec.w(), px, true, GuiLanguage.ink(), GuiText.Align.RIGHT, 0);
+            return;
+        }
+        float frac = MathHelper.clamp(left / (float) total, 0f, 1f);
+        boolean urgent = io.github.heavyseasmc.mod.ui.CountdownDigits.urgent(left);
+        Rect bar = l.countBar();
+        GuiMaterial.hudPart(context, HudPart.COUNT_BAR, bar.x(), bar.y(), bar.w(), bar.h(), l.k());
+        GuiMaterial.hudPartLeft(context, urgent ? HudPart.COUNT_FILL_URGENT : HudPart.COUNT_FILL,
+                bar.x(), bar.y(), bar.w(), bar.h(), Math.round(bar.w() * frac), l.k());
+        Rect sec = l.countSeconds();
+        int px = l.len(SheetLayout.SEC_PX);
+        // 整数秒、最后 5 秒朱砂（用户 2026-10-13；判据只在 CountdownDigits 一处）
+        GuiText.drawPx(context, Long.toString(io.github.heavyseasmc.mod.ui.CountdownDigits.seconds(left)), sec.x(), sec.y() + (sec.h() - GuiText.linePxAt(px, true)) / 2,
+                sec.w(), px, true, urgent ? GuiLanguage.cinnabar() : GuiLanguage.ink(), GuiText.Align.RIGHT, 0);
+    }
+
+    /**
+     * 提示那一行（物理像素）：一句次墨的说明 · 若干「键帽 + 一句话」· 确认那一件画成搪瓷按钮（金圈），整行居中，间距 28。
+     * 放不下时先省掉打头那句说明，再不行就缩（归 {@link GuiText}）。
+     */
+    private void drawHintsPx(DrawContext context, SheetLayout l, Text cue, List<KeyHint> hints) {
+        int gap = l.len(SheetLayout.HINTS_GAP);
+        int textPx = l.len(SheetLayout.HINTS_PX);
+        String lead = cue == null ? "" : cue.getString();
+        int leadW = lead.isEmpty() ? 0 : GuiText.widthPx(lead, textPx, false, 0);
+        int[] widths = new int[hints.size()];
+        int total = 0;
+        for (int i = 0; i < hints.size(); i++) {
+            widths[i] = hintWidthPx(l, hints.get(i));
+            total += widths[i] + (i > 0 ? gap : 0);
+        }
+        int room = l.sheet().w() - 2 * l.len(40);
+        if (leadW > 0 && total + gap + leadW > room) {
+            leadW = 0;                                   // 放不下：先省掉那句说明，键位与按钮一个不少
+            lead = "";
+        }
+        int all = total + (leadW > 0 ? leadW + gap : 0);
+        int x = l.width() / 2 - Math.min(all, room) / 2;
+        footLeftPx = Math.min(footLeftPx, x);
+        int cy = l.hintsCenterY();
+        if (leadW > 0) {
+            GuiText.drawPx(context, lead, x, cy - GuiText.linePxAt(textPx, false) / 2, leadW + 2, textPx, false,
+                    GuiLanguage.secondary(), GuiText.Align.LEFT, 0);
+            x += leadW + gap;
+        }
+        for (int i = 0; i < hints.size(); i++) {
+            drawHintPx(context, l, hints.get(i), x, cy, widths[i]);
+            x += widths[i] + gap;
+        }
+    }
+
+    private int hintWidthPx(SheetLayout l, KeyHint hint) {
+        int keys = 0;
+        for (String key : hint.keys()) {
+            keys += keycapWPx(l, key) + l.len(SheetLayout.ROW_GAP);
+        }
+        if (hint.primary()) {
+            return 2 * l.len(SheetLayout.BTN_PAD_X) + keys + (hint.keys().isEmpty() ? 0 : l.len(SheetLayout.BTN_GAP)
+                    - l.len(SheetLayout.ROW_GAP)) + GuiText.widthPx(hint.label().getString(), l.len(SheetLayout.BTN_PX),
+                    false, l.len(SheetLayout.BTN_SPACING));
+        }
+        return keys + GuiText.widthPx(hint.label().getString(), l.len(SheetLayout.HINTS_PX), false, 0);
+    }
+
+    /** 键帽宽（物理像素）：样张 .key { min-width: 26px; padding: 0 7px }，字 600 14px。 */
+    private static int keycapWPx(SheetLayout l, String key) {
+        return Math.max(l.len(io.github.heavyseasmc.mod.ui.HudLayout.KEY), GuiText.widthPx(key, l.len(14), true, 0) + 2 * l.len(7));
+    }
+
+    private void drawHintPx(DrawContext context, SheetLayout l, KeyHint hint, int x, int cy, int w) {
+        int key = l.len(io.github.heavyseasmc.mod.ui.HudLayout.KEY);
+        int keyPx = l.len(14);
+        if (hint.primary()) {
+            int h = l.len(SheetLayout.HINTS_H);
+            footerConfirm = unitBox(new Rect(x, cy - h / 2, w, h));
+            footerConfirmKey = hint.keys().isEmpty() ? "Enter" : hint.keys().getFirst();
+            // 「确认」不上铜框，是加重一档的米色牌（用户 2026-10-13）：铜框只给当前选中的那一枚，同屏焦点只有一个
+            GuiMaterial.hudPart(context, HudPart.BTN_FIRM, x, cy - h / 2, w, h, l.k());
+            x += l.len(SheetLayout.BTN_PAD_X);
+        }
+        for (String k : hint.keys()) {
+            int kw = keycapWPx(l, k);
+            GuiMaterial.hudPart(context, HudPart.KEY, x, cy - key / 2, kw, key, l.k());
+            GuiText.drawPx(context, k, x, cy - key / 2 + (key - GuiText.linePxAt(keyPx, true)) / 2, kw, keyPx, true,
+                    GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.CENTER, 0);
+            x += kw + l.len(SheetLayout.ROW_GAP);
+        }
+        String label = hint.label().getString();
+        if (hint.primary()) {
+            if (!hint.keys().isEmpty()) {
+                x += l.len(SheetLayout.BTN_GAP) - l.len(SheetLayout.ROW_GAP);
+            }
+            int px = l.len(SheetLayout.BTN_PX);
+            GuiText.drawPx(context, label, x, cy - GuiText.linePxAt(px, false) / 2, w, px, false,
+                    GuiLanguage.Hud.ENAMEL_LINE, GuiText.Align.LEFT, l.len(SheetLayout.BTN_SPACING));
+        } else {
+            int px = l.len(SheetLayout.HINTS_PX);
+            GuiText.drawPx(context, label, x, cy - GuiText.linePxAt(px, false) / 2, w, px, false,
+                    GuiLanguage.ink(), GuiText.Align.LEFT, 0);
+        }
+    }
+
+    protected Text timeoutHint() {
+        HudView view = projection();
+        // The live timer and its consequence must describe the same decision, even if a child outlives its parent.
+        if (view.myConsent()) return Text.translatable("heavyseas.timeout.agree");
+        if (view.myThirstChoice()) return Text.translatable("heavyseas.timeout.water");
+        if (view.myPick()) return Text.translatable("heavyseas.timeout.pick");
+        if (view.myHelmPick()) return Text.translatable("heavyseas.timeout.highlight");
+        if (view.myRowPending()) return Text.translatable("heavyseas.timeout.row");
+        if (view.myTurnToAct() || view.myProvisionTarget()) return Text.translatable("heavyseas.timeout.pass");
+        if (view.myWeaponChoice()) return Text.translatable("heavyseas.timeout.weapon");
+        if (view.myStance()) return Text.translatable("heavyseas.timeout.watch");
+        if (view.myWaterDonation()) return Text.translatable("heavyseas.timeout.no_more");
+        if (client != null && client.world != null) {
+            var table = GameComponents.of(client.world).tableView();
+            if (table.overboardOpen() && !table.plays().isEmpty()) return Text.translatable("heavyseas.timeout.no_more");
+        }
+        if (decisionContext() != null && !decisionContext().valid(view)) return null;
+        // 投影里认不出是哪一种（补给箱只在包里）：问倒计时所属的那一面自己（二级页问它的上一页）
+        GameScreen source = decisionContext() == null ? this : decisionContext().owner();
+        return source.timeoutText();
+    }
+
+    /** 一条提示：几枚键帽加一个短词。 */
+    protected static KeyHint keys(String label, String... caps) {
+        return new KeyHint(List.of(caps), Text.translatable("heavyseas.keys." + label), false);
+    }
+
+    /**
+     * 「确认」那一条：画成搪瓷按钮。一屏只该有一件东西看上去能按。
+     *
+     * <p>各面确认那一下叫什么不一样（确认 · 打出 · 留下 · 押上），所以按<b>标签</b>指名，
+     * 不按键名 —— 换掉标签的那一面照样是那一件能按的东西。
+     */
+    protected static KeyHint primary(String label, String... caps) {
+        return new KeyHint(List.of(caps), Text.translatable("heavyseas.keys." + label), true);
+    }
+
+    protected static KeyHint confirm(String... caps) {
+        return primary("confirm", caps);
+    }
+
+    /** 这一条提示外面那圈搪瓷牌左右各留多少。 */
+    private static final int PRIMARY_PAD_X = 6;
+
+    /**
+     * 物资牌的牌名与那一句效果。
+     *
+     * <p>❗这两条与角色名一样是<b>拼出来</b>的 lang 键（物资 id 来自 {@code data/provisions}，代码里没有那张表），
+     * 所以构建期的 {@code checkLangKeys} 单独按数据核对这一族 —— 加一张牌而忘了写那一句，会在构建时红。
+     */
+    /**
+     * 航海牌牌面上印的那个名字（「水手落海」「全员落海」……，{@link io.github.heavyseasmc.mod.card.CardFaces#nav}）。
+     * 牌面还没有版式的那一种（「除某某外落海」）给 {@code null}，签子上就只写说明，不为一个名字崩掉这一面。
+     */
+    protected static Text navTitle(io.github.heavyseasmc.mod.state.NavCardView card) {
+        try {
+            return CardPainter.resolve(io.github.heavyseasmc.mod.card.CardFaces.nav(card).title());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    protected static Text provisionName(String id) {
+        return Text.translatable("heavyseas.provision." + id);
+    }
+
+    protected static Text provisionEffect(String id) {
+        return Text.translatable("heavyseas.provision." + id + ".effect");
+    }
+
+    /**
+     * 提示签最上面那一小行：这张牌属于哪一类、牌堆里一共几张。
+     *
+     * <p>❗数据来自服务端发来的目录包（{@link Catalog}），不在客户端算 ——
+     * 张数是数据包定的，抄一份到客户端，换数据包时两边就分家，而分家之后屏幕上照样有数字，只是错的。
+     * 目录还没到就返回 {@code null}：那一栏**空着**，不编一个数字顶上。
+     */
+    protected static Text provisionCaption(String id) {
+        io.github.heavyseasmc.mod.net.CatalogS2C.Provisions entry = Catalog.provision(id);
+        return entry == null ? null : Text.translatable("heavyseas.plate.caption",
+                Text.translatable("heavyseas.category." + entry.category()), entry.count());
+    }
+
+    // ------------------------------------------------------------ 提示签：牌自己的内容（ADR-0037 §7.12）
+
+    /** 提示签的内边距与两行之间。 */
+    private static final int PLATE_PAD_X = 10;
+    private static final int PLATE_PAD_Y = 4;
+    /** 签子最宽占舞台的几成。 */
+    private static final float PLATE_MAX_SHARE = 0.46f;
+    private static final float PLATE_MAX_SHARE_LARGE = 0.62f;
+    private static final int PLATE_MIN_W = 120;
+
+    /**
+     * 查看态的版面：牌收成一叠在左，说明在右。
+     *
+     * <p>❗<b>默认态一个字都没有。</b> 牌做什么是<b>冷信息</b> —— 玩一两次就记住了，
+     * 不该天天占着舞台；轮到谁、还剩几秒才是热的，那些常驻在共有的带上。
+     * 用户 2026-09-22：「藏一层右键 / U 键查看，然后做个把牌堆起来的动效，堆顶为查看的这张牌，
+     * 右边为描述文字，这样一下子就宽敞了」。省下的不只是一行字，是整整一块签子的高度。
+     *
+     * <p>说明放<b>右边</b>而不是下面：这一排牌横着已经铺满，而牌一收成叠，横向立刻空出一大片 ——
+     * 纵向本来就是最紧的那一维（§7.8）。
+     */
+    protected record Inspect(int cardX, int cardY, int cardW, int cardH, int plateX, int plateY, int plateW) {
+    }
+
+    /** 查看态里那一叠牌与那张签子各在哪。只由带位与窗口算，与这一面有几张牌无关。 */
+    protected Inspect inspect(Bands b) {
+        return inspect(b, b.stageTop());
+    }
+
+    /**
+     * 同上，但舞台顶由调用方给。
+     *
+     * <p>❗划船与舵手两面的舞台<b>第一行是「划船堆 N 张 · 舵手 X」</b>，按整个舞台居中的话
+     * 签子会压住它（2026-09-23 实拍）。那一行是热信息，不该被查看态盖掉。
+     */
+    protected Inspect inspect(Bands b, int stageTop) {
+        // ❗上下先让出金框（卡外 CARD_FRAME）与一叠牌往下错开的那几层：原先整个舞台高都给了堆顶那张，
+        //   金框与压在底下的几张于是盖住了舞台的下沿线（2026-09-25 四面补拍，手牌一面的查看态 band_check 红）。
+        int padTop = CARD_FRAME + 1;
+        int padBottom = CARD_FRAME + (int) Math.ceil(STACK_MAX_DEPTH * STACK_STEP_Y) + 1;
+        int room = Math.max(0, b.stageBottom() - stageTop - padTop - padBottom);
+        int h = Math.min(room, Math.min(sharpCardHeight(), Math.round(height * MAX_CARD_H_RATIO)));
+        int w = GuiLanguage.cardWidth(h);
+        int stage = paneW() - 2 * SIDE;
+        // 阅读字号加大时字宽一倍多，签子按同一个比例宽就只放得下三四个词一行（2026-10-13 验收 L03）：放宽到剩下的那一截
+        float share = ClientPrefs.largeReading() ? PLATE_MAX_SHARE_LARGE : PLATE_MAX_SHARE;
+        int plateW = Math.max(PLATE_MIN_W, Math.min(Math.round(stage * share), stage - w - PLATE_GAP));
+        int total = w + PLATE_GAP + plateW;
+        int left = (paneW() - total) / 2;
+        int top = stageTop + padTop + Math.max(0, (room - h) / 2);
+        return new Inspect(left, top, w, h, left + w + PLATE_GAP, top, plateW);
+    }
+
+    /** 查看态那一叠牌：最多错开几层、每层往右下错开多少（GUI 单位）。 */
+    private static final int STACK_MAX_DEPTH = 6;
+    private static final float STACK_STEP_X = 1.6f;
+    private static final float STACK_STEP_Y = 1.2f;
+
+    /**
+     * 查看态开着没有。**状态只在这里存一份** —— 六个牌面各存各的，迟早有一面忘了关。
+     */
+    private boolean inspecting;
+    /** 这一次进 / 出查看态的起点，喂给「堆」。 */
+    private long inspectAt;
+
+    protected boolean inspecting() {
+        return inspecting;
+    }
+
+    /** 「堆」走到哪了：0 = 还摊成一排，1 = 已经收成一叠。进与出走同一条曲线，只是方向相反。 */
+    protected float gathered(long now) {
+        return inspecting ? GuiLanguage.gather(now, inspectAt) : 1f - GuiLanguage.gather(now, inspectAt);
+    }
+
+    protected void toggleInspect() {
+        inspecting = !inspecting;
+        inspectAt = System.currentTimeMillis();
+        // 与语言无关的一行：客户端回归（click_test）靠它判「右键 / U 真的进了查看态」，而不是确认了什么。
+        // ❗「看的是第几张」取自界面此刻的状态（inspectedIndex），不回显右键点中的参数 ——
+        //   回显参数的话，「点中了第 k 张却没把高亮挪过去」照样打印第 k 张（证伪表：参数回显不是判据）。
+        int shown = inspectedIndex();
+        LOGGER.info("查看：{} {}{}", inspecting ? "进" : "出", getClass().getSimpleName(),
+                inspecting && shown >= 0 ? " 第 " + shown + " 张" : "");
+    }
+
+    /** 查看态里那一叠顶上是第几张（各面的高亮）；这一面没有查看态时是 -1。 */
+    protected int inspectedIndex() {
+        return -1;
+    }
+
+    /**
+     * 进 / 出查看态的键。各面的 {@code keyPressed} 开头调它，返回 {@code true} 就别再往下走。
+     *
+     * <p><b>U 与 Tab 都是「看」</b>，各面一样（用户 2026-09-25 定「U 是详情」，ADR-0043 D2）；右键是同一件事的鼠标版。
+     * 此前统一用 Tab、不用 U，是因为手牌一面的 U 是「使用」—— 现在「使用」改成 Enter，U 空出来了。
+     */
+    protected boolean inspectKey(int keyCode) {
+        if (inspecting && (keyCode == GLFW.GLFW_KEY_DOWN || keyCode == GLFW.GLFW_KEY_UP)) {
+            plateFirstLine = Math.max(0, Math.min(plateLastLine, plateFirstLine + (keyCode == GLFW.GLFW_KEY_DOWN ? 1 : -1)));
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_TAB || keyCode == GLFW.GLFW_KEY_U) {
+            toggleInspect();
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && inspecting) {
+            toggleInspect();          // 查看态里 Esc 只收这一层，不去关界面
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 右键 = 看（与 U · Tab 同一件事），各面的 {@link #rightClick} 调它。
+     *
+     * <p>点在某张牌上、而且还没在看：先把高亮挪到<b>点中的那一张</b>，再进查看态 —— 右键看的是你点的那张，
+     * 不是碰巧高亮着的那张（ADR-0043 §7.0）。点在空处、或者已经在看：开 / 关查看态。
+     * 查看态里牌收成了一叠，摊开那一排的命中框已经不对，所以那时不按位置认牌。
+     *
+     * @param cardIndex 点中了第几张；{@code < 0} = 没点在牌上（调用方在查看态里一律传 -1）
+     * @param highlight 把高亮挪到第几张 —— 各面挪高亮的方式不同（有的要重新「抬」），由各面给
+     */
+    protected boolean inspectClick(int cardIndex, java.util.function.IntConsumer highlight) {
+        if (!inspecting && cardIndex >= 0) {
+            highlight.accept(cardIndex);
+            LOGGER.info("查看（右键）：第 {} 张", cardIndex);
+        }
+        toggleInspect();
+        return true;
+    }
+
+    /** 一张牌这一帧落在哪、多大。 */
+    protected record CardPose(float cx, float bottom, int w, int h) {
+    }
+
+    /**
+     * 牌落在桌上的影子（「落牌加重」的第二件：影子收紧，ADR-0037 §7.1 第 3 条）。
+     * 在牌自己的坐标里画（{@code (0,0)} 是牌的左上角），画在牌之前。
+     *
+     * <p>离桌越高，影子离得越远、摊得越开、越淡；落定时贴紧、最深 —— 那一下收紧就是「落下来了」。
+     * 2026-09-30 之前牌没有影子，只有纸板与标签那两道固定偏移的（ADR-0045 §1.3 动 1）。
+     *
+     * @param height 这张牌此刻离桌多高，GUI 单位（入场还没落定的那一截 · 顿 · 抬 加起来）
+     */
+    protected void drawCardShadow(DrawContext context, int w, int h, float height) {
+        // 系数是实拍调的：第一版抬 9 个单位时影子离得太远、太重，读起来像一块灰板（2026-09-30）。
+        float up = Math.max(0f, height);
+        int dx = Math.round(1.5f + up * 0.18f);
+        int dy = Math.round(2.5f + up * 0.5f);
+        int spread = Math.round(up * 0.18f);
+        int alpha = Math.max(0x12, 0x4C - Math.round(up * 3.2f));
+        // 影子落在桌上 —— 只许落在舞台那一格里。补给箱的牌底边贴着舞台下沿，不裁的话影子压断那一道通栏线：
+        // 2026-09-30 pass_test 当场红在「基线里只找到一道带线」（那道线正是它认「这一面还开着」的依据）。
+        // 裁剪区按屏幕坐标给，不受这张牌的矩阵影响。
+        Bands b = bands();
+        context.enableScissor(0, b.stageTop(), paneW(), b.stageBottom());
+        context.fill(dx - spread, dy - spread, w + dx + spread, h + dy + spread, alpha << 24);
+        context.disableScissor();
+    }
+
+    /**
+     * 一张牌在「摊成一排」与「收成一叠」之间的落位。
+     *
+     * @param depth 这张在叠里排第几层（被看的那张是 0）；一叠牌要错开一点点，才看得出是一叠而不是一张
+     */
+    protected CardPose cardPose(Inspect in, float g, float rowCx, float rowBottom, int rowW, int rowH, int depth) {
+        int d = Math.min(Math.max(0, depth), STACK_MAX_DEPTH);
+        float stackX = in.cardX() + d * STACK_STEP_X;
+        float stackBottom = in.cardY() + in.cardH() + d * STACK_STEP_Y;
+        return new CardPose(rowCx + (stackX + in.cardW() / 2f - rowCx) * g,
+                rowBottom + (stackBottom - rowBottom) * g,
+                Math.round(rowW + (in.cardW() - rowW) * g),
+                Math.round(rowH + (in.cardH() - rowH) * g));
+    }
+
+    /** 这一面的按键提示右头：确认那一件，加一枚「U 查看 / 收起」（Tab 与右键也行，提示只写一个）。 */
+    protected java.util.List<KeyHint> inspectHints(String confirm) {
+        if (!density().atLeast(Density.FULL)) {
+            return List.of(primary(confirm, "Enter"));      // 查看那一条是说明，小窗第一个砍
+        }
+        return List.of(primary(confirm, "Enter"), keys(inspecting ? "close" : "inspect", "U"));
+    }
+
+    /** 同上，中间多一件（挂武器那面的「Esc 不押」）。 */
+    protected java.util.List<KeyHint> inspectHints(String confirm, KeyHint extra) {
+        if (!density().atLeast(Density.FULL)) {
+            return List.of(primary(confirm, "Enter"), extra);
+        }
+        return List.of(primary(confirm, "Enter"), extra, keys(inspecting ? "close" : "inspect", "U"));
+    }
+
+    /** 窗口长过这么久就算「不限时」（服务端用 {@code GameComponent.UNLIMITED_MS} = 一年）。 */
+    static final long UNLIMITED_THRESHOLD_MS = 24L * 3600 * 1000;
+
+    /** 那一叠牌与签子之间。 */
+    private static final int PLATE_GAP = 14;
+
+    /**
+     * 签子上写什么：<b>类别 · 牌堆里共几张 / 牌名 / 一句效果</b>。
+     *
+     * <p>它就是「承担讲规矩那件事的另有它物」（用户 2026-09-22：「GUI 文字不是用来教玩家怎么玩游戏的」）。
+     *
+     * @param pointX  尖角指着哪儿；{@code < 0} = 不要尖角（签子在牌旁边时）
+     * @param caption 题头，可为 {@code null}（类别与张数还没送到客户端时就是这样）
+     */
+    protected int drawCardPlate(DrawContext context, int x, int top, int w, int pointX,
+                                Text caption, Text name, Text body) {
+        int tw = w - 2 * PLATE_PAD_X;
+        int capH = caption == null ? 0 : GuiText.lineHeight(GuiText.CAPTION, false) + 2;
+        // 签子按**这一句实际排几行**画：短句的签子就矮一点。查看态里它在牌旁边，
+        // 高矮不影响牌的位置，所以不必像常驻那版那样按最大值留位。
+        int lineH = GuiText.readingLineHeight(GuiText.BODY, false);
+        int nameH = name == null ? 0 : GuiText.lineHeight(GuiText.NAME, true) + 2;
+        // 原先这里还多扣一行：那是「↑↓ 查看全文」画在签子外面时给它留的位，它挪进签子里之后（下面 scrollHintH）这一行就白白空着，
+        // 英文加大字号下最后一句因此要滚才看得到（2026-10-13 验收 L03）
+        int available = Math.max(lineH, bands().stageBottom() - top - 2 * PLATE_PAD_Y - capH - nameH);
+        int maxLines = Math.max(1, available / lineH);
+        int textHeight = GuiText.readingHeight(body.getString(), tw, GuiText.BODY, false);
+        // 一屏放不下时，签子里最后留一行「↑↓ 或滚轮查看全文」—— 画在签<b>里面</b>，正文少排一行给它让位。
+        // 原先画在签子外面的下沿，压到签子下方的东西（2026-10-13 验收）。
+        int scrollHintH = GuiText.lineHeight(GuiText.CAPTION, false) + 2;
+        boolean overflow = textHeight > maxLines * lineH;
+        if (overflow) {
+            maxLines = Math.max(1, (available - scrollHintH) / lineH);
+        }
+        int bodyH = Math.min(maxLines * lineH, textHeight);
+        String contentKey = (name == null ? "" : name.getString()) + body.getString();
+        if (!contentKey.equals(plateContentKey)) {
+            plateContentKey = contentKey;
+            plateFirstLine = 0;
+        }
+        plateLastLine = Math.max(0, (textHeight + lineH - 1) / lineH - maxLines);
+        plateFirstLine = Math.min(plateFirstLine, plateLastLine);
+        int hintH = plateLastLine > 0 ? scrollHintH : 0;
+        int h = 2 * PLATE_PAD_Y + capH + nameH + bodyH + hintH;
+        GuiMaterial.plate(context, x, top, w, h, pointX);
+
+        int tx = x + PLATE_PAD_X;
+        int y = top + PLATE_PAD_Y;
+        int ink = GuiLanguage.onTag(GuiLanguage.ink());
+        if (caption != null) {
+            GuiText.line(context, caption, tx, y, tw, GuiText.CAPTION, false,
+                    GuiLanguage.onTag(GuiLanguage.muted()), GuiText.Align.LEFT);
+            y += capH;
+        }
+        if (name != null) {
+            // 航海牌没有牌名（id 形如 nav_07，不是给人读的），它的身份就是下面那一句。
+            GuiText.line(context, name, tx, y, tw, GuiText.NAME, true, ink, GuiText.Align.LEFT);
+            y += GuiText.lineHeight(GuiText.NAME, true) + 2;
+        }
+        GuiText.drawReading(context, body.getString(), tx, y, tw, GuiText.BODY, false, ink, plateFirstLine, maxLines);
+        plateBox = new Box(x, top, w, h);
+        if (plateLastLine > 0) {
+            GuiText.line(context, Text.translatable("heavyseas.navigation.scroll_detail"), tx, y + bodyH + 2,
+                    tw, GuiText.CAPTION, false, GuiLanguage.onTag(GuiLanguage.muted()), GuiText.Align.LEFT);
+        }
+        return top + h;
+    }
+
+    private Box plateBox;
+    private String plateContentKey = "";
+    private int plateFirstLine;
+    private int plateLastLine;
+
+    /** 把一个 ARGB 色换成另一个不透明度。按不动的东西靠它淡下去，不另起颜色：语义色只有三个。 */
+    protected static int withAlpha(int argb, int alpha) {
+        return (alpha << 24) | (argb & 0xFFFFFF);
+    }
+
+    /** 按不动的按钮：底与字都只剩这么多不透明度。 */
+    protected static final int DISABLED_FILL_ALPHA = 0x55;
+    protected static final int DISABLED_TEXT_ALPHA = 0x66;
+
+    /**
+     * 角色名。
+     *
+     * <p>❗这是唯一一处<b>拼出来</b>的 lang 键（角色 id 来自数据，代码里没有那张表），
+     * 所以构建期的 {@code checkLangKeys} 单独按 {@code data/roster} 核对这一族。
+     */
+    protected static Text nameOf(String characterId) {
+        return characterId.isEmpty() ? Text.literal("—") : Text.translatable("heavyseas.character." + characterId);
+    }
+
+    /**
+     * 上带：回合 · 阶段 · 海鸥。全船都知道的东西 —— 每一面都要、而且必须长得一样，所以放在这里。
+     */
+    protected void drawPublicBand(DrawContext context, HudView view, int y) {
+        // 照样张 b-3 的 .hd：四格阶段（此刻那一格垫铜绿圆底，其余 42%）+ 四只海鸥（飞来的实、没来的 30%），在板的中线上居中。
+        // 2026-09-30 之前这里还有天候图标与一枚进度弧，左头还有那句短语 —— 样张没有，天候并进悬停签，短语挪进提示那一行。
+        SheetLayout l = sheet();
+        int ink = GuiLanguage.ink();
+        boolean endgame = view.endgame().active();
+        pxBegin(context);
+        int icon = l.len(SheetLayout.ICON);
+        for (int i = 0; i < SheetLayout.PHASES; i++) {
+            Rect ph = l.phase(i);
+            boolean on = !endgame && view.phase().ordinal() == i;
+            if (on) {
+                GuiMaterial.hudPart(context, HudPart.PHASE_ON, ph.x(), ph.y(), ph.w(), ph.h(), l.k());
+            }
+            GuiMaterial.hudIcon(context, io.github.heavyseasmc.mod.ui.GameLabels.phaseIcon(i), ph.x() + (ph.w() - icon) / 2, ph.y() + (ph.h() - icon) / 2,
+                    icon, icon, on ? GuiLanguage.Hud.PHASE_ON_ICON : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.PHASE_OFF_ALPHA),
+                    l.k());
+        }
+        for (int i = 0; i < GameState.GULLS_TO_LAND; i++) {
+            Rect g = l.gull(i);
+            GuiMaterial.hudIcon(context, HudPart.IC_GULL, g.x(), g.y(), g.w(), g.h(),
+                    i < view.gulls() ? ink : GuiLanguage.Hud.alpha(ink, GuiLanguage.Hud.GULL_OFF_ALPHA), l.k());
+        }
+        pxEnd(context);
+        Text status = Text.translatable("heavyseas.status.header", view.turn(), phaseLabel(view),
+                view.gulls(), GameState.GULLS_TO_LAND);
+        if (!view.weather().isEmpty()) {
+            status = status.copy().append(" · ").append(Text.translatable("heavyseas.game.weather",
+                    Text.translatable("heavyseas.weather." + view.weather()),
+                    Text.translatable("heavyseas.weather.effect." + view.weather())));
+        }
+        Rect first = l.phase(0);
+        Rect last = l.gull(GameState.GULLS_TO_LAND - 1);
+        detailHits.add(new DetailHit(unitBox(new Rect(first.x(), first.y(), last.right() - first.x(), first.h())), status));
+    }
+
+    /** 上带四格阶段的图标（样张 b-3：天候 · 补给 · 行动 · 航海，与 {@link Phase} 的顺序一致）。 */
+
+    /**
+     * 这一面此刻要你做什么：一句不超过 8 个字的动词短语，画在上带左头（ADR-0043 D3 (b)）。
+     * 不是你的决定（看手牌 · 看公开区 · 翻牌 · 计分）或已经定了，就返回 {@code null} —— 过期的提示比没有提示更糟。
+     */
+    protected Text cue() {
+        return null;
+    }
+
+    /**
+     * 上带与 HUD 里的「阶段」：终局进行中写「终局」（ADR-0022）。
+     *
+     * <p>对局停在哪个阶段结束的，终局一开始就没有意义了 —— 2026-09-16 实拍：翻牌那一面顶上写着「行动阶段」。
+     */
+    static Text phaseLabel(HudView view) {
+        return view.endgame().active() ? Text.translatable("heavyseas.phase.endgame") : phaseName(view.phase());
+    }
+
+    // 下面两个用 switch 而不是拼字符串：拼出来的 lang 键静态扫不到，漏了也不报错。
+    protected static Text conditionName(Condition condition) {
+        return io.github.heavyseasmc.mod.ui.GameLabels.conditionName(condition);
+    }
+
+    protected static Text phaseName(Phase phase) {
+        return io.github.heavyseasmc.mod.ui.GameLabels.phaseName(phase);
+    }
+}

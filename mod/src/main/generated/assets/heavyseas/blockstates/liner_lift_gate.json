@@ -1,0 +1,964 @@
+{
+  "variants": {
+    "deck=a,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=a,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=a,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=a,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=a,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=a,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=a,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=a,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=a,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=a,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=a,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=a,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=a,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=a,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=a,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=a,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=a,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=a,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=a,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=a,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=a,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=a,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=a,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=a,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=a,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=a,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=a,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=a,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=a,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=a,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=a,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=a,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    },
+    "deck=b,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=b,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=b,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=b,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=b,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=b,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=b,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=b,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=b,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=b,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=b,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=b,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=b,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=b,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=b,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=b,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=b,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=b,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=b,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=b,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=b,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=b,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=b,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=b,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=b,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=b,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=b,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=b,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=b,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=b,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=b,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=b,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    },
+    "deck=boat,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=boat,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=boat,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=boat,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=boat,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=boat,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=boat,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=boat,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=boat,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=boat,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=boat,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=boat,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=boat,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=boat,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=boat,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=boat,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=boat,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=boat,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=boat,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=boat,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=boat,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=boat,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=boat,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=boat,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=boat,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=boat,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=boat,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=boat,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=boat,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=boat,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=boat,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=boat,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    },
+    "deck=c,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=c,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=c,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=c,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=c,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=c,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=c,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=c,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=c,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=c,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=c,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=c,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=c,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=c,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=c,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=c,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=c,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=c,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=c,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=c,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=c,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=c,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=c,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=c,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=c,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=c,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=c,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=c,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=c,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=c,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=c,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=c,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    },
+    "deck=d,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=d,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=d,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=d,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=d,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=d,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=d,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=d,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=d,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=d,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=d,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=d,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=d,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=d,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=d,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=d,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=d,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=d,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=d,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=d,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=d,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=d,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=d,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=d,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=d,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=d,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=d,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=d,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=d,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=d,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=d,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=d,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    },
+    "deck=e,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=e,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=e,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=e,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=e,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=e,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=e,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=e,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=e,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=e,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=e,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=e,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=e,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=e,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=e,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=e,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=e,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=e,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=e,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=e,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=e,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=e,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=e,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=e,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=e,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=e,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=e,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=e,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=e,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=e,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=e,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=e,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    },
+    "deck=f,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=f,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=f,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=f,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=f,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=f,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=f,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=f,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=f,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=f,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=f,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=f,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=f,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=f,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=f,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=f,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=f,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=f,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=f,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=f,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=f,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=f,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=f,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=f,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=f,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=f,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=f,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=f,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=f,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=f,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=f,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=f,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    },
+    "deck=none,facing=east,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 270
+    },
+    "deck=none,facing=east,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 270
+    },
+    "deck=none,facing=east,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 270
+    },
+    "deck=none,facing=east,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 270
+    },
+    "deck=none,facing=east,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 270
+    },
+    "deck=none,facing=east,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 270
+    },
+    "deck=none,facing=east,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 270
+    },
+    "deck=none,facing=east,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 270
+    },
+    "deck=none,facing=north,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 180
+    },
+    "deck=none,facing=north,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 180
+    },
+    "deck=none,facing=north,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 180
+    },
+    "deck=none,facing=north,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 180
+    },
+    "deck=none,facing=north,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 180
+    },
+    "deck=none,facing=north,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 180
+    },
+    "deck=none,facing=north,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 180
+    },
+    "deck=none,facing=north,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 180
+    },
+    "deck=none,facing=south,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower"
+    },
+    "deck=none,facing=south,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower"
+    },
+    "deck=none,facing=south,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower"
+    },
+    "deck=none,facing=south,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower"
+    },
+    "deck=none,facing=south,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper"
+    },
+    "deck=none,facing=south,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper"
+    },
+    "deck=none,facing=south,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper"
+    },
+    "deck=none,facing=south,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper"
+    },
+    "deck=none,facing=west,half=lower,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_lower",
+      "y": 90
+    },
+    "deck=none,facing=west,half=lower,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_lower",
+      "y": 90
+    },
+    "deck=none,facing=west,half=lower,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_lower",
+      "y": 90
+    },
+    "deck=none,facing=west,half=lower,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_lower",
+      "y": 90
+    },
+    "deck=none,facing=west,half=upper,open=false,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_closed_upper",
+      "y": 90
+    },
+    "deck=none,facing=west,half=upper,open=false,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_closed_upper",
+      "y": 90
+    },
+    "deck=none,facing=west,half=upper,open=true,side=left": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_left_open_upper",
+      "y": 90
+    },
+    "deck=none,facing=west,half=upper,open=true,side=right": {
+      "model": "heavyseas:block/liner/liner_lift_gate/lift/gate_right_open_upper",
+      "y": 90
+    }
+  }
+}

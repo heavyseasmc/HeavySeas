@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/well_trim_straight_single",
+  "textures": {
+    "n": "heavyseas:block/liner/stairs/nosing",
+    "p": "heavyseas:block/liner/stairs/trim",
+    "particle": "heavyseas:block/liner/stairs/trim"
+  }
+}

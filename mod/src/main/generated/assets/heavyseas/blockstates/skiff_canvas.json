@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/skiff/skiff_canvas/canvas"
+    },
+    "facing=north": {
+      "model": "heavyseas:block/skiff/skiff_canvas/canvas",
+      "y": 270
+    },
+    "facing=south": {
+      "model": "heavyseas:block/skiff/skiff_canvas/canvas",
+      "y": 90
+    },
+    "facing=west": {
+      "model": "heavyseas:block/skiff/skiff_canvas/canvas",
+      "y": 180
+    }
+  }
+}

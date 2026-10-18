@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/lift/gate_right_closed_upper",
+  "textures": {
+    "g": "heavyseas:block/liner/lift/gate",
+    "particle": "heavyseas:block/liner/lift/gate"
+  }
+}

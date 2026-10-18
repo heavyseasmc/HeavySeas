@@ -1,0 +1,10 @@
+{
+  "parent": "heavyseas:block/liner/template/frame_tb",
+  "textures": {
+    "back": "heavyseas:block/liner/frame_mahogany_gilt_tb",
+    "end": "heavyseas:block/liner/frame_mahogany_gilt_c",
+    "front": "heavyseas:block/liner/frame_mahogany_gilt_tb",
+    "particle": "heavyseas:block/liner/frame_mahogany_gilt_tb",
+    "side": "heavyseas:block/liner/frame_mahogany_gilt_c"
+  }
+}

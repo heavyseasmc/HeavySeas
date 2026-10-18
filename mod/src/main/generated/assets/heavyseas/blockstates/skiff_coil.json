@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/skiff/skiff_coil/coil",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/skiff/skiff_coil/coil",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/skiff/skiff_coil/coil"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/skiff/skiff_coil/coil",
+      "y": 90
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,part=bottom": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_bottom",
+      "y": 90
+    },
+    "facing=east,part=middle": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_middle",
+      "y": 90
+    },
+    "facing=east,part=single": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_single",
+      "y": 90
+    },
+    "facing=east,part=top": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_top",
+      "y": 90
+    },
+    "facing=north,part=bottom": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_bottom"
+    },
+    "facing=north,part=middle": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_middle"
+    },
+    "facing=north,part=single": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_single"
+    },
+    "facing=north,part=top": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_top"
+    },
+    "facing=south,part=bottom": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_bottom",
+      "y": 180
+    },
+    "facing=south,part=middle": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_middle",
+      "y": 180
+    },
+    "facing=south,part=single": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_single",
+      "y": 180
+    },
+    "facing=south,part=top": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_top",
+      "y": 180
+    },
+    "facing=west,part=bottom": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_bottom",
+      "y": 270
+    },
+    "facing=west,part=middle": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_middle",
+      "y": 270
+    },
+    "facing=west,part=single": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_single",
+      "y": 270
+    },
+    "facing=west,part=top": {
+      "model": "heavyseas:block/liner/liner_balustrade_slope/stairs/balustrade_slope_top",
+      "y": 270
+    }
+  }
+}

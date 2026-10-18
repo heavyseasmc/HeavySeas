@@ -1,0 +1,1193 @@
+package io.github.heavyseasmc.mod.command;
+
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.ProvisionEffect;
+import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.play.Contest;
+import io.github.heavyseasmc.engine.play.Session;
+import io.github.heavyseasmc.engine.state.Fight;
+import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.engine.weather.WeatherCard;
+import io.github.heavyseasmc.engine.weather.WeatherEffect;
+import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.data.SceneDataLoader;
+import io.github.heavyseasmc.mod.game.ActionPhase;
+import io.github.heavyseasmc.mod.game.ContestPhase;
+import io.github.heavyseasmc.mod.game.DesignationPhase;
+import io.github.heavyseasmc.mod.game.GameFlow;
+import io.github.heavyseasmc.mod.game.NavigationPhase;
+import io.github.heavyseasmc.mod.game.StandInMinds;
+import io.github.heavyseasmc.mod.game.ThirstPhase;
+import io.github.heavyseasmc.mod.state.ExperienceView;
+import io.github.heavyseasmc.mod.state.GameComponent;
+import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.state.StandInMind;
+import io.github.heavyseasmc.mod.world.Backdrop;
+import io.github.heavyseasmc.mod.world.Nameplates;
+import io.github.heavyseasmc.mod.world.MistSea;
+import io.github.heavyseasmc.mod.world.Seats;
+import io.github.heavyseasmc.mod.world.Gulls;
+
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.tree.CommandNode;
+import net.minecraft.command.argument.IdentifierArgumentType;
+import net.minecraft.server.command.CommandManager;
+import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * {@code /seas} —— M1 的全部操作入口；M2 起是开发脚手架（ADR-0017：玩家侧指令作废，GUI 是唯一路径）。
+ *
+ * <h2>为什么还留着</h2>
+ * 指令能被一个人跑完 —— 配合 dummy，开发期不必凑 6 个真人；出口验收 {@code playthrough-check.sh}
+ * 关着替身自动推进打的那一局，靠的就是这里的 {@code pass · row · swap · fight}（ADR-0019）。
+ * 整棵命令树仅向管理员和控制台开放；普通玩家使用 GUI。
+ *
+ * <h2>谁能替谁下指令</h2>
+ * 真人占的座位只有他本人能动；dummy 占的座位要 2 级权限（它是测试夹具，不该让普通玩家随手替人行动）。
+ * {@code navigate} 与 {@code dummy auto} 一律 2 级：舵手挑牌走界面，指令只是开发者提前定的口子。
+ */
+public final class SeasCommand {
+
+    private static final int DEV_PERMISSION = 2;
+
+    /**
+     * ❗Minecraft 接住指令里抛出的异常，只对来源打一句「An unexpected error occurred」，
+     * <b>堆栈要 debug 级才打</b>。于是「指令有 bug」与「指令拒绝了你」在日志上长得一样。
+     * 每条 /seas 都经这里包一层，异常连堆栈一起进日志。
+     */
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    static com.mojang.brigadier.Command<ServerCommandSource> guarded(
+            com.mojang.brigadier.Command<ServerCommandSource> inner) {
+        return context -> {
+            try {
+                return inner.run(context);
+            } catch (RuntimeException e) {
+                LOGGER.error("/seas 执行失败", e);
+                Replies.error(context.getSource(), Text.literal("/seas 出错：" + e));
+                return 0;
+            }
+        };
+    }
+
+    private SeasCommand() {
+    }
+
+    /** 角色 id 的补全：只补当前这一局里真的存在的角色，避免补出一个 7 人局才有的名字。 */
+    static final SuggestionProvider<ServerCommandSource> CHARACTERS = (context, builder) -> {
+        GameComponent component = GameComponents.of(gameWorld(context));
+        component.session().ifPresentOrElse(
+                session -> session.state().bySeat().forEach(id -> builder.suggest(id.value())),
+                () -> GameDataLoader.require().roster().characters()
+                        .forEach(s -> builder.suggest(s.id().value())));
+        return builder.buildFuture();
+    };
+
+    /** 天候 id 直接来自本次加载的数据，不在命令里维护第二张白名单。 */
+    static final SuggestionProvider<ServerCommandSource> WEATHERS = (context, builder) -> {
+        GameDataLoader.require().weather().forEach(card -> builder.suggest(card.id()));
+        return builder.buildFuture();
+    };
+
+    /**
+     * 整棵 {@code /seas}，生产服与开发环境<b>同一棵</b>（ADR-0060 D2）：原先只在开发环境注册的 {@code /seas dev}
+     * 并进了 {@code /seas debug}（{@link DebugCommand}），靠权限挡，不再靠「生产服根本没有」。
+     *
+     * <h2>权限挂在每个一级子指令上，不挂在根上（ADR-0099 D4 (a)）</h2>
+     * 设置菜单要一条人人可用的 {@code /seas config}，而根节点原先整棵要 2 级 —— 普通玩家连 {@code /seas} 都看不见。
+     * 现在每个一级子指令各自 {@code requires} 2 级（{@code debug} 里更高的几支照旧更高）；根节点只问「这个人在它下面有没有一条用得了」，
+     * 于是普通玩家在 {@code /seas} 下面看得见、也只看得见 {@code config} 这一条。
+     * ❗漏挂一个 {@code requires} 就等于把开发指令放给所有人：{@code SeasCommandRegistrationTest} 逐个核一级子指令（除白名单外都要 2 级）。
+     */
+    public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
+        AtomicReference<CommandNode<ServerCommandSource>> root = new AtomicReference<>();
+        root.set(dispatcher.register(CommandManager.literal("seas")
+                .requires(source -> anyChildUsable(root.get(), source))
+                .then(CommandManager.literal("start")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(context -> start(context, 6, SceneDataLoader.DEFAULT)))
+                        .then(CommandManager.argument("players", IntegerArgumentType.integer(6, 8))
+                                .executes(guarded(context -> start(context,
+                                        IntegerArgumentType.getInteger(context, "players"), SceneDataLoader.DEFAULT)))
+                                // 用哪份航程布局（ADR-0034 §5.5）：换地图演练与非官方地图走这个口，缺省官方布局。
+                                .then(CommandManager.argument("layout", IdentifierArgumentType.identifier())
+                                        .suggests(LAYOUTS)
+                                        .executes(guarded(context -> start(context,
+                                                IntegerArgumentType.getInteger(context, "players"),
+                                                IdentifierArgumentType.getIdentifier(context, "layout")))))))
+                .then(CommandManager.literal("end")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::end)))
+                .then(CommandManager.literal("dummy")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::dummyStatus))
+                        .then(CommandManager.literal("add")
+                                .then(CommandManager.argument("character", StringArgumentType.word())
+                                        .suggests(CHARACTERS)
+                                        .executes(guarded(SeasCommand::dummyAdd))))
+                        .then(CommandManager.literal("auto")
+                                .executes(guarded(context -> dummyAuto(context, null)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyAuto(context, true))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyAuto(context, false)))))
+                        .then(CommandManager.literal("random")
+                                .executes(guarded(context -> dummyRandom(context, null, false)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyRandom(context, true, false)))
+                                        .then(CommandManager.literal("fast")
+                                                .executes(guarded(context -> dummyRandom(context, true, true)))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyRandom(context, false, false)))))
+                        // 动脑 / 大模型（StandInMinds）：与 random 同一个样子 —— on [fast] · off · 不带参数只报
+                        .then(CommandManager.literal("smart")
+                                .executes(guarded(context -> dummyMind(context, StandInMind.SMART, null, false)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.SMART, true, false)))
+                                        .then(CommandManager.literal("fast")
+                                                .executes(guarded(context -> dummyMind(context, StandInMind.SMART, true, true)))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.SMART, false, false)))))
+                        .then(CommandManager.literal("llm")
+                                .executes(guarded(context -> dummyMind(context, StandInMind.LLM, null, false)))
+                                .then(CommandManager.literal("on")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.LLM, true, false)))
+                                        .then(CommandManager.literal("fast")
+                                                .executes(guarded(context -> dummyMind(context, StandInMind.LLM, true, true)))))
+                                .then(CommandManager.literal("off")
+                                        .executes(guarded(context -> dummyMind(context, StandInMind.LLM, false, false))))
+                                // 只让这几座问大模型、其余动脑（逗号或空格隔开的角色 id；all = 每一座）
+                                .then(CommandManager.literal("seats")
+                                        .executes(guarded(context -> llmSeats(context, null)))
+                                        .then(CommandManager.argument("seats", StringArgumentType.greedyString())
+                                                .executes(guarded(context -> llmSeats(context,
+                                                        StringArgumentType.getString(context, "seats"))))))))
+                .then(CommandManager.literal("status")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::status)))
+                .then(CommandManager.literal("pass")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::pass)))
+                .then(CommandManager.literal("row")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(context -> row(context, 0)))
+                        .then(CommandManager.argument("card", IntegerArgumentType.integer(1))
+                                .executes(guarded(context -> row(context,
+                                        IntegerArgumentType.getInteger(context, "card") - 1)))))
+                .then(CommandManager.literal("swap")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .executes(guarded(SeasCommand::swap))))
+                .then(CommandManager.literal("steal")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .executes(guarded(SeasCommand::steal))))
+                .then(CommandManager.literal("fight")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .executes(guarded(SeasCommand::fight))))
+                // 这一场进行中的几下（ADR-0023）。真人那条路要等四面 GUI，所以先只给 dev。
+                .then(CommandManager.literal("consent")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.literal("agree").executes(guarded(context -> consent(context, false))))
+                        .then(CommandManager.literal("fight").executes(guarded(context -> consent(context, true)))))
+                .then(CommandManager.literal("join")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .then(CommandManager.literal("attack")
+                                        .executes(guarded(context -> join(context, Fight.Side.ATTACK))))
+                                .then(CommandManager.literal("defend")
+                                        .executes(guarded(context -> join(context, Fight.Side.DEFEND))))))
+                .then(CommandManager.literal("stances")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::stances)))
+                .then(CommandManager.literal("weapon")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .then(CommandManager.argument("card", StringArgumentType.word())
+                                        .suggests(HELD_CARDS)
+                                        .executes(guarded(SeasCommand::weapon)))))
+                .then(CommandManager.literal("strike")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::strike)))
+                .then(CommandManager.literal("pick")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(context -> pick(context, null)))
+                        .then(CommandManager.argument("card", StringArgumentType.word())
+                                .suggests(HELD_CARDS)
+                                .executes(guarded(context -> pick(context,
+                                        StringArgumentType.getString(context, "card"))))))
+                .then(CommandManager.literal("reveal")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .then(CommandManager.argument("card", StringArgumentType.word())
+                                        .suggests(HELD_CARDS)
+                                        .executes(guarded(SeasCommand::reveal)))))
+                .then(CommandManager.literal("give")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .then(CommandManager.argument("to", StringArgumentType.word())
+                                        .suggests(CHARACTERS)
+                                        .then(CommandManager.argument("card", StringArgumentType.word())
+                                                .suggests(HELD_CARDS)
+                                                .executes(guarded(SeasCommand::give))))))
+                .then(CommandManager.literal("drink")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .then(CommandManager.argument("card", StringArgumentType.word())
+                                        .suggests(HELD_CARDS)
+                                        .executes(guarded(SeasCommand::drink)))))
+                .then(CommandManager.literal("use")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("card", StringArgumentType.word())
+                                .suggests(HELD_CARDS)
+                                .executes(guarded(context -> use(context, null)))
+                                .then(CommandManager.argument("target", StringArgumentType.word())
+                                        .suggests(CHARACTERS)
+                                        .executes(guarded(context -> use(context,
+                                                StringArgumentType.getString(context, "target")))))))
+                .then(CommandManager.literal("water")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("cups", IntegerArgumentType.integer(0, 9))
+                                .executes(guarded(context -> water(context,
+                                        IntegerArgumentType.getInteger(context, "cups")))))
+                        .then(CommandManager.literal("from")
+                                .then(CommandManager.argument("character", StringArgumentType.word())
+                                        .suggests(CHARACTERS)
+                                        .executes(guarded(SeasCommand::waterFrom)))))
+                .then(CommandManager.literal("land")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(SeasCommand::land)))
+                .then(CommandManager.literal("grant")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .then(CommandManager.argument("character", StringArgumentType.word())
+                                .suggests(CHARACTERS)
+                                .then(CommandManager.argument("card", StringArgumentType.word())
+                                        .executes(guarded(SeasCommand::grant)))))
+                .then(CommandManager.literal("navigate")
+                        .requires(source -> source.hasPermissionLevel(DEV_PERMISSION))
+                        .executes(guarded(context -> navigate(context, null)))
+                        .then(CommandManager.argument("card", StringArgumentType.word())
+                                .executes(guarded(context -> navigate(context,
+                                        StringArgumentType.getString(context, "card"))))))
+                // 只有管理员能用的调试指令（ADR-0060）：每一个节点自己也要 2 级，见 DebugCommand
+                .then(DebugCommand.tree())
+                // 设置菜单（ADR-0099 D4 (a)）：人人可用（判据里 OPEN_TO_EVERYONE 那一条）—— 能看谁都能看，能不能改由菜单里的快照说了算
+                .then(CommandManager.literal("config").executes(guarded(SeasCommand::openSettings)))));
+    }
+
+    /** {@code /seas config}：发一份快照，叫客户端开设置菜单。 */
+    private static int openSettings(CommandContext<ServerCommandSource> context) {
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        if (player == null) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.settings.command.not_player"));
+            return 0;
+        }
+        if (!io.github.heavyseasmc.mod.config.SettingsSync.openFor(player)) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.settings.command.no_client"));
+            return 0;
+        }
+        return 1;
+    }
+
+    /** 根节点用得了吗：下面至少有一条这个人用得了（见 {@link #register} 的说明）。还没建好时一律不行。 */
+    static boolean anyChildUsable(CommandNode<ServerCommandSource> node, ServerCommandSource source) {
+        return node != null && node.getChildren().stream().anyMatch(child -> child.canUse(source));
+    }
+
+    /** 已加载的布局 id：从场景数据现取，不在命令里维护第二张表。 */
+    private static final SuggestionProvider<ServerCommandSource> LAYOUTS = (context, builder) -> {
+        SceneDataLoader.ids().forEach(id -> builder.suggest(id.toString()));
+        return builder.buildFuture();
+    };
+
+    private static int start(CommandContext<ServerCommandSource> context, int players,
+                             net.minecraft.util.Identifier layoutId) {
+        ServerWorld lobby = context.getSource().getWorld();
+        GameComponent lobbyComponent = GameComponents.of(lobby);
+        ServerWorld sea = MistSea.world(lobby.getServer());
+        if (sea == null) {
+            Replies.error(context.getSource(), Text.literal("雾海维度未加载（布局还没读到，或维度不在）"));
+            return 0;
+        }
+        if (GameComponents.of(sea).session().isPresent()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.already_running"));
+            return 0;
+        }
+        // 在线的人都拉进来（调试与回归脚本的老路）—— 但过了魔镜、在北辰号上闲逛的人不拉，坐进演习艇的才算（ADR-0083）
+        List<ServerPlayerEntity> humans = new ArrayList<>(lobby.getServer().getPlayerManager().getPlayerList().stream()
+                .filter(p -> MistSea.mirrorEscrow(p).isEmpty() || io.github.heavyseasmc.mod.world.liner.DrillSkiff.seated(p)).toList());
+        try {
+            // 指令开的局：名单里有替身就是演示局（审查 2026-10-07 R5，GameComponent#isDemo）
+            MistSea.startVoyage(lobby.getServer(), players, humans, lobbyComponent.pendingDummies(), null, layoutId, true);
+            lobbyComponent.clearPendingDummies();
+        } catch (RuntimeException e) {
+            Replies.error(context.getSource(), Text.literal(String.valueOf(e.getMessage())));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int end(CommandContext<ServerCommandSource> context) {
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_game"));
+            return 0;
+        }
+        DesignationPhase.clear(world, component);
+        Nameplates.clear(world);
+        Gulls.clear(world, component);
+        Backdrop.clear(world, component);
+        Seats.clear(world, component);
+        component.end();
+        GameComponents.sync(world);
+        MistSea.restoreAll(world, component);
+        Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.ended"), true);
+        return 1;
+    }
+
+    private static int dummyAdd(CommandContext<ServerCommandSource> context) {
+        GameComponent component = GameComponents.of(gameWorld(context));
+        if (component.session().isPresent()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.already_running"));
+            return 0;
+        }
+        String raw = StringArgumentType.getString(context, "character");
+        boolean known = GameDataLoader.require().roster().characters().stream()
+                .anyMatch(s -> s.id().value().equals(raw));
+        if (!known) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.unknown_character", raw));
+            return 0;
+        }
+        CharacterId id = CharacterId.of(raw);
+        if (!component.reserveForDummy(id)) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.dummy_exists", raw));
+            return 0;
+        }
+        Replies.feedback(context.getSource(), 
+                () -> Text.translatable("heavyseas.command.dummy_added", GameFlow.characterName(id),
+                        component.pendingDummies().size()), true);
+        return 1;
+    }
+
+    /**
+     * 替身自动推进的开关（ADR-0019）。不带参数时只报当前值。
+     *
+     * <p>对局中途切换时：关掉从下一步起生效（已经排下的那一步执行前会自己再看一眼开关）；
+     * 打开时，行动阶段里眼下停着的那一位替身当场补排上（QA HS-RUN-001：原先要等 60 秒超时或手动 pass，
+     * {@link GameFlow#resumeStandIn}）。
+     * 那一行日志是 {@code playthrough-check.sh} 分开两局的界线，别改措辞。
+     */
+    private static int dummyAuto(CommandContext<ServerCommandSource> context, Boolean on) {
+        // M4 以后对局固定在雾海。两局之间雾海没有 session，gameWorld() 会退回主世界；
+        // 若把开关写到主世界，下一局读到的仍是雾海组件默认值 true，出口验收的 B 局就会假装关着、
+        // 实际仍由替身自动走。这个 dev 配置控制的是下一局，始终写到实际承载对局的世界。
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        GameComponent component = GameComponents.of(sea != null ? sea : context.getSource().getWorld());
+        if (on != null) {
+            component.setDummyAutoplay(on);
+            LOGGER.info("替身自动推进：{}", on ? "开" : "关");
+            if (on && sea != null) {
+                GameFlow.resumeStandIn(sea, component);
+            }
+        }
+        boolean now = component.dummyAutoplay();
+        Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.autoplay",
+                Text.translatable(now ? "heavyseas.command.autoplay_on" : "heavyseas.command.autoplay_off")),
+                on != null);
+        return 1;
+    }
+
+    /**
+     * 替身随机行动的开关（{@code StandInPlay}，用户 2026-10-07）。不带参数时只报当前值。写到雾海的组件上，理由与 {@link #dummyAuto} 同。
+     * {@code on fast} 是调试用的快档：替身几乎不停顿；{@code on} 是慢档（替身轮到后停 4 秒，「demo 玩家不要出牌太快」）。
+     * 打开时顺带把自动推进也打开 —— 随机行动是自动推进的一种，关着自动推进时替身等指令，随机开关就没有意义。
+     */
+    private static int dummyRandom(CommandContext<ServerCommandSource> context, Boolean on, boolean fast) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        GameComponent component = GameComponents.of(sea != null ? sea : context.getSource().getWorld());
+        if (on != null) {
+            component.setDummyRandom(on);
+            component.setDummyFast(on && fast);
+            if (on && !component.dummyAutoplay()) {
+                component.setDummyAutoplay(true);
+            }
+            LOGGER.info("替身随机行动：{}", on ? (fast ? "开 · 快档" : "开") : "关");
+            if (on && sea != null) {
+                GameFlow.resumeStandIn(sea, component);
+            }
+        }
+        boolean now = component.dummyRandom();
+        Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.dummy_random",
+                Text.translatable(now ? "heavyseas.command.autoplay_on" : "heavyseas.command.autoplay_off")),
+                on != null);
+        return 1;
+    }
+
+    /** {@code /seas dummy}：替身此刻用哪种脑子、自动推进开没开、快慢档、大模型给哪几座。 */
+    private static int dummyStatus(CommandContext<ServerCommandSource> context) {
+        GameComponent component = standInComponent(context);
+        String line = StandInMinds.status(component);
+        Replies.feedback(context.getSource(), () -> Text.literal(line), false);
+        return 1;
+    }
+
+    /**
+     * 替身的脑子换成动脑 / 大模型（{@code StandInMinds}）。不带参数时只报当前值。写到雾海的组件上，理由与 {@link #dummyAuto} 同。
+     * 打开时顺带把自动推进也打开（与随机开关同一个理由）；{@code off} 只关掉这一种（换回「什么也不做」）。
+     * 开发期的开关：回话直接写字、不进 lang（与 {@code /seasllm} 同）。
+     */
+    private static int dummyMind(CommandContext<ServerCommandSource> context, StandInMind mind, Boolean on,
+                                 boolean fast) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        GameComponent component = standInComponent(context);
+        if (on != null) {
+            if (on) {
+                component.setDummyMind(mind);
+                component.setDummyFast(fast);
+                if (!component.dummyAutoplay()) {
+                    component.setDummyAutoplay(true);
+                }
+            } else if (component.dummyMind() == mind) {
+                component.setDummyMind(StandInMind.IDLE);
+                component.setDummyFast(false);
+            }
+            LOGGER.info("替身脑子：{}{}", component.dummyMind().label(), on && fast ? " · 快档" : "");
+            if (on && sea != null) {
+                GameFlow.resumeStandIn(sea, component);
+            }
+        }
+        String line = StandInMinds.status(component);
+        Replies.feedback(context.getSource(), () -> Text.literal(line), on != null);
+        return 1;
+    }
+
+    /** {@code /seas dummy llm seats [a,b,…|all]}：大模型只给这几座，其余替身动脑。不带参数时只报当前值。 */
+    private static int llmSeats(CommandContext<ServerCommandSource> context, String spec) {
+        GameComponent component = standInComponent(context);
+        if (spec != null) {
+            List<CharacterId> seats = new ArrayList<>();
+            if (!spec.isBlank() && !spec.trim().equals("all")) {
+                for (String part : spec.trim().split("[,\\s]+")) {
+                    CharacterId id = CharacterId.of(part);
+                    if (GameDataLoader.require().roster().characters().stream().noneMatch(s -> s.id().equals(id))) {
+                        Replies.error(context.getSource(), Text.literal("没有这个角色：" + part));
+                        return 0;
+                    }
+                    seats.add(id);
+                }
+            }
+            component.setLlmSeats(seats);
+            LOGGER.info("大模型替身的座位：{}", seats.isEmpty() ? "每一座" : seats.stream().map(CharacterId::value).toList());
+        }
+        String line = StandInMinds.status(component);
+        Replies.feedback(context.getSource(), () -> Text.literal(line), spec != null);
+        return 1;
+    }
+
+    /** 替身的开关写在承载对局的雾海那一份组件上（两局之间也是），理由见 {@link #dummyAuto}。 */
+    private static GameComponent standInComponent(CommandContext<ServerCommandSource> context) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        return GameComponents.of(sea != null ? sea : context.getSource().getWorld());
+    }
+
+    private static int status(CommandContext<ServerCommandSource> context) {
+        GameComponent component = GameComponents.of(gameWorld(context));
+        if (component.session().isEmpty()) {
+            // ❗没有对局时 gameWorld() 退回执行者所在的世界（控制台是主世界），而「上一局中断在第几回合」
+            //   记在承载对局的雾海那个维度的组件里 —— 只读这一份，重启后永远是「没有对局」（QA HS-RUN-002）。
+            //   与 dummyAuto 那一条同一个坑：两局之间要问雾海，不问 gameWorld()。
+            ServerWorld sea = MistSea.world(context.getSource().getServer());
+            int interrupted = Math.max(component.interruptedTurn(),
+                    sea == null ? 0 : GameComponents.of(sea).interruptedTurn());
+            Replies.feedback(context.getSource(), () -> interrupted > 0
+                    ? Text.translatable("heavyseas.command.interrupted", interrupted)
+                    : Text.translatable("heavyseas.command.no_game"), false);
+            return 0;
+        }
+        GameFlow.statusLines(component).forEach(line -> Replies.feedback(context.getSource(), () -> line, false));
+        return 1;
+    }
+
+    private static int pass(CommandContext<ServerCommandSource> context) {
+        return act(context, "PASS", (world, component, actor) -> {
+            Replies.feedback(context.getSource(), 
+                    () -> Text.translatable("heavyseas.command.passed", GameFlow.characterName(actor)), true);
+            return true;
+        });
+    }
+
+    /** 今天有没有航海阶段。按**效果**判、不按天候 id：数据包可以给任何 id 配这个效果（ADR-0032 #2 · #3）。 */
+    public static boolean skipsNavigation(Optional<WeatherCard> weather) {
+        return weather.map(WeatherCard::effect).filter(e -> e == WeatherEffect.SKIP_NAVIGATION).isPresent();
+    }
+
+    private static int row(CommandContext<ServerCommandSource> context, int selected) {
+        return act(context, "ROW", (world, component, actor) -> {
+            Session session = component.requireSession();
+            // ❗无风日没有航海阶段，引擎的 beginRow 会抛。指令路径以前直接把它抛给 guarded，于是日志里是一句「/seas 出错」+ 堆栈，
+            //   与真的有 bug 长得一样 —— 出口验收随天候抽签时红时绿（2026-09-20 实拍）。先给一句人话，与界面路径同一条规矩。
+            if (skipsNavigation(session.currentWeather())) {
+                Replies.error(context.getSource(), Text.translatable("heavyseas.action.row_becalmed_hint"));
+                return false;
+            }
+            // 一次走完两步：指令没有「想一想」这回事。底下与划船一面是同一份规则（Session#row 就是那两步）。
+            List<NavigationCard> drawn = ActionPhase.rowChoosing(session, actor, selected);
+            SkiffProps.onRow(world, component);
+            Replies.feedback(context.getSource(), 
+                    () -> Text.translatable("heavyseas.command.rowed", GameFlow.characterName(actor), drawn.size()),
+                    true);
+            return true;
+        });
+    }
+
+    /**
+     * 换座位：**宣告**，不是当场换（ADR-0023）。
+     *
+     * <p>❗<b>这条指令的语义在第四刀变了</b>：目标清醒时要由他表态（12 秒，超时算同意），
+     * 拒绝就进站队与挂武器两段。行动的收尾也因此挪到了这一场结束的那一刻 ——
+     * 所以它走的是不自己收尾的那条外壳，由 {@link ContestPhase} 负责 {@code finishAction}。
+     */
+    private static int swap(CommandContext<ServerCommandSource> context) {
+        return declare(context, "SWAP", Contest.Kind.SWAP);
+    }
+
+    /** 抢夺：同样是宣告。小孩的偷窃不问也打不起来，引擎直接把它带进挑牌。 */
+    private static int steal(CommandContext<ServerCommandSource> context) {
+        return declare(context, "STEAL", Contest.Kind.STEAL);
+    }
+
+    private static int declare(CommandContext<ServerCommandSource> context, String what, Contest.Kind kind) {
+        return act(context, what, (world, component, actor) -> {
+            Session session = component.requireSession();
+            Optional<CharacterId> target = resolve(context, session);
+            if (target.isEmpty()) {
+                return false;
+            }
+            if (target.get().equals(actor)) {
+                Replies.error(context.getSource(), Text.translatable("heavyseas.command.swap_self"));
+                return false;
+            }
+            if (session.state().isRemoved(target.get())) {
+                // 引擎也会拒绝，这里先给一句人话：他连座位牌一起被海水带走了。
+                Replies.error(context.getSource(), Text.translatable("heavyseas.command.removed",
+                        GameFlow.characterName(target.get())));
+                return false;
+            }
+            ContestPhase.declare(world, component, actor, kind, target.get());
+            return true;
+        }, false);
+    }
+
+    /**
+     * 打一架（dev 捷径）：宣告换座位，并且替目标喊「战斗」。
+     *
+     * <p>规则上战斗只能从拒绝里来（规则 §9.1），所以这条指令<b>走的是同一条流程</b> ——
+     * 它省掉的只是「问目标」那一步。出口验收的 B 局靠它把两段式真的跑一遍。
+     */
+    private static int fight(CommandContext<ServerCommandSource> context) {
+        return act(context, "FIGHT", (world, component, actor) -> {
+            Session session = component.requireSession();
+            Optional<CharacterId> target = resolve(context, session);
+            if (target.isEmpty()) {
+                return false;
+            }
+            // ❗只有**清醒**的人才能拒绝，所以昏迷与死亡者打不起来（可以被随意搜刮）。
+            if (!session.fightTargets(actor).contains(target.get())) {
+                Replies.error(context.getSource(), Text.translatable("heavyseas.command.cannot_fight",
+                        GameFlow.characterName(target.get())));
+                return false;
+            }
+            ContestPhase.declare(world, component, actor, Contest.Kind.SWAP, target.get());
+            if (session.contest().map(c -> c.stage() == Contest.Stage.CONSENT).orElse(false)) {
+                // 替目标喊的「战斗」：目标本人没按过，事件来源标管理代答
+                ContestPhase.consent(world, component, true, ExperienceView.Source.ADMIN);
+            }
+            return true;
+        }, false);
+    }
+
+    /** 表态（dev）：被指定的那个人同意，还是喊战斗。 */
+    private static int consent(CommandContext<ServerCommandSource> context, boolean fight) {
+        return inContest(context, Contest.Stage.CONSENT, (world, component) -> {
+            CharacterId target = component.requireSession().contest().orElseThrow().target();
+            ContestPhase.consent(world, component, fight, commandSource(context, component, target));
+            return true;
+        });
+    }
+
+    /**
+     * 站队（dev）：清醒的人加入任意一边，加入之后不能反悔。
+     *
+     * <p>❗<b>先问清醒、先问在不在场上，再交给引擎</b>：引擎对这两种都抛，而抛出来就是一句堆栈 ——
+     * 出口验收里那条 `must_not "/seas 出错"` 会当场红。「拒绝了你」与「有 bug」必须在日志上分得开。
+     */
+    private static int join(CommandContext<ServerCommandSource> context, Fight.Side side) {
+        return inContest(context, Contest.Stage.STANCES, (world, component) -> {
+            Session session = component.requireSession();
+            Optional<CharacterId> who = named(context, session, "character");
+            if (who.isEmpty()) {
+                return false;
+            }
+            if (session.state().isRemoved(who.get()) || !session.state().conditionOf(who.get()).canAct()) {
+                Replies.error(context.getSource(), Text.translatable("heavyseas.command.cannot_join",
+                        GameFlow.characterName(who.get())));
+                return false;
+            }
+            if (session.contest().orElseThrow().fight().orElseThrow().combatants().contains(who.get())) {
+                Replies.error(context.getSource(), Text.translatable("heavyseas.command.already_fighting",
+                        GameFlow.characterName(who.get())));
+                return false;
+            }
+            ContestPhase.join(world, component, who.get(), side, commandSource(context, component, who.get()));
+            return true;
+        });
+    }
+
+    /** 站队段提前结束（dev）：不等那 15 秒。 */
+    private static int stances(CommandContext<ServerCommandSource> context) {
+        return inContest(context, Contest.Stage.STANCES, (world, component) -> {
+            ContestPhase.closeStances(world, component);
+            return true;
+        });
+    }
+
+    /**
+     * 挂武器（dev）：只有参战者能押，而且只能押手上或面前真有的那几张。
+     *
+     * <p>❗同样先问清楚再交给引擎（理由见 {@link #join}）：没参战、不是武器、押多了，引擎三种都抛。
+     */
+    private static int weapon(CommandContext<ServerCommandSource> context) {
+        return inContest(context, Contest.Stage.WEAPONS, (world, component) -> {
+            Session session = component.requireSession();
+            Optional<CharacterId> who = named(context, session, "character");
+            if (who.isEmpty()) {
+                return false;
+            }
+            Contest contest = session.contest().orElseThrow();
+            String card = StringArgumentType.getString(context, "card");
+            if (!contest.fight().orElseThrow().combatants().contains(who.get())) {
+                Replies.error(context.getSource(), Text.translatable("heavyseas.command.not_fighting",
+                        GameFlow.characterName(who.get())));
+                return false;
+            }
+            // ❗判据只有一份（{@link ContestPhase#canCommitWeapon}）：界面那条路走的也是它。
+            if (!ContestPhase.canCommitWeapon(session, contest, who.get(), card)) {
+                Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_such_weapon",
+                        GameFlow.characterName(who.get()), provisionName(card)));
+                return false;
+            }
+            ContestPhase.commitWeapon(world, component, who.get(), card, commandSource(context, component, who.get()));
+            return true;
+        });
+    }
+
+    /** 结算（dev）：不等挂武器段的倒计时，现在就打。 */
+    private static int strike(CommandContext<ServerCommandSource> context) {
+        return inContest(context, Contest.Stage.WEAPONS, (world, component) -> {
+            ContestPhase.resolve(world, component);
+            return true;
+        });
+    }
+
+    /** 挑牌（dev）：给牌名就挑面前那一张，不给就按手牌随机一张。 */
+    private static int pick(CommandContext<ServerCommandSource> context, String cardId) {
+        return inContest(context, Contest.Stage.PICK, (world, component) -> {
+            if (cardId == null) {
+                ContestPhase.pickFromHand(world, component);
+            } else {
+                ContestPhase.pickFromFront(world, component, cardId);
+            }
+            return true;
+        });
+    }
+
+    /**
+     * 这一场进行中那几下的共同外壳：要有对局、要有这一场、而且要在对的那一段。
+     *
+     * <p>❗这里<b>不记行动</b>：进攻方的行动在这一场收场的那一刻才结束（规则 §9.1），由 {@link ContestPhase} 收尾。
+     *
+     * <p>一律 2 级权限：真人自己表态、站队、押武器要走四面 GUI（还没做，见 CURRENT_STATUS），
+     * 这几条是**开发脚手架**，与 {@code navigate} 同一条理由。
+     */
+    /**
+     * 这条指令替谁答（事件来源）：执行指令的正是那个座位上的真人本人（{@code execute as <他>} 或他自己敲），
+     * 按他自己算；否则是管理员代答，标 {@link ExperienceView.Source#ADMIN} —— 侧栏与日志分得开「他自己选的」与「被代答的」。
+     */
+    private static ExperienceView.Source commandSource(CommandContext<ServerCommandSource> context,
+                                                       GameComponent component, CharacterId who) {
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        boolean self = player != null && component.seatOf(player.getUuid()).map(who::equals).orElse(false);
+        return self ? GameFlow.actorSource(component, who) : ExperienceView.Source.ADMIN;
+    }
+
+    private static int inContest(CommandContext<ServerCommandSource> context, Contest.Stage stage,
+                                 ContestAction action) {
+        ServerCommandSource source = context.getSource();
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            Replies.error(source, Text.translatable("heavyseas.command.no_game"));
+            return 0;
+        }
+        Optional<Contest> contest = component.requireSession().contest();
+        if (contest.isEmpty() || contest.get().stage() != stage) {
+            Replies.error(source, Text.translatable("heavyseas.command.no_contest"));
+            return 0;
+        }
+        return action.run(world, component) ? 1 : 0;
+    }
+
+    /** Console commands still originate in the overworld after players cross into M4's match dimension. */
+    static ServerWorld gameWorld(CommandContext<ServerCommandSource> context) {
+        ServerWorld sea = MistSea.world(context.getSource().getServer());
+        if (sea != null && GameComponents.of(sea).session().isPresent()) {
+            return sea;
+        }
+        return context.getSource().getWorld();
+    }
+
+    @FunctionalInterface
+    private interface ContestAction {
+        /** @return 真的做成了吗；false 表示已经报过错。 */
+        boolean run(ServerWorld world, GameComponent component);
+    }
+
+    /**
+     * 舵手挑牌窗口里提前定（dev）。
+     *
+     * <p>❗航海阶段已经不等这条指令了（ADR-0019）：没人划船时当场翻顶牌，替身开着自动推进时当场挑第一张，
+     * 其余情况开 12 秒窗口、超时认高亮。这条指令只在窗口开着时有用。
+     */
+    private static int navigate(CommandContext<ServerCommandSource> context, String cardId) {
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_game"));
+            return 0;
+        }
+        Session session = component.requireSession();
+        if (session.state().phase() != Phase.NAVIGATION) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.not_navigation"));
+            return 0;
+        }
+        if (component.helmDeadline() <= 0) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_pick_window"));
+            return 0;
+        }
+        List<NavigationCard> stack = session.table().rowStack();
+        if (cardId == null) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.pick_needed",
+                    String.join(", ", stack.stream().map(NavigationCard::id).toList())));
+            return 0;
+        }
+        for (int i = 0; i < stack.size(); i++) {
+            if (stack.get(i).id().equals(cardId)) {
+                NavigationPhase.pickByCommand(world, component, i);
+                return 1;
+            }
+        }
+        Replies.error(context.getSource(), Text.translatable("heavyseas.command.not_in_row_stack", cardId));
+        return 0;
+    }
+
+    private static Optional<CharacterId> resolve(CommandContext<ServerCommandSource> context, Session session) {
+        String raw = StringArgumentType.getString(context, "character");
+        Optional<CharacterId> found = session.state().bySeat().stream()
+                .filter(id -> id.value().equals(raw)).findFirst();
+        if (found.isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.unknown_character", raw));
+        }
+        return found;
+    }
+
+    /** 物资 id 的补全：只补这一局里真的在谁手上/面前的牌。补出一张没人有的牌毫无用处。 */
+    private static final SuggestionProvider<ServerCommandSource> HELD_CARDS = (context, builder) -> {
+        GameComponent component = GameComponents.of(gameWorld(context));
+        ServerPlayerEntity player = context.getSource().getPlayer();
+        UUID executor = player == null ? null : player.getUuid();
+        component.session().ifPresent(session -> suggestableCards(session, component, executor).forEach(builder::suggest));
+        return builder.buildFuture();
+    };
+
+    /**
+     * 补全里给谁看哪些牌：面前的牌全船公开，照给；手牌按 D4（{@code DebugCommand#mayPeek}）—— 这一局里的人只看得到自己手上的。
+     *
+     * <p>❗审查 2026-10-07 L3：原先把全船的手牌都补出来，坐在这一局里的 2 级管理员打 {@code /seas pick } 按一下 Tab
+     * 就看见每个人手里有什么，而且不留痕 —— D4 只拦了 {@code inspect} 与 {@code dump}。
+     *
+     * @param executor 下指令的人；{@code null} = 控制台 / RCON（不在这一局里，照旧全给）
+     */
+    static java.util.Set<String> suggestableCards(Session session, GameComponent component, UUID executor) {
+        boolean peek = DebugCommand.mayPeek(executor,
+                id -> component.belongsToActiveVoyage(id) || component.seatOf(id).isPresent());
+        Optional<CharacterId> own = executor == null ? Optional.empty() : component.seatOf(executor);
+        java.util.Set<String> cards = new java.util.LinkedHashSet<>();
+        for (CharacterId id : session.state().bySeat()) {
+            if (peek || own.map(id::equals).orElse(false)) {
+                cards.addAll(session.state().stateOf(id).hand());
+            }
+            cards.addAll(session.state().stateOf(id).front());
+        }
+        return cards;
+    }
+
+    // ------------------------------------------------------------------ 物资（ADR-0021）
+
+    /** 亮出：不占行动、不可逆。规则上任何时候都可以，所以这里不挑阶段。 */
+    private static int reveal(CommandContext<ServerCommandSource> context) {
+        return onSeat(context, "REVEAL", (world, component, who) -> {
+            String card = StringArgumentType.getString(context, "card");
+            component.requireSession().reveal(who, card);
+            GameComponents.sync(world);
+            Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.revealed",
+                    GameFlow.characterName(who), provisionName(card)), true);
+            return true;
+        });
+    }
+
+    /** 送一张给别人。只在行动阶段（规则 §5.2），由引擎把关。 */
+    private static int give(CommandContext<ServerCommandSource> context) {
+        return onSeat(context, "GIVE", (world, component, who) -> {
+            String card = StringArgumentType.getString(context, "card");
+            Optional<CharacterId> to = named(context, component.requireSession(), "to");
+            if (to.isEmpty()) {
+                return false;
+            }
+            component.requireSession().giveCard(who, to.get(), card);
+            GameComponents.sync(world);
+            Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.gave",
+                    GameFlow.characterName(who), GameFlow.characterName(to.get()), provisionName(card)), true);
+            return true;
+        });
+    }
+
+    /** 喝一口酒：不占行动，每回合一次。 */
+    private static int drink(CommandContext<ServerCommandSource> context) {
+        return onSeat(context, "DRINK", (world, component, who) -> {
+            String card = StringArgumentType.getString(context, "card");
+            component.requireSession().drinkRum(who, card);
+            GameComponents.sync(world);
+            Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.drank",
+                    GameFlow.characterName(who), provisionName(card)), true);
+            return true;
+        });
+    }
+
+    /**
+     * 特殊行动：<b>占掉这一个行动</b>，所以走 {@link #act} 那层外壳（认人、做事、推进）。
+     *
+     * <p>四张：医疗箱 · 撑伞 · 信号枪当信号 · 绝境。哪张属于哪种由效果决定，不在这里写一张表。
+     */
+    private static int use(CommandContext<ServerCommandSource> context, String targetId) {
+        return act(context, "USE", (world, component, actor) -> {
+            Session session = component.requireSession();
+            String card = StringArgumentType.getString(context, "card");
+            if (!session.provisions().get(card).isSpecialAction()) {
+                Replies.error(context.getSource(), 
+                        Text.translatable("heavyseas.command.not_special", provisionName(card)));
+                return false;
+            }
+            ProvisionEffect effect = session.provisions().get(card).effect();
+            if (effect instanceof ProvisionEffect.Heal) {
+                // 不指定目标时治「伤得最重、而且还没死」的那个 —— 医疗箱主要就是用来救醒昏迷者的。
+                // ❗这是<b>指令层的便利</b>，不是规则：规则里目标由打牌的人指定（界面那条路将来要给他挑）。
+                CharacterId target = targetId == null ? mostWounded(session) : CharacterId.of(targetId);
+                if (target == null) {
+                    Replies.error(context.getSource(), Text.translatable("heavyseas.command.nobody_wounded"));
+                    return false;
+                }
+                session.useMedicalKit(actor, target, card);
+                Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.healed",
+                        GameFlow.characterName(actor), GameFlow.characterName(target)), true);
+            } else if (effect instanceof ProvisionEffect.PreventThirst) {
+                session.openParasol(actor, card);
+                Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.opened",
+                        GameFlow.characterName(actor), provisionName(card)), true);
+            } else if (effect instanceof ProvisionEffect.HealAll) {
+                List<CharacterId> healed = session.useRation(actor, card);
+                Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.rationed",
+                        GameFlow.characterName(actor), healed.size()), true);
+            } else {
+                int before = session.state().gulls();
+                session.fireSignal(actor, card);
+                Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.signalled",
+                        GameFlow.characterName(actor), session.state().gulls() - before), true);
+            }
+            return true;
+        });
+    }
+
+    /** <b>夹具</b>（2 级权限）：海鸥直接置满，走正常的终局流程 —— 终局不摆出来就验不了（ADR-0022 §7.7）。 */
+    private static int land(CommandContext<ServerCommandSource> context) {
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_game"));
+            return 0;
+        }
+        if (component.requireSession().state().isOver()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.already_over"));
+            return 0;
+        }
+        // ❗先问再靠：划船 / 落海 / 口渴还有人没定完时引擎会抛，抛出来就是一句「/seas 出错」——
+        //   「拒绝了你」与「有 bug」在日志上分不开（与 grant 同一条）。
+        if (component.requireSession().decisionInProgress()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.land_busy"));
+            return 0;
+        }
+        GameFlow.landForFixture(world, component);
+        return 1;
+    }
+
+    /**
+     * <b>夹具</b>（2 级权限）：从牌堆里取一张指定的牌发给某人。
+     *
+     * <p>与 {@code dummy add} 同一族 —— 它们都不是规则，是「不摆好局面就验不了」的那种东西。
+     * 口渴那一面要有人既渴着又手里有水，等它自己出现的验收脚本一定会时灵时不灵。
+     * 牌真的从牌堆里少一张，对账照样成立。
+     */
+    private static int grant(CommandContext<ServerCommandSource> context) {
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_game"));
+            return 0;
+        }
+        Session session = component.requireSession();
+        Optional<CharacterId> who = named(context, session, "character");
+        if (who.isEmpty()) {
+            return 0;
+        }
+        String card = StringArgumentType.getString(context, "card");
+        // ❗先问再发：牌堆里没有这张时引擎会抛，而抛出来是一句堆栈 ——「拒绝了你」与「有 bug」
+        //   在日志上就分不开了（与 join、weapon 同一条）。喂料脚本正是靠这句礼貌的拒绝
+        //   才敢一口气把五种武器都试一遍。
+        if (session.table().provisionsLeft(card) <= 0) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.pile_empty_of",
+                    provisionName(card), session.table().provisionsLeft()));
+            return 0;
+        }
+        session.dealFromPile(who.get(), card);
+        LOGGER.info("夹具：{} 从牌堆里拿到 {}", who.get().value(), card);
+        // 改了局面就留痕（ADR-0060 D3，审查 2026-10-07 L3）：与 /seas debug deal 同一句、同一条路 —— 原先 grant 不经 DebugTrace，
+        //   用了没人知道，计分面板那枚章也不算它。DebugTrace.changed 里会推投影。
+        io.github.heavyseasmc.mod.game.DebugTrace.changed(world, component, context.getSource().getName(), context.getInput(),
+                Text.translatable("heavyseas.debug.did.deal", GameFlow.characterName(who.get()), provisionName(card)));
+        Replies.feedback(context.getSource(), () -> Text.translatable("heavyseas.command.granted",
+                GameFlow.characterName(who.get()), provisionName(card)), false);
+        return 1;
+    }
+
+    /** 伤得最重、而且还没死的那个；全场都没受伤时返回 null。 */
+    private static CharacterId mostWounded(Session session) {
+        CharacterId worst = null;
+        int worstDamage = 0;
+        for (CharacterId id : session.state().bySeat()) {
+            if (session.state().conditionOf(id) == io.github.heavyseasmc.engine.state.Condition.DEAD) {
+                continue;
+            }
+            int damage = session.state().stateOf(id).damage();
+            if (damage > worstDamage) {
+                worst = id;
+                worstDamage = damage;
+            }
+        }
+        return worst;
+    }
+
+    /** 口渴窗口里替自己定：喝几张。 */
+    private static int water(CommandContext<ServerCommandSource> context, int cups) {
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (!thirstWindowOpen(context, component)) {
+            return 0;
+        }
+        ThirstPhase.chooseByCommand(world, component, cups);
+        return 1;
+    }
+
+    /** 别人替他打一张水（规则 §5.2 的例外）。❗<b>昏迷者唯一的水源。</b> */
+    private static int waterFrom(CommandContext<ServerCommandSource> context) {
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (!thirstWindowOpen(context, component)) {
+            return 0;
+        }
+        Optional<CharacterId> donor = named(context, component.requireSession(), "character");
+        if (donor.isEmpty()) {
+            return 0;
+        }
+        return ThirstPhase.donateByCommand(world, component, donor.get()) ? 1 : 0;
+    }
+
+    private static boolean thirstWindowOpen(CommandContext<ServerCommandSource> context,
+                                            GameComponent component) {
+        if (component.session().isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_game"));
+            return false;
+        }
+        if (component.requireSession().thirstPending().isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.no_thirst_window"));
+            return false;
+        }
+        return true;
+    }
+
+    /** 显示名走 lang 键，与卡面同一套（O17：文案从卡面提取，不另写一遍）。 */
+    static Text provisionName(String cardId) {
+        return Text.translatable("heavyseas.provision." + cardId);
+    }
+
+    /**
+     * 「这件事由某个座位做」的共同外壳：认人、做事、<b>不推进阶段</b>。
+     *
+     * <p>❗与 {@link #act} 的差别只有一处，而那一处是规则：亮出 · 赠送 · 喝酒<b>都不占行动</b>
+     * （规则 §5.2 与 §11.2）。走 {@code act} 的话它们会白白吃掉一个行动，
+     * 而表现只是「怎么轮到下一个人了」—— 不报错。
+     */
+    private static int onSeat(CommandContext<ServerCommandSource> context, String what, Action action) {
+        ServerCommandSource source = context.getSource();
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            Replies.error(source, Text.translatable("heavyseas.command.no_game"));
+            return 0;
+        }
+        Optional<CharacterId> who = named(context, component.requireSession(), "character");
+        if (who.isEmpty()) {
+            return 0;
+        }
+        GameComponent.Occupant occupant = component.occupantOf(who.get()).orElseThrow();
+        ServerPlayerEntity player = source.getPlayer();
+        // ❗2 级权限（控制台 / op）可以驱动任何座位，包括真人的。这几条是**开发脚手架**（ADR-0017：
+        //   玩家侧指令作废，GUI 是唯一路径），而验收脚本要从控制台摆局面 —— 比如「让他手里有水」。
+        boolean allowed = source.hasPermissionLevel(DEV_PERMISSION)
+                || (!occupant.isDummy() && player != null && occupant.player().equals(player.getUuid()));
+        if (!allowed) {
+            Replies.error(source, Text.translatable("heavyseas.command.not_your_seat",
+                    GameFlow.characterName(who.get())));
+            return 0;
+        }
+        if (!action.run(world, component, who.get())) {
+            return 0;
+        }
+        LOGGER.info("物资（指令）：{} {}", who.get().value(), what);
+        return 1;
+    }
+
+    /** 取一个角色参数并核对它在这一局里。 */
+    static Optional<CharacterId> named(CommandContext<ServerCommandSource> context,
+                                               Session session, String argument) {
+        String raw = StringArgumentType.getString(context, argument);
+        Optional<CharacterId> found = session.state().bySeat().stream()
+                .filter(id -> id.value().equals(raw)).findFirst();
+        if (found.isEmpty()) {
+            Replies.error(context.getSource(), Text.translatable("heavyseas.command.unknown_character", raw));
+        }
+        return found;
+    }
+
+    /**
+     * 行动阶段的共同外壳：确认轮到谁、确认下指令的人有资格、做事、然后推进。
+     *
+     * <p>把这层抽出来是因为四个动作里有三件事一模一样，而**漏掉「推进」那一步的表现是
+     * 游戏卡住不动**，不是报错 —— 那种 bug 每个动作都得重犯一次才发现得了。
+     *
+     * @param what 与语言无关的动作名，进日志：验收脚本靠它判「指令那条路真的走通了」
+     */
+    private static int act(CommandContext<ServerCommandSource> context, String what, Action action) {
+        return act(context, what, action, true);
+    }
+
+    /**
+     * @param finish 做完就记下行动吗。❗换座位与抢夺是 {@code false}：它们的行动要等这一场收场
+     *               （表态 · 站队 · 挂武器可能跨好几秒），由 {@link ContestPhase} 收尾。
+     *               这里照旧记 {@code false} 也要打那一行日志 —— 出口验收按它判「指令那条路真的走通了」
+     */
+    private static int act(CommandContext<ServerCommandSource> context, String what, Action action, boolean finish) {
+        ServerCommandSource source = context.getSource();
+        ServerWorld world = gameWorld(context);
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            Replies.error(source, Text.translatable("heavyseas.command.no_game"));
+            return 0;
+        }
+        Session session = component.requireSession();
+        if (session.state().phase() != Phase.ACTION) {
+            Replies.error(source, Text.translatable("heavyseas.command.not_action"));
+            return 0;
+        }
+        // ❗有人在划船一面上还没选完：他的行动还没结束，谁都不能插进来（引擎也会抛，这里先给一句人话）。
+        Optional<CharacterId> rower = session.rower();
+        if (rower.isPresent()) {
+            Replies.error(source, Text.translatable("heavyseas.command.rowing_pending", GameFlow.characterName(rower.get())));
+            return 0;
+        }
+        // ❗这一场还没收场：规则上进行中任何卡不得易手、谁的行动也记不了（ADR-0023 §7.4 · §7.7）。
+        //   引擎照样会抛 —— 但抛出来的是一句堆栈，而喂料脚本在 12 秒的表态窗口里补发的那个 pass
+        //   恰好会撞上它（实拍到三次）。这里先给一句人话，让「拒绝了你」与「有 bug」在日志上分得开。
+        Optional<Contest> pending = session.contest();
+        if (pending.isPresent()) {
+            Replies.error(source, Text.translatable("heavyseas.command.contest_pending",
+                    GameFlow.characterName(pending.get().attacker()),
+                    GameFlow.characterName(pending.get().target())));
+            return 0;
+        }
+        Optional<CharacterId> actor = session.nextActor();
+        if (actor.isEmpty()) {
+            Replies.error(source, Text.translatable("heavyseas.command.nobody_can_act"));
+            return 0;
+        }
+        GameComponent.Occupant occupant = component.occupantOf(actor.get()).orElseThrow();
+        ServerPlayerEntity player = source.getPlayer();
+        boolean allowed = occupant.isDummy()
+                ? source.hasPermissionLevel(DEV_PERMISSION)
+                : player != null && occupant.player().equals(player.getUuid());
+        if (!allowed) {
+            Replies.error(source, Text.translatable("heavyseas.command.not_your_turn",
+                    GameFlow.characterName(actor.get())));
+            return 0;
+        }
+        if (!action.run(world, component, actor.get())) {
+            return 0;                        // 动作自己报过错了，不推进
+        }
+        LOGGER.info("行动（指令）：{} {}", actor.get().value(), what);
+        if (finish) {
+            GameFlow.finishAction(world, component, actor.get());
+        }
+        return 1;
+    }
+
+    @FunctionalInterface
+    private interface Action {
+        /** @return 真的做成了才推进阶段；返回 false 表示已经报过错。 */
+        boolean run(ServerWorld world, GameComponent component, CharacterId actor);
+    }
+}

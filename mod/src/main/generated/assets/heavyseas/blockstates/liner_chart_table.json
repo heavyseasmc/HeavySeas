@@ -1,0 +1,94 @@
+{
+  "variants": {
+    "facing=east,part=back_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_east",
+      "y": 90
+    },
+    "facing=east,part=back_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_mid",
+      "y": 90
+    },
+    "facing=east,part=back_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_west",
+      "y": 90
+    },
+    "facing=east,part=front_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_east",
+      "y": 90
+    },
+    "facing=east,part=front_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_mid",
+      "y": 90
+    },
+    "facing=east,part=front_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_west",
+      "y": 90
+    },
+    "facing=north,part=back_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_east"
+    },
+    "facing=north,part=back_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_mid"
+    },
+    "facing=north,part=back_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_west"
+    },
+    "facing=north,part=front_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_east"
+    },
+    "facing=north,part=front_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_mid"
+    },
+    "facing=north,part=front_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_west"
+    },
+    "facing=south,part=back_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_east",
+      "y": 180
+    },
+    "facing=south,part=back_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_mid",
+      "y": 180
+    },
+    "facing=south,part=back_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_west",
+      "y": 180
+    },
+    "facing=south,part=front_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_east",
+      "y": 180
+    },
+    "facing=south,part=front_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_mid",
+      "y": 180
+    },
+    "facing=south,part=front_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_west",
+      "y": 180
+    },
+    "facing=west,part=back_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_east",
+      "y": 270
+    },
+    "facing=west,part=back_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_mid",
+      "y": 270
+    },
+    "facing=west,part=back_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_back_west",
+      "y": 270
+    },
+    "facing=west,part=front_east": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_east",
+      "y": 270
+    },
+    "facing=west,part=front_mid": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_mid",
+      "y": 270
+    },
+    "facing=west,part=front_west": {
+      "model": "heavyseas:block/liner/liner_chart_table/prop/chart_table_front_west",
+      "y": 270
+    }
+  }
+}

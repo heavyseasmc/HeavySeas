@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/skiff/template/rudder_lower",
+  "textures": {
+    "blade": "heavyseas:block/skiff/rudder",
+    "brass": "heavyseas:block/skiff/brass",
+    "particle": "heavyseas:block/skiff/rudder",
+    "tiller": "heavyseas:block/skiff/tiller"
+  }
+}

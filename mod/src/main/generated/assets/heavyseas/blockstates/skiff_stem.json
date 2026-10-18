@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "end=bow,facing=east": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs",
+      "y": 180
+    },
+    "end=bow,facing=north": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs",
+      "y": 90
+    },
+    "end=bow,facing=south": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs",
+      "y": 270
+    },
+    "end=bow,facing=west": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs"
+    },
+    "end=stern,facing=east": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs"
+    },
+    "end=stern,facing=north": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs",
+      "y": 270
+    },
+    "end=stern,facing=south": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs",
+      "y": 90
+    },
+    "end=stern,facing=west": {
+      "model": "heavyseas:block/skiff/skiff_stem/hull_stairs",
+      "y": 180
+    }
+  }
+}

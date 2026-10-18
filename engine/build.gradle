@@ -1,0 +1,143 @@
+// 纯 Java 规则引擎。
+//
+// ❗此模块**不得**引入任何 Minecraft / Fabric / Loom 依赖。
+// 理由：本作不做 AI 玩家，因此没有任何自动化对局验证手段，
+// 单元测试是唯一的自动化防线；而只有把引擎与 MC 运行时彻底切开，
+// 才能在毫秒级跑几千局随机对局。
+//
+// 允许的依赖只有两类：JDK 标准库，以及纯数据解析（Gson）—— 由下面的依赖白名单机械地拦。
+
+dependencies {
+    // ❗Gson 的版本对齐 Minecraft 1.21.1 自带的那一份（2.10.1），不是随手挑的。
+    //   玩家机器上引擎用的是 MC 类路径上的 Gson，模组不另带；两边版本不一致时，
+    //   单测与开发环境（Gradle 取高版本）跑的就不是玩家那边的 Gson。
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// ❗依赖白名单：engine 的四条类路径上，每一个 jar 都必须来自下表列出的 group。
+//
+// M0 时「零 MC 依赖」是构建层面的天然事实：整个构建里根本没有 Fabric / Minecraft。
+// M1 起同一个构建里有了 Loom，这条就只剩「没人往这里加」一道自觉，所以改成机器拦。
+// 用白名单，不用排除法：MC 那边的 group 不止一个（com.mojang、net.minecraft、net.fabricmc，
+// 外加它们各自带进来的库），排除法只拦得住想到的那几个。
+// 本地文件依赖与其他工程（包括 :mod）一律不在表里 —— 依赖方向只能是 mod → engine。
+//
+// 要给引擎加依赖，先改这张表：让「引擎多了一个依赖」成为一个看得见的决定，而不是顺手。
+def allowedGroups = [
+    main: ['com.google.code.gson'],
+    test: ['com.google.code.gson', 'org.junit.jupiter', 'org.junit.platform', 'org.opentest4j', 'org.apiguardian'],
+]
+def allowlist = [
+    compileClasspath    : allowedGroups.main,
+    runtimeClasspath    : allowedGroups.main,
+    testCompileClasspath: allowedGroups.test,
+    testRuntimeClasspath: allowedGroups.test,
+]
+
+def dependencyAllowlist = tasks.register('checkDependencyAllowlist') {
+    group = 'verification'
+    description = 'engine 的类路径上只允许白名单里的依赖（拦 Minecraft / Fabric / 本地文件 / 其他工程）'
+    def resolved = allowlist.collectEntries { name, groups ->
+        [(name): configurations.named(name).flatMap { it.incoming.artifacts.resolvedArtifacts }]
+    }
+    doLast {
+        def violations = []
+        def counts = []
+        resolved.each { name, artifacts ->
+            def jars = artifacts.get()
+            counts << "${name} ${jars.size()}"
+            jars.each { artifact ->
+                def component = artifact.id.componentIdentifier
+                if (!(component instanceof ModuleComponentIdentifier)) {
+                    violations << "${name}: ${component.displayName}（不是来自仓库的模块）"
+                } else if (!allowlist[name].contains(component.group)) {
+                    violations << "${name}: ${component.displayName}"
+                }
+            }
+        }
+        if (violations) {
+            throw new GradleException(
+                    (['engine 的类路径上出现了白名单以外的依赖（白名单在 engine/build.gradle）：']
+                            + violations.collect { '  - ' + it }).join(System.lineSeparator()))
+        }
+        // 打出每条类路径扫了几个 jar：「0 违规」与「什么都没扫到」输出一模一样，只有数量分得开。
+        logger.lifecycle("依赖白名单通过：${counts.join(' · ')}")
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn dependencyAllowlist
+}
+
+// 数值数据不打进 jar，由调用方（M1 的 mod 模块 / 测试）显式指定路径载入，
+// 以保持 data/ 目录的权属边界清晰（见 data/README.md）。
+//
+// 测试读的那个目录必须是任务的输入（审查 2026-10-07 G2）：原先只把路径当系统属性传，Gradle 只比那串字、不看目录里的内容 ——
+//   只改 data/ 里的数值，:engine:test 是 UP-TO-DATE（本地）/ FROM-CACHE（CI 恢复构建缓存），新数值从没被单测与随机对局跑过。
+//   现在路径经一个带 @InputDirectory 的参数提供者传：目录内容按相对路径记指纹（换个克隆目录不算变，构建缓存照样能命中），
+//   路径本身不再是输入。做成任务属性 ext.dataDir：红测要能把它指向一份副本、在副本里改一个数
+//   （docs/tools/build-redtests.sh 的 engine-data-*：改之前第二遍必须 UP-TO-DATE，改之后必须真的执行）。
+class DataDirArgument implements CommandLineArgumentProvider {
+    private final DirectoryProperty dir
+
+    DataDirArgument(DirectoryProperty dir) {
+        this.dir = dir
+    }
+
+    @InputDirectory
+    @PathSensitive(PathSensitivity.RELATIVE)
+    DirectoryProperty getDir() {
+        return dir
+    }
+
+    @Override
+    Iterable<String> asArguments() {
+        return ['-Dheavyseas.data.dir=' + dir.get().asFile.absolutePath]
+    }
+}
+
+tasks.named('test') {
+    ext.dataDir = objects.directoryProperty().fileValue(rootProject.file('data'))
+    jvmArgumentProviders.add(new DataDirArgument(ext.dataDir))
+
+    // ❗O1 的测量台把分布表打在标准输出上，不打开这个就看不见 ——
+    // 它是「只打印不判定」的，判定写进断言就成了拿被检查对象证明自己。
+    // 打开它的代价是测试自己 println 的内容会进构建日志；目前只有那一个类在用。
+    // 顺带记一条 2026-09-14 实测（不是推断）：Gradle 对 assume 失败只打印一行 SKIPPED，
+    // 理由一个字都不打，afterTest 监听器拿到的 TestResult 里连异常都没有 ——
+    // 将来再有「允许缺席」的数据时，跳过的理由同样只能靠这个口子说出来。
+    testLogging {
+        showStandardStreams = true
+    }
+
+    // 慢测（O47，2026-10-09）：统计实验与只打印不判定的量具打 @Tag("slow")，默认的 test 不跑 ——
+    //   一次 :engine:test 真跑 400 秒，其中 SearchSmarterTest 175 · NavigationDeckStatsTest 128，改一行规则就要陪它们等。
+    //   它们归 :engine:slowTest：挂在 check 上（公开 CI 的 ./gradlew build 照跑）· release-gate.sh --release 跑 · 日常门禁不跑。
+    //   ❗判定规则对不对的测试不许打这个标签 —— 那等于把正确性挪出日常门禁；只给「几千局才量得出」与「只打印」的。
+    useJUnitPlatform {
+        excludeTags 'slow'
+    }
+}
+
+tasks.register('slowTest', Test) {
+    group = 'verification'
+    description = '只跑打了 @Tag("slow") 的统计实验与量具（默认的 test 不跑它们）'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'slow'
+    }
+    ext.dataDir = objects.directoryProperty().fileValue(rootProject.file('data'))
+    jvmArgumentProviders.add(new DataDirArgument(ext.dataDir))
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'slowTest'
+}

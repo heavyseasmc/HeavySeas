@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "heavyseas:block/skiff/skiff_floorboards/floor",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "heavyseas:block/skiff/skiff_floorboards/floor",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "heavyseas:block/skiff/skiff_floorboards/floor"
+    },
+    "facing=west": {
+      "model": "heavyseas:block/skiff/skiff_floorboards/floor",
+      "y": 90
+    }
+  }
+}

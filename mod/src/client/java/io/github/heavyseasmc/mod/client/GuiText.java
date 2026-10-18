@@ -1,0 +1,747 @@
+package io.github.heavyseasmc.mod.client;
+
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.ui.TextFit;
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import org.joml.Matrix4f;
+
+/**
+ * GUI 的字：思源宋体（Noto Serif SC，OFL），与牌面同一个世界（ADR-0037）。对局界面里的字只从这里画。
+ *
+ * <p>三条规矩都来自 2026-09-21 的真客户端截图（ADR-0037 §7.3），不是推断：
+ * <ul>
+ *   <li><b>在物理像素空间里画</b>。Minecraft 的字形图按最近邻采样，只有 1 纹素 = 1 物理像素才清楚。
+ *       所以字体定义按物理像素字号注册了一条梯子（{@code font/r16.json} 这类，{@code oversample} 恒为 1），
+ *       这里把矩阵缩到 1 / 界面缩放倍数 再画 —— 与界面尺寸是几无关。</li>
+ *   <li><b>不许用矩阵把字放大</b>：放大出来的边缘全是锯齿台阶。要大字就取梯子上更大的一级。</li>
+ *   <li><b>有地板</b>：界面尺寸 1 下 11 单位的中文在任何字体里都读不出，所以字号不低于梯子最低一级。</li>
+ * </ul>
+ *
+ * <p>「任何情况下不越界」由 {@link TextFit} 保证（缩 → 折 → 截，每一步都量）；这里只负责量与画。
+ * 版面要按 {@link #lineHeight} 排，不要假设一行是 9 个单位 —— 地板会让小界面尺寸下的行比想的高。
+ */
+final class GuiText {
+
+    /** 梯子。❗与 {@code assets/heavyseas/font/} 下的定义一一对应（管线的 build_gui_font.py 生成），另有测试核对。 */
+    static final int[] REGULAR_PX = {12, 14, 16, 18, 20, 24, 28, 32, 40};
+    static final int[] BOLD_PX = {14, 16, 18, 20, 24, 28, 32, 40, 48, 64};
+
+    /** 1.21.1 的 TTF 字形顶边 = 绘制 y + (7 − ascent)：基线恒在绘制 y 往下 7，与字号无关（读的是 yarn 源码）。 */
+    private static final int BASELINE_BELOW_DRAW_Y = 7;
+    /** 行框高 = 字号 × 这个数；汉字的字面框在基线上 0.88、下 0.12（Noto Serif CJK 的度量）。 */
+    private static final float LINE_RATIO = 1.25f;
+    private static final float IDEOGRAPH_ASCENT = 0.88f;
+
+    /** 字号档，按旧稿子的 GUI 单位记录；物理字号只随窗口变，Minecraft 界面尺寸只做坐标换算。 */
+    static final int CAPTION = 8;
+    /** 与 Minecraft 默认字体等大：1280×720（界面尺寸 3）下是 24 物理像素。再大，240 个单位高的界面里牌就被字挤小了（实拍过）。 */
+    static final int BODY = 9;
+    static final int NAME = 12;
+    static final int TITLE = 15;
+
+    /** 阴影的颜色（不含不透明度）：牌面墨色那一路的近黑，不用纯黑。 */
+    private static final int SHADOW = 0x00120E0B;
+
+    /** 印在纸上的墨：正文略透一点，纸纹从底下透上来；四周各一道更淡的，边缘微微洇开。 */
+    private static final int INK_ALPHA = 0xEE;
+    private static final int INK_BLEED_ALPHA = 0x26;
+    private static final int[][] INK_BLEED = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    private static int inked(int color) {
+        return (color & 0xFFFFFF) | (INK_ALPHA << 24);
+    }
+
+    enum Align { LEFT, CENTER, RIGHT }
+
+    private GuiText() {
+    }
+
+    /** Reading panels use one chosen font size and reflow; a long paragraph never shrinks the font. */
+    static int readingSizePx(int basePx, boolean bold) {
+        return readingSizePx(basePx, bold, ClientPrefs.largeReading());
+    }
+
+    /** 同上，阅读字号那一档由调用方给：版面单测要两档各排一遍，不读本机偏好。 */
+    static int readingSizePx(int basePx, boolean bold, boolean large) {
+        int[] ladder = bold ? BOLD_PX : REGULAR_PX;
+        int wanted = large ? Math.max(18, (int) Math.ceil(basePx * 1.25)) : basePx;
+        for (int px : ladder) {
+            if (px >= wanted) {
+                return px;
+            }
+        }
+        return ladder[ladder.length - 1];
+    }
+
+    static int readingLinePx(int basePx, boolean bold) {
+        return (int) Math.ceil(readingSizePx(basePx, bold) * 1.4);
+    }
+
+    static List<String> readingLinesPx(String text, int boxPx, int basePx, boolean bold) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        int px = readingSizePx(basePx, bold);
+        List<String> lines = new ArrayList<>();
+        for (String paragraph : text.split("\\n", -1)) {
+            if (paragraph.isBlank()) {
+                lines.add("");
+            } else {
+                List<String> wrapped = READING_FITS.get(new ReadingKey(paragraph, Math.max(1, boxPx), px, bold),
+                        key -> TextFit.fit(key.text(), key.width(), 2048, new int[]{key.size()},
+                                (s, size) -> renderer.getWidth(styled(s, key.bold(), size)), TextFit.Policy.WRAP_FIRST)
+                                .lines().stream().map(TextFit.Line::text).toList());
+                lines.addAll(wrapped);
+            }
+        }
+        return List.copyOf(lines);
+    }
+
+    static void drawReadingLinesPx(DrawContext context, List<String> lines, int x, int y, int basePx,
+                                   boolean bold, int color, int firstLine, int maxLines) {
+        int px = readingSizePx(basePx, bold);
+        int step = readingLinePx(basePx, bold);
+        int start = Math.max(0, Math.min(firstLine, lines.size()));
+        int end = Math.min(lines.size(), start + Math.max(0, maxLines));
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        for (int i = start; i < end; i++) {
+            context.drawText(renderer, styled(lines.get(i), bold, px), x,
+                    y + (i - start) * step + (step - linePx(px)) / 2 + baselineIn(px) - BASELINE_BELOW_DRAW_Y,
+                    color, false);
+        }
+    }
+
+    /**
+     * 一段每个字各有颜色、各自粗细的字（航海日志：人名 · 牌名有主题色，动词加粗），按阅读字号折行，
+     * 返回每一行在原文里的位置。量的时候加粗的字按粗体量 —— 粗体宽一些，按正文量会戳出框。
+     *
+     * <p>折行照书页那一套（{@link io.github.heavyseasmc.mod.rulebook.LineBreak}：避头尾 · 数字与量词不拆 · 末行不只剩一个字），
+     * {@code glued} 标出不许断开的字缝（人名 · 牌名，{@link LogInk#glue}）。2026-10-13 第二轮验收 50 · 52：
+     * 原先按 {@code TextFit.wrapSpans} 折，「船/长」被拆、「1/次。」数字与量词分家、末行只剩一个「人」。
+     *
+     * <p>❗按字量的宽度加起来，与画的时候按「颜色或粗细一变就另起一截」量出来的整数宽度会差一点（每截向上取整）。
+     * 折完逐行按画的那种量法再核一遍，超了就把上限收窄超出的那么多重折 —— 绝不戳出框。
+     */
+    static List<TextFit.Span> readingRunLinesPx(String text, boolean[] bold, boolean[] glued, int boxPx, int basePx) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        int regular = readingSizePx(basePx, false);
+        int heavy = readingSizePx(basePx, true);
+        float[] widths = new float[text.length()];
+        for (int i = 0; i < text.length(); i++) {
+            int end = Character.isHighSurrogate(text.charAt(i)) && i + 1 < text.length() ? i + 2 : i + 1;
+            widths[i] = renderer.getTextHandler().getWidth(styled(text.substring(i, end), bold[i], bold[i] ? heavy : regular));
+            if (end == i + 2) {
+                widths[++i] = 0f;            // 代理对的低位给 0（LineBreak 的约定）
+            }
+        }
+        String flat = text.replace('\n', ' ');   // 一条播报里万一夹着换行：当空格折（LineBreak 只收一段）
+        int box = Math.max(1, boxPx);
+        float max = box;
+        List<io.github.heavyseasmc.mod.rulebook.LineBreak.Line> lines = List.of();
+        for (int attempt = 0; attempt < 4; attempt++) {
+            lines = io.github.heavyseasmc.mod.rulebook.LineBreak.wrapNoWidow(flat, widths, max, glued);
+            int over = 0;
+            for (var line : lines) {
+                over = Math.max(over, runWidth(renderer, text, bold, line.start(), line.end(), regular, heavy) - box);
+            }
+            if (over <= 0) {
+                break;
+            }
+            max -= over;
+        }
+        List<TextFit.Span> out = new ArrayList<>(lines.size());
+        for (var line : lines) {
+            out.add(new TextFit.Span(line.start(), line.end()));
+        }
+        return List.copyOf(out);
+    }
+
+    /** 原文 {@code [start, end)} 照 {@link #drawReadingRunPx} 的量法有多宽：粗细一变另起一截，每截取整。 */
+    private static int runWidth(TextRenderer renderer, String text, boolean[] bold, int start, int end, int regular,
+                                int heavy) {
+        int w = 0;
+        int from = start;
+        for (int i = start + 1; i <= end; i++) {
+            if (i == end || bold[i] != bold[from]) {
+                w += renderer.getWidth(styled(text.substring(from, i), bold[from], bold[from] ? heavy : regular));
+                from = i;
+            }
+        }
+        return w;
+    }
+
+    /** 画 {@link #readingRunLinesPx} 排出的一行：颜色或粗细一变就另起一截，基线照正文那一级对齐。 */
+    static void drawReadingRunPx(DrawContext context, String line, int[] colors, boolean[] bold, int x, int y,
+                                 int basePx) {
+        if (line.isEmpty()) {
+            return;
+        }
+        int regular = readingSizePx(basePx, false);
+        int heavy = readingSizePx(basePx, true);
+        int step = readingLinePx(basePx, false);
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        // 基线恒在绘制 y 往下 7（与字号无关），所以粗细两级用同一个 y 就在同一条基线上
+        int py = y + (step - linePx(regular)) / 2 + baselineIn(regular) - BASELINE_BELOW_DRAW_Y;
+        int start = 0;
+        int cx = x;
+        for (int i = 1; i <= line.length(); i++) {
+            if (i == line.length() || colors[i] != colors[start] || bold[i] != bold[start]) {
+                int px = bold[start] ? heavy : regular;
+                Text segment = styled(line.substring(start, i), bold[start], px);
+                context.drawText(renderer, segment, cx, py, colors[start], false);
+                cx += renderer.getWidth(segment);
+                start = i;
+            }
+        }
+    }
+
+    static int readingLineHeight(int guiSize, boolean bold) {
+        return ceilDiv(readingLinePx((int) Math.round(GuiMetrics.pixels(guiSize)), bold),
+                scale(MinecraftClient.getInstance()));
+    }
+
+    /**
+     * 一行字按<b>阅读字号</b>（{@link #drawReading} 画的那一档）有多宽，GUI 单位，向上取整。
+     * ❗按 {@link #width} 量、再交给 {@link #drawReading} 画，两边字号不同：加大阅读字号时量出来的宽放不下，一行折成两行
+     * （2026-10-13 验收 34：聊天开着时倒计时签折成两行）。量与画走同一档。
+     */
+    static int readingWidth(String text, int guiSize, boolean bold) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int s = scale(client);
+        int px = readingSizePx((int) Math.round(GuiMetrics.pixels(guiSize)), bold);
+        return ceilDiv(client.textRenderer.getWidth(styled(text, bold, px)), s);
+    }
+
+    static int readingHeight(String text, int boxW, int guiSize, boolean bold) {
+        int s = scale(MinecraftClient.getInstance());
+        int base = (int) Math.round(GuiMetrics.pixels(guiSize));
+        return ceilDiv(readingLinesPx(text, boxW * s, base, bold).size() * readingLinePx(base, bold), s);
+    }
+
+    static void drawReading(DrawContext context, String text, int x, int y, int boxW, int guiSize,
+                            boolean bold, int color, int firstLine, int maxLines) {
+        int s = scale(MinecraftClient.getInstance());
+        int base = (int) Math.round(GuiMetrics.pixels(guiSize));
+        List<String> lines = readingLinesPx(text, boxW * s, base, bold);
+        context.getMatrices().push();
+        context.getMatrices().scale(1f / s, 1f / s, 1f);
+        drawReadingLinesPx(context, lines, x * s, y * s, base, bold, color, firstLine, maxLines);
+        context.getMatrices().pop();
+    }
+
+    /** 画一行（放不下就缩字号，再不行截断）。返回占掉的高度，GUI 单位。 */
+    static int line(DrawContext context, Text text, int x, int y, int boxW, int guiSize, boolean bold, int color, Align align) {
+        return draw(context, text.getString(), x, y, boxW, guiSize, bold, color, align, 1);
+    }
+
+    /**
+     * 把一段字画进宽 {@code boxW} 的框里，最多 {@code maxLines} 行。
+     *
+     * @param x,y     框的左上角，GUI 单位
+     * @param guiSize 旧稿子里的字号单位；按窗口换成物理字号后取梯子上不大于它的那一级，且不低于地板
+     * @return 占掉的高度，GUI 单位
+     */
+    static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
+                    int color, Align align, int maxLines) {
+        return draw(context, text, x, y, boxW, guiSize, bold, color, align, maxLines, false);
+    }
+
+    /**
+     * 同上，可带阴影。阴影只给<b>直接压在世界上</b>的字（主画面 HUD）：背后是天是海说不准，没有它亮处读不出。
+     * 画在材质板上的字一律不带 —— 印在纸上的墨没有影子。
+     */
+    static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
+                    int color, Align align, int maxLines, boolean shadow) {
+        return draw(context, text, x, y, boxW, guiSize, bold, color, align, maxLines, shadow, false);
+    }
+
+    /**
+     * 同上，{@code ink} = 这行字是<b>印在牌面上</b>的：正文略透、边缘微微洇开，让它读起来是墨而不是贴纸。
+     * 界面上的字一律不走它 —— 界面不是纸。
+     */
+    static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
+                    int color, Align align, int maxLines, boolean shadow, boolean ink) {
+        return draw(context, text, x, y, boxW, guiSize, bold, color, align, maxLines, shadow, ink, 0);
+    }
+
+    /**
+     * 同上，但倍率由调用方给。
+     *
+     * <p>{@code scaleOverride <= 0} 时用窗口的界面尺寸换算坐标，界面字号则只跟窗口；牌面字号已由卡面槽位给定。
+     * 给正数是**合成进牌自己的纹理**那一路（{@link CardComposite}）：那时排字的坐标系是<b>贴图自己的像素</b>，
+     * 与窗口多大、界面尺寸设成几，一点关系都没有 —— 传窗口的倍率进去，同一张牌在不同窗口下会合成出不同的字号。
+     */
+    static int draw(DrawContext context, String text, int x, int y, int boxW, int guiSize, boolean bold,
+                    int color, Align align, int maxLines, boolean shadow, boolean ink, int scaleOverride) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        TextRenderer renderer = client.textRenderer;
+        int scale = scaleOverride > 0 ? scaleOverride : scale(client);
+        // 牌面及离屏合成的字号已由卡面槽位换算；界面旧字号则按窗口换算一次。
+        int wantedPx = scaleOverride > 0 || ink ? guiSize * scale : (int) Math.round(GuiMetrics.pixels(guiSize));
+        TextFit.Result fit = fit(renderer, text, boxW, wantedPx, bold, maxLines, scale);
+        int linePx = linePx(fit.size());
+        int baseline = Math.round((linePx - fit.size()) / 2f + fit.size() * IDEOGRAPH_ASCENT);
+
+        MatrixStack matrices = context.getMatrices();
+        matrices.push();
+        snapToPixel(matrices, scale);
+        matrices.scale(1f / scale, 1f / scale, 1f);
+        int boxPx = boxW * scale;
+        for (int i = 0; i < fit.lines().size(); i++) {
+            TextFit.Line l = fit.lines().get(i);
+            int dx = switch (align) {
+                case LEFT -> 0;
+                case CENTER -> (boxPx - l.width()) / 2;
+                case RIGHT -> boxPx - l.width();
+            };
+            int px = x * scale + dx;
+            int py = y * scale + i * linePx + baseline - BASELINE_BELOW_DRAW_Y;
+            Text styled = styled(l.text(), bold, fit.size());
+            if (shadow) {
+                int off = Math.max(1, (int) Math.round(GuiMetrics.pixels(0.5)));
+                context.drawText(renderer, styled, px + off, py + off, SHADOW | (color & 0xFF000000), false);
+            }
+            if (ink) {
+                // 墨会被纸吃掉一点：先在四周各压一道极淡的同色，再写正文，边缘于是有一点点洇开。
+                // ❗这是给<b>印在牌面上</b>的字用的 —— 界面上的字一律不走它。
+                // 起因：牌名改成实时排字之后，锐利的字压在被重采样柔化过的牌上，读起来像贴纸（用户 2026-09-22 判「塑料感」）。
+                int bleed = (color & 0xFFFFFF) | (INK_BLEED_ALPHA << 24);
+                for (int[] d : INK_BLEED) {
+                    context.drawText(renderer, styled, px + d[0], py + d[1], bleed, false);
+                }
+            }
+            context.drawText(renderer, styled, px, py, ink ? inked(color) : color, false);
+        }
+        matrices.pop();
+        return ceilDiv(Math.max(1, fit.lines().size()) * linePx, scale);
+    }
+
+    // ---------------------------------------------------------------- 物理像素里排字（主画面 HUD）
+
+    /**
+     * 在<b>已经缩到物理像素</b>的矩阵里画一行字。主画面 HUD 照样张按物理像素排（{@code HudLayout}），
+     * 调用方先把矩阵缩到 1 / 界面尺寸，这里就不再缩 —— 否则缩两次。
+     *
+     * <p>字号直接给物理像素（样张的 {@code font-size} 乘上 {@code HudLayout.k()} 再取整），取梯子上不大于它的那一级；
+     * 放不下就往下缩一级，再不行截断（与 {@link #draw} 同一套 {@link TextFit}）。
+     *
+     * @param top     行框上沿（物理像素）；行框高是 {@link #linePxAt}
+     * @param spacing 字距（物理像素，样张的 {@code letter-spacing}）；大于 0 时按字符分开画、不缩不截
+     * @return 实际画了多宽（物理像素）
+     */
+    static int drawPx(DrawContext context, String text, int x, int top, int boxPx, int sizePx, boolean bold,
+                      int color, Align align, int spacing) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        // 加了字距放不下就退回不加字距、照常缩字号：原先加字距的那一路不缩不截，英文「Only you can see」
+        // 在加大字号下整句画出签子右沿（2026-10-13 验收 L05）
+        int spacedPx = candidates(bold, sizePx)[0];
+        if (spacing > 0 && spacedWidth(renderer, text, bold, spacedPx, spacing) <= boxPx) {
+            int px = spacedPx;
+            int w = spacedWidth(renderer, text, bold, px, spacing);
+            int x0 = x + alignOffset(align, boxPx, w);
+            int py = top + baselineIn(px) - BASELINE_BELOW_DRAW_Y;
+            int cx = x0;
+            for (int i = 0; i < text.length(); ) {
+                int cp = text.codePointAt(i);
+                String ch = new String(Character.toChars(cp));
+                context.drawText(renderer, styled(ch, bold, px), cx, py, color, false);
+                cx += renderer.getWidth(styled(ch, bold, px)) + spacing;
+                i += Character.charCount(cp);
+            }
+            return w;
+        }
+        TextFit.Result fit = fitCached(renderer, text, boxPx, 1, bold, sizePx, TextFit.Policy.SHRINK_FIRST);
+        if (fit.lines().isEmpty()) {
+            return 0;
+        }
+        TextFit.Line l = fit.lines().get(0);
+        int py = top + (linePx(sizePxOf(bold, sizePx)) - linePx(fit.size())) / 2 + baselineIn(fit.size())
+                - BASELINE_BELOW_DRAW_Y;
+        context.drawText(renderer, styled(l.text(), bold, fit.size()), x + alignOffset(align, boxPx, l.width()), py,
+                color, false);
+        return l.width();
+    }
+
+    /**
+     * 一行字（左对齐）：照 {@link #drawPx} 先在梯子上往下缩；梯子最小一级还放不下时<b>整行等比缩到放得下</b>，不截、不留空。
+     *
+     * <p>给「字少但必须在」的地方用：按钮里的那句话、状态牌上的阶段名。{@link #drawPx} 连省略号都放不下时什么都不画
+     * （{@code TextFit} 的「空着，也不越界」）—— 英文「打出」那一枚按钮于是只剩一个键帽（2026-10-13 验收 L07）。
+     *
+     * @return 实际画了多宽（物理像素）
+     */
+    static int drawPxFit(DrawContext context, String text, int x, int top, int boxPx, int sizePx, boolean bold, int color) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        int[] sizes = candidates(bold, sizePx);
+        int smallest = sizes[sizes.length - 1];
+        int w = renderer.getWidth(styled(text, bold, smallest));
+        if (w <= boxPx || w <= 0) {
+            return drawPx(context, text, x, top, boxPx, sizePx, bold, color, Align.LEFT, 0);
+        }
+        float f = Math.max(0.01f, boxPx / (float) w);
+        int lineFull = linePx(sizePxOf(bold, sizePx));
+        float cy = top + lineFull / 2f;
+        int py = top + (lineFull - linePx(smallest)) / 2 + baselineIn(smallest) - BASELINE_BELOW_DRAW_Y;
+        context.getMatrices().push();
+        context.getMatrices().translate(x, cy, 0f);
+        context.getMatrices().scale(f, f, 1f);
+        context.drawText(renderer, styled(text, bold, smallest), 0, Math.round(py - cy), color, false);
+        context.getMatrices().pop();
+        return boxPx;
+    }
+
+    /**
+     * 同上，但是一段：先折行，折不下才缩，最多 {@code maxLines} 行，行距由调用方给（样张的 {@code line-height}）。
+     *
+     * @return 实际排了几行
+     */
+    static int paragraphPx(DrawContext context, String text, int x, int top, int boxPx, int sizePx, boolean bold,
+                           int color, int maxLines, int lineStepPx) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        TextFit.Result fit = fitCached(renderer, text, boxPx, maxLines, bold, sizePx, TextFit.Policy.WRAP_FIRST);
+        int lead = (lineStepPx - linePx(fit.size())) / 2;
+        for (int i = 0; i < fit.lines().size(); i++) {
+            TextFit.Line l = fit.lines().get(i);
+            int py = top + i * lineStepPx + lead + baselineIn(fit.size()) - BASELINE_BELOW_DRAW_Y;
+            context.drawText(renderer, styled(l.text(), bold, fit.size()), x, py, color, false);
+        }
+        return Math.max(1, fit.lines().size());
+    }
+
+    /**
+     * 同 {@link #paragraphPx}，但每个字可以有自己的颜色（{@code colors[i]} 对应 {@code text} 的第 i 个 char）。
+     * 折行与缩字和单色那一版完全一样（同一套 {@link TextFit}），之后按原文的位置把颜色对回去、一截一截画 ——
+     * 航海日志里人名、牌名、伤害各用主题色（用户 2026-10-07：「日志看起来很费劲，行动或者牌的字应该有主题色」）。
+     *
+     * @return 实际排了几行
+     */
+    static int paragraphRunsPx(DrawContext context, String text, int[] colors, int x, int top, int boxPx, int sizePx,
+                               boolean bold, int maxLines, int lineStepPx) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        TextFit.Result fit = fitCached(renderer, text, boxPx, maxLines, bold, sizePx, TextFit.Policy.WRAP_FIRST);
+        int lead = (lineStepPx - linePx(fit.size())) / 2;
+        List<String> lines = fit.lines().stream().map(TextFit.Line::text).toList();
+        int[][] perLine = lineColors(text, colors, lines);
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            int py = top + i * lineStepPx + lead + baselineIn(fit.size()) - BASELINE_BELOW_DRAW_Y;
+            int cx = x;
+            int runStart = 0;
+            for (int j = 1; j <= line.length(); j++) {
+                if (j == line.length() || perLine[i][j] != perLine[i][runStart]) {
+                    String seg = line.substring(runStart, j);
+                    context.drawText(renderer, styled(seg, bold, fit.size()), cx, py, perLine[i][runStart], false);
+                    cx += renderer.getWidth(styled(seg, bold, fit.size()));
+                    runStart = j;
+                }
+            }
+        }
+        return Math.max(1, fit.lines().size());
+    }
+
+    /**
+     * 排好的每一行、每一个字是什么颜色：按原文的位置对回去。
+     * TextFit 会丢掉折行处与首尾的空白、把连着的几个空白并成一个，截断时补一个「…」——
+     * 所以对下一个实字之前，原文里的空白一律跳过；对不上的（「…」）沿用前一个字的颜色。
+     */
+    static int[][] lineColors(String text, int[] colors, List<String> lines) {
+        int[][] out = new int[lines.size()][];
+        int cursor = 0;
+        int last = colors.length > 0 ? colors[0] : 0xFF000000;
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            out[i] = new int[line.length()];
+            for (int j = 0; j < line.length(); j++) {
+                char ch = line.charAt(j);
+                if (!Character.isWhitespace(ch)) {
+                    while (cursor < text.length() && Character.isWhitespace(text.charAt(cursor))) {
+                        cursor++;
+                    }
+                }
+                if (cursor < text.length() && text.charAt(cursor) == ch) {
+                    last = colors[cursor];
+                    cursor++;
+                }
+                out[i][j] = last;
+            }
+        }
+        return out;
+    }
+
+    // ---------------------------------------------------------------- 聊天（ChatSkin）：一个字号、只折不缩，颜色按原文位置一个个对回
+
+    /**
+     * 只用 {@code sizePx} 那一级（梯子上不大于它的最大一级）排：放得下就一行，放不下折行，折满 {@code maxLines} 还放不下就截断加「…」。
+     * 聊天一句一句地摆，同一页里字号忽大忽小比截掉一截难看（与 {@link #paragraphPx} 的「折不下才缩」不同）。
+     */
+    static TextFit.Result fitFixedPx(String text, int boxPx, int sizePx, int maxLines) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        int size = candidates(false, sizePx)[0];
+        return FIXED_FITS.get(new FitKey(text, boxPx, maxLines, false, size, TextFit.Policy.WRAP_FIRST), key ->
+                TextFit.fit(text, boxPx, maxLines, new int[]{size}, (s, px) -> renderer.getWidth(styled(s, false, px)),
+                        TextFit.Policy.WRAP_FIRST));
+    }
+
+    private static final FitCache<FitKey, TextFit.Result> FIXED_FITS = new FitCache<>(512);
+
+    /**
+     * 画排好的一行，每个字一个颜色（{@code colors[j]} 对应 {@code line} 的第 j 个 char），颜色一变另起一截。
+     *
+     * @param rowTop  这一行的行框上沿（物理像素）
+     * @param rowStep 行距（物理像素）：字在里面竖向居中
+     */
+    static void drawRowRunsPx(DrawContext context, String line, int[] colors, int x, int rowTop, int rowStep, int size) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        int py = rowTop + (rowStep - linePx(size)) / 2 + baselineIn(size) - BASELINE_BELOW_DRAW_Y;
+        int cx = x;
+        int runStart = 0;
+        for (int j = 1; j <= line.length(); j++) {
+            if (j == line.length() || colors[j] != colors[runStart]) {
+                String seg = line.substring(runStart, j);
+                if ((colors[runStart] >>> 24) >= 4) {               // 不透明度低于 4 时 Minecraft 当它是不透明的
+                    context.drawText(renderer, styled(seg, false, size), cx, py, colors[runStart], false);
+                }
+                cx += renderer.getWidth(styled(seg, false, size));
+                runStart = j;
+            }
+        }
+    }
+
+    /** 排好的一行里，前 {@code end} 个 char 照 {@link #drawRowRunsPx} 的量法有多宽（物理像素）：点哪个字用。 */
+    static int prefixWidthPx(String line, int end, int size) {
+        return MinecraftClient.getInstance().textRenderer.getWidth(styled(line.substring(0, end), false, size));
+    }
+
+    /**
+     * 排好的每一行、每一个字对应原文的第几个 char（{@code -1} = 原文里没有，比如截断补的「…」）。
+     * 对法与 {@link #lineColors} 相同：折行处与首尾的空白被丢掉了，对下一个实字之前原文里的空白一律跳过。
+     */
+    static int[][] lineIndices(String text, List<String> lines) {
+        int[][] out = new int[lines.size()][];
+        int cursor = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            out[i] = new int[line.length()];
+            for (int j = 0; j < line.length(); j++) {
+                char ch = line.charAt(j);
+                if (!Character.isWhitespace(ch)) {
+                    while (cursor < text.length() && Character.isWhitespace(text.charAt(cursor))) {
+                        cursor++;
+                    }
+                }
+                if (cursor < text.length() && text.charAt(cursor) == ch) {
+                    out[i][j] = cursor++;
+                } else {
+                    out[i][j] = -1;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** 物理像素字号 {@code size}（梯子上的一级）的行框多高。 */
+    static int rowPx(int size) {
+        return linePx(size);
+    }
+
+    /** 这段字在 {@link #paragraphPx} 里会排成几行（先量后铺底用）。 */
+    static int paragraphLines(String text, int boxPx, int sizePx, boolean bold, int maxLines) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        return Math.max(1, fitCached(renderer, text, boxPx, maxLines, bold, sizePx, TextFit.Policy.WRAP_FIRST)
+                .lines().size());
+    }
+
+    /** 物理像素字号下一行字多宽（带字距）。 */
+    static int widthPx(String text, int sizePx, boolean bold, int spacing) {
+        TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
+        return spacedWidth(renderer, text, bold, sizePxOf(bold, sizePx), spacing);
+    }
+
+    /** 物理像素字号下一行的行框多高。 */
+    static int linePxAt(int sizePx, boolean bold) {
+        return linePx(sizePxOf(bold, sizePx));
+    }
+
+    private static int sizePxOf(boolean bold, int sizePx) {
+        return candidates(bold, sizePx)[0];
+    }
+
+    private static int spacedWidth(TextRenderer renderer, String text, boolean bold, int px, int spacing) {
+        int w = renderer.getWidth(styled(text, bold, px));
+        return spacing > 0 ? w + spacing * Math.max(0, text.codePointCount(0, text.length()) - 1) : w;
+    }
+
+    private static int baselineIn(int px) {
+        return Math.round((linePx(px) - px) / 2f + px * IDEOGRAPH_ASCENT);
+    }
+
+    private static int alignOffset(Align align, int box, int w) {
+        return switch (align) {
+            case LEFT -> 0;
+            case CENTER -> (box - w) / 2;
+            case RIGHT -> box - w;
+        };
+    }
+
+    /** 只量不画：这段字排进宽 {@code boxW} 的框里要占多高，GUI 单位。要先铺底再写字的地方用。 */
+    static int height(String text, int boxW, int guiSize, boolean bold, int maxLines) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int scale = scale(client);
+        TextFit.Result fit = fit(client.textRenderer, text, boxW, (int) Math.round(GuiMetrics.pixels(guiSize)), bold, maxLines, scale);
+        return ceilDiv(Math.max(1, fit.lines().size()) * linePx(fit.size()), scale);
+    }
+
+    private static TextFit.Result fit(TextRenderer renderer, String text, int boxW, int wantedPx, boolean bold,
+                                      int maxLines, int scale) {
+        // 只许一行的是标签：只能缩。许多行的是段落：先折行，折不下才缩 —— 先缩的话长句会变成一行小字，
+        // 同一栏里字号忽大忽小（航海日志实拍过）。
+        return fitCached(renderer, text, boxW * scale, maxLines, bold, wantedPx,
+                maxLines > 1 ? TextFit.Policy.WRAP_FIRST : TextFit.Policy.SHRINK_FIRST);
+    }
+
+    /**
+     * 量字、折行的结果存起来（审查 2026-10-07 P4）：已经到手、不会再变的字（航海日志几十条、按钮、说明签）原先每帧都重新折行、
+     * 一个字一个字地量宽 —— 日志拉伸时英文每帧约 831 次量宽。结果只取决于下面这几样，键里一样不少；字体换了（资源重载 · 换语言）
+     * 由 {@link #forgetMeasurements} 整个作废。只在渲染线程上用。
+     */
+    private static final FitCache<FitKey, TextFit.Result> FITS = new FitCache<>(1024);
+    private record ReadingKey(String text, int width, int size, boolean bold) { }
+    private static final FitCache<ReadingKey, List<String>> READING_FITS = new FitCache<>(2048);
+    private static int measurementVersion;
+
+    static int measurementVersion() { return measurementVersion; }
+
+    /** 一次量字的全部输入：字 · 框宽（物理像素）· 最多几行 · 粗细 · 梯子上最大的那一级 · 先折还是先缩。 */
+    private record FitKey(String text, int box, int maxLines, boolean bold, int top, TextFit.Policy policy) {
+    }
+
+    private static TextFit.Result fitCached(TextRenderer renderer, String text, int boxPx, int maxLines, boolean bold,
+                                            int wantPx, TextFit.Policy policy) {
+        int[] sizes = candidates(bold, wantPx);
+        return FITS.get(new FitKey(text, boxPx, maxLines, bold, sizes[0], policy), key ->
+                TextFit.fit(text, boxPx, maxLines, sizes, (s, px) -> renderer.getWidth(styled(s, bold, px)), policy));
+    }
+
+    /** 字体可能换了（资源重载、换语言）：存着的量字结果全作废。 */
+    static void forgetMeasurements() {
+        FITS.clear();
+        FIXED_FITS.clear();
+        READING_FITS.clear();
+        measurementVersion++;
+    }
+
+    /** 这个字号的一行有多高，GUI 单位。版面按它排。 */
+    static int lineHeight(int guiSize, boolean bold) {
+        int scale = scale(MinecraftClient.getInstance());
+        return ceilDiv(linePx(candidates(bold, (int) Math.round(GuiMetrics.pixels(guiSize)))[0]), scale);
+    }
+
+    /** 一行字（不折、不截）在想要的字号下有多宽，GUI 单位，向上取整。排按钮宽度这类要先知道宽度的场合用。 */
+    static int width(String text, int guiSize, boolean bold) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int scale = scale(client);
+        int px = candidates(bold, (int) Math.round(GuiMetrics.pixels(guiSize)))[0];
+        return ceilDiv(client.textRenderer.getWidth(styled(text, bold, px)), scale);
+    }
+
+    /**
+     * 照 {@link #draw(DrawContext, String, int, int, int, int, boolean, int, Align, int, boolean, boolean, int)}
+     * 那一路（{@code ink} · {@code scaleOverride} 同义）画一行不缩不截的字有多宽，单位与它的 {@code x} 相同。
+     * 牌面角标按实际字宽排位置用（ADR-0090）：量与画走同一套换算，两边才对得上。
+     */
+    static float drawnWidth(String text, int guiSize, boolean bold, boolean ink, int scaleOverride) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        int scale = scaleOverride > 0 ? scaleOverride : scale(client);
+        int wantedPx = scaleOverride > 0 || ink ? guiSize * scale : (int) Math.round(GuiMetrics.pixels(guiSize));
+        int px = candidates(bold, wantedPx)[0];
+        return client.textRenderer.getWidth(styled(text, bold, px)) / (float) scale;
+    }
+
+    /**
+     * 这一级字号（**物理像素**）上，这行字有多宽（物理像素）。
+     *
+     * <p>给牌名闸门用：字号梯子是离散的，「在某个尺寸下放得下」推不出「每个尺寸下都放得下」，
+     * 所以要逐级各查一遍。界面自己别用它 —— 界面要的是 GUI 单位，用 {@link #width}。
+     */
+    static int widthAtPx(String text, int px, boolean bold) {
+        return MinecraftClient.getInstance().textRenderer.getWidth(styled(text, bold, px));
+    }
+
+    private static int linePx(int px) {
+        return (int) Math.ceil(px * LINE_RATIO);
+    }
+
+    /** 梯子上不大于 {@code wantPx} 的各级，从大到小；一级都没有就只剩地板。 */
+    static int[] candidates(boolean bold, int wantPx) {
+        int[] ladder = bold ? BOLD_PX : REGULAR_PX;
+        List<Integer> out = new ArrayList<>();
+        for (int i = ladder.length - 1; i >= 0; i--) {
+            if (ladder[i] <= wantPx) {
+                out.add(ladder[i]);
+            }
+        }
+        if (out.isEmpty()) {
+            out.add(ladder[0]);
+        }
+        return out.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    static Identifier fontId(boolean bold, int px) {
+        return Identifier.of(HeavySeasMod.MOD_ID, (bold ? "b" : "r") + px);
+    }
+
+    private static Text styled(String s, boolean bold, int px) {
+        return Text.literal(plain(s)).setStyle(Style.EMPTY.withFont(fontId(bold, px)));
+    }
+
+    /**
+     * 剥掉 lang 里的格式记号（{@code §l}…{@code §r}，播报给动词做的记号，见 {@link LogInk}）。
+     * 这里的字一律按我们自己的字体与粗细画；记号留着的话 Minecraft 会按它的假粗体再描一遍，而量宽时又不算它。
+     */
+    static String plain(String s) {
+        if (s.indexOf(SECTION) < 0) {
+            return s;
+        }
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == SECTION) {
+                i++;                                 // 记号与它后面那个字一起跳过
+            } else {
+                out.append(s.charAt(i));
+            }
+        }
+        return out.toString();
+    }
+
+    /** 格式记号起头的那个字。 */
+    private static final char SECTION = 0x00A7;
+
+    private static int scale(MinecraftClient client) {
+        return Math.max(1, (int) Math.round(client.getWindow().getScaleFactor()));
+    }
+
+    /**
+     * 调用方的矩阵若带着小数位移（「抬」的 9 像素是插值出来的），字形四边形就落在半个物理像素上，
+     * 最近邻采样下笔画会一粗一细。只有平移、没有缩放时把它补到整像素；带缩放的（「发」的 0.94 → 1、「翻」）
+     * 正在动，不补。
+     */
+    private static void snapToPixel(MatrixStack matrices, int scale) {
+        Matrix4f m = matrices.peek().getPositionMatrix();
+        if (Math.abs(m.m00() - 1f) > 1e-4f || Math.abs(m.m11() - 1f) > 1e-4f) {
+            return;
+        }
+        float tx = m.m30() * scale;
+        float ty = m.m31() * scale;
+        matrices.translate((Math.round(tx) - tx) / scale, (Math.round(ty) - ty) / scale, 0f);
+    }
+
+    private static int ceilDiv(int a, int b) {
+        return (a + b - 1) / b;
+    }
+}

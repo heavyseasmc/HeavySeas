@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "id": "heavyseas:default",
+  "_comment": [
+    "本文件只有 id 与数字，没有任何显示名称。",
+    "显示名走 lang 文件（i18n 从第一天起），这既是本地化需要，",
+    "也让本目录保持为纯机械数值——与 data/README.md 的权属声明一致。",
+    "seat 是船头(1)→船尾(8)。船头先分物资，船尾是舵手。",
+    "presets 必须按 seat 升序排列；从 8 人里摘掉 hostess 与 doctor 恰好得到 6 人局，",
+    "这个嵌套是三套阵容平衡的基础，改 seat 会破坏它。"
+  ],
+  "characters": [
+    {
+      "id": "jeweler",
+      "seat": 1,
+      "size": 4,
+      "survival": 8,
+      "expansion": "base",
+      "ability": {
+        "kind": "score_multiplier",
+        "target": "jewelry",
+        "factor": 2,
+        "applies_to": "set_total"
+      }
+    },
+    {
+      "id": "collector",
+      "seat": 2,
+      "size": 5,
+      "survival": 7,
+      "expansion": "base",
+      "ability": {
+        "kind": "score_multiplier",
+        "target": "fine_art",
+        "factor": 2,
+        "applies_to": "face_value"
+      }
+    },
+    {
+      "id": "captain",
+      "seat": 3,
+      "size": 7,
+      "survival": 5,
+      "expansion": "base",
+      "ability": {
+        "kind": "score_multiplier",
+        "target": "cash",
+        "factor": 2,
+        "applies_to": "face_value"
+      }
+    },
+    {
+      "id": "mate",
+      "seat": 4,
+      "size": 8,
+      "survival": 4,
+      "expansion": "base",
+      "ability": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "hostess",
+      "seat": 5,
+      "size": 3,
+      "survival": 9,
+      "expansion": "spirits",
+      "ability": {
+        "kind": "share_effect",
+        "sources": [
+          "water",
+          "rum"
+        ],
+        "requires_conscious": true,
+        "resolves_last_in_thirst": true,
+        "stacking": {
+          "water": true,
+          "rum": false
+        }
+      }
+    },
+    {
+      "id": "sailor",
+      "seat": 6,
+      "size": 6,
+      "survival": 6,
+      "expansion": "base",
+      "ability": {
+        "kind": "overboard_immune",
+        "requires_conscious": true,
+        "not_protected_from": [
+          "bait_bucket"
+        ]
+      }
+    },
+    {
+      "id": "doctor",
+      "seat": 7,
+      "size": 4,
+      "survival": 8,
+      "expansion": "desperation",
+      "ability": {
+        "kind": "no_discard",
+        "target": "medical_kit",
+        "still_costs_action": true,
+        "stays_in_front": true,
+        "cannot_return_to_hand": true
+      }
+    },
+    {
+      "id": "kid",
+      "seat": 8,
+      "size": 3,
+      "survival": 9,
+      "expansion": "base",
+      "ability": {
+        "kind": "steal_uncontested",
+        "zone": "hand",
+        "triggers_fight": false,
+        "no_flash_reveal": true
+      }
+    }
+  ],
+  "presets": {
+    "6": [
+      "jeweler",
+      "collector",
+      "captain",
+      "mate",
+      "sailor",
+      "kid"
+    ],
+    "7": [
+      "jeweler",
+      "collector",
+      "captain",
+      "mate",
+      "sailor",
+      "doctor",
+      "kid"
+    ],
+    "8": [
+      "jeweler",
+      "collector",
+      "captain",
+      "mate",
+      "hostess",
+      "sailor",
+      "doctor",
+      "kid"
+    ]
+  },
+  "treasure_scoring": {
+    "cash": {
+      "kind": "face_value",
+      "value": 1
+    },
+    "fine_art": {
+      "kind": "face_value",
+      "values": [
+        2,
+        3,
+        3
+      ]
+    },
+    "jewelry": {
+      "kind": "set_total",
+      "table": {
+        "1": 1,
+        "2": 4,
+        "3": 8
+      }
+    }
+  }
+}

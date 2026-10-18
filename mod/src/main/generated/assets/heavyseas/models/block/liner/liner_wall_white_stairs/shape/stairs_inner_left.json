@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/shape/stairs_inner_left",
+  "textures": {
+    "down": "heavyseas:block/liner/wall_white",
+    "particle": "heavyseas:block/liner/wall_white",
+    "side": "heavyseas:block/liner/wall_white",
+    "up": "heavyseas:block/liner/wall_white"
+  }
+}

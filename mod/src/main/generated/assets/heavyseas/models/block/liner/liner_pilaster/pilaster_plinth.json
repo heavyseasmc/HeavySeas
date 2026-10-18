@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/pilaster_plinth",
+  "textures": {
+    "b": "heavyseas:block/liner/pilaster_base",
+    "p": "heavyseas:block/liner/pilaster",
+    "particle": "heavyseas:block/liner/pilaster"
+  }
+}

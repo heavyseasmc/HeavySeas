@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "facing=east,part=ring_e": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_e",
+      "y": 90
+    },
+    "facing=east,part=ring_n": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_n",
+      "y": 90
+    },
+    "facing=east,part=ring_ne": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_ne",
+      "y": 90
+    },
+    "facing=east,part=ring_nw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_nw",
+      "y": 90
+    },
+    "facing=east,part=ring_s": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_s",
+      "y": 90
+    },
+    "facing=east,part=ring_se": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_se",
+      "y": 90
+    },
+    "facing=east,part=ring_sw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_sw",
+      "y": 90
+    },
+    "facing=east,part=ring_w": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_w",
+      "y": 90
+    },
+    "facing=north,part=ring_e": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_e"
+    },
+    "facing=north,part=ring_n": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_n"
+    },
+    "facing=north,part=ring_ne": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_ne"
+    },
+    "facing=north,part=ring_nw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_nw"
+    },
+    "facing=north,part=ring_s": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_s"
+    },
+    "facing=north,part=ring_se": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_se"
+    },
+    "facing=north,part=ring_sw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_sw"
+    },
+    "facing=north,part=ring_w": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_w"
+    },
+    "facing=south,part=ring_e": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_e",
+      "y": 180
+    },
+    "facing=south,part=ring_n": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_n",
+      "y": 180
+    },
+    "facing=south,part=ring_ne": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_ne",
+      "y": 180
+    },
+    "facing=south,part=ring_nw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_nw",
+      "y": 180
+    },
+    "facing=south,part=ring_s": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_s",
+      "y": 180
+    },
+    "facing=south,part=ring_se": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_se",
+      "y": 180
+    },
+    "facing=south,part=ring_sw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_sw",
+      "y": 180
+    },
+    "facing=south,part=ring_w": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_w",
+      "y": 180
+    },
+    "facing=west,part=ring_e": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_e",
+      "y": 270
+    },
+    "facing=west,part=ring_n": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_n",
+      "y": 270
+    },
+    "facing=west,part=ring_ne": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_ne",
+      "y": 270
+    },
+    "facing=west,part=ring_nw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_nw",
+      "y": 270
+    },
+    "facing=west,part=ring_s": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_s",
+      "y": 270
+    },
+    "facing=west,part=ring_se": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_se",
+      "y": 270
+    },
+    "facing=west,part=ring_sw": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_sw",
+      "y": 270
+    },
+    "facing=west,part=ring_w": {
+      "model": "heavyseas:block/liner/liner_lookout_floor/prop/lookout_floor_ring_w",
+      "y": 270
+    }
+  }
+}

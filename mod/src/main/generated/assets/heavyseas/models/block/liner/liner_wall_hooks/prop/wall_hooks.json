@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/wall_hooks",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/wall_hooks",
+    "particle": "heavyseas:block/liner/prop/wall_hooks"
+  }
+}

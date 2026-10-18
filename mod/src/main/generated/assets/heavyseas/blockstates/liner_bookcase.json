@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,part=east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_east",
+      "y": 90
+    },
+    "facing=east,part=upper_east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_east",
+      "y": 90
+    },
+    "facing=east,part=upper_west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_west",
+      "y": 90
+    },
+    "facing=east,part=west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_west",
+      "y": 90
+    },
+    "facing=north,part=east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_east"
+    },
+    "facing=north,part=upper_east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_east"
+    },
+    "facing=north,part=upper_west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_west"
+    },
+    "facing=north,part=west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_west"
+    },
+    "facing=south,part=east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_east",
+      "y": 180
+    },
+    "facing=south,part=upper_east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_east",
+      "y": 180
+    },
+    "facing=south,part=upper_west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_west",
+      "y": 180
+    },
+    "facing=south,part=west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_west",
+      "y": 180
+    },
+    "facing=west,part=east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_east",
+      "y": 270
+    },
+    "facing=west,part=upper_east": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_east",
+      "y": 270
+    },
+    "facing=west,part=upper_west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_upper_west",
+      "y": 270
+    },
+    "facing=west,part=west": {
+      "model": "heavyseas:block/liner/liner_bookcase/prop/bookcase_west",
+      "y": 270
+    }
+  }
+}

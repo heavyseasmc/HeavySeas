@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/towel_rail",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/towel_rail",
+    "particle": "heavyseas:block/liner/prop/towel_rail"
+  }
+}

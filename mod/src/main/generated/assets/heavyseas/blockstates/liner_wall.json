@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "exterior=false,facing=east": {
+      "model": "heavyseas:block/liner/liner_wall/cube",
+      "y": 270
+    },
+    "exterior=false,facing=north": {
+      "model": "heavyseas:block/liner/liner_wall/cube",
+      "y": 180
+    },
+    "exterior=false,facing=south": {
+      "model": "heavyseas:block/liner/liner_wall/cube"
+    },
+    "exterior=false,facing=west": {
+      "model": "heavyseas:block/liner/liner_wall/cube",
+      "y": 90
+    },
+    "exterior=true,facing=east": {
+      "model": "heavyseas:block/liner/liner_wall/cube_front",
+      "y": 270
+    },
+    "exterior=true,facing=north": {
+      "model": "heavyseas:block/liner/liner_wall/cube_front",
+      "y": 180
+    },
+    "exterior=true,facing=south": {
+      "model": "heavyseas:block/liner/liner_wall/cube_front"
+    },
+    "exterior=true,facing=west": {
+      "model": "heavyseas:block/liner/liner_wall/cube_front",
+      "y": 90
+    }
+  }
+}

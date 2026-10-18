@@ -1,0 +1,142 @@
+package io.github.heavyseasmc.engine.scoring;
+
+import io.github.heavyseasmc.engine.model.Ability;
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Roster;
+import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.model.TreasureKind;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.List;
+
+/**
+ * 终局计分。
+ *
+ * <h2>模型</h2>
+ * 四项<b>相互独立</b>地累加。这不是简化，是规则本身的形状：死者只要尸体还在艇上，
+ * 财宝照算；而所恨者死亡、所爱者存活的分数，与自己的生死无关。
+ *
+ * <h2>只有一个真特例</h2>
+ * 规则里有三种特殊身份，但其中两种<b>不需要任何特例代码</b>，它们从四项独立里涌现：
+ *
+ * <ul>
+ *   <li><b>自恋者</b>（爱=自己）：第一项付自己的生存分，第三项"所爱者存活"也付自己的
+ *       生存分 —— 自然 ×2，不用写。</li>
+ *   <li><b>矛盾者</b>（爱=恨=同一人）：目标活着则第三项付其生存分、第四项因未死亡付 0；
+ *       目标死了则反过来。"二者择一"是<b>涌现的结果，不是一条要实现的规则</b>。</li>
+ *   <li><b>自恋兼厌世</b>：厌世把第一项清零，第三项照付 —— 净结果是生存分只算一次。
+ *       同样不用写特例。</li>
+ * </ul>
+ *
+ * 真正的特例只有一个：<b>厌世者的第四项</b>改为遍历艇上的死者。
+ *
+ * <h2>两个谓词不共用</h2>
+ * 憎恨卡看 {@link FinalState#died()}——一个<b>事件</b>：他死了就给分，不问死在哪、
+ * 尸体还在不在；厌世者看 {@link FinalState#corpseOnBoat()}——一个<b>状态</b>：只清点艇上的尸体。
+ *
+ * <p>共用一个谓词的话，两种口径<b>只在有人落水死亡时才分叉</b> —— 那种低频分叉能一路
+ * 活到发布之后。
+ *
+ * <h2>分值不写在这里</h2>
+ * 财宝的分值与珠宝的套组表由调用方以 {@link TreasureScoring} 交进来，数据来自 {@code data/roster}。
+ * 本类只管「怎么组合」，不管「值多少」—— 否则同一份数值又会有代码与数据两个真相源。
+ */
+public final class Scorer {
+
+    private Scorer() {
+    }
+
+    public static Map<CharacterId, ScoreSheet> scoreAll(
+            Roster roster, Map<CharacterId, FinalState> states, TreasureScoring scoring) {
+        Map<CharacterId, ScoreSheet> out = new LinkedHashMap<>();
+        for (Survivor s : roster.survivors()) {
+            out.put(s.id(), score(roster, states, s.id(), scoring));
+        }
+        return out;
+    }
+
+    public static ScoreSheet score(
+            Roster roster, Map<CharacterId, FinalState> states, CharacterId who, TreasureScoring scoring) {
+        return explain(roster, states, who, scoring).score();
+    }
+
+    /** The same objective model drives both live goal explanations and final scoring. */
+    public record Goal(int selfSurvival, CharacterId love, int lovedSurvival, CharacterId hate,
+                       int hatedSize, boolean selfHate, List<Contribution> corpseCandidates) {
+        public Goal { corpseCandidates = List.copyOf(corpseCandidates); }
+    }
+    public record Contribution(CharacterId who, int points) { }
+    public record Explanation(ScoreSheet score, Goal goal, boolean alive, boolean onBoat,
+                              boolean lovedAlive, boolean hatedDead, List<Contribution> corpses) {
+        public Explanation { corpses = List.copyOf(corpses); }
+    }
+    public static Goal goal(Roster roster, CharacterId who, CharacterId love, CharacterId hate) {
+        boolean selfHate = who.equals(hate);
+        List<Contribution> candidates = selfHate ? roster.survivors().stream()
+                .filter(s -> !s.id().equals(who) && !s.id().equals(love))
+                .map(s -> new Contribution(s.id(), s.size())).toList() : List.of();
+        return new Goal(selfHate ? 0 : roster.get(who).survival(), love, roster.get(love).survival(),
+                hate, roster.get(hate).size(), selfHate, candidates);
+    }
+
+    public static Explanation explain(Roster roster, Map<CharacterId, FinalState> states,
+                                      CharacterId who, TreasureScoring scoring) {
+        Objects.requireNonNull(scoring, "scoring");
+        Survivor self = roster.get(who);
+        FinalState st = require(states, who);
+        Goal goal = goal(roster, who, st.love(), st.hate());
+        boolean misanthrope = goal.selfHate();
+
+        // ① 自己存活 → 自己的生存分。厌世者自身生死不计分，此项清零。
+        int selfSurvival = st.alive() ? goal.selfSurvival() : 0;
+
+        // ② 自己在艇上（不论生死）→ 财宝分。落水死亡被移出者，财宝随之退出游戏。
+        int treasure = st.onBoat() ? treasureScore(self, st.treasures(), scoring) : 0;
+
+        // ③ 所爱者存活 → 其生存分。爱=自己时此项照付，自恋者的 ×2 由此涌现。
+        boolean lovedAlive = require(states, st.love()).alive();
+        boolean hatedDead = require(states, st.hate()).died();
+        int loved = lovedAlive ? goal.lovedSurvival() : 0;
+
+        // ④ 所恨者死亡 → 其体型分。唯一的特例在这里。
+        List<Contribution> corpses = goal.corpseCandidates().stream()
+                .filter(c -> require(states, c.who()).corpseOnBoat()).toList();
+        int hated = misanthrope ? corpses.stream().mapToInt(Contribution::points).sum()
+                : (hatedDead ? goal.hatedSize() : 0);
+
+        return new Explanation(new ScoreSheet(selfSurvival, treasure, loved, hated), goal,
+                st.alive(), st.onBoat(), lovedAlive, hatedDead, corpses);
+    }
+
+    private static int treasureScore(Survivor self, Treasures t, TreasureScoring scoring) {
+        int cash = t.cash() * scoring.cashFaceValue() * multiplier(self, TreasureKind.CASH);
+
+        if (t.fineArtFaceValue() > scoring.fineArtFaceValueTotal()) {
+            throw new IllegalArgumentException("美术品面值合计 %d 超过了全部美术品的面值之和 %d"
+                    .formatted(t.fineArtFaceValue(), scoring.fineArtFaceValueTotal()));
+        }
+        int fineArt = t.fineArtFaceValue() * multiplier(self, TreasureKind.FINE_ART);
+
+        // 珠宝是套组计分，且加倍作用于<b>套组总分</b>而非单张面值：
+        // 先查表再翻倍，标准表下 3 张 = 8 × 2 = 16。
+        int jewelry = scoring.jewelrySetTotal(t.jewelry()) * multiplier(self, TreasureKind.JEWELRY);
+
+        return cash + fineArt + jewelry;
+    }
+
+    private static int multiplier(Survivor self, TreasureKind kind) {
+        return self.ability() instanceof Ability.ScoreMultiplier m && m.target() == kind
+                ? m.factor()
+                : 1;
+    }
+
+    private static FinalState require(Map<CharacterId, FinalState> states, CharacterId id) {
+        FinalState st = states.get(id);
+        if (st == null) {
+            throw new IllegalArgumentException("缺少终局状态: " + id);
+        }
+        return st;
+    }
+}

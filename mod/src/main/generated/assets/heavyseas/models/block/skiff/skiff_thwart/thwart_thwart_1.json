@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/thwart",
+  "textures": {
+    "particle": "heavyseas:block/skiff/thwart_1",
+    "top": "heavyseas:block/skiff/thwart_1"
+  }
+}

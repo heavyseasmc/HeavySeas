@@ -1,0 +1,169 @@
+package io.github.heavyseasmc.engine.data;
+
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Roster;
+import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.navigation.Selector;
+import io.github.heavyseasmc.engine.scoring.TreasureScoring;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+/**
+ * 拿真实 {@code data/} 跑加载器。
+ *
+ * <p>角色表与物资表<b>已落库</b>，这几条在 CI 上照跑 —— 它们同时是加载器的正向对照：
+ * 合成数据全绿只证明解析器自洽，真实数据全绿才证明它读得懂导出器写出来的东西。
+ *
+ * <p>四份数据现在都已落库，所以整个类在 CI 上照跑；缺任何一份都是失败，见 {@link LocalData}。
+ */
+class RealDataTest {
+
+    @Test
+    @DisplayName("角色表：八个角色、三套预设，预设是嵌套的")
+    void rosterLoads() {
+        RosterData data = RosterLoader.load(LocalData.dir().file("roster/default.json"));
+
+        assertEquals(8, data.characters().size());
+        assertEquals(Set.of(6, 7, 8), data.presets().keySet());
+
+        // ❗嵌套是三套阵容平衡的基础（见 data/roster/default.json 的注释）：
+        //   从 8 人里摘掉两个人恰好得到 6 人局。写成断言之前它只是一句注释。
+        Set<CharacterId> six = new LinkedHashSet<>(data.presets().get(6));
+        Set<CharacterId> seven = new LinkedHashSet<>(data.presets().get(7));
+        Set<CharacterId> eight = new LinkedHashSet<>(data.presets().get(8));
+        assertTrue(seven.containsAll(six), "7 人局不是 6 人局的超集: " + seven);
+        assertTrue(eight.containsAll(seven), "8 人局不是 7 人局的超集: " + eight);
+
+        // 体型与生存分的关系：两者之和固定为 12，这是「壮的人难杀但不值钱」的数值形式。
+        for (Survivor survivor : data.characters()) {
+            assertEquals(12, survivor.size() + survivor.survival(),
+                    survivor.id() + " 的体型+生存分不是 12");
+        }
+
+        Roster eightPlayers = data.preset(8);
+        assertEquals(8, eightPlayers.size());
+        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8),
+                eightPlayers.survivors().stream().map(Survivor::seat).toList());
+
+        // 财宝计分表只在数据里有一份，这里把它与规则对一遍：现金每张 1 分、美术品 2/3/3、珠宝套组 1/4/8。
+        TreasureScoring scoring = data.treasureScoring();
+        assertEquals(1, scoring.cashFaceValue());
+        assertEquals(List.of(2, 3, 3), scoring.fineArtFaceValues());
+        assertEquals(List.of(1, 4, 8), scoring.jewelrySetTotals());
+    }
+
+    @Test
+    @DisplayName("房主自定义阵容：6–8 个、已知且唯一，最终按固定座位排序")
+    void customRosterSelection() {
+        RosterData data = RosterLoader.load(LocalData.dir().file("roster/default.json"));
+        List<CharacterId> reversed = data.presets().get(6).reversed();
+        Roster selected = data.select(reversed);
+        assertEquals(data.presets().get(6), selected.survivors().stream().map(Survivor::id).toList());
+        for (int count : List.of(6, 7, 8)) {
+            assertEquals(count, data.select(data.presets().get(count)).size());
+        }
+        assertThrows(IllegalArgumentException.class, () -> data.select(reversed.subList(0, 5)), "五人必须被人数下限拒绝");
+        var nine = new java.util.ArrayList<>(data.presets().get(8));
+        nine.add(nine.getFirst());
+        var tooMany = assertThrows(IllegalArgumentException.class, () -> data.select(nine));
+        assertTrue(tooMany.getMessage().contains("6–8"), "九人必须先被人数上限拒绝，不能只碰巧被重复角色拒绝");
+        assertThrows(IllegalArgumentException.class, () -> data.select(List.of(
+                reversed.get(0), reversed.get(0), reversed.get(1), reversed.get(2), reversed.get(3), reversed.get(4))));
+        assertThrows(IllegalArgumentException.class, () -> data.select(List.of(
+                CharacterId.of("unknown"), reversed.get(0), reversed.get(1), reversed.get(2),
+                reversed.get(3), reversed.get(4))));
+    }
+
+    @Test
+    @DisplayName("物资表：18 种 id，47 张牌")
+    void provisionsLoad() {
+        Set<String> ids = ProvisionLoader.loadIds(LocalData.dir().file("provisions/default.json"));
+        assertEquals(18, ids.size(), "物资 id 数变了: " + ids);
+        assertTrue(ids.contains("water"), ids.toString());
+        assertTrue(ids.contains("parasol"), ids.toString());
+    }
+
+    @Test
+    @DisplayName("航海牌：31 张，点名全部落在角色表里")
+    void navigationLoads() {
+        List<NavigationCard> deck = LocalData.navigationDeck();
+        assertEquals(31, deck.size());
+
+        Set<CharacterId> known = RosterLoader.load(LocalData.dir().file("roster/default.json")).ids();
+        Set<String> named = new LinkedHashSet<>();
+        int withGull = 0;
+        int conditional = 0;
+        for (NavigationCard card : deck) {
+            if (card.gull() != 0) {
+                withGull++;
+            }
+            for (Selector selector : List.of(card.overboard(), card.thirst())) {
+                switch (selector) {
+                    case Selector.Only only -> only.characters().forEach(id -> named.add(id.value()));
+                    case Selector.Except except -> except.characters().forEach(id -> named.add(id.value()));
+                    case Selector.Conditional ignored -> conditional++;
+                    case Selector.Everyone ignored -> { }
+                    case Selector.Nobody ignored -> { }
+                }
+            }
+        }
+
+        // 正向对照：如果加载器其实什么都没点到，下面三条会一起垮，而不是一起「通过」。
+        assertFalse(named.isEmpty(), "31 张牌里一个人都没点到，点名多半没解析");
+        assertEquals(known.size(), named.size(),
+                "有角色从头到尾没被任何一张牌点过，落水/口渴分布会缺一条腿: " + named);
+        assertTrue(withGull > 0, "没有任何一张牌带海鸥，那样一局永远结束不了");
+        assertEquals(1, conditional, "带条件的牌张数变了 —— 条件是唯一不受 id 白名单保护的字段");
+    }
+
+    @Test
+    @DisplayName("真实数据从字符流读与从文件读一致 —— 数据包走的是字符流")
+    void realDataThroughReader() throws IOException {
+        Path file = LocalData.dir().file("roster/default.json");
+        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            assertEquals(RosterLoader.load(file), RosterLoader.load("heavyseas:roster/default", reader));
+        }
+    }
+
+    @Test
+    @DisplayName("❗四份数据自称同一个 id —— 单看每一份都合法，只有比对才发现换了半套")
+    void allFourDeclareTheSameVariant() throws IOException {
+        DataDir dir = LocalData.dir();
+        String roster;
+        String provisions;
+        String navigation;
+        String weather;
+        try (Reader r = Files.newBufferedReader(dir.file("roster/default.json"), StandardCharsets.UTF_8)) {
+            roster = RosterLoader.loadDocument("heavyseas:roster/default", r).id();
+        }
+        try (Reader r = Files.newBufferedReader(dir.file("provisions/default.json"), StandardCharsets.UTF_8)) {
+            provisions = ProvisionLoader.loadDocument("heavyseas:provisions/default", r).id();
+        }
+        try (Reader r = Files.newBufferedReader(dir.file(LocalData.NAVIGATION), StandardCharsets.UTF_8)) {
+            navigation = NavigationLoader.loadDocument("heavyseas:navigation/default", r,
+                    LocalData.roster().ids(), LocalData.provisionIds()).id();
+        }
+        try (Reader r = Files.newBufferedReader(dir.file("weather/default.json"), StandardCharsets.UTF_8)) {
+            weather = WeatherLoader.loadDocument("heavyseas:weather/default", r).id();
+        }
+        assertEquals("heavyseas:default", roster, "角色表自称的变体");
+        assertEquals(roster, provisions, "物资表与角色表不是同一个变体");
+        assertEquals(roster, navigation, "航海牌与角色表不是同一个变体");
+        assertEquals(roster, weather, "天候牌与角色表不是同一个变体");
+    }
+}

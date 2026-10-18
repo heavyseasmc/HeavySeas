@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/skiff/template/bailer",
+  "textures": {
+    "brass": "heavyseas:block/skiff/brass",
+    "particle": "heavyseas:block/skiff/bailer",
+    "t": "heavyseas:block/skiff/bailer"
+  }
+}

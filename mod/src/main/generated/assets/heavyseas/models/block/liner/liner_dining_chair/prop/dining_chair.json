@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/dining_chair",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/dining_chair",
+    "particle": "heavyseas:block/liner/prop/dining_chair"
+  }
+}

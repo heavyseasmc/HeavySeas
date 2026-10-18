@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "heavyseas:default",
+  "_comment": [
+    "雾表（ADR-0034 §5.1.4）：每种天候那一天的能见度（格）、雨雷与钉住的时刻。",
+    "start / end 是地形雾的起点与终点；天空雾一律从 0 起。start == end == 0 表示不改，走游戏默认的雾（晴空）。",
+    "要覆盖 data/weather 的全部 id，另加一条 default 给没有天候数据的旧局；多一个少一个都在加载期拒绝。",
+    "这些数是初稿，实拍十张之后由人定。"
+  ],
+  "entries": {
+    "dense_fog":      { "start": 2,  "end": 12,  "rain": false, "thunder": false, "time": 6000 },
+    "rain":           { "start": 8,  "end": 40,  "rain": true,  "thunder": false, "time": 13000 },
+    "storm":          { "start": 5,  "end": 25,  "rain": true,  "thunder": true,  "time": 14000 },
+    "huge_wave":      { "start": 7,  "end": 35,  "rain": false, "thunder": false, "time": 12000 },
+    "gale":           { "start": 12, "end": 60,  "rain": false, "thunder": false, "time": 6000 },
+    "becalmed":       { "start": 6,  "end": 30,  "rain": false, "thunder": false, "time": 6000 },
+    "sweltering":     { "start": 16, "end": 80,  "rain": false, "thunder": false, "time": 6000 },
+    "scorching_heat": { "start": 16, "end": 80,  "rain": false, "thunder": false, "time": 6000 },
+    "clear_skies":    { "start": 0,  "end": 0,   "rain": false, "thunder": false, "time": 6000 },
+    "sunday":         { "start": 10, "end": 50,  "rain": false, "thunder": false, "time": 8000 },
+    "default":        { "start": 6,  "end": 30,  "rain": false, "thunder": false, "time": 6000 }
+  }
+}

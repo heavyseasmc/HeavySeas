@@ -1,0 +1,304 @@
+{
+  "variants": {
+    "facing=east,part=bottom,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_bottom",
+      "y": 270
+    },
+    "facing=east,part=bottom,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_bottom",
+      "y": 270
+    },
+    "facing=east,part=bottom,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_bottom",
+      "y": 270
+    },
+    "facing=east,part=bottom,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_bottom",
+      "y": 270
+    },
+    "facing=east,part=bottom,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_bottom",
+      "y": 270
+    },
+    "facing=east,part=middle,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_middle",
+      "y": 270
+    },
+    "facing=east,part=middle,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_middle",
+      "y": 270
+    },
+    "facing=east,part=middle,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_middle",
+      "y": 270
+    },
+    "facing=east,part=middle,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_middle",
+      "y": 270
+    },
+    "facing=east,part=middle,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_middle",
+      "y": 270
+    },
+    "facing=east,part=single,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_single",
+      "y": 270
+    },
+    "facing=east,part=single,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_single",
+      "y": 270
+    },
+    "facing=east,part=single,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_single",
+      "y": 270
+    },
+    "facing=east,part=single,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_single",
+      "y": 270
+    },
+    "facing=east,part=single,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_single",
+      "y": 270
+    },
+    "facing=east,part=top,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_top",
+      "y": 270
+    },
+    "facing=east,part=top,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_top",
+      "y": 270
+    },
+    "facing=east,part=top,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_top",
+      "y": 270
+    },
+    "facing=east,part=top,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_top",
+      "y": 270
+    },
+    "facing=east,part=top,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_top",
+      "y": 270
+    },
+    "facing=north,part=bottom,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_bottom",
+      "y": 180
+    },
+    "facing=north,part=bottom,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_bottom",
+      "y": 180
+    },
+    "facing=north,part=bottom,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_bottom",
+      "y": 180
+    },
+    "facing=north,part=bottom,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_bottom",
+      "y": 180
+    },
+    "facing=north,part=bottom,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_bottom",
+      "y": 180
+    },
+    "facing=north,part=middle,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_middle",
+      "y": 180
+    },
+    "facing=north,part=middle,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_middle",
+      "y": 180
+    },
+    "facing=north,part=middle,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_middle",
+      "y": 180
+    },
+    "facing=north,part=middle,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_middle",
+      "y": 180
+    },
+    "facing=north,part=middle,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_middle",
+      "y": 180
+    },
+    "facing=north,part=single,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_single",
+      "y": 180
+    },
+    "facing=north,part=single,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_single",
+      "y": 180
+    },
+    "facing=north,part=single,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_single",
+      "y": 180
+    },
+    "facing=north,part=single,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_single",
+      "y": 180
+    },
+    "facing=north,part=single,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_single",
+      "y": 180
+    },
+    "facing=north,part=top,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_top",
+      "y": 180
+    },
+    "facing=north,part=top,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_top",
+      "y": 180
+    },
+    "facing=north,part=top,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_top",
+      "y": 180
+    },
+    "facing=north,part=top,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_top",
+      "y": 180
+    },
+    "facing=north,part=top,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_top",
+      "y": 180
+    },
+    "facing=south,part=bottom,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_bottom"
+    },
+    "facing=south,part=bottom,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_bottom"
+    },
+    "facing=south,part=bottom,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_bottom"
+    },
+    "facing=south,part=bottom,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_bottom"
+    },
+    "facing=south,part=bottom,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_bottom"
+    },
+    "facing=south,part=middle,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_middle"
+    },
+    "facing=south,part=middle,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_middle"
+    },
+    "facing=south,part=middle,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_middle"
+    },
+    "facing=south,part=middle,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_middle"
+    },
+    "facing=south,part=middle,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_middle"
+    },
+    "facing=south,part=single,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_single"
+    },
+    "facing=south,part=single,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_single"
+    },
+    "facing=south,part=single,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_single"
+    },
+    "facing=south,part=single,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_single"
+    },
+    "facing=south,part=single,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_single"
+    },
+    "facing=south,part=top,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_top"
+    },
+    "facing=south,part=top,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_top"
+    },
+    "facing=south,part=top,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_top"
+    },
+    "facing=south,part=top,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_top"
+    },
+    "facing=south,part=top,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_top"
+    },
+    "facing=west,part=bottom,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_bottom",
+      "y": 90
+    },
+    "facing=west,part=bottom,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_bottom",
+      "y": 90
+    },
+    "facing=west,part=bottom,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_bottom",
+      "y": 90
+    },
+    "facing=west,part=bottom,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_bottom",
+      "y": 90
+    },
+    "facing=west,part=bottom,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_bottom",
+      "y": 90
+    },
+    "facing=west,part=middle,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_middle",
+      "y": 90
+    },
+    "facing=west,part=middle,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_middle",
+      "y": 90
+    },
+    "facing=west,part=middle,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_middle",
+      "y": 90
+    },
+    "facing=west,part=middle,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_middle",
+      "y": 90
+    },
+    "facing=west,part=middle,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_middle",
+      "y": 90
+    },
+    "facing=west,part=single,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_single",
+      "y": 90
+    },
+    "facing=west,part=single,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_single",
+      "y": 90
+    },
+    "facing=west,part=single,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_single",
+      "y": 90
+    },
+    "facing=west,part=single,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_single",
+      "y": 90
+    },
+    "facing=west,part=single,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_single",
+      "y": 90
+    },
+    "facing=west,part=top,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_left_top",
+      "y": 90
+    },
+    "facing=west,part=top,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_inner_right_top",
+      "y": 90
+    },
+    "facing=west,part=top,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_left_top",
+      "y": 90
+    },
+    "facing=west,part=top,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_outer_right_top",
+      "y": 90
+    },
+    "facing=west,part=top,shape=straight": {
+      "model": "heavyseas:block/liner/liner_well_trim/stairs/well_trim_straight_top",
+      "y": 90
+    }
+  }
+}

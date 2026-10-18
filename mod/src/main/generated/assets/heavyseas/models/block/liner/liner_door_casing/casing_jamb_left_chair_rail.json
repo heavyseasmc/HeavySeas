@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/casing_jamb_left_chair_rail",
+  "textures": {
+    "c": "heavyseas:block/liner/door_casing",
+    "h": "heavyseas:block/liner/door_casing_head",
+    "particle": "heavyseas:block/liner/door_casing",
+    "r": "heavyseas:block/liner/chair_rail"
+  }
+}

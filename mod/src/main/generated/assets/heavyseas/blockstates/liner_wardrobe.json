@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "facing=east,open=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower",
+      "y": 90
+    },
+    "facing=east,open=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper",
+      "y": 90
+    },
+    "facing=east,open=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower",
+      "y": 90
+    },
+    "facing=east,open=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper",
+      "y": 90
+    },
+    "facing=north,open=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower"
+    },
+    "facing=north,open=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper"
+    },
+    "facing=north,open=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower"
+    },
+    "facing=north,open=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper"
+    },
+    "facing=south,open=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower",
+      "y": 180
+    },
+    "facing=south,open=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper",
+      "y": 180
+    },
+    "facing=south,open=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower",
+      "y": 180
+    },
+    "facing=south,open=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper",
+      "y": 180
+    },
+    "facing=west,open=false,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower",
+      "y": 270
+    },
+    "facing=west,open=false,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper",
+      "y": 270
+    },
+    "facing=west,open=true,part=lower": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_lower",
+      "y": 270
+    },
+    "facing=west,open=true,part=upper": {
+      "model": "heavyseas:block/liner/liner_wardrobe/prop/rig_wardrobe_upper",
+      "y": 270
+    }
+  }
+}

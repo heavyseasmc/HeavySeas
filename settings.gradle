@@ -1,0 +1,24 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    plugins {
+        // 版本号与其余 Minecraft / Fabric 坐标放在一起，见 gradle.properties。
+        id 'fabric-loom' version "${loom_version}"
+    }
+}
+
+rootProject.name = 'heavy-seas'
+
+// 纯 Java 规则引擎，零 MC 依赖。
+// M0 时这是构建层面的天然事实（整个构建里没有 Fabric）；M1 起同一个构建里有了 Loom，
+// 于是改由 engine/build.gradle 的依赖白名单机械地拦。
+include 'engine'
+
+// Fabric 模组，目标 Minecraft 1.21.1。依赖方向只能是 mod → engine。
+include 'mod'

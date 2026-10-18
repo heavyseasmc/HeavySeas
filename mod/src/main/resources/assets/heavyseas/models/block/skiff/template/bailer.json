@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#t"},
+  "elements": [
+    {"from": [5, 0, 5], "to": [11, 1, 11], "faces": {"north": {"texture": "#t", "uv": [0, 14, 6, 15]}, "south": {"texture": "#t", "uv": [0, 14, 6, 15]}, "east": {"texture": "#t", "uv": [0, 14, 6, 15]}, "west": {"texture": "#t", "uv": [0, 14, 6, 15]}, "down": {"texture": "#t", "uv": [0, 8, 6, 14]}}},
+    {"from": [4.5, 1, 4.5], "to": [11.5, 6, 11.5], "faces": {"north": {"texture": "#t", "uv": [0, 2, 7, 7]}, "south": {"texture": "#t", "uv": [0, 2, 7, 7]}, "east": {"texture": "#t", "uv": [0, 2, 7, 7]}, "west": {"texture": "#t", "uv": [0, 2, 7, 7]}}},
+    {"from": [4, 6, 4], "to": [12, 7, 12], "faces": {"north": {"texture": "#t", "uv": [0, 0, 8, 1]}, "south": {"texture": "#t", "uv": [0, 0, 8, 1]}, "east": {"texture": "#t", "uv": [0, 0, 8, 1]}, "west": {"texture": "#t", "uv": [0, 0, 8, 1]}, "up": {"texture": "#t", "uv": [8, 8, 16, 16]}}},
+    {"from": [7.5, 7, 4], "to": [8.5, 9, 5], "faces": {"north": {"texture": "#brass"}, "south": {"texture": "#brass"}, "east": {"texture": "#brass"}, "west": {"texture": "#brass"}, "up": {"texture": "#brass"}, "down": {"texture": "#brass"}}},
+    {"from": [7.5, 7, 11], "to": [8.5, 9, 12], "faces": {"north": {"texture": "#brass"}, "south": {"texture": "#brass"}, "east": {"texture": "#brass"}, "west": {"texture": "#brass"}, "up": {"texture": "#brass"}, "down": {"texture": "#brass"}}},
+    {"from": [7.5, 9, 4], "to": [8.5, 10, 12], "faces": {"north": {"texture": "#brass"}, "south": {"texture": "#brass"}, "east": {"texture": "#brass"}, "west": {"texture": "#brass"}, "up": {"texture": "#brass"}, "down": {"texture": "#brass"}}}
+  ]
+}

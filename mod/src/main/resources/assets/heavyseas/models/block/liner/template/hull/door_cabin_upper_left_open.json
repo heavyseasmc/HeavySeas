@@ -1,0 +1,11 @@
+{
+  "parent": "minecraft:block/block", "ambientocclusion": false, "textures": {"particle": "#f"},
+  "elements": [
+    {"from": [0, 0, 0], "to": [3, 16, 3], "faces": {"west": {"texture": "#f", "uv": [13, 0, 16, 16]}, "east": {"texture": "#f", "uv": [0, 0, 3, 16]}, "north": {"texture": "#f", "uv": [13, 0, 16, 16]}, "south": {"texture": "#f", "uv": [0, 0, 3, 16]}, "up": {"texture": "#f", "uv": [0, 0, 3, 3], "rotation": 270}, "down": {"texture": "#f", "uv": [0, 13, 3, 16], "rotation": 90}}},
+    {"from": [13, 0, 0], "to": [16, 16, 3], "faces": {"west": {"texture": "#f", "uv": [13, 0, 16, 16]}, "east": {"texture": "#f", "uv": [0, 0, 3, 16]}, "north": {"texture": "#f", "uv": [0, 0, 3, 16]}, "south": {"texture": "#f", "uv": [13, 0, 16, 16]}, "up": {"texture": "#f", "uv": [0, 13, 3, 16], "rotation": 270}, "down": {"texture": "#f", "uv": [0, 0, 3, 3], "rotation": 90}}},
+    {"from": [3, 13, 0], "to": [13, 16, 3], "faces": {"north": {"texture": "#f", "uv": [3, 0, 13, 3]}, "south": {"texture": "#f", "uv": [3, 0, 13, 3]}, "up": {"texture": "#f", "uv": [0, 3, 3, 13], "rotation": 270}, "down": {"texture": "#f", "uv": [0, 3, 3, 13], "rotation": 90}}},
+    {"from": [3, 0, 0.5], "to": [13, 13, 2.5], "faces": {"north": {"texture": "#f", "uv": [3, 3, 13, 16]}, "south": {"texture": "#f", "uv": [3, 3, 13, 16]}, "down": {"texture": "#f", "uv": [0.5, 3, 2.5, 13], "rotation": 90}}},
+    {"from": [5, 2, 0.25], "to": [11, 11, 2.75], "faces": {"west": {"texture": "#f", "uv": [13.25, 5, 15.75, 14]}, "east": {"texture": "#f", "uv": [0.25, 5, 2.75, 14]}, "north": {"texture": "#f", "uv": [5, 5, 11, 14]}, "south": {"texture": "#f", "uv": [5, 5, 11, 14]}, "up": {"texture": "#f", "uv": [0.25, 5, 2.75, 11], "rotation": 270}, "down": {"texture": "#f", "uv": [0.25, 5, 2.75, 11], "rotation": 90}}},
+    {"from": [6, 8, 2.75], "to": [10, 10, 3.25], "faces": {"west": {"texture": "#m", "uv": [10, 14, 10.5, 16]}, "east": {"texture": "#m", "uv": [10, 14, 10.5, 16]}, "north": {"texture": "#m", "uv": [10, 14, 14, 16]}, "south": {"texture": "#m", "uv": [4, 14, 8, 16]}, "up": {"texture": "#m", "uv": [10, 14, 10.5, 16], "rotation": 270}, "down": {"texture": "#m", "uv": [10, 14, 10.5, 16], "rotation": 90}}}
+  ]
+}

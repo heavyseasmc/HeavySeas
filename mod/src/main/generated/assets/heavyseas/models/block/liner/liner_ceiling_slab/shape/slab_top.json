@@ -1,0 +1,12 @@
+{
+  "parent": "heavyseas:block/liner/template/shape/slab_top",
+  "textures": {
+    "down": "heavyseas:block/liner/ceiling",
+    "east": "heavyseas:block/liner/ceiling",
+    "north": "heavyseas:block/liner/ceiling",
+    "particle": "heavyseas:block/liner/ceiling",
+    "south": "heavyseas:block/liner/ceiling",
+    "up": "heavyseas:block/liner/ceiling",
+    "west": "heavyseas:block/liner/ceiling"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/crystal_chandelier_corner",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/crystal_chandelier",
+    "particle": "heavyseas:block/liner/prop/crystal_chandelier"
+  }
+}

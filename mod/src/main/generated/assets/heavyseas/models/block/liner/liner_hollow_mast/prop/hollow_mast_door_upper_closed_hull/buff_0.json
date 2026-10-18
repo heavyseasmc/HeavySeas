@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/hollow_mast_door_upper_closed",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/hollow_mast",
+    "m": "heavyseas:block/liner/hull/buff_0",
+    "particle": "heavyseas:block/liner/prop/hollow_mast"
+  }
+}

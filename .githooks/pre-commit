@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# 提交前检查。启用（每个克隆只需一次）：
+#   git config core.hooksPath .githooks
+#
+# 去哪里找维护者的检查脚本、找不到怎么办，见同目录 private-check.sh。
+#
+set -eu
+
+. "$(dirname "$0")/private-check.sh"
+
+run_private_check precommit.sh "$@" || {
+  echo
+  echo "提交已中止。确需绕过时：git commit --no-verify（请三思）"
+  exit 1
+}
+
+# docs/ 是维护者的本地目录，不应被暂存。
+staged_files=$(git diff --cached --name-only)
+staged_docs=$(printf '%s\n' "$staged_files" | grep '^docs/' || true)
+if [ -n "$staged_docs" ]; then
+  echo "❌ docs/ 下的文件被暂存了，该目录不入库："
+  echo "$staged_docs" | sed 's/^/     /'
+  echo "   修复：git restore --staged docs/"
+  exit 1
+fi

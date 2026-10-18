@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "hanging=false,oil=0": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_standing_lantern"
+    },
+    "hanging=false,oil=1": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_standing_lantern_lit_o1"
+    },
+    "hanging=false,oil=2": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_standing_lantern_lit_o2"
+    },
+    "hanging=false,oil=3": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_standing_lantern_lit_o3"
+    },
+    "hanging=false,oil=4": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_standing_lantern_lit"
+    },
+    "hanging=true,oil=0": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_hanging_lantern"
+    },
+    "hanging=true,oil=1": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_hanging_lantern_lit_o1"
+    },
+    "hanging=true,oil=2": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_hanging_lantern_lit_o2"
+    },
+    "hanging=true,oil=3": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_hanging_lantern_lit_o3"
+    },
+    "hanging=true,oil=4": {
+      "model": "heavyseas:block/skiff/skiff_lantern/lantern_hanging_lantern_lit"
+    }
+  }
+}

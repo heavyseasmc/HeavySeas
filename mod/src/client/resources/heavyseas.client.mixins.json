@@ -1,0 +1,31 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.heavyseasmc.mod.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "BackgroundRendererMixin",
+    "CameraMixin",
+    "ChatHudMixin",
+    "ChatScreenMixin",
+    "ClientWorldPropertiesMixin",
+    "GameScreenRenderMixin",
+    "InGameHudMixin",
+    "ItemStackTooltipMixin",
+    "KeyBindingPriorityMixin",
+    "MinecraftClientMixin",
+    "MouseScrollMixin",
+    "NativeImageMixin",
+    "TelescopeFovMixin",
+    "TelescopeHudMixin",
+    "TelescopeMouseMixin",
+    "TelescopeUseMixin",
+    "TextFieldWidgetMixin",
+    "TrueTypeFontMixin",
+    "TutorialToastMixin",
+    "WorldWeatherMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

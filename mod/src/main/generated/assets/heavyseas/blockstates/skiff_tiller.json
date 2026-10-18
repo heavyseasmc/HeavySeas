@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=east,part=end": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_end",
+      "y": 270
+    },
+    "facing=east,part=mid": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_mid",
+      "y": 270
+    },
+    "facing=north,part=end": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_end",
+      "y": 180
+    },
+    "facing=north,part=mid": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_mid",
+      "y": 180
+    },
+    "facing=south,part=end": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_end"
+    },
+    "facing=south,part=mid": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_mid"
+    },
+    "facing=west,part=end": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_end",
+      "y": 90
+    },
+    "facing=west,part=mid": {
+      "model": "heavyseas:block/skiff/skiff_tiller/tiller_mid",
+      "y": 90
+    }
+  }
+}

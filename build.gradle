@@ -1,0 +1,33 @@
+subprojects {
+    apply plugin: 'java'
+
+    group = rootProject.property('group')
+    version = rootProject.property('version')
+
+    // Java 版本只在 gradle.properties 写一处（java_version），理由也写在那里。
+    def javaVersion = Integer.parseInt(rootProject.property('java_version').toString())
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(javaVersion)
+        }
+        withSourcesJar()
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = javaVersion
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+            exceptionFormat = 'full'
+        }
+    }
+}

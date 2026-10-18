@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/arch_l_lower",
+  "textures": {
+    "c": "heavyseas:block/liner/door_casing",
+    "f": "heavyseas:block/liner/wall",
+    "particle": "heavyseas:block/liner/wall",
+    "w": "heavyseas:block/liner/wall_white"
+  }
+}

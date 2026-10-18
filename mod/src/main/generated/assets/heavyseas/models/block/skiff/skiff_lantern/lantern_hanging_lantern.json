@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/skiff/template/lantern_hanging",
+  "textures": {
+    "l": "heavyseas:block/skiff/lantern",
+    "particle": "heavyseas:block/skiff/lantern"
+  }
+}

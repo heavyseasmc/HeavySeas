@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/portrait_medium_upper_west",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/portrait_medium",
+    "p": "heavyseas:block/liner/prop/portrait_medium_jeweler",
+    "particle": "heavyseas:block/liner/prop/portrait_medium"
+  }
+}

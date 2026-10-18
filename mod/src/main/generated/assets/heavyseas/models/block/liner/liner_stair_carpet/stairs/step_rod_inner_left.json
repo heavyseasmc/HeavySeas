@@ -1,0 +1,12 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/step_rod_inner_left",
+  "textures": {
+    "b": "heavyseas:block/liner/stairs/rod",
+    "n": "heavyseas:block/liner/stairs/nosing",
+    "particle": "heavyseas:block/liner/stairs/string",
+    "r": "heavyseas:block/liner/stairs/riser_carpet",
+    "s": "heavyseas:block/liner/stairs/string",
+    "t": "heavyseas:block/liner/stairs/tread_carpet",
+    "u": "heavyseas:block/liner/stairs/soffit"
+  }
+}

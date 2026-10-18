@@ -1,0 +1,22 @@
+{
+  "parent": "heavyseas:block/liner/liner_hull_waterline_stairs/shape/stairs_straight_hull/waterline_0",
+  "display": {
+    "gui": {
+      "rotation": [
+        30,
+        45,
+        0
+      ],
+      "scale": [
+        0.625,
+        0.625,
+        0.625
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

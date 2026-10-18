@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#oar"},
+  "elements": [
+    {"from": [0, 3, 5], "to": [12, 4, 11], "faces": {"up": {"texture": "#oar", "uv": [0, 6, 12, 12]}, "down": {"texture": "#oar", "uv": [0, 6, 12, 12]}, "north": {"texture": "#oar", "uv": [12, 14, 0, 15]}, "south": {"texture": "#oar", "uv": [0, 14, 12, 15]}, "west": {"texture": "#oar", "uv": [5, 14, 11, 15]}}, "rotation": {"origin": [24, 3.5, 8], "axis": "y", "angle": 22.5}},
+    {"from": [12, 2.5, 7], "to": [16, 4.5, 9], "faces": {"up": {"texture": "#oar", "uv": [12, 0, 16, 2]}, "down": {"texture": "#oar", "uv": [12, 0, 16, 2]}, "north": {"texture": "#oar", "uv": [16, 0, 12, 2]}, "south": {"texture": "#oar", "uv": [12, 0, 16, 2]}}, "rotation": {"origin": [24, 3.5, 8], "axis": "y", "angle": 22.5}}
+  ]
+}

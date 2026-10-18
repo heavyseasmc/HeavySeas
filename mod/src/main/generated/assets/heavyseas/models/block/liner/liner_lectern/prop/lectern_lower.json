@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/lectern_lower",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/lectern",
+    "k": "heavyseas:block/liner/prop/lectern_detail",
+    "particle": "heavyseas:block/liner/prop/lectern"
+  }
+}

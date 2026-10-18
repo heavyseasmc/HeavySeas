@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/alarm_bell",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/alarm_bell",
+    "k": "heavyseas:block/liner/prop/alarm_bell_detail",
+    "particle": "heavyseas:block/liner/prop/alarm_bell"
+  }
+}

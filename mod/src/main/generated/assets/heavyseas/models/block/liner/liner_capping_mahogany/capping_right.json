@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/capping_right",
+  "textures": {
+    "c": "heavyseas:block/liner/capping_mahogany",
+    "p": "heavyseas:block/liner/pilaster_mahogany",
+    "particle": "heavyseas:block/liner/capping_mahogany"
+  }
+}

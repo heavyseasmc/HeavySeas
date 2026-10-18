@@ -1,0 +1,750 @@
+package io.github.heavyseasmc.mod.game;
+
+import io.github.heavyseasmc.engine.model.CharacterId;
+import io.github.heavyseasmc.engine.model.Roster;
+import io.github.heavyseasmc.engine.model.Survivor;
+import io.github.heavyseasmc.engine.navigation.NavigationCard;
+import io.github.heavyseasmc.engine.play.NavigationReport;
+import io.github.heavyseasmc.engine.play.Session;
+import io.github.heavyseasmc.engine.play.Table;
+import io.github.heavyseasmc.engine.state.Condition;
+import io.github.heavyseasmc.engine.state.GameState;
+import io.github.heavyseasmc.engine.state.Phase;
+import io.github.heavyseasmc.engine.weather.WeatherCard;
+import io.github.heavyseasmc.mod.world.skiff.SkiffProps;
+import io.github.heavyseasmc.mod.HeavySeasMod;
+import io.github.heavyseasmc.mod.config.ServerSettings;
+import io.github.heavyseasmc.mod.data.GameData;
+import io.github.heavyseasmc.mod.data.GameDataLoader;
+import io.github.heavyseasmc.mod.data.VoyageLayout;
+import io.github.heavyseasmc.mod.state.GameComponent;
+import io.github.heavyseasmc.mod.state.ExperienceView;
+import io.github.heavyseasmc.mod.state.GameComponents;
+import io.github.heavyseasmc.mod.state.NavCardView;
+import io.github.heavyseasmc.mod.world.Backdrop;
+import io.github.heavyseasmc.mod.world.Seats;
+import io.github.heavyseasmc.mod.world.Gulls;
+import io.github.heavyseasmc.mod.world.MistSea;
+import io.github.heavyseasmc.mod.world.Nameplates;
+
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+
+/**
+ * 对局流程：把玩家的决定变成 {@link Session} 上的调用，并把结果播给全场。
+ *
+ * <h2>规则不在这里</h2>
+ * 这里一条规则都没有。阶段怎么推进、谁能行动、落海怎么算，全在引擎的 {@code play} 包里 ——
+ * 模拟器跑几千局验的就是那一份。本类只做三件事：**问谁、调用、播报**。
+ *
+ * <h2>谁来推下一步（ADR-0019）</h2>
+ * 真人的决定从界面来；替身的决定在自动推进开着时由排程在下一 tick 做（{@link #tick}），关着时等指令；
+ * 航海阶段不等任何指令 —— {@link NavigationPhase} 要么当场翻顶牌，要么开舵手的 12 秒窗口。
+ */
+public final class GameFlow {
+
+    /**
+     * ❗播给玩家的话走 lang 键，而**专用服务端不加载客户端资源**，所以控制台日志里看到的是键名。
+     * 验收脚本要能判定「这一局真的跑完了」，就得有几行与语言无关的日志。这就是那几行。
+     */
+    private static final Logger LOGGER = LoggerFactory.getLogger(HeavySeasMod.MOD_ID);
+
+    /**
+     * 航海结算之后，有真人在座时停多久再进下一回合（ADR-0019）。
+     *
+     * <p>下一回合的补给箱可能当场弹出来，而底色 {@code 0xE4} 下聊天只剩淡影 —— 刚执行的那张牌就没人看得到了。
+     * 没有真人时不停：验收脚本里没人要看。节奏参数，属 ADR-0018 §8「实现中打磨」那一列。
+     * 默认值；这一局实际用的在 {@link GameTiming}（ADR-0099 D8）。
+     */
+    public static final long REVEAL_HOLD_MS = 3000L;
+
+    private GameFlow() {
+    }
+
+    /**
+     * 开一局。座位顺序由角色决定（夫人永远在船头），与谁来占无关；座位摆在哪由布局定（ADR-0034 §5.5）。
+     *
+     * @param viaCommand 是 {@code /seas start} 开的（不是演习艇敲钟开航）。指令开的、名单里有替身的局是<b>演示局</b>
+     *                   （{@link GameComponent#isDemo}）；演习艇开航即使补了替身也是正式局（审查 2026-10-07 R5）
+     */
+    public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
+                             Set<CharacterId> reservedForDummies, VoyageLayout layout, boolean viaCommand) {
+        GameData data = GameDataLoader.require();
+        start(world, players, humans, reservedForDummies, layout, data.roster().preset(players), viaCommand);
+    }
+
+    /** 房主从大厅面板确认的自定义阵容。 */
+    public static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
+                             Set<CharacterId> reservedForDummies, VoyageLayout layout,
+                             List<CharacterId> selectedRoster, boolean viaCommand) {
+        GameData data = GameDataLoader.require();
+        start(world, players, humans, reservedForDummies, layout, data.roster().select(selectedRoster), viaCommand);
+    }
+
+    private static void start(ServerWorld world, int players, List<ServerPlayerEntity> humans,
+                              Set<CharacterId> reservedForDummies, VoyageLayout layout, Roster roster,
+                              boolean viaCommand) {
+        GameData data = GameDataLoader.require();
+        if (roster.survivors().size() != players) {
+            throw new IllegalArgumentException("阵容人数与登船人数不一致");
+        }
+
+        List<CharacterId> seats = roster.survivors().stream().map(Survivor::id).toList();
+        for (CharacterId reserved : reservedForDummies) {
+            if (!seats.contains(reserved)) {
+                throw new IllegalArgumentException(
+                        "%d 人局里没有 %s 这个角色".formatted(players, reserved.value()));
+            }
+        }
+
+        // 角色随机发（决策 ⑯）。dummy 预定的座位先扣掉，剩下的在真人之间随机分。
+        List<CharacterId> open = new ArrayList<>(seats);
+        open.removeAll(reservedForDummies);
+        // 开局要洗的全从一个种子派生（ADR-0060）：指定了就用指定的，否则现取 —— 现取的种子不进日志（StartShuffle）。
+        Optional<DebugNext.Setting> seedSetting = DebugNext.seed();
+        Optional<DebugNext.Setting> weatherSetting = DebugNext.weather();
+        long seed = seedSetting.map(s -> Long.parseLong(s.value())).orElseGet(() -> world.getRandom().nextLong());
+        StartShuffle.Result dealt = StartShuffle.shuffle(data, roster, open, seed);
+        List<CharacterId> shuffled = dealt.humanSeats();
+
+        Map<CharacterId, GameComponent.Occupant> occupants = new LinkedHashMap<>();
+        for (CharacterId dummy : reservedForDummies) {
+            occupants.put(dummy, new GameComponent.Occupant(null, "dummy"));
+        }
+        int taken = 0;
+        for (ServerPlayerEntity human : humans) {
+            if (taken >= shuffled.size()) {
+                break;                       // 人比座位多：多出来的人这一局是旁观
+            }
+            occupants.put(shuffled.get(taken++),
+                    new GameComponent.Occupant(human.getUuid(), human.getGameProfile().getName()));
+        }
+        // 没人占的座位一律是 dummy —— 一个人也能把整局跑完（决策 ② 的硬性前置）。
+        for (int i = taken; i < shuffled.size(); i++) {
+            occupants.put(shuffled.get(i), new GameComponent.Occupant(null, "dummy"));
+        }
+
+        // ❗三副牌都要给。漏掉物资会让物资阶段静默跳过，漏掉天候会让四阶段兼容路径
+        //   静默退回三阶段；两种局面都照样能打到终局，所以必须在这里一次接齐（StartShuffle 一次洗齐）。
+        Table table = dealt.table();
+        // 第一天翻哪一张（/seas debug next weather）：只调顺序，不造牌。翻不出就不开这一局，并说清楚怎么办。
+        weatherSetting.ifPresent(w -> {
+            if (!table.weather().orElseThrow().stackNext(w.value())) {
+                throw new IllegalStateException("下一局第一天定为 %s，这一套天候里没有这一张（/seas debug next clear 清掉）"
+                        .formatted(w.value()));
+            }
+        });
+        Session session = new Session("world=" + world.getRegistryKey().getValue(), roster, table);
+        // 开局发爱恨（ADR-0022）：两个独立置换，全程保密。
+        // ❗日志里不打谁爱谁、谁恨谁 —— 开服的人往往也是玩家。终局翻牌时才一张张写进日志。
+        session.dealAffinities(dealt.affinities());
+
+        GameComponent component = GameComponents.of(world);
+        component.begin(session, occupants, humans.stream().map(ServerPlayerEntity::getUuid)
+                .collect(java.util.stream.Collectors.toSet()));
+        // 演示局在开局这一刻定死（审查 2026-10-07 R5）：Seats 不钉人与「等真人不限时」都问这一个标志，不再各自推导。
+        //   ❗按倾向定、用户可推翻：演习艇开了替身补位（stand_ins.fill_empty_seats）的那一局算正式局。
+        component.setDemo(viaCommand && occupants.values().stream().anyMatch(GameComponent.Occupant::isDummy));
+        component.setGameRandom(new Random(dealt.gameSeed()));
+        // 动脑 / 大模型替身的种子：由开局种子派生，<b>不从</b>上面那条流里取（取一次就改了天意，同一个种子打出另一局）
+        component.setStandInSeed(new java.util.SplittableRandom(dealt.gameSeed() ^ 0x5A17D1CE5EEDL).nextLong());
+        // 这一局的时限：开局这一刻从服务端设置里取一份，一局之内不变（ADR-0099 D8）。取在第一次推投影之前。
+        ServerSettings.TimingRead timing = ServerSettings.gameTiming();
+        component.setTiming(timing.timing());
+        DebugNext.clear();                    // 只管这一局：开成了就清，不会悄悄留到再下一局
+        // ❗开局也是一次状态变化，先把投影推出去。各面的包（补给箱、划船、舵手）都在这之后发，
+        //   而那几面要靠投影判「对局还在不在」—— 投影还没到就收到包的话，界面开出来又当场自己收掉。
+        //   2026-09-16 实拍：船头那一位的补给箱一闪即没，然后干等 16 秒超时，屏幕上没有任何报错。
+        sync(world);
+
+        broadcast(world, Text.translatable("heavyseas.opening.line1").formatted(Formatting.GOLD));
+        broadcast(world, Text.translatable("heavyseas.opening.line2").formatted(Formatting.GRAY));
+        broadcast(world, Text.translatable("heavyseas.opening.line3").formatted(Formatting.GRAY));
+        for (CharacterId id : session.state().bySeat()) {
+            GameComponent.Occupant who = component.occupantOf(id).orElseThrow();
+            broadcast(world, Text.translatable("heavyseas.game.seat",
+                    session.state().stateOf(id).seat(), characterName(id),
+                    who.isDummy() ? Text.translatable("heavyseas.game.dummy") : Text.literal(who.label())));
+        }
+        // 开局时生效的调试设定，记成这一局的改动（ADR-0060 D3）：全船右栏一行、计分面板的章里算一处。
+        seedSetting.ifPresent(s -> DebugTrace.atStart(world, component, s.who(), s.command(),
+                Text.translatable("heavyseas.debug.did.seed", s.value())));
+        weatherSetting.ifPresent(w -> DebugTrace.atStart(world, component, w.who(), w.command(),
+                Text.translatable("heavyseas.debug.did.first_weather", Text.translatable("heavyseas.weather." + w.value()))));
+        io.github.heavyseasmc.mod.world.PlayerSky.forced().ifPresent(sky -> DebugTrace.atStart(world, component,
+                sky.who(), sky.command(), Text.translatable("heavyseas.debug.did.sky_carried")));
+        // ❗前半段的措辞被 playthrough-check.sh 与 playthrough_feed.py 盯着，只许往后加字段。
+        //   种子只在<b>指定了</b>时才打（那一局已经算调试过的局）；现取的种子不进日志，理由见 StartShuffle。
+        LOGGER.info("对局开始：{} 人局 · 座位 {} · 替身自动推进{} · 布局 {} · 维度 {}{}", players,
+                session.state().bySeat().stream().map(CharacterId::value).toList(),
+                component.dummyAutoplay() ? "开" : "关", layout.id(), layout.dimension(),
+                seedSetting.map(s -> " · 调试种子 " + s.value()).orElse(""));
+        // 另起一行，不往上面那行里加：那一行的前半段被验收脚本盯着。这一行说清用的是哪一套时限、取自哪里（设置 / 默认）。
+        LOGGER.info("对局时限（{}）：{}", timing.source(), component.timing().describe());
+        // 又一行，同样不往上面加：这一局算不算演示局（不钉座位 · 等真人可不限时），有退路的地方要说走的是哪一条
+        LOGGER.info("对局类型：{}", component.isDemo() ? "演示局（/seas start 开的、有替身）" : "正式局");
+        // 位次摆进世界（ADR-0024）。放在播报之后：摆船会再推一次投影，而开局那一帧已经推过了。
+        Seats.place(world, component, layout, session.state().bySeat().size());
+        enterWeather(world, component);
+    }
+
+    /** 每日开头翻天候，立即结算“晴空”，并把“礼拜天”的额外物资阶段交给流程标志。 */
+    public static void enterWeather(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        if (session.state().phase() != Phase.WEATHER || session.state().isOver()) {
+            announceTurn(world, component);
+            return;
+        }
+        WeatherCard weather = session.beginWeather();
+        component.setExtraProvisionPending(weather.effect()
+                == io.github.heavyseasmc.engine.weather.WeatherEffect.EXTRA_PROVISION);
+        broadcast(world, Text.translatable("heavyseas.game.weather",
+                Text.translatable(weatherNameKey(weather)), Text.translatable(weatherEffectKey(weather)))
+                .formatted(Formatting.AQUA));
+        LOGGER.info("天候：{}（{}）", weather.id(), weather.effect().id());
+        // 天候到世界（ADR-0034 §5.1.5）：只记一行；昼夜与雨雷由 PlayerSky 按人发、客户端照画（ADR-0058 §4），雾由投影带给客户端。
+        MistSea.applyWeather(world, component, weather.id());
+        SkiffProps.onNewDay(world, component, weather, session.state().turn());   // 灯油烧掉一档 · 帆按天候效果（ADR-0057）
+        session.advancePhase();
+        enterProvision(world, component);
+    }
+
+    /**
+     * 进入物资阶段：补给箱从船头传起。
+     *
+     * <p>❗本方法**不推进阶段**。传递是异步的（要等人选牌或等超时），
+     * 推进由 {@link #afterProvision} 在传完之后做 —— 在这里推进会让整轮传递被跳过，
+     * 而表现只是「物资阶段一闪而过」，不报错。
+     */
+    public static void enterProvision(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        if (session.state().phase() != Phase.PROVISION || session.state().isOver()) {
+            announceTurn(world, component);
+            return;
+        }
+        if (session.table().provisionsLeft() == 0) {
+            // 牌堆抽完即止，不洗回重用 —— 之后每回合都会走到这里。
+            broadcast(world, Text.translatable("heavyseas.game.provision_empty")
+                    .formatted(Formatting.DARK_GRAY));
+            afterProvision(world, component);
+            return;
+        }
+        // ❗先播报再发牌：全是替身时整轮传递会**同步**走完，
+        //   先 begin 的话「开始」那句会排在「结束」后面。
+        broadcast(world, Text.translatable("heavyseas.game.provision_begin",
+                session.provisionDraws()).formatted(Formatting.DARK_GRAY));
+        if (!ProvisionPhase.begin(world, component)) {
+            afterProvision(world, component);      // 一个清醒的人都没有：别把局面卡在这儿
+        }
+    }
+
+    /** 一轮传递结束之后才推进阶段。由 {@link ProvisionPhase} 回调。 */
+    public static void afterProvision(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        if (session.state().isOver()) {
+            announceOutcome(world, component);
+            return;
+        }
+        if (component.takeExtraProvisionPending()) {
+            broadcast(world, Text.translatable("heavyseas.game.weather_extra_provision")
+                    .formatted(Formatting.DARK_GRAY));
+            enterProvision(world, component);
+            return;
+        }
+        session.advancePhase();
+        announceTurn(world, component);
+    }
+
+    /** 播报当前该谁动；航海阶段则交给 {@link NavigationPhase}。 */
+    public static void announceTurn(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        if (session.state().isOver()) {
+            announceOutcome(world, component);
+            return;
+        }
+        if (session.state().phase() == Phase.ACTION) {
+            Optional<CharacterId> actor = session.nextActor();
+            if (actor.isEmpty()) {
+                component.clearActionWindow();
+                session.advancePhase();       // 没人能行动是合法状态，直接进航海
+                announceTurn(world, component);
+                return;
+            }
+            boolean humanTurn = component.occupantOf(actor.get()).map(o -> !o.isDummy()).orElse(false);
+            long actionMs = component.timing().actionMs();   // 开局快照（ADR-0099 D8）
+            component.openActionWindow(humanTurn ? component.humanWindow(actionMs)
+                    : actionMs);   // 演示局里等真人不限时（用户 2026-10-07）
+            // 投影要在播报与替身排程之前推出去，真人客户端才能在轮到他的第一帧拿到完整倒计时。
+            sync(world);
+            GameComponent.Occupant who = component.occupantOf(actor.get()).orElseThrow();
+            broadcast(world, Text.translatable("heavyseas.game.your_turn",
+                    characterName(actor.get()), occupantName(component, actor.get())));
+            // 与语言无关的一行：playthrough-check.sh 关着开关打的那一局，按这一行的节奏替替身发指令。
+            LOGGER.info("轮到 {} 行动（第 {} 回合 · {}）", actor.get().value(), session.state().turn(),
+                    who.isDummy() ? "替身" : "真人");
+            if (who.isDummy() && component.dummyAutoplay()) {
+                CharacterId dummy = actor.get();
+                if (StandInMinds.thinks(component)) {
+                    // 动脑 / 大模型：这一刻就开始想（工作线程上），做出来不早于随机替身那一拍。
+                    //   想完回到主线程时排进排程，所以照样不会在这一次调用里递归打完（ADR-0019 §1）。
+                    StandInMinds.beginTurn(world, component, dummy, System.currentTimeMillis() + StandInPlay.beat(component));
+                    return;
+                }
+                // ❗排到下一 tick，不当场做：当场做的话，全是替身的一局会在这一次调用里递归打完（ADR-0019 §1）。
+                //   随机行动开着时再停一拍（StandInPlay.beat）：替身一个接一个当场动完，真人跟不上。
+                schedule(component, component.standInsAct() ? StandInPlay.beat(component) : 0L,
+                        "替身 " + dummy.value() + (component.dummyRandom() ? " 随机行动" : " 什么也不做"),
+                        () -> ActionPhase.autoPass(world, component, dummy));
+            }
+            return;
+        }
+        component.clearActionWindow();
+        // ❗推投影要在分支**之前**。原先只有航海那一支推得到，于是物资→行动之后
+        //   HUD 与手牌界面停在「物资」阶段，直到有人行动才跟上 —— 不报错、不掉线。
+        sync(world);
+        if (session.state().phase() == Phase.NAVIGATION) {
+            NavigationPhase.begin(world, component);
+            return;
+        }
+        if (session.state().phase() == Phase.WEATHER) {
+            enterWeather(world, component);
+        }
+    }
+
+    /**
+     * 把投影推给局内玩家。
+     *
+     * <p>每次状态变化都推一次。**漏推的表现是 HUD 停在旧数字上** —— 不报错、不掉线，
+     * 玩家只会觉得「这血怎么不掉」，而那时早已看不出是哪一步漏了。
+     */
+    private static void sync(ServerWorld world) {
+        GameComponents.sync(world);
+    }
+
+    /** 一个人行动结束：记标记，然后看还有没有下一个。 */
+    public static void finishAction(ServerWorld world, GameComponent component, CharacterId actor) {
+        Session session = component.requireSession();
+        component.clearActionWindow();
+        component.clearProvisionTarget();
+        session.markActed(actor);
+        sync(world);
+        if (session.state().isOver()) {
+            announceOutcome(world, component);
+            return;
+        }
+        if (session.nextActor().isEmpty()) {
+            session.advancePhase();
+        }
+        announceTurn(world, component);
+    }
+
+    /**
+     * 航海结算：执行这张牌、把它公开、停一下，然后进下一回合。由 {@link NavigationPhase} 调用。
+     *
+     * @param pick 舵手挑的那张；{@code null} 表示翻顶牌
+     */
+    public static void navigate(ServerWorld world, GameComponent component, NavigationCard pick) {
+        Session session = component.requireSession();
+        NavigationCard card = session.takeCardForNavigation(pick);
+        if (pick != null) {
+            SkiffProps.onHelm(world, component, card.id());       // 舵手挑了牌：舵往一边偏一下（只是样子）
+        }
+        resolveNavigation(world, component, card);
+    }
+
+    /** 狂风额外翻出的那一张。 */
+    public static void navigateWeather(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        NavigationCard card = session.takeWeatherNavigationCard();
+        resolveNavigation(world, component, card);
+    }
+
+    private static void resolveNavigation(ServerWorld world, GameComponent component, NavigationCard card) {
+        Session session = component.requireSession();
+        component.clearHelm();
+        // 海鸥与落海当场算完；口渴逐个问（ADR-0021）——「喝几张水」是决策，真人答不了同步的问题。
+        session.beginNavigation(card);
+
+        // 结算后只公开被执行的那一张（决策 ⑭）。播的是它印着什么，不是它的 id —— id 不是给人读的。
+        List<String> seats = session.state().bySeat().stream().map(CharacterId::value).toList();
+        broadcast(world, Text.translatable("heavyseas.game.card_played",
+                NavCardText.describe(NavCardView.of(card), seats,
+                        session.currentWeather().map(w -> w.effect().id()).orElse(""))).formatted(Formatting.AQUA));
+        OverboardPhase.begin(world, component);
+    }
+
+    static void completeNavigation(ServerWorld world, GameComponent component, NavigationReport report) {
+        Session session = component.requireSession();
+        NavigationCard card = report.card();
+        if (!report.overboardSelected().isEmpty()) {
+            broadcast(world, Text.translatable("heavyseas.game.overboard", names(report.overboardSelected())));
+        }
+        if (!report.thirstSelected().isEmpty()) {
+            broadcast(world, Text.translatable("heavyseas.game.thirst", names(report.thirstSelected())));
+        }
+        // 死在水里的人连人带牌离场（ADR-0022）。说出来：座位条上他那一格空了，没人说的话看起来像是界面坏了。
+        for (CharacterId gone : report.removed()) {
+            broadcast(world, Text.translatable("heavyseas.game.removed", characterName(gone))
+                    .formatted(Formatting.DARK_AQUA));
+        }
+        if (!report.removed().isEmpty()) {
+            LOGGER.info("移出游戏：{}", ids(report.removed()));
+        }
+        LOGGER.info("航海牌 {}：海鸥 {} · 落海 {} · 口渴 {}", card.id(), card.gull(),
+                ids(report.overboardSelected()), ids(report.thirstSelected()));
+        sync(world);                          // 执行的那张进投影：HUD 这时才拿得到
+        if (session.state().isOver()) {
+            announceOutcome(world, component);
+            return;
+        }
+        ThirstPhase.begin(world, component);
+    }
+
+    /**
+     * 口渴全部结算完之后：停一下让人看清刚才那张牌，然后进下一回合。由 {@link ThirstPhase} 调用。
+     *
+     * <p>❗这一段原先在 {@link #navigate} 的末尾。口渴拆成逐个问之后，
+     * 「什么时候算完」不再是同一次调用里的事 —— 写在原处的话，下一回合会在还有人没决定时就开始。
+     */
+    public static void afterNavigation(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        // ❗与语言无关的一行，而且是**这一回合真的走完了**的唯一标志：
+        //   「航海牌 …」只说明牌结算到了口渴那一步，口渴要逐个问，问完才算完（ADR-0021）。
+        //   演示脚本与验收脚本判「可以进下一步了」认的是这一行，不是那一行。
+        sync(world);
+        if (session.state().isOver()) {
+            announceOutcome(world, component);
+            return;
+        }
+        long revealHold = component.timing().revealHoldMs();   // 开局快照（ADR-0099 D8）
+        if (session.finishNavigationResolution()) {
+            schedule(component, component.anyHumanSeated() ? revealHold : 0L,
+                    "狂风额外航海牌后进入标准航海", () -> continueAfterThirst(world, component, session,
+                            () -> NavigationPhase.begin(world, component)));
+            return;
+        }
+        LOGGER.info("航海阶段结束：第 {} 回合（口渴已结算完）", session.state().turn());
+        long hold = component.anyHumanSeated() ? revealHold : 0L;
+        schedule(component, hold, "航海结算后进下一回合", () -> continueAfterThirst(world, component, session, () -> {
+            session.advancePhase();
+            enterWeather(world, component);
+        }));
+    }
+
+    /** 展示航海结果的停顿里也能喝酒；执行后续步骤前先处理新排入的口渴。 */
+    private static void continueAfterThirst(ServerWorld world, GameComponent component, Session expected, Runnable next) {
+        if (component.session().orElse(null) != expected || expected.state().phase() != Phase.NAVIGATION
+                || expected.state().isOver()) {
+            return;
+        }
+        if (expected.thirstInProgress()) {
+            ThirstPhase.begin(world, component);
+        } else {
+            next.run();
+        }
+    }
+
+    /**
+     * 中途打开替身自动推进时，把眼下停着的那一位替身补排上（QA 2026-09-25 HS-RUN-001）。
+     *
+     * <p>替身的「什么也不做」只在「轮到谁」那一刻排程（{@link #announceTurn}）。开关在那之后才打开，
+     * 就没人去推这一位 —— 要等 60 秒行动超时，或者有人手动 pass（QA 实测 200 tick 仍停在首位替身）。
+     * 只补行动阶段：别的阶段（补给箱 · 口渴 · 表态 · 舵手）各有自己的窗口与超时，
+     * 轮到下一位替身时照开关走，本来就停不住。
+     *
+     * @return 补排了一步没有（没有对局 · 不在行动阶段 · 轮到的是真人 · 正在划船，都不补）
+     */
+    public static boolean resumeStandIn(ServerWorld world, GameComponent component) {
+        Optional<Session> maybe = component.session();
+        if (maybe.isEmpty() || !component.dummyAutoplay()) {
+            return false;
+        }
+        Session session = maybe.get();
+        if (session.state().phase() != Phase.ACTION || session.rower().isPresent()) {
+            return false;
+        }
+        Optional<CharacterId> actor = session.nextActor();
+        if (actor.isEmpty() || !component.occupantOf(actor.get()).map(GameComponent.Occupant::isDummy).orElse(false)) {
+            return false;
+        }
+        CharacterId dummy = actor.get();
+        LOGGER.info("替身自动推进：开关刚打开，补排眼下这一位 {}", dummy.value());
+        schedule(component, 0L, "替身 " + dummy.value() + " 什么也不做（开关刚打开）",
+                () -> ActionPhase.autoPass(world, component, dummy));
+        return true;
+    }
+
+    /** 把一步排到之后的 tick（ADR-0019）。见 {@link GameComponent.Step}。 */
+    static void schedule(GameComponent component, long delayMs, String what, Runnable step) {
+        component.schedule(System.currentTimeMillis() + delayMs, what, step);
+    }
+
+    /** 每 tick 执行到期的一步（挂在 {@link #guarded} 上：取步骤那一下出错也照样收这一局）。 */
+    public static void tick(ServerWorld world, GameComponent component, long now) {
+        Optional<GameComponent.Step> due = component.pollDueStep(now);
+        if (due.isEmpty()) {
+            return;
+        }
+        try {
+            due.get().action().run();
+        } catch (RuntimeException e) {
+            abort(world, component, due.get().what(), e);
+        }
+    }
+
+    /** 一面在一个世界里的每 tick 计时（各阶段的 {@code tick}）。 */
+    @FunctionalInterface
+    public interface WorldTick {
+        void tick(ServerWorld world, GameComponent component, long now);
+    }
+
+    /**
+     * 把一面的计时挂上 {@code END_SERVER_TICK}，并套上与排程同一条「出错就结束这一局」（{@link #abort}）。
+     *
+     * <p>❗审查 2026-10-07 C1：各阶段的计时原先直接挂在每 tick 的事件上、外面没有 try —— 挑牌超时那一下引擎一抛，
+     * 异常一路冒到 {@code MinecraftServer} 的总 catch，写崩溃报告、停服。排程里的一步出错只结束这一局，
+     * 计时里的同一种错却让整个服务端停掉：两条路的后果不该差这么多。这里是唯一的包法，每一面都经它挂，不各写一份 try。
+     *
+     * @param what 这是哪一面的计时（出错时进日志）
+     */
+    public static net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.EndTick guarded(String what, WorldTick tick) {
+        return server -> {
+            long now = System.currentTimeMillis();
+            for (ServerWorld world : server.getWorlds()) {
+                GameComponent component = GameComponents.of(world);
+                try {
+                    tick.tick(world, component, now);
+                } catch (RuntimeException e) {
+                    abort(world, component, what, e);
+                }
+            }
+        };
+    }
+
+    /**
+     * 出错就结束这一局：排程里的一步、各阶段的计时、替身的看门狗，抛出来的异常都走这里（审查 2026-10-07 C1 · Q4）。
+     *
+     * <p>❗局面停在一步抛错的地方，就不会再有下一步来推它 —— 与其留一局永远不动的对局，不如当场结束并点名：
+     * 日志里有这一行，验收脚本才判得出来。收场本身再出错只记一行，不往外抛：这里是兜底，兜底不能把服务端带倒。
+     *
+     * @param what 出错的是哪一步（进日志）
+     */
+    public static void abort(ServerWorld world, GameComponent component, String what, RuntimeException e) {
+        if (component.session().isEmpty()) {
+            // 没有对局可收（比如刚收完那一刻到的一下）：只记下来，不碰别的
+            LOGGER.error("对局计时出错（{}），此刻没有进行中的对局", what, e);
+            return;
+        }
+        LOGGER.error("对局推进出错（{}），这一局到此为止", what, e);
+        try {
+            DesignationPhase.clear(world, component);
+            Nameplates.clear(world);
+            Gulls.clear(world, component);
+            Backdrop.clear(world, component);
+            Seats.clear(world, component);
+            // 普通系统事件都进 HUD 侧栏；崩溃会立刻收起会话，侧栏也随之消失，
+            // 所以最后这一句只能走 action bar。它不写入聊天历史。
+            world.getServer().getPlayerManager().getPlayerList().stream()
+                    .filter(player -> component.belongsToActiveVoyage(player.getUuid()))   // 北辰号上的人不在这一局里（ADR-0083）
+                    .forEach(player -> player.sendMessage(
+                            Text.translatable("heavyseas.game.crashed").formatted(Formatting.RED), true));
+            component.end();
+            sync(world);
+            MistSea.restoreAll(world, component);
+        } catch (RuntimeException again) {
+            LOGGER.error("对局出错后收场时又出错（{}）：会话已尽量收起，剩下的靠 /seas end 或重启清", what, again);
+            if (component.session().isPresent()) {
+                component.end();
+            }
+        }
+    }
+
+    private static void announceOutcome(ServerWorld world, GameComponent component) {
+        if (component.endgame().isPresent()) {
+            return;                       // 结束可能从好几条路先后到达；终局序列已经开始了，别再播一遍
+        }
+        Session session = component.requireSession();
+        GameState end = session.state();
+        component.clearActionWindow();
+        broadcast(world, Text.translatable(outcomeKey(end.outcome().orElseThrow()),
+                end.turn(), session.aliveCount()).formatted(Formatting.GOLD));
+        for (CharacterId id : end.bySeat()) {
+            broadcast(world, Text.translatable(end.isRemoved(id)
+                            ? "heavyseas.game.final_line_removed" : "heavyseas.game.final_line",
+                    characterName(id), conditionName(end.conditionOf(id))));
+        }
+        LOGGER.info("对局结束：{} · 第 {} 回合 · 存活 {} 人",
+                end.outcome().orElseThrow(), end.turn(), session.aliveCount());
+        if (component.debugged()) {
+            // D8（ADR-0060）：调试改过局面的局不计入长线进度。进度系统还没有，先把这一条记下来、让以后的那一侧认它。
+            LOGGER.info("本局有 {} 处调试改动：不计入长线进度", component.debugChanges());
+        }
+        // ❗不再当场收起会话：终局序列（翻恨 → 翻爱 → 计分）走完才收（ADR-0022）。
+        //   原先这里是 component.end() —— 「本阶段不计分」那句占位也一起拿掉了。
+        sync(world);
+        EndgamePhase.begin(world, component);
+    }
+
+    /**
+     * <b>夹具</b>（{@code /seas land}）：海鸥直接置满，走正常的终局流程（ADR-0022 §7.7）。
+     *
+     * <p>各面的计时一并停掉：行动、补给箱、舵手、口渴的窗口若还开着，
+     * 它们的超时会在终局序列里再推一下已经结束的对局。
+     */
+    public static void landForFixture(ServerWorld world, GameComponent component) {
+        Session session = component.requireSession();
+        session.landForFixture();
+        LOGGER.info("夹具：直接靠岸（第 {} 回合）", session.state().turn());
+        afterFixtureLanding(world, component);
+    }
+
+    /**
+     * 海鸥已经被夹具 / 调试口凑满之后的那一段：停掉各面的计时，走正常的终局流程。
+     * {@code /seas land} 与 {@code /seas debug gulls}（ADR-0060）共用这一条 —— 「到 4 只走正常的靠岸流程」只此一份。
+     */
+    public static void afterFixtureLanding(ServerWorld world, GameComponent component) {
+        component.clearActionWindow();
+        component.clearProvisionTarget();
+        component.clearProvision();
+        component.clearHelm();
+        component.clearThirst();
+        // 审查 2026-10-07 R7：站队 / 押武器、举着拳头找人、落海这三扇窗原先不收 —— 分数已经在终局开头算定，
+        //   它们到点照样结算（打架掉血、落海受伤、举拳的人还能宣告一场新打架），计分面板与局面对不上。
+        component.clearContest();
+        DesignationPhase.clear(world, component);
+        component.setOverboardDeadline(0L);
+        component.setStandInsOverboard(false);
+        announceOutcome(world, component);
+    }
+
+    /** 一行状态：回合、阶段、海鸥、每个人的伤势。纯文字 HUD 的服务端那一半。 */
+    public static List<Text> statusLines(GameComponent component) {
+        Session session = component.requireSession();
+        GameState g = session.state();
+        List<Text> out = new ArrayList<>();
+        out.add(Text.translatable("heavyseas.status.header", g.turn(), phaseName(g.phase()),
+                g.gulls(), GameState.GULLS_TO_LAND).formatted(Formatting.GOLD));
+        for (CharacterId id : g.bySeat()) {
+            Survivor s = g.roster().get(id);
+            Condition condition = g.conditionOf(id);
+            out.add(Text.translatable("heavyseas.status.line",
+                    g.stateOf(id).seat(), characterName(id), occupantName(component, id),
+                    s.size() - g.stateOf(id).damage(), s.size(),
+                    conditionName(condition), g.stateOf(id).thirst().count()));
+        }
+        // 与计分面板那枚章同一个数（ADR-0060 D3）
+        if (component.debugChanges() > 0) {
+            out.add(Text.translatable("heavyseas.debug.stamp", component.debugChanges())
+                    .formatted(Formatting.LIGHT_PURPLE));
+        }
+        return out;
+    }
+
+    /**
+     * 全场只有一套识别词：职业（方案 §4.1，称呼层已取消）。
+     *
+     * <p>❗这是唯一一处**拼出来**的 lang 键，因为角色 id 来自数据、代码里没有那张表。
+     * 构建期的 {@code checkLangKeys} 因此单独按 {@code data/roster} 核对这一族。
+     */
+    /**
+     * 这一下是谁做的（事件来源）：掉线的真人按离线，替身按替身，其余算真人自己按的。
+     *
+     * <p>表态、站队、押武器三处播报原先各自抄一份「是不是替身」，这里收成一份。
+     * 管理指令代答不走这里：那一侧自己标 {@link ExperienceView.Source#ADMIN}。
+     */
+    public static ExperienceView.Source actorSource(GameComponent component, CharacterId who) {
+        if (component.session().map(s -> s.state().isOffline(who)).orElse(false)) {
+            return ExperienceView.Source.DISCONNECT;
+        }
+        boolean standIn = component.occupantOf(who).map(GameComponent.Occupant::isDummy).orElse(false);
+        return standIn ? ExperienceView.Source.STAND_IN : ExperienceView.Source.PLAYER;
+    }
+
+    /** 到点替他定的那一下：人掉线了就是离线，否则才是超时 —— 两者在玩家看来是两件事。 */
+    public static ExperienceView.Source defaultedSource(GameComponent component, CharacterId who) {
+        return component.session().map(s -> s.state().isOffline(who)).orElse(false)
+                ? ExperienceView.Source.DISCONNECT : ExperienceView.Source.TIMEOUT;
+    }
+
+    public static Text characterName(CharacterId id) {
+        return Text.translatable("heavyseas.character." + id.value());
+    }
+
+    /**
+     * 下面三个用 switch 而不是拼字符串。
+     *
+     * <p>拼出来的键**静态扫不到**，而漏一个键的表现是界面上出现一行
+     * {@code heavyseas.condition.dead} 这样的原文 —— 游戏照跑，没有任何报错。
+     * 写成 switch 之后，加一个枚举值编译期就红，键漏没漏也由构建期的闸门查得到。
+     */
+    private static Text conditionName(Condition condition) {
+        return io.github.heavyseasmc.mod.ui.GameLabels.conditionName(condition);
+    }
+
+    private static Text phaseName(Phase phase) {
+        return io.github.heavyseasmc.mod.ui.GameLabels.phaseName(phase);
+    }
+
+    private static String outcomeKey(GameState.Outcome outcome) {
+        return switch (outcome) {
+            case LANDED -> "heavyseas.game.over.landed";
+            case ALL_DEAD -> "heavyseas.game.over.all_dead";
+        };
+    }
+
+    private static Text occupantName(GameComponent component, CharacterId id) {
+        return component.occupantOf(id)
+                .map(o -> o.isDummy() ? Text.translatable("heavyseas.game.dummy") : Text.literal(o.label()))
+                .orElse(Text.literal("?"));
+    }
+
+    private static Text names(List<CharacterId> ids) {
+        Text joined = Text.empty();
+        for (int i = 0; i < ids.size(); i++) {
+            if (i > 0) {
+                joined = joined.copy().append(Text.translatable("heavyseas.nav.name_sep"));
+            }
+            joined = joined.copy().append(characterName(ids.get(i)));
+        }
+        return joined;
+    }
+
+    private static List<String> ids(List<CharacterId> ids) {
+        return ids.stream().map(CharacterId::value).toList();
+    }
+
+    /** 播给全场。包内可见：{@link ActionPhase} 与 {@link NavigationPhase} 要播同样的话。 */
+    static void broadcast(ServerWorld world, Text message) {
+        broadcast(world, message, ExperienceView.Source.RULE, "");
+    }
+
+    static void broadcast(ServerWorld world, Text message, ExperienceView.Source source, String actor) {
+        GameComponent component = GameComponents.of(world);
+        if (component.session().isEmpty()) {
+            LOGGER.warn("雾海没有进行中的对局，丢弃播报：{}", message.getString());
+            return;
+        }
+        component.notify(message, source, actor);
+        sync(world);
+    }
+
+    private static String weatherNameKey(WeatherCard card) {
+        return "heavyseas.weather." + card.id();
+    }
+
+    private static String weatherEffectKey(WeatherCard card) {
+        return "heavyseas.weather.effect." + card.id();
+    }
+}

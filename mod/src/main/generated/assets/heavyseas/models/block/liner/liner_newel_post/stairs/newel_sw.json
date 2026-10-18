@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/stairs/newel_sw",
+  "textures": {
+    "b": "heavyseas:block/liner/stairs/newel",
+    "particle": "heavyseas:block/liner/stairs/newel"
+  }
+}

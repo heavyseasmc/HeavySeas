@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/rig_sideboard_east",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/rig_sideboard",
+    "particle": "heavyseas:block/liner/prop/rig_sideboard"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "parent": "heavyseas:block/liner/template/prop/fireplace_mahogany_wide_mid_off",
+  "textures": {
+    "b": "heavyseas:block/liner/prop/fireplace_mahogany",
+    "g": "heavyseas:block/liner/prop/fireplace_mahogany_glow_off",
+    "k": "heavyseas:block/liner/prop/fireplace_mahogany_detail",
+    "particle": "heavyseas:block/liner/prop/fireplace_mahogany"
+  }
+}
