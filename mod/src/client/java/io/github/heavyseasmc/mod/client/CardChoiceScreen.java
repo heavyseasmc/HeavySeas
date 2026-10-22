@@ -140,7 +140,7 @@ public final class CardChoiceScreen extends GameScreen {
         }
         var l = sheet();
         double top0 = Math.max(l.railBottom() + CardRow.RAIL_CLEAR * l.k(),
-                (stageTop + (hasPass() ? 2 : 1) * lineStep() + HINT_GAP) * (double) guiScale());
+                (stageTop + (token > 0 ? 3 : hasPass() ? 2 : 1) * lineStep() + HINT_GAP) * (double) guiScale());
         // 左边那张跟着选中的那一项走：挑到「什么也不做」时它也是那一张。
         // ❗在画的那一刻才取：render 里悬停可能刚挪过焦点，先取好的话会拿着上一格去画这一格
         pick.render(context, mouseX, mouseY, dt, top0, people, (ctx, x, y, w, h) -> {
@@ -173,12 +173,29 @@ public final class CardChoiceScreen extends GameScreen {
             }
             drawLine(context, effect, paneW() / 2, stageTop + lineStep(), ink);
         }
+        // 这么选的话谁会淹死（ADR-0043 §11 第五组）：引擎按结算同一个口径算好的（Session#overboardDrownsIf），
+        // 随你挑的那一格变。取最新的投影 —— 别人在这一窗里出了牌，结局会跟着变
+        if (token > 0) {
+            List<String> drowns = onPass() ? table.passDrowns() : drownsOf(table, choices.get(pick.focus()));
+            Text line = drowns.isEmpty() ? Text.translatable("heavyseas.overboard.drowns_none")
+                    : Text.translatable("heavyseas.overboard.drowns",
+                            io.github.heavyseasmc.mod.game.NavCardText.join(drowns.stream().map(GameScreen::nameOf).toList()));
+            drawLine(context, line, paneW() / 2, stageTop + 2 * lineStep(),
+                    drowns.isEmpty() ? GuiLanguage.secondary() : GuiLanguage.cinnabar());
+        }
         // 总长取投影（ADR-0099 D8：时限可配，不再用编译进去的常量）
         Countdown countdown = token > 0 ? new Countdown(table.deadline(), table.window(), 0) : null;
         // 落海那一窗：Esc 只收起（金签上按 G 回来），「不用」是那一排最后一格；赠送：Esc 取消
         drawFootBand(context, b, List.of(keys("select", "←", "→")),
                 hasPass() ? List.of(confirm("Enter")) : List.of(confirm("Enter"), keys("cancel", "Esc")),
                 now, countdown);
+    }
+
+    /** 这一格在最新投影里那一份的淹死名单；对不上（这一格刚不在了）就用打开时那一份。 */
+    private static List<String> drownsOf(TableView table, TableView.Play choice) {
+        return table.plays().stream()
+                .filter(p -> p.card().equals(choice.card()) && p.target().equals(choice.target()))
+                .findFirst().map(TableView.Play::drowns).orElse(choice.drowns());
     }
 
     private void commit() {

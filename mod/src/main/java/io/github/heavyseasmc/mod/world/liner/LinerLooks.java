@@ -157,6 +157,10 @@ public final class LinerLooks {
         out.put("pilaster_left_plinth_skirting", woodSkirting);
         out.put("pilaster_right_plinth", mirrored(wood));
         out.put("pilaster_right_plinth_skirting", mirrored(woodSkirting));
+        // 5e（ADR-0093 B4 · B11）：白漆壁柱穿过的线 —— 两边各一段腰线；顶格柱身到 11.5 · 束腰 · 柱头 · 薄檐口整格穿过（liner_decor.pilaster_trim_els）
+        out.put("pilaster_chair_rail", List.of(box(5.5, 0, 0, 10.5, 16, 1.5), box(0, 0, 0, 5.5, 2, 1), box(10.5, 0, 0, 16, 2, 1)));
+        out.put("pilaster_cornice", concat(List.of(box(5.5, 0, 0, 10.5, 11.5, 1.5), box(5, 11.5, 0, 11, 12, 2), box(4, 12, 0, 12, 13, 2.5)),
+                corniceThin));
         return out;
     }
 
@@ -293,6 +297,12 @@ public final class LinerLooks {
                     box(13.5, 11, 2.5, 16, 16, 16), box(14.75, 8, 1.25, 16, 11, 16))),
             Map.entry("cornice_outer_left", List.of(box(0, 11, 0, 2.5, 16, 2.5), box(0, 8, 0, 1.25, 11, 1.25))),
             Map.entry("cornice_outer_right", List.of(box(13.5, 11, 0, 16, 16, 2.5), box(14.75, 8, 0, 16, 11, 1.25))),
+            // A8：天花梁 —— 挂在格子上半截（11–16），宽 6 居中；十字是两个方向各一根
+            Map.entry("beam", List.of(box(0, 11, 5, 16, 16, 11))),
+            Map.entry("beam_cross", List.of(box(0, 11, 5, 16, 16, 11), box(5, 11, 0, 11, 16, 16))),
+            // 5e：凸出檐口下面接壁柱 —— 柱身 0–5.5 · 束腰 · 柱头 6–8（liner_decor.cornice_capital_els）
+            Map.entry("cornice_capital", List.of(box(0, 11, 0, 16, 16, 2.5), box(0, 8, 0, 16, 11, 1.25),
+                    box(5.5, 0, 0, 10.5, 5.5, 1.5), box(5, 5.5, 0, 11, 6, 2), box(4, 6, 0, 12, 8, 2.5))),
             Map.entry("pilaster", List.of(box(5.5, 0, 0, 10.5, 16, 1.5))),
             Map.entry("pilaster_left", List.of(box(0, 0, 0, 5, 16, 1.5))),
             Map.entry("pilaster_right", List.of(box(11, 0, 0, 16, 16, 1.5))),

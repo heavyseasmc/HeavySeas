@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "heavyseas_gametest",
+  "version": "0.0.0",
+  "name": "HeavySeas GameTests",
+  "description": "Server GameTests for development only; never shipped.",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["io.github.heavyseasmc.mod.world.liner.LinerGameTests"]
+  },
+  "depends": {
+    "heavyseas": "*",
+    "fabric-gametest-api-v1": "*"
+  }
+}

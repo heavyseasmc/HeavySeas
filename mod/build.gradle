@@ -51,6 +51,35 @@ loom {
     //   所以 mixins.json 不写 refmap；下面的 checkMixinRemapped 守着「生产 jar 里的 mixin 真的翻过了」。
 }
 
+// 服务端 GameTest（2026-10-19，ADR-0109 §7.2：Fabric API 自带的 fabric-gametest-api-v1，小范围试）：一个单独的源码集，
+// 自己一份 fabric.mod.json（入口 fabric-gametest），不进发给玩家的 jar。跑：./gradlew :mod:runGametest —— 起一个专用服务端、
+// 跑完全部、有一条没过就以非 0 退出；报告 build/gametest/report.xml。
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+loom {
+    mods {
+        heavyseasGametest {
+            sourceSet sourceSets.gametest
+        }
+    }
+    runs {
+        gametest {
+            server()
+            name 'Game Test'
+            vmArg '-Dfabric-api.gametest'
+            vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.get().asFile}/gametest/report.xml"
+            runDir 'build/gametest'
+            source sourceSets.gametest
+            ideConfigGenerated false
+        }
+    }
+}
+
 repositories {
     maven {
         name = 'Ladysnake'
@@ -377,7 +406,7 @@ def checkItemCatalog = tasks.register('checkItemCatalog') {
         files.each { File f ->
             def text = f.getText('UTF-8')
             if (f.name ==~ /(Liner(Blocks|Props|Glass|Hull|Doors|Stairs|Lift|Shapes)|SkiffBlocks)\.java/) {
-                text.findAll(/(?:add|frame|prop|glass|hull|door|window|lift)\("((?:liner|skiff)_[a-z0-9_]+)"/) { whole, id -> registered << id }
+                text.findAll(/(?:add|frame|carpet|prop|glass|hull|door|window|lift)\("((?:liner|skiff)_[a-z0-9_]+)"/) { whole, id -> registered << id }
             }
             text.findAll(/Registries\.ITEM, Identifier\.of\(HeavySeasMod\.MOD_ID, "([a-z0-9_]+)"\)/) { whole, id -> registered << id }
             if (f.name == 'SceneItems.java') {
@@ -386,7 +415,7 @@ def checkItemCatalog = tasks.register('checkItemCatalog') {
         }
         // 正向对照：每一种登记写法都得认出东西来，否则「没登记」与「没在扫」一样
         ['liner_wall', 'liner_sofa_cream', 'liner_window_2x2', 'liner_door_cabin', 'liner_lift_gate', 'liner_balustrade', 'skiff_hull',
-         'gull_spawn_egg', 'chart_ship', 'liner_teak_slab'].each {
+         'gull_spawn_egg', 'chart_ship', 'liner_teak_slab', 'liner_carpet_navy'].each {
             if (!registered.contains(it)) {
                 throw new GradleException("登记的物品里没认出 ${it}（共认出 ${registered.size()} 件）—— 判据坏了")
             }
@@ -1369,9 +1398,9 @@ def checkLinerBlocks = tasks.register('checkLinerBlocks') {
     inputs.files(ext.extraSources).optional()
     doLast { Task t ->
         // 大框五款走 frame("liner_frame_…") 登记，灯与家具走 prop("liner_…")（LinerProps），船壳与舷窗走 hull("liner_…")（LinerHull），
-        //   门走 door("liner_…")（LinerDoors），电梯门走 lift("liner_…")（LinerLift），整扇窗走 window("liner_window_<宽>x<高>", …)（ADR-0091；名字里有数字），其余走 add("liner_…")
+        //   门走 door("liner_…")（LinerDoors），电梯门走 lift("liner_…")（LinerLift），整扇窗走 window("liner_window_<宽>x<高>", …)（ADR-0091；名字里有数字），三色地毯走 carpet("liner_carpet…")（ADR-0111），其余走 add("liner_…")
         checkDecorBlocks(t, [label: '大邮轮', prefix: 'liner_', dir: 'liner', blocksClass: 'LinerBlocks / LinerProps',
-                             registerPattern: /(?:add|frame|prop|glass|hull|door|window|lift)\("(liner_[a-z0-9_]+)"/, hull: false, scanTabs: false])
+                             registerPattern: /(?:add|frame|carpet|prop|glass|hull|door|window|lift)\("(liner_[a-z0-9_]+)"/, hull: false, scanTabs: false])
     }
 }
 
@@ -1484,6 +1513,8 @@ def checkLinerShip = tasks.register('checkLinerShip') {
                 def name = st.Name.toString()
                 if (name == 'minecraft:air') { return }
                 states++
+                // 游泳池的池水（方案 A7，2026-10-19）：「一律自制」之下唯一的例外，与 liner_ship.ALLOWED_VANILLA 同一份；待用户认
+                if (name == 'minecraft:water') { return }
                 if (!name.startsWith('heavyseas:')) { problems << "${id}：${name} 不是本模组的方块（一律自制）"; return }
                 def shortName = name.substring('heavyseas:'.length())
                 def props = (st.Properties ?: [:]) as Map

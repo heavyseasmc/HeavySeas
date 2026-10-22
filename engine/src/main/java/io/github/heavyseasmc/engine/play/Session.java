@@ -249,11 +249,7 @@ public final class Session {
      * @return 本阶段该抽几张
      */
     public int provisionDraws() {
-        int draws = state.consciousBySeat().size();
-        if (draws < 0) {
-            throw new IllegalStateException("抽牌数不可能为负");
-        }
-        return draws;
+        return state.consciousBySeat().size();
     }
 
     // ---------------------------------------------------------------- 物资阶段
@@ -1687,6 +1683,49 @@ public final class Session {
     }
 
     /** 一个独立落海阶段；诱饵伤害、冲牌、水中死亡都只看这一阶段的名单。 */
+    /**
+     * 这一窗里 {@code from} 如果照 {@code play} 出（空 = 这次不出牌），这一批落海的人里谁会淹死 —— 不改动对局。
+     *
+     * <p>给落海那一面写「会淹死：谁」用（ADR-0043 §11 第五组）。口径逐条照 {@link #resolveOverboard}：
+     * 下水名单同 {@link #stillInWater}；落水那 1 点有人免（{@link #isOverboardImmune}），鲨鱼那一份谁都不免；
+     * 受完伤按 {@link Condition#inWater} 判，救生圈看出完这张牌之后面前有没有。本来就是尸体的不算「淹死」（他早死了）。
+     * 别的落海者在同一窗里还没出的牌不算：这是「只看你这一下」的预告。
+     */
+    public List<CharacterId> overboardDrownsIf(CharacterId from, Optional<OverboardPlay> play) {
+        if (pendingNavigation == null) {
+            throw new IllegalStateException("no pending overboard window");
+        }
+        GameState g = state;
+        int bait = pendingNavigation.bait;
+        if (play.isPresent()) {
+            OverboardPlay p = play.get();
+            ProvisionEffect effect = requireOverboardPlay(from, p.target(), p.card(), pendingNavigation.token);
+            if (effect instanceof ProvisionEffect.DamageInWater damage) {
+                g = g.withState(from, withoutConsumedCard(g.stateOf(from), p.card()));
+                bait = addedBait(bait, damage);
+            } else {
+                SurvivorState giver = g.stateOf(from);
+                g = g.withState(from, giver.hasInHand(p.card()) ? giver.withoutCard(p.card()) : giver.withoutCardInFront(p.card()));
+                g = g.withState(p.target(), g.stateOf(p.target()).withCardInFront(p.card()));
+            }
+        }
+        List<CharacterId> inWater = stillInWater(g, pendingNavigation.windows.getFirst());
+        int shark = overboardExtraDamage(g, inWater, bait);
+        List<CharacterId> drowned = new ArrayList<>();
+        for (CharacterId id : inWater) {
+            if (g.conditionOf(id) == Condition.DEAD) {
+                continue;
+            }
+            int damage = g.stateOf(id).damage() + (isOverboardImmune(g, id) ? 0 : 1) + shark;
+            boolean ring = g.stateOf(id).front().stream()
+                    .anyMatch(c -> table.provisions().get(c).effect() instanceof ProvisionEffect.PreventOverboardDamage);
+            if (Condition.inWater(damage, g.roster().get(id).size(), ring) == Condition.DEAD) {
+                drowned.add(id);
+            }
+        }
+        return List.copyOf(drowned);
+    }
+
     private OverboardOutcome resolveOverboard(List<CharacterId> requested, int playedBait) {
         List<CharacterId> inWater = stillInWater(state, requested);
         List<CharacterId> selected = inWater.stream()
@@ -2412,8 +2451,8 @@ public final class Session {
      * <p>理由与航海牌那条相同：少一张<b>不会报错</b>，只会让某个效果再也不出现，
      * 而那种错能安静地跑完几千局。
      *
-     * <p>❗它建立在「没有牌会离开游戏」之上。规则里尸体落海会把牌一起带走，
-     * 而引擎还没有「移出游戏」这回事 —— 哪天做了，这里要同时加一个「已退出」的桶。
+     * <p>尸体落海会把牌一起带走（移出游戏）：那些牌进「随人离场」那一桶（{@code table.removedProvisions()}），
+     * 一样算在总数里 —— 不进任何一桶的牌才是丢了。
      */
     public void requireNoProvisionLost(String where) {
         int inHands = 0;

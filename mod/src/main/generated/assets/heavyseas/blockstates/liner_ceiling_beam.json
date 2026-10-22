@@ -1,0 +1,17 @@
+{
+  "variants": {
+    "axis=x,cross=false": {
+      "model": "heavyseas:block/liner/liner_ceiling_beam/beam"
+    },
+    "axis=x,cross=true": {
+      "model": "heavyseas:block/liner/liner_ceiling_beam/beam_cross"
+    },
+    "axis=z,cross=false": {
+      "model": "heavyseas:block/liner/liner_ceiling_beam/beam",
+      "y": 90
+    },
+    "axis=z,cross=true": {
+      "model": "heavyseas:block/liner/liner_ceiling_beam/beam_cross"
+    }
+  }
+}

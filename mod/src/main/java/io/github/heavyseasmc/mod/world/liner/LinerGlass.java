@@ -149,6 +149,27 @@ public final class LinerGlass {
 
     public static final EnumProperty<Sill> SILL = EnumProperty.of("sill", Sill.class);
 
+    /**
+     * 窗框（ADR-0111 §11，用户 2026-10-19 选 D）：白漆 · 桃花心木（内沿一道亮金线）。暖的屋子（深木墙板、深木门套）的窗与亮子用桃花心木，
+     * 由生成器写好；手放默认白漆。只换框那一张贴图，模板相同。
+     */
+    public enum Finish implements StringIdentifiable {
+        WHITE("glass/window_frame"), MAHOGANY("glass/window_frame_mahogany");
+
+        final String frame;
+
+        Finish(String frame) {
+            this.frame = frame;
+        }
+
+        @Override
+        public String asString() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    public static final EnumProperty<Finish> FINISH = EnumProperty.of("finish", Finish.class);
+
     private static final Map<String, Block> BLOCKS = new LinkedHashMap<>();
 
     private static final List<Window> WINDOWS = new ArrayList<>();
@@ -265,13 +286,14 @@ public final class LinerGlass {
             this.height = height;
             this.col = COLS[width];
             this.row = ROWS[height];
-            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH).with(SILL, Sill.INSIDE));
+            setDefaultState(getStateManager().getDefaultState().with(FACING, Direction.SOUTH).with(SILL, Sill.INSIDE)
+                    .with(FINISH, Finish.WHITE));
         }
 
         @Override
         protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
             int[] size = PENDING.get();
-            builder.add(FACING, SILL);
+            builder.add(FACING, SILL, FINISH);
             if (size[0] > 1) {
                 builder.add(COLS[size[0]]);
             }
@@ -336,7 +358,7 @@ public final class LinerGlass {
             String mask = mask(col(s), row(s), width, height);
             // 玻璃每种 mask 一张：画框那几边一圈压边，左上那一格（上、左都画框）带反光 —— 一扇窗一到两段斜纹，不论多大
             String template = "glass/window_" + mask + "_" + s.get(SILL).asString();
-            return LinerLooks.look(template, tex("frame", "glass/window_frame", "glass", "glass/window_glass_" + mask))
+            return LinerLooks.look(template, tex("frame", s.get(FINISH).frame, "glass", "glass/window_glass_" + mask))
                     .turned(LinerBlock.yawOf(s.get(FACING)));
         }
 

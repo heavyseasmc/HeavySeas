@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/cornice_capital",
+  "textures": {
+    "p": "heavyseas:block/liner/pilaster",
+    "particle": "heavyseas:block/liner/cornice",
+    "t": "heavyseas:block/liner/cornice"
+  }
+}

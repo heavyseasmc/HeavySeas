@@ -213,6 +213,21 @@ final class LinerConnectRulesTest {
         assertEquals("plinth", LinerConnect.Rules.pilasterBase(true, false, false), "两边没有踢脚：只有墩");
         assertEquals("skirting", LinerConnect.Rules.pilasterBase(true, true, false), "一边有踢脚就把两侧那截踢脚一起画上");
         assertEquals("skirting", LinerConnect.Rules.pilasterBase(true, false, true));
+        // 5e（2026-10-19）：白漆壁柱这一格穿过哪条线 —— 薄檐口 > 腰线；踢脚归柱脚；最下一格一律 none
+        assertEquals("cornice", LinerConnect.Rules.pilasterTrim(false, "cornice", null), "顶格旁边是薄檐口：长柱头");
+        assertEquals("cornice", LinerConnect.Rules.pilasterTrim(false, "chair_rail", "cornice"), "两样都有时薄檐口优先");
+        assertEquals("chair_rail", LinerConnect.Rules.pilasterTrim(false, null, "chair_rail"));
+        assertEquals("none", LinerConnect.Rules.pilasterTrim(false, "skirting", "skirting"), "踢脚不算：柱脚那一格管");
+        assertEquals("none", LinerConnect.Rules.pilasterTrim(true, "cornice", "cornice"), "最下一格（有柱脚）不画线");
+        assertEquals("none", LinerConnect.Rules.pilasterTrim(false, null, null));
+        assertTrue(LinerConnect.Rules.corniceCapital(true, true), "直段、正下方是壁柱：长柱头");
+        // A8 天花梁
+        assertEquals("cross", LinerConnect.Rules.beamShape(true, true, "x"));
+        assertEquals("z", LinerConnect.Rules.beamShape(false, true, "x"), "只有南北有梁：转过去顺着它");
+        assertEquals("x", LinerConnect.Rules.beamShape(true, false, "z"));
+        assertEquals("z", LinerConnect.Rules.beamShape(false, false, "z"), "孤零零一根：照放的方向");
+        assertFalse(LinerConnect.Rules.corniceCapital(false, true), "拐角那几块不长");
+        assertFalse(LinerConnect.Rules.corniceCapital(true, false));
     }
 
     // ---------------------------------------------------------------- A 甲板新贴附件（ADR-0080 §7）：格架 · 拱 · 宽门套

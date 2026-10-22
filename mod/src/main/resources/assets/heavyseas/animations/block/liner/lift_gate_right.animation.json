@@ -1,0 +1,147 @@
+{
+ "format_version": "1.8.0",
+ "animations": {
+  "open": {
+   "loop": "hold_on_last_frame",
+   "animation_length": 1.2,
+   "bones": {
+    "lattice": {
+     "scale": {
+      "0.0": {
+       "vector": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "1.20": {
+       "vector": [
+        0.18519,
+        1.0,
+        1.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    },
+    "stile": {
+     "position": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "1.20": {
+       "vector": [
+        -11.0,
+        0.0,
+        0.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    }
+   }
+  },
+  "close": {
+   "loop": "hold_on_last_frame",
+   "animation_length": 1.2,
+   "bones": {
+    "lattice": {
+     "scale": {
+      "0.0": {
+       "vector": [
+        0.18519,
+        1.0,
+        1.0
+       ]
+      },
+      "1.20": {
+       "vector": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    },
+    "stile": {
+     "position": {
+      "0.0": {
+       "vector": [
+        -11.0,
+        0.0,
+        0.0
+       ]
+      },
+      "1.20": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ],
+       "easing": "easeInOutSine"
+      }
+     }
+    }
+   }
+  },
+  "opened": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "lattice": {
+     "scale": {
+      "0.0": {
+       "vector": [
+        0.18519,
+        1.0,
+        1.0
+       ]
+      }
+     }
+    },
+    "stile": {
+     "position": {
+      "0.0": {
+       "vector": [
+        -11.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    }
+   }
+  },
+  "closed": {
+   "loop": "hold_on_last_frame",
+   "bones": {
+    "lattice": {
+     "scale": {
+      "0.0": {
+       "vector": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      }
+     }
+    },
+    "stile": {
+     "position": {
+      "0.0": {
+       "vector": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     }
+    }
+   }
+  }
+ }
+}

@@ -196,6 +196,15 @@ public final class SheetLayout {
         return at(tx + CHIP_DX - CHIP / 2, top() + RAIL_TOP + CHIP_DY - CHIP / 2, CHIP, CHIP);
     }
 
+    /**
+     * 舵手那枚舵轮小圆片（ADR-0043 §11 第二组）：与右上那枚（{@link #seatChip}）左右对称，挂在头像左上。
+     * 主画面的轨上舵轮是另一个形制（带划船堆张数，{@code HudLayout#helmBadge}）；各面的轨窄，只放一枚圆片。
+     */
+    public Rect seatHelm(int i, int seats) {
+        double tx = seatX(i, seats) + (SEAT_W - TOKEN) / 2;
+        return at(tx + (TOKEN - CHIP_DX) - CHIP / 2, top() + RAIL_TOP + CHIP_DY - CHIP / 2, CHIP, CHIP);
+    }
+
     /** 座位轨的底（物理像素）：名字那一行的下沿。 */
     public int railBottom() {
         return (int) Math.round((top() + RAIL_TOP + TOKEN + NAME_GAP + NAME_LINE) * k);

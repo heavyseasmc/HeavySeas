@@ -93,6 +93,15 @@ public final class ExperienceProjector {
         var affinities = session.affinities().orElseThrow();
         var goal = Scorer.goal(session.state().roster(), who, affinities.loveOf(who), affinities.hateOf(who));
         List<Text> lines = new ArrayList<>();
+        // 第一行：要是这一刻靠岸，你能得几分（ADR-0043 A2 · §11 第七组）。与终局计分同一个函数、同一份分值表；
+        // 手牌一面那一行摘要取的就是第一行。只用本人的爱恨 + 全船公开的状态，只进本人那一包。
+        // 数值数据还没读成功（只有单测会这样）就不写这一行 —— 那时终局也算不出分。
+        var data = io.github.heavyseasmc.mod.data.GameDataLoader.peek();
+        if (data.isPresent() && !session.state().isOver()) {
+            int total = Scorer.score(session.state().roster(), session.finalStates(), who,
+                    data.get().roster().treasureScoring()).total();
+            lines.add(Text.translatable("heavyseas.ux.goal.landing", total));
+        }
         lines.add(Text.translatable(goal.selfHate() ? "heavyseas.ux.goal.self_hate" : "heavyseas.ux.goal.self", goal.selfSurvival()));
         lines.add(Text.translatable("heavyseas.ux.goal.love", name(goal.love()), goal.lovedSurvival()));
         if (goal.selfHate()) {

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "#t"},
+  "elements": [
+    {"from": [0, 11, 5], "to": [16, 16, 11], "faces": {"down": {"texture": "#t", "uv": [0, 0, 16, 6]}, "north": {"texture": "#t", "uv": [0, 8, 16, 13]}, "south": {"texture": "#t", "uv": [0, 8, 16, 13]}, "east": {"texture": "#t", "uv": [5, 8, 11, 13], "cullface": "east"}, "west": {"texture": "#t", "uv": [5, 8, 11, 13], "cullface": "west"}, "up": {"texture": "#t", "uv": [0, 0, 16, 6], "cullface": "up"}}}
+  ]
+}

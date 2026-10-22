@@ -38,7 +38,7 @@ import java.util.Optional;
  * 截止时间只在服务端判，客户端显示同一份投影，掉线或关界面都不会把整局永久卡住。
  *
  * <h2>划船分两步</h2>
- * 点「划船」时服务端抽 2 张，只写进划船者那一包（{@code GameComponent#writeView}）；他选中一张后，
+ * 点「划船」时服务端抽 2 张（面前亮着船桨的每把多抽，见 {@code Session} 的 {@code weapon_and_row_bonus}），只写进划船者那一包（{@code GameComponent#writeView}）；他选中一张后，
  * 服务端把它放进划船堆、其余塞回牌堆底，这次行动随即结束。
  *
  * <h2>替身</h2>
@@ -298,7 +298,7 @@ public final class ActionPhase {
     }
 
     /**
-     * 划船第一步：抽 2 张到他手上，推一次投影 —— 两张牌只进他那一包，划船一面由此弹出。
+     * 划船第一步：抽 2 张（面前亮着船桨的多抽）到他手上，推一次投影 —— 两张牌只进他那一包，划船一面由此弹出。
      *
      * <p>牌堆空到一张都抽不出来时，引擎当场结束这次划船（照样领标记），这里就直接算行动结束。
      */
@@ -443,7 +443,7 @@ public final class ActionPhase {
     }
 
     /**
-     * 替身划船第一步（动脑 / 大模型）：抽 2 张，开划船那一扇窗，等它想好留哪一张（{@link #chooseRowForStandIn}）。
+     * 替身划船第一步（动脑 / 大模型）：抽 2 张（船桨照样多抽），开划船那一扇窗，等它想好留哪一张（{@link #chooseRowForStandIn}）。
      * 与界面那条路（{@link #beginRow}）同一套播报与收尾；窗口按局里的划船时限开（不是「等真人」的那一种）——
      * 想不出来到点照旧整组塞回牌堆底。
      *
@@ -481,7 +481,7 @@ public final class ActionPhase {
     }
 
     /**
-     * 替身划船（{@link StandInPlay}）：抽 2 张、随机留 1 张，一次走完。播报与收尾与真人那条路相同（{@link #finishRow}）。
+     * 替身划船（{@link StandInPlay}）：抽 2 张（船桨照样多抽）、随机留 1 张，一次走完。播报与收尾与真人那条路相同（{@link #finishRow}）。
      *
      * @return 划了没有（风平浪静没有航海阶段时引擎会拒，那时返回前什么都没动）
      */

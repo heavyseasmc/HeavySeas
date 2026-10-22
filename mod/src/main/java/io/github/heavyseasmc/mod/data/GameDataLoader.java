@@ -73,6 +73,11 @@ public final class GameDataLoader implements SimpleSynchronousResourceReloadList
         return data;
     }
 
+    /** 同 {@link #require}，但还没读成功时是空 —— 给「有就多写一行、没有就不写」的投影用，调用方要自己报出它走了哪条路。 */
+    public static java.util.Optional<GameData> peek() {
+        return java.util.Optional.ofNullable(current);
+    }
+
     /** 注册到服务端数据包的重载流程上。 */
     public static void register() {
         ResourceManagerHelper.get(ResourceType.SERVER_DATA)

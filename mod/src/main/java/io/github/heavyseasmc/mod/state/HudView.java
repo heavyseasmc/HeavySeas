@@ -42,7 +42,7 @@ import java.util.Optional;
  * @param maxHealth 体型
  * @param condition 清醒 / 昏迷 / 死亡
  * @param thirst    口渴标记数
- * @param endgame   终局序列走到哪了 · 公开（已翻开的目标、计分阶段的合计；最后那张不翻的没有）
+ * @param endgame   终局序列走到哪了 · 公开（已翻开的目标、计分阶段的合计；两轮都翻满全员，见 {@code EndgamePhase}）
  * @param contest   进行中的换座位 / 抢夺（ADR-0023）· 公开到「谁对谁 · 哪一段 · 两边阵营与体型和」；
  *                  自己押得出的武器与被抢方面前那一区只进该收的人那一包
  * @param love      收件人自己爱谁（角色 id）· <b>只有本人</b>；还没发爱恨时是空串

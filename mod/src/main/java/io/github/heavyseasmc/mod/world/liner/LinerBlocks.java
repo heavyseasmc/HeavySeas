@@ -53,6 +53,8 @@ public final class LinerBlocks {
     public static final BooleanProperty EXTERIOR = BooleanProperty.of("exterior");
     /** 居中整根的壁柱是不是这一根最上面那一格（长柱头）：看上面那一格是不是同一根（ADR-0093 B7；左右半根照旧不长，B4 再说）。 */
     public static final BooleanProperty CAPITAL = BooleanProperty.of("capital");
+    /** 天花梁（A8）：这一格是十字（两个方向都有梁接着）。 */
+    public static final BooleanProperty CROSS = BooleanProperty.of("cross");
     /** 顶帽是高的那一种（整套檐部：楣板 · 珠线 · 横带 · 挑檐，原「主景横楣」，ADR-0093 B7）；手放默认普通顶帽。 */
     public static final BooleanProperty TALL = BooleanProperty.of("tall");
     /** 地毯：四边接不接地毯。 */
@@ -313,6 +315,8 @@ public final class LinerBlocks {
     }
 
     private static final Map<String, LinerBlock> BLOCKS = new LinkedHashMap<>();
+    /** 各种地毯 → 贴图名前缀（物品按这张表认「这是地毯，只铺在柚木甲板上」）。要写在所有地毯常量之前：静态字段按书写顺序初始化。 */
+    private static final Map<LinerBlock, String> CARPET_PREFIX = new LinkedHashMap<>();
 
     // ---------------------------------------------------------------- 底面层：墙、平顶、甲板、地毯
 
@@ -322,8 +326,19 @@ public final class LinerBlocks {
             s -> s.get(EXTERIOR) ? outward("wall") : look("cube", tex("all", "wall")), FACING, EXTERIOR);
     public static final LinerBlock CEILING = add("liner_ceiling", solid(MapColor.OFF_WHITE), LinerBlock.Kind.PLAIN,
             s -> look("cube", tex("all", "ceiling")));
+    /** 奶油平顶（A8，2026-10-19：头等客房 · 走廊 K2、点菜餐厅 P2 的格板）：同白平顶，换一种奶油色。 */
+    public static final LinerBlock CEILING_CREAM = add("liner_ceiling_cream", solid(MapColor.PALE_YELLOW), LinerBlock.Kind.PLAIN,
+            s -> look("cube", tex("all", "ceiling_cream")));
+    /**
+     * 白漆描金天花梁（A8 · P2）：挂在天花下面那一格的上半截，梁底两道金线。顺着放的人看的方向；两个方向都有梁接着就成十字，
+     * 只有一个方向有就转过去顺着它（{@link LinerConnect.Rules#beamShape}）。
+     */
+    public static final LinerBlock CEILING_BEAM = add("liner_ceiling_beam", piece(MapColor.OFF_WHITE), LinerBlock.Kind.BEAM,
+            s -> s.get(CROSS) ? look("beam_cross", tex("t", "ceiling_beam"))
+                    : look("beam", tex("t", "ceiling_beam"), s.get(AXIS) == Direction.Axis.Z ? 90 : 0), AXIS, CROSS);
+    /** 桃花心木墙板：第七轮（ADR-0111）起用自己的一张深木墙板 {@code mahogany_wall}，不再借家具 · 台阶共用的 {@code mahogany}。 */
     public static final LinerBlock MAHOGANY_WALL = add("liner_mahogany_wall", solid(MapColor.DARK_RED), LinerBlock.Kind.FRONT,
-            s -> s.get(EXTERIOR) ? outward("mahogany") : look("cube", tex("all", "mahogany")), FACING, EXTERIOR);
+            s -> s.get(EXTERIOR) ? outward("mahogany_wall") : look("cube", tex("all", "mahogany_wall")), FACING, EXTERIOR);
     public static final LinerBlock TEAK_DECK = add("liner_teak_deck", solid(MapColor.OAK_TAN), LinerBlock.Kind.DECK,
             s -> look("floor", tex("top", "teak_deck", "side", "teak_side"), s.get(AXIS) == Direction.Axis.X ? 90 : 0), AXIS);
     // 浴室（客房第二版，2026-10-15）：白釉地铁砖墙（六面同图）· 马赛克地砖（顶面黑白小砖，四侧与底面同柚木甲板 —— 铺在楼板那一层）。
@@ -332,11 +347,23 @@ public final class LinerBlocks {
             s -> look("cube", tex("all", "prop/tile_wall")));
     public static final LinerBlock TILE_FLOOR = add("liner_tile_floor", solid(MapColor.WHITE).sounds(BlockSoundGroup.STONE), LinerBlock.Kind.PLAIN,
             s -> look("floor", tex("top", "prop/tile_floor", "side", "teak_side")));
+    /**
+     * 土耳其浴室热室的大理石台（2026-10-22，用户「未决定的全部按倾向」）：白大理石整块，六面同图；台面上偶尔冒一缕蒸汽
+     * （{@link LinerAmbience#steam}，客户端粒子）。
+     */
+    public static final LinerBlock HAMMAM_SLAB = add("liner_hammam_slab", solid(MapColor.WHITE).sounds(BlockSoundGroup.STONE),
+            LinerBlock.Kind.PLAIN, s -> look("cube", tex("all", "prop/hammam_slab")));
     // 地毯（ADR-0093 B3 · B14，用户 2026-10-07「按倾向」）：铺了毯的柚木地板 —— 拿地毯点一格柚木甲板就铺上（{@link CarpetItem}），
     //   剪刀揭掉还原成柚木（axis 记着底下那层板的走向）。四边收不收口看邻居是不是地毯：单独一格就是四边收口的一块小方毯，
     //   四边都接着的那几格走花纹（两格一个周期，按位置）。毯面与地板齐平，家具不悬空。ADR-0091 的毯边五件退役
-    public static final LinerBlock CARPET = add("liner_carpet", solid(MapColor.RED).sounds(BlockSoundGroup.WOOL), LinerBlock.Kind.CARPET,
-            s -> look("floor", tex("top", carpetTop(s), "side", "mahogany")), AXIS, NORTH, EAST, SOUTH, WEST, CELL);
+    //   第七轮（ADR-0111 §7）：按舱等分色 —— 酒红（头等，沿用 liner_carpet 这个名字）· 海军蓝（二等）· 墨绿（吸烟室）；
+    //   深底暗铜花、铺满无中心。不同颜色的两块挨着各自收边（连接只认同一种）
+    public static final LinerBlock CARPET = carpet("liner_carpet", "carpet", MapColor.RED);
+    public static final LinerBlock CARPET_NAVY = carpet("liner_carpet_navy", "carpet_navy", MapColor.BLUE);
+    public static final LinerBlock CARPET_GREEN = carpet("liner_carpet_green", "carpet_green", MapColor.DARK_GREEN);
+    /** 深色平顶（ADR-0111：客房吊顶压到净高 4）：深桃花心木横板。 */
+    public static final LinerBlock CEILING_MAHOGANY = add("liner_ceiling_mahogany", solid(MapColor.DARK_RED), LinerBlock.Kind.PLAIN,
+            s -> look("cube", tex("all", "ceiling_mahogany")));
     // 地板的「底面白平顶」那 7 种已退（ADR-0093 B6）：四层客用甲板之后各层都有自己的平顶（ADR-0092），船上一格都没用
 
     // ---------------------------------------------------------------- 结构层：大框（自动拼）· 护墙 · 腰线 · 檐口 · 壁柱 · 顶帽
@@ -346,14 +373,30 @@ public final class LinerBlocks {
     public static final LinerBlock FRAME_GILT_WIDE = frame("liner_frame_gilt_wide", "gilt_wide", MapColor.OFF_WHITE);
     public static final LinerBlock FRAME_MAHOGANY = frame("liner_frame_mahogany", "mahogany", MapColor.DARK_RED);
     public static final LinerBlock FRAME_MAHOGANY_GILT = frame("liner_frame_mahogany_gilt", "mahogany_gilt", MapColor.DARK_RED);
+    // 第七轮（ADR-0111 §7）：亮金框条的三种框里 —— 暗花墙布（头等客房 · 休息室）· 火焰纹（吸烟室 · 写字室 · 图书室，一框一条中轴）·
+    //   人字拼（二等客房）。框外与护墙仍是桃花心木墙板
+    public static final LinerBlock FRAME_DAMASK_GILT = frame("liner_frame_damask_gilt", "damask_gilt", MapColor.DARK_RED);
+    public static final LinerBlock FRAME_FLAME_GILT = frame("liner_frame_flame_gilt", "flame_gilt", MapColor.DARK_RED);
+    public static final LinerBlock FRAME_PARQUET_GILT = frame("liner_frame_parquet_gilt", "parquet_gilt", MapColor.DARK_RED);
     public static final LinerBlock WAINSCOT = add("liner_wainscot", solid(MapColor.OFF_WHITE), LinerBlock.Kind.WAINSCOT,
             s -> faced("wainscot_", s.get(PART).code, "wall", s.get(EXTERIOR)), FACING, PART, EXTERIOR);
     public static final LinerBlock WAINSCOT_MAHOGANY = add("liner_wainscot_mahogany", solid(MapColor.DARK_RED), LinerBlock.Kind.WAINSCOT,
             s -> faced("wainscot_mahogany_", s.get(PART).code, "mahogany", s.get(EXTERIOR)), FACING, PART, EXTERIOR);
     public static final LinerBlock CHAIR_RAIL = add("liner_chair_rail", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
             s -> look("chair_rail" + s.get(SHAPE).suffix(), tex("t", "chair_rail")), FACING, SHAPE);
+    /** 描金腰线（ADR-0111：深木墙的屋子与走廊）：同腰线（拐角一样），亮金三道、沿线流光。只与同一种接拐角。 */
+    public static final LinerBlock CHAIR_RAIL_GILT = add("liner_chair_rail_gilt", piece(MapColor.GOLD), LinerBlock.Kind.RUN,
+            s -> look("chair_rail" + s.get(SHAPE).suffix(), tex("t", "chair_rail_gilt")), FACING, SHAPE);
     public static final LinerBlock CORNICE = add("liner_cornice", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
-            s -> look("cornice" + s.get(SHAPE).suffix(), tex("t", "cornice")), FACING, SHAPE);
+            s -> s.get(CAPITAL) && s.get(SHAPE) == CornerShape.STRAIGHT
+                    // 5e（ADR-0093 B4 · A11）：正下方是同朝向的白漆壁柱 —— 檐口下面那 8 像素里接上柱身、长柱头（LinerConnect.Rules#corniceCapital）
+                    ? look("cornice_capital", tex("t", "cornice", "p", "pilaster"))
+                    : look("cornice" + s.get(SHAPE).suffix(), tex("t", "cornice")), FACING, SHAPE, CAPITAL);
+    /** 描金檐口（A8 · K2：头等客房与走廊）：同凸出檐口（拐角 · 柱头都一样），小线脚上沿一道金线。只与同一种接拐角。 */
+    public static final LinerBlock CORNICE_GILT = add("liner_cornice_gilt", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
+            s -> s.get(CAPITAL) && s.get(SHAPE) == CornerShape.STRAIGHT
+                    ? look("cornice_capital", tex("t", "cornice_gilt", "p", "pilaster"))
+                    : look("cornice" + s.get(SHAPE).suffix(), tex("t", "cornice_gilt")), FACING, SHAPE, CAPITAL);
     // ---- 贴附件第一组（ADR-0069 §2 ②；二评 r2「矮空间缺交接件：墙顶薄檐口、踢脚条、门套」）：摆法同檐口
     /** 矮层（室内 3 格）的薄檐口：总下垂 3.5 像素、最大出挑 1.5（凸出檐口是 8 与 2.5）；拐角同檐口。 */
     public static final LinerBlock CORNICE_THIN = add("liner_cornice_thin", piece(MapColor.OFF_WHITE), LinerBlock.Kind.RUN,
@@ -364,9 +407,18 @@ public final class LinerBlocks {
     /** 白漆门套：门洞两侧与上方一圈（每格一块），顺带画旁边的踢脚 / 腰线 / 薄檐口。 */
     public static final LinerBlock DOOR_CASING = add("liner_door_casing", piece(MapColor.OFF_WHITE), LinerBlock.Kind.CASING,
             LinerBlocks::casingLook, FACING, CASING_PART, TRIM);
-    /** 白漆壁柱；最下一格自动长出柱脚（base，见 {@link LinerConnect.Rules#pilasterBase}）。 */
+    /**
+     * 桃花心木门套（2026-10-19 用户标注「门套搭配不上」：深木墙的屋子与走廊，ADR-0111）：同白漆门套（模板 · 部位 · 顺带的线都一样），
+     * 换成深木那两张；顺带的腰线画描金腰线。
+     */
+    public static final LinerBlock DOOR_CASING_MAHOGANY = add("liner_door_casing_mahogany", piece(MapColor.DARK_RED), LinerBlock.Kind.CASING,
+            s -> casingLook(s, "door_casing_mahogany", "door_casing_mahogany_head", "chair_rail_gilt"), FACING, CASING_PART, TRIM);
+    /**
+     * 白漆壁柱；最下一格自动长出柱脚（base，见 {@link LinerConnect.Rules#pilasterBase}）；别的格看左右穿过的那条线（trim，5e，
+     * {@link LinerConnect.Rules#pilasterTrim}）：腰线两边各补一段 · 薄檐口那一格长柱头、檐口整格穿过（ADR-0093 B4 · A11）。
+     */
     public static final LinerBlock PILASTER = add("liner_pilaster", piece(MapColor.OFF_WHITE), LinerBlock.Kind.WALL_PIECE,
-            s -> look("pilaster" + s.get(BASE).suffix(), baseTex(s.get(BASE), "pilaster", "pilaster_base")), FACING, BASE);
+            LinerBlocks::pilasterLook, FACING, BASE, TRIM);
     public static final LinerBlock PILASTER_MAHOGANY = add("liner_pilaster_mahogany", piece(MapColor.DARK_RED), LinerBlock.Kind.PILASTER_SIDE,
             s -> s.get(SIDE) == PilasterSide.CENTER
                     // 居中整根：就是原来的主景立框那四段（底段台座 · 中段 · 顶段柱头 · 单独一格两头都有），模板与贴图照用
@@ -439,7 +491,7 @@ public final class LinerBlocks {
         BLOCKS.forEach((name, block) -> {
             Identifier id = Identifier.of(HeavySeasMod.MOD_ID, name);
             Registry.register(Registries.BLOCK, id, block);
-            Registry.register(Registries.ITEM, id, block == CARPET ? new CarpetItem(block, new Item.Settings())
+            Registry.register(Registries.ITEM, id, CARPET_PREFIX.containsKey(block) ? new CarpetItem(block, new Item.Settings())
                     : new BlockItem(block, new Item.Settings()));
         });
         DecorHammer.register();                        // 装修锤（ADR-0093 B15）：放下以后再改，右键轮换形态
@@ -454,13 +506,21 @@ public final class LinerBlocks {
      * 地毯这一格的顶面：不接地毯的那几边画毯边（{@code carpet_border_<边>}，贴图就是旧毯边件那几张）；四边都接着走花纹，
      * 两格一个周期、第几格按位置算（{@code carpet_cell_<i><j>}）。
      */
-    static String carpetTop(BlockState s) {
+    static String carpetTop(BlockState s, String prefix) {
         String mask = LinerConnect.Rules.carpetMask(s.get(NORTH), s.get(EAST), s.get(SOUTH), s.get(WEST));
         if (!mask.isEmpty()) {
-            return "carpet_border_" + mask;
+            return prefix + "_border_" + mask;
         }
         int cell = s.get(CELL);
-        return "carpet_cell_" + cell % LinerConnect.CARPET_PERIOD + cell / LinerConnect.CARPET_PERIOD;
+        return prefix + "_cell_" + cell % LinerConnect.CARPET_PERIOD + cell / LinerConnect.CARPET_PERIOD;
+    }
+
+    /** 一种颜色的地毯：铺了毯的柚木地板（同 {@link #CARPET} 的做法），顶面贴图 {@code <prefix>_border_<边>} / {@code <prefix>_cell_<i><j>}。 */
+    private static LinerBlock carpet(String name, String prefix, MapColor color) {
+        LinerBlock block = add(name, solid(color).sounds(BlockSoundGroup.WOOL), LinerBlock.Kind.CARPET,
+                s -> look("floor", tex("top", carpetTop(s, prefix), "side", "mahogany")), AXIS, NORTH, EAST, SOUTH, WEST, CELL);
+        CARPET_PREFIX.put(block, prefix);
+        return block;
     }
 
     /**
@@ -468,12 +528,17 @@ public final class LinerBlocks {
      * （手动 /setblock 才会出现）画成不带线的那一块，不出紫黑格子。
      */
     static LinerLooks.Look casingLook(BlockState s) {
+        return casingLook(s, "door_casing", "door_casing_head", "chair_rail");
+    }
+
+    /** 门套：竖条 / 横条的贴图与顺带的腰线那一张可换（白漆一套、桃花心木一套），模板同一套。 */
+    static LinerLooks.Look casingLook(BlockState s, String jamb, String head, String rail) {
         CasingPart part = s.get(CASING_PART);
         Trim trim = LinerConnect.Rules.casingAllows(part.asString(), s.get(TRIM).asString()) ? s.get(TRIM) : Trim.NONE;
-        Map<String, String> t = tex("c", "door_casing", "h", "door_casing_head");
+        Map<String, String> t = tex("c", jamb, "h", head);
         switch (trim) {
             case SKIRTING -> t.put("k", "skirting");
-            case CHAIR_RAIL -> t.put("r", "chair_rail");
+            case CHAIR_RAIL -> t.put("r", rail);
             case CORNICE -> t.put("n", "cornice_thin");
             default -> {
             }
@@ -487,6 +552,16 @@ public final class LinerBlocks {
     }
 
     /** 壁柱的贴图：柱身；有柱脚加柱脚那一张；两边有踢脚再加踢脚条那一张。 */
+    /** 白漆壁柱这一格的样子：柱脚那一格照旧；别的格按穿过的那条线（5e）。 */
+    static LinerLooks.Look pilasterLook(BlockState s) {
+        Trim trim = s.get(TRIM);
+        if (s.get(BASE) != PilasterBase.NONE || trim == Trim.NONE || trim == Trim.SKIRTING) {
+            return look("pilaster" + s.get(BASE).suffix(), baseTex(s.get(BASE), "pilaster", "pilaster_base"));
+        }
+        return trim == Trim.CHAIR_RAIL ? look("pilaster_chair_rail", tex("p", "pilaster", "r", "chair_rail"))
+                : look("pilaster_cornice", tex("p", "pilaster", "n", "cornice_thin"));
+    }
+
     private static Map<String, String> baseTex(PilasterBase base, String shaft, String plinth) {
         return switch (base) {
             case NONE -> tex("p", shaft);

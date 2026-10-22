@@ -1,0 +1,7 @@
+{
+  "parent": "heavyseas:block/liner/template/beam_cross",
+  "textures": {
+    "particle": "heavyseas:block/liner/ceiling_beam",
+    "t": "heavyseas:block/liner/ceiling_beam"
+  }
+}

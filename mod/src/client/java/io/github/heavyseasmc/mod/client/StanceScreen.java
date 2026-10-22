@@ -216,6 +216,12 @@ public final class StanceScreen extends GameScreen {
         return "taking-sides";
     }
 
+    /** 规则签再带上「谁赢」：这几面做的决定就看两边力气怎么比（ADR-0043 §11 第六组）。 */
+    @Override
+    protected List<String> rulesAnchors() {
+        return List.of(rulesAnchor(), "section-39");
+    }
+
     @Override
     protected Text timeoutText() {
         return Text.translatable("heavyseas.timeout.watch");

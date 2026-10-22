@@ -49,14 +49,32 @@ public final class RulebookHtml {
         if (written == 0) {
             throw new IllegalStateException("一份都没生成");
         }
+        // 搭建手册（方案 A14，ADR-0093 §6）：写法同书柜里的书（ShelfBook.parse，不从数据展开），同一套块、同一张网页
+        int manuals = 0;
+        for (String lang : List.of("zh_cn", "en_us")) {
+            var source = RulebookData.manualSource(lang);
+            if (source.isEmpty()) {
+                continue;
+            }
+            Path file = out.resolve("manual_" + lang + ".html");
+            Files.writeString(file, page(lang, ShelfBook.parse(source.get())), StandardCharsets.UTF_8);
+            System.out.println("搭建手册网页版：" + file);
+            manuals++;
+        }
+        if (manuals == 0) {
+            throw new IllegalStateException("搭建手册一份都没生成（assets/heavyseas/manual/）");
+        }
     }
 
     public static String render(String lang, String source) {
         Map<String, String> strings = RulebookData.langFile(lang);
         List<Rulebook.KeyLine> keys = DEFAULT_KEYS.stream()
                 .map(k -> new Rulebook.KeyLine(require(strings, k[0]), k[1])).toList();
-        List<Rulebook.Block> blocks = Rulebook.parse(source, RulebookData.facts(strings::get, keys));
+        return page(lang, Rulebook.parse(source, RulebookData.facts(strings::get, keys)));
+    }
 
+    /** 一串块排成一张网页（规则书与搭建手册共用）。 */
+    public static String page(String lang, List<Rulebook.Block> blocks) {
         StringBuilder header = new StringBuilder();
         StringBuilder toc = new StringBuilder();
         StringBuilder body = new StringBuilder();

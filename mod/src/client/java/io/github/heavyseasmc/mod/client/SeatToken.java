@@ -59,6 +59,19 @@ final class SeatToken {
         }
     }
 
+    /** 舵手左上那枚：同一副纸底墨边，里面一只舵轮（墨）。 */
+    static void helm(DrawContext context, Rect c, double k) {
+        float cx = c.x() + c.w() / 2f;
+        float cy = c.y() + c.h() / 2f;
+        float r = c.w() / 2f;
+        GuiMaterial.disc(context, cx, cy + (float) k, r, 0x73000000);
+        GuiMaterial.disc(context, cx, cy, r, SeatMarks.INK);
+        GuiMaterial.disc(context, cx, cy, r - (float) (1.5 * k), SeatMarks.PAPER);
+        int s = (int) Math.round(13 * k);
+        GuiMaterial.hudIcon(context, HudPart.IC_HELM18, Math.round(cx - s / 2f), Math.round(cy - s / 2f), s, s,
+                SeatMarks.INK, s / 18.0);
+    }
+
     /** 右上那枚小圆片；{@link SeatClock.Chip#NONE} 时什么都不画。{@code c} 是它的方框，{@code k} 是稿子像素换物理像素的倍率。 */
     static void chip(DrawContext context, Rect c, double k, SeatClock.Chip chip) {
         if (chip == SeatClock.Chip.NONE) {

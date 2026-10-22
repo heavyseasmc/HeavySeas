@@ -42,7 +42,7 @@ import java.util.function.Supplier;
  * 前后几乎看不出差别）。这里把两种窗的模型包一层：建区块网格时屋里那一侧的方块光 ≥ {@link #THRESHOLD}，<b>朝船外那一面</b>的玻璃
  * 换成暖金、三分之二不透明的那一张（{@code …_lit}，生成器 {@code liner_hull.py} / {@code liner_glass.py} 出）、画成满亮度。
  * 灯一关，那一格的方块光掉下去，游戏因光照变化重建那一段网格，窗回到平常的样子 —— 不用另外跟踪灯的开关。
- * 朝屋里那一面不动：从亮着的舱室里看出去，玻璃照旧是透的。
+ * 朝屋里那一面不动：从亮着的舱室里看出去，玻璃照旧是透的 —— 只有窗后藏着灯的（方案 A10，{@link #backlit}）反过来，朝屋里那一面亮。
  *
  * <ul>
  *   <li>舷窗：{@code facing} 朝船外；只从屋里那一面进光，所以看<b>这一格自己</b>的方块光（{@code LinerHull.Porthole}）；拼大的按整块看。</li>
@@ -188,6 +188,51 @@ public final class GlassGlow extends ForwardingBakedModel {
         return view.getLightLevel(LightType.BLOCK, pos.offset(facing)) >= THRESHOLD;
     }
 
+    /**
+     * 窗后藏灯（方案 A10，D 甲板头等餐厅照真船）：大窗背后是空着的一格、那里的方块光到阈值、而且比屋里那一侧亮 —— 光源在窗后面，
+     * 朝<b>屋里</b>那一面也换成亮的，夜里从屋里看窗是暖的。背后没藏灯的窗，背后那一格的光是屋里透过玻璃漏过去的，总比屋里暗，不亮。
+     * 同样按整扇判。
+     */
+    private boolean backlit(BlockRenderView view, BlockState state, BlockPos pos, Direction facing) {
+        if (kind != Kind.WINDOW) {
+            return false;
+        }
+        Direction back = facing.getOpposite();
+        Iterable<BlockPos> cells = state.getBlock() instanceof LinerGlass.Window w ? w.cellsOf(pos, state) : java.util.List.of(pos);
+        for (BlockPos p : cells) {
+            BlockPos behind = p.offset(back);
+            if (backlit(view.getBlockState(behind).isAir(), view.getLightLevel(LightType.BLOCK, behind),
+                    view.getLightLevel(LightType.BLOCK, p.offset(facing)), hullGap(view, p, back))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 窗与船壳之间那道窄空隙（方案 A10 藏灯的地方）：往窗背后走 1–{@link #GAP_MAX} 格，一路空着、先碰到船壳类（船壳板 · 舷窗）。
+     * 2026-10-19 用户实拍「玻璃渲染有问题，有的发黄，有的不会」：A 甲板阅览室窗外是 3 格宽的散步廊、廊里有灯 ——
+     * 离灯近的窗背后够亮，被当成「窗后藏灯」亮了，远的不亮。散步廊不是夹层，不认。
+     */
+    private static boolean hullGap(BlockRenderView view, BlockPos window, Direction back) {
+        for (int d = 1; d <= GAP_MAX; d++) {
+            BlockState s = view.getBlockState(window.offset(back, d));
+            if (s.isAir()) {
+                continue;
+            }
+            return s.getBlock() instanceof LinerHull.HullPlate || s.getBlock() instanceof LinerHull.Porthole;
+        }
+        return false;
+    }
+
+    /** 窗与船壳之间的空隙最多几格：D 甲板 1 格、E 甲板 2 格（ADR-0093 §6 A10 量的）。 */
+    static final int GAP_MAX = 2;
+
+    /** 那一格窗背后：空着、光到阈值、比屋里那一侧亮，而且背后是通到船壳的窄空隙（不是散步廊那种有灯的空间）。 */
+    static boolean backlit(boolean behindAir, int behindLight, int frontLight, boolean hullGap) {
+        return behindAir && hullGap && behindLight >= THRESHOLD && behindLight > frontLight;
+    }
+
     @Override
     public boolean isVanillaAdapter() {
         return false;
@@ -197,16 +242,20 @@ public final class GlassGlow extends ForwardingBakedModel {
     public void emitBlockQuads(BlockRenderView view, BlockState state, BlockPos pos, Supplier<Random> random, RenderContext context) {
         Direction facing = state.get(Properties.HORIZONTAL_FACING);
         Direction outward = kind == Kind.PORTHOLE ? facing : facing.getOpposite();
-        if (!lit(view, state, pos, facing)) {
+        boolean litOut = lit(view, state, pos, facing);
+        boolean litIn = backlit(view, state, pos, facing);
+        if (!litOut && !litIn) {
             wrapped.emitBlockQuads(view, state, pos, random, context);
             return;
         }
+        Direction inward = outward.getOpposite();
         QuadEmitter emitter = context.getEmitter();
         Random r = random.get();
         for (Direction face : FACES) {
             for (BakedQuad quad : wrapped.getQuads(state, face, r)) {
                 Sprite from = quad.getSprite();
-                Sprite to = quad.getFace() == outward ? lit.get(from.getContents().getId()) : null;
+                boolean swap = (litOut && quad.getFace() == outward) || (litIn && quad.getFace() == inward);
+                Sprite to = swap ? lit.get(from.getContents().getId()) : null;
                 emitter.fromVanilla(quad, to != null ? glow : plain, face);
                 if (to != null) {
                     // 换贴图：图集里两张 16 × 16 各占一块，按比例把 UV 从平常那一块搬到亮的那一块

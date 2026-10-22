@@ -60,6 +60,22 @@ public final class RulebookData {
         throw new IllegalStateException("jar 里一份规则书源文件都没有（assets/heavyseas/rulebook/*.md）");
     }
 
+    /** 搭建手册（方案 A14）那种语言的源文件：{@code assets/heavyseas/manual/<语言>.md}，写法同书柜里的书（不从数据展开）。 */
+    public static Optional<String> manualSource(String language) {
+        return read("/assets/heavyseas/manual/" + language.toLowerCase(Locale.ROOT) + ".md");
+    }
+
+    /** 同 {@link #pick}，挑的是搭建手册。 */
+    public static Map.Entry<String, String> pickManual(String language) {
+        for (String lang : java.util.stream.Stream.concat(java.util.stream.Stream.of(language), FALLBACK_LANGUAGES.stream()).toList()) {
+            Optional<String> text = manualSource(lang);
+            if (text.isPresent()) {
+                return Map.entry(lang, text.get());
+            }
+        }
+        throw new IllegalStateException("jar 里一份搭建手册都没有（assets/heavyseas/manual/*.md）");
+    }
+
     /**
      * 用类路径上的数据与给定的 lang 查表拼出展开所需的一切。
      *

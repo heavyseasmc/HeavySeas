@@ -101,6 +101,8 @@ public final class HeavySeasMod implements ModInitializer {
         LinerHull.register();                          // 北辰号的船壳板与舷窗（ADR-0069 §2 ① · ④）
         LinerDoors.register();                         // 北辰号的门（ADR-0069 §2 ⑤）
         io.github.heavyseasmc.mod.world.liner.LinerLift.register();     // 北辰号的电梯（2026-10-14：栅门 · 指针盘 · 召唤按钮 · 轿厢面板）
+        // 旧存档里先摆好的栅门 / 指针盘 / 柜子没有方块实体（只有方块状态变时才补建）：区块载入时补上（2026-10-19）
+        ServerChunkEvents.CHUNK_LOAD.register(io.github.heavyseasmc.mod.world.liner.LinerLiftRigs::repair);
         io.github.heavyseasmc.mod.world.liner.LinerStairs.register();   // 北辰号大楼梯一族（ADR 草稿 stairs）
         io.github.heavyseasmc.mod.world.liner.LinerShapes.register();   // 五种材料的楼梯 / 台阶（ADR-0093 第 5 批 5d）
         // 座位实体（ADR-0024）：位次从此是世界里的空间关系。客户端那一半只给它一个空渲染器。

@@ -32,8 +32,9 @@ final class CarpetItem extends BlockItem {
             return ActionResult.FAIL;
         }
         if (!world.isClient) {
-            BlockState carpet = LinerBlocks.CARPET.connect(
-                    LinerBlocks.CARPET.getDefaultState().with(LinerBlocks.AXIS, floor.get(LinerBlocks.AXIS)), world, pos);
+            // 铺哪一种看这个物品自己的方块（第七轮起地毯分酒红 · 海军蓝 · 墨绿三种，ADR-0111）
+            LinerBlock rug = (LinerBlock) getBlock();
+            BlockState carpet = rug.connect(rug.getDefaultState().with(LinerBlocks.AXIS, floor.get(LinerBlocks.AXIS)), world, pos);
             world.setBlockState(pos, carpet, Block.NOTIFY_ALL);
             world.playSound(null, pos, SoundEvents.BLOCK_WOOL_PLACE, SoundCategory.BLOCKS, 1.0f, 0.8f);
             PlayerEntity player = ctx.getPlayer();

@@ -100,7 +100,7 @@ class RulebookExcerptsTest {
     @DisplayName("角色本事从书里取：小孩的抢法取得到，没有的 id 是空表")
     void characterNotes() {
         RulebookExcerpts zh = RulebookExcerpts.load("zh_cn");
-        assertTrue(String.join("\n", zh.characterNotes("kid")).contains("只能拿手牌"), zh.characterNotes("kid").toString());
+        assertTrue(String.join("\n", zh.characterNotes("kid")).contains("只能摸对方的手牌"), zh.characterNotes("kid").toString());
         assertEquals(List.of(), zh.characterNotes("nobody"));
     }
 }

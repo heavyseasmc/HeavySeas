@@ -1,0 +1,95 @@
+{
+ "format_version": "1.12.0",
+ "minecraft:geometry": [
+  {
+   "description": {
+    "identifier": "geometry.heavyseas.lift_dial_needle",
+    "texture_width": 16,
+    "texture_height": 16,
+    "visible_bounds_width": 4,
+    "visible_bounds_height": 4,
+    "visible_bounds_offset": [
+     0,
+     1,
+     0
+    ]
+   },
+   "bones": [
+    {
+     "name": "needle",
+     "pivot": [
+      -8.0,
+      4.0,
+      8.75
+     ],
+     "cubes": [
+      {
+       "origin": [
+        -15.4,
+        3.6,
+        8.5
+       ],
+       "size": [
+        6.8,
+        0.8,
+        0.5
+       ],
+       "uv": {
+        "south": {
+         "uv": [
+          0.0,
+          11
+         ],
+         "uv_size": [
+          16,
+          1
+         ]
+        },
+        "up": {
+         "uv": [
+          16,
+          13
+         ],
+         "uv_size": [
+          -16,
+          -1
+         ]
+        },
+        "down": {
+         "uv": [
+          16,
+          13
+         ],
+         "uv_size": [
+          -16,
+          -1
+         ]
+        },
+        "east": {
+         "uv": [
+          0.0,
+          12
+         ],
+         "uv_size": [
+          16,
+          1
+         ]
+        },
+        "west": {
+         "uv": [
+          0.0,
+          12
+         ],
+         "uv_size": [
+          16,
+          1
+         ]
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -67,6 +67,18 @@ public final class LinerAmbience {
     }
 
     /**
+     * 热室大理石台上的蒸汽（2026-10-22）：台面上方是空的才冒；三回里一回，一缕白汽慢慢往上飘（游戏自带的白烟粒子，速度压得很低）。
+     */
+    static void steam(World world, BlockPos pos, Random random) {
+        if (!world.getBlockState(pos.up()).isAir() || random.nextInt(3) != 0) {
+            return;
+        }
+        // 第一版用 CLOUD：实拍是一团团大白块，像噪点（2026-10-22）—— 换成小一号的白烟
+        world.addParticle(ParticleTypes.WHITE_SMOKE, pos.getX() + 0.2 + random.nextDouble() * 0.6, pos.getY() + 1.05,
+                pos.getZ() + 0.2 + random.nextDouble() * 0.6, 0.0, 0.01 + random.nextDouble() * 0.01, 0.0);
+    }
+
+    /**
      * 落地钟右键：动作栏只写此刻的时刻（如「23:40」）—— 界面文案只写状态（用户 10-01「揭晓阶段就行了」那一条）。
      * 雾海这一维读主世界的钟（ADR-0054 §1），对局里天候牌拨钟时这里照实跟着走。
      */
@@ -135,6 +147,22 @@ public final class LinerAmbience {
             RUNNING.put(key, new Running(block, points, spreads));
         }
         return ActionResult.SUCCESS;
+    }
+
+    /**
+     * 这一件此刻在不在出水（服务端 GameTest 用，2026-10-19）：pos 是这一件的任意一格；那一格已经不是这一件（被拆了）就按出水点那一格认。
+     * 认法与 {@link #runWater} 同一套（键是第一个出水点所在的格）。
+     */
+    static boolean running(ServerWorld world, BlockPos pos) {
+        BlockState state = world.getBlockState(pos);
+        BlockPos cell = pos;
+        if (state.getBlock() instanceof LinerProp block && !LinerProp.Rules.spouts(block.spec().kind()).isEmpty()) {
+            LinerProp.Part here = block.partOf(state);
+            if (here != null) {
+                cell = LinerProp.Rules.offset(pos, here, LinerProp.Rules.spouts(block.spec().kind()).get(0).cell(), state.get(LinerProp.FACING));
+            }
+        }
+        return RUNNING.containsKey(new WaterKey(world.getRegistryKey(), cell.toImmutable()));
     }
 
     private static void tickWater(ServerWorld world) {

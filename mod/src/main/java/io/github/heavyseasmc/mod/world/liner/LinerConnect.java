@@ -225,9 +225,9 @@ public final class LinerConnect {
          */
         public static String lineKind(String block, String base) {
             return switch (block) {
-                case "liner_door_casing", "liner_door_casing_tall" -> "casing";        // 宽门套与门套同一族：跨过去接着找
+                case "liner_door_casing", "liner_door_casing_tall", "liner_door_casing_mahogany" -> "casing";   // 宽门套 · 桃花心木门套与门套同一族
                 case "liner_skirting" -> "skirting";
-                case "liner_chair_rail" -> "chair_rail";
+                case "liner_chair_rail", "liner_chair_rail_gilt" -> "chair_rail";      // 描金腰线也是腰线（ADR-0111）
                 case "liner_cornice_thin" -> "cornice";
                 default -> "skirting".equals(base) ? "skirting" : null;
             };
@@ -237,6 +237,42 @@ public final class LinerConnect {
          * 壁柱这一格的柱脚：正下方不是同一根壁柱（同一种、同一朝向、同一边）= 最下一格 → 长出柱脚；
          * 左右任一边紧挨着同一朝向的踢脚条 → 墩两侧那一截踢脚一起画。不是最下一格 = {@code none}。
          */
+        /**
+         * 白漆壁柱这一格穿过哪条线（5e，2026-10-19，ADR-0093 B4 · B11）：同门套，往左右两边沿墙找下去（{@link #runBeside}），
+         * 薄檐口 > 腰线；踢脚不算 —— 那是最下一格的柱脚管的（{@link #pilasterBase}），最下一格一律 {@code none}。
+         * 薄檐口那一格画成「柱身到 11.5 · 束腰 · 柱头 · 檐口整格穿过」，腰线那一格两边各补一段（{@code liner_decor.pilaster_trim_els}）。
+         *
+         * @param bottom 这一格是不是这根壁柱的最下一格（有柱脚）
+         */
+        public static String pilasterTrim(boolean bottom, String left, String right) {
+            if (bottom) {
+                return "none";
+            }
+            String best = "none";
+            for (String t : new String[]{"chair_rail", "cornice"}) {
+                if (t.equals(left) || t.equals(right)) {
+                    best = t;
+                }
+            }
+            return best;
+        }
+
+        /**
+         * 天花梁这一格的样子（A8）：东西两边有梁接着 = hasX，南北两边 = hasZ。两个方向都有 → {@code cross}；只有一个方向 → 顺着它；
+         * 都没有 → 照放的时候那个方向（{@code placed}：{@code x} · {@code z}）。
+         */
+        public static String beamShape(boolean hasX, boolean hasZ, String placed) {
+            if (hasX && hasZ) {
+                return "cross";
+            }
+            return hasX ? "x" : hasZ ? "z" : placed;
+        }
+
+        /** 凸出檐口这一格长不长柱头（5e）：直的那一段、正下方是同朝向的白漆壁柱。拐角那几块不长（柱子立在屋角时让给拐角）。 */
+        public static boolean corniceCapital(boolean straight, boolean pilasterBelow) {
+            return straight && pilasterBelow;
+        }
+
         public static String pilasterBase(boolean bottom, boolean skirtingLeft, boolean skirtingRight) {
             if (!bottom) {
                 return "none";

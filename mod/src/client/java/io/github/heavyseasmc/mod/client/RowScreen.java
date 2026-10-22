@@ -165,7 +165,7 @@ public final class RowScreen extends GameScreen {
         // 签子上写牌面上印的那个名字（「水手落海」「全员落海」），与堆顶那张对得上
         if (gathered > 0f && focus >= 0 && focus < cards.size()) {
             drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
-                    null, navTitle(cards.get(focus)), NavCardText.describe(cards.get(focus), view.seats(), Catalog.weatherEffect(view.weather()))
+                    null, navTitle(cards.get(focus)), NavCardText.describe(cards.get(focus), navEligible(), Catalog.weatherEffect(view.weather()))
                             .copy().append("\n").append(Text.translatable("heavyseas.navigation.row_destination")));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("use"), now,
@@ -236,7 +236,7 @@ public final class RowScreen extends GameScreen {
     private void drawHint(DrawContext context, Layout l) {
         // 这一行说的是**这张牌会做什么**（牌面上的字在这个尺寸下读不出来），不是规矩 ——
         // 航海卡去字并接上提示签之后，这一行也该跟着走（ADR-0037 §7.4 第 3 条还欠）。
-        drawParagraph(context, NavCardText.describe(cards.get(focus), view.seats(), Catalog.weatherEffect(view.weather())), l.hintY(), 2, GuiLanguage.ink());
+        drawParagraph(context, NavCardText.describe(cards.get(focus), navEligible(), Catalog.weatherEffect(view.weather())), l.hintY(), 2, GuiLanguage.ink());
     }
 
     private int cardAt(int mouseX, int mouseY, Layout l) {

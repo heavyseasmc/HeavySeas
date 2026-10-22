@@ -35,7 +35,8 @@ import static io.github.heavyseasmc.mod.world.liner.LinerLooks.tex;
  *
  * <ul>
  *   <li><b>客房门</b>：白漆镶板门，黄铜门把手（两面都有），走廊那一面上半截一块空白的黄铜门牌 —— 门牌是门本身的一部分
- *       （ADR-0069 §4：贴在会动的东西上的件做成门的变体），开门时跟着门扇转。</li>
+ *       （ADR-0069 §4：贴在会动的东西上的件做成门的变体），开门时跟着门扇转。<b>深木款</b>（ADR-0111 §11，用户 2026-10-19 选 D）：
+ *       同一套模板，门扇是比墙板深一截的桃花心木、凸板外一圈亮金线 —— 暖的屋子用它，配深木门套。</li>
  *   <li><b>大房间双开门</b>：桃花心木，上半截玻璃（田字分格）。两扇各是一扇门，紧挨着放时游戏自己把第二扇的合页放到另一边；
  *       <b>右键一扇，两扇一起开关</b>（{@link Rules#partnerSide}）。红石仍是各管各的（与游戏自带的门相同）。</li>
  * </ul>
@@ -48,8 +49,9 @@ public final class LinerDoors {
 
     private static final Map<String, LinerDoor> DOORS = new LinkedHashMap<>();
 
-    public static final LinerDoor CABIN = door("liner_door_cabin", Kind.CABIN, MapColor.OFF_WHITE);
-    public static final LinerDoor DOUBLE = door("liner_door_double", Kind.DOUBLE, MapColor.DARK_RED);
+    public static final LinerDoor CABIN = door("liner_door_cabin", Kind.CABIN, MapColor.OFF_WHITE, "cabin");
+    public static final LinerDoor CABIN_MAHOGANY = door("liner_door_cabin_mahogany", Kind.CABIN, MapColor.DARK_RED, "cabin_mahogany");
+    public static final LinerDoor DOUBLE = door("liner_door_double", Kind.DOUBLE, MapColor.DARK_RED, "double");
 
     /** 两种门。 */
     public enum Kind {
@@ -79,10 +81,11 @@ public final class LinerDoors {
         return Collections.unmodifiableMap(DOORS);
     }
 
-    private static LinerDoor door(String name, Kind kind, MapColor color) {
+    /** paint = 门扇贴图名里的那一段（{@code hull/door_<paint>_lower}）；模板按 kind 取，同一种门的几款只差贴图。 */
+    private static LinerDoor door(String name, Kind kind, MapColor color, String paint) {
         AbstractBlock.Settings settings = AbstractBlock.Settings.create().mapColor(color).strength(-1.0f, 3_600_000.0f)
                 .dropsNothing().pistonBehavior(PistonBehavior.BLOCK).nonOpaque();
-        LinerDoor block = new LinerDoor(settings, kind);
+        LinerDoor block = new LinerDoor(settings, kind, paint);
         DOORS.put(name, block);
         return block;
     }
@@ -91,10 +94,12 @@ public final class LinerDoors {
     public static final class LinerDoor extends DoorBlock implements LinerLooks.Styled {
 
         private final Kind kind;
+        private final String paint;
 
-        LinerDoor(AbstractBlock.Settings settings, Kind kind) {
+        LinerDoor(AbstractBlock.Settings settings, Kind kind, String paint) {
             super(BlockSetType.OAK, settings);
             this.kind = kind;
+            this.paint = paint;
         }
 
         public Kind kind() {
@@ -114,13 +119,13 @@ public final class LinerDoors {
         public LinerLooks.Look itemLook() {
             return LinerLooks.look("hull/door_" + kind.id() + "_item", kind == Kind.DOUBLE
                     ? tex("f", "hull/door_double_lower", "u", "hull/door_double_upper", "m", "hull/brass", "g", "hull/glass")
-                    : tex("f", "hull/door_cabin_lower", "u", "hull/door_cabin_upper", "m", "hull/brass"));
+                    : tex("f", "hull/door_" + paint + "_lower", "u", "hull/door_" + paint + "_upper", "m", "hull/brass"));
         }
 
         private Map<String, String> textures(String half) {
             return kind == Kind.DOUBLE
                     ? tex("f", "hull/door_double_" + half, "m", "hull/brass", "g", "hull/glass")
-                    : tex("f", "hull/door_cabin_" + half, "m", "hull/brass");
+                    : tex("f", "hull/door_" + paint + "_" + half, "m", "hull/brass");
         }
 
         /** 双开门：右键这一扇，隔壁那一扇（同一种门、同一朝向、合页在另一边、同一半）跟着开或关。 */

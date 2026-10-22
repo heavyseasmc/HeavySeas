@@ -1,543 +1,1083 @@
 {
   "variants": {
-    "col=0,facing=east,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both",
+    "col=0,facing=east,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside",
+    "col=0,facing=east,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none",
+    "col=0,facing=east,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside",
+    "col=0,facing=east,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both",
+    "col=0,facing=east,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside",
+    "col=0,facing=east,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none",
+    "col=0,facing=east,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside",
+    "col=0,facing=east,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both",
+    "col=0,facing=east,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside",
+    "col=0,facing=east,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none",
+    "col=0,facing=east,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=east,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside",
+    "col=0,facing=east,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=0,facing=north,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both",
+    "col=0,facing=east,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=east,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame",
+      "y": 270
+    },
+    "col=0,facing=north,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside",
+    "col=0,facing=north,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none",
+    "col=0,facing=north,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside",
+    "col=0,facing=north,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both",
+    "col=0,facing=north,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside",
+    "col=0,facing=north,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none",
+    "col=0,facing=north,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside",
+    "col=0,facing=north,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both",
+    "col=0,facing=north,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside",
+    "col=0,facing=north,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none",
+    "col=0,facing=north,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=north,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside",
+    "col=0,facing=north,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=0,facing=south,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both"
+    "col=0,facing=north,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside"
+    "col=0,facing=north,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none"
+    "col=0,facing=north,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside"
+    "col=0,facing=north,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both"
+    "col=0,facing=north,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside"
+    "col=0,facing=north,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none"
+    "col=0,facing=north,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside"
+    "col=0,facing=north,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both"
+    "col=0,facing=north,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside"
+    "col=0,facing=north,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none"
+    "col=0,facing=north,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=south,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside"
+    "col=0,facing=north,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame",
+      "y": 180
     },
-    "col=0,facing=west,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both",
+    "col=0,facing=south,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame_mahogany"
+    },
+    "col=0,facing=south,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame"
+    },
+    "col=0,facing=south,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame"
+    },
+    "col=0,facing=west,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside",
+    "col=0,facing=west,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none",
+    "col=0,facing=west,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside",
+    "col=0,facing=west,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both",
+    "col=0,facing=west,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside",
+    "col=0,facing=west,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none",
+    "col=0,facing=west,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside",
+    "col=0,facing=west,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both",
+    "col=0,facing=west,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside",
+    "col=0,facing=west,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none",
+    "col=0,facing=west,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=0,facing=west,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside",
+    "col=0,facing=west,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=1,facing=east,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both",
+    "col=0,facing=west,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_both_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_none_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_bl_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_both_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_none_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_l_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_both_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_none_glass/window_frame",
+      "y": 90
+    },
+    "col=0,facing=west,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tl_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=east,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside",
+    "col=1,facing=east,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none",
+    "col=1,facing=east,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside",
+    "col=1,facing=east,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both",
+    "col=1,facing=east,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside",
+    "col=1,facing=east,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none",
+    "col=1,facing=east,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside",
+    "col=1,facing=east,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both",
+    "col=1,facing=east,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside",
+    "col=1,facing=east,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none",
+    "col=1,facing=east,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=east,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside",
+    "col=1,facing=east,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame_mahogany",
       "y": 270
     },
-    "col=1,facing=north,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both",
-      "y": 180
-    },
-    "col=1,facing=north,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside",
-      "y": 180
-    },
-    "col=1,facing=north,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none",
-      "y": 180
-    },
-    "col=1,facing=north,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside",
-      "y": 180
-    },
-    "col=1,facing=north,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both",
-      "y": 180
-    },
-    "col=1,facing=north,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside",
-      "y": 180
-    },
-    "col=1,facing=north,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none",
-      "y": 180
-    },
-    "col=1,facing=north,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside",
-      "y": 180
-    },
-    "col=1,facing=north,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both",
-      "y": 180
-    },
-    "col=1,facing=north,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside",
-      "y": 180
-    },
-    "col=1,facing=north,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none",
-      "y": 180
-    },
-    "col=1,facing=north,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside",
-      "y": 180
-    },
-    "col=1,facing=south,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both"
-    },
-    "col=1,facing=south,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside"
-    },
-    "col=1,facing=south,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none"
-    },
-    "col=1,facing=south,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside"
-    },
-    "col=1,facing=south,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both"
-    },
-    "col=1,facing=south,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside"
-    },
-    "col=1,facing=south,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none"
-    },
-    "col=1,facing=south,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside"
-    },
-    "col=1,facing=south,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both"
-    },
-    "col=1,facing=south,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside"
-    },
-    "col=1,facing=south,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none"
-    },
-    "col=1,facing=south,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside"
-    },
-    "col=1,facing=west,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both",
-      "y": 90
-    },
-    "col=1,facing=west,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside",
-      "y": 90
-    },
-    "col=1,facing=west,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none",
-      "y": 90
-    },
-    "col=1,facing=west,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside",
-      "y": 90
-    },
-    "col=1,facing=west,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both",
-      "y": 90
-    },
-    "col=1,facing=west,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside",
-      "y": 90
-    },
-    "col=1,facing=west,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none",
-      "y": 90
-    },
-    "col=1,facing=west,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside",
-      "y": 90
-    },
-    "col=1,facing=west,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both",
-      "y": 90
-    },
-    "col=1,facing=west,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside",
-      "y": 90
-    },
-    "col=1,facing=west,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none",
-      "y": 90
-    },
-    "col=1,facing=west,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside",
-      "y": 90
-    },
-    "col=2,facing=east,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both",
+    "col=1,facing=east,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside",
+    "col=1,facing=east,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none",
+    "col=1,facing=east,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside",
+    "col=1,facing=east,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both",
+    "col=1,facing=east,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside",
+    "col=1,facing=east,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none",
+    "col=1,facing=east,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside",
+    "col=1,facing=east,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both",
+    "col=1,facing=east,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside",
+    "col=1,facing=east,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none",
+    "col=1,facing=east,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=east,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside",
+    "col=1,facing=east,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame",
       "y": 270
     },
-    "col=2,facing=north,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both",
+    "col=1,facing=north,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside",
+    "col=1,facing=north,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none",
+    "col=1,facing=north,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside",
+    "col=1,facing=north,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both",
+    "col=1,facing=north,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside",
+    "col=1,facing=north,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none",
+    "col=1,facing=north,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside",
+    "col=1,facing=north,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both",
+    "col=1,facing=north,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside",
+    "col=1,facing=north,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none",
+    "col=1,facing=north,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=north,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside",
+    "col=1,facing=north,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame_mahogany",
       "y": 180
     },
-    "col=2,facing=south,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both"
+    "col=1,facing=north,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside"
+    "col=1,facing=north,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none"
+    "col=1,facing=north,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside"
+    "col=1,facing=north,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both"
+    "col=1,facing=north,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside"
+    "col=1,facing=north,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none"
+    "col=1,facing=north,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside"
+    "col=1,facing=north,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both"
+    "col=1,facing=north,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside"
+    "col=1,facing=north,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none"
+    "col=1,facing=north,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=south,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside"
+    "col=1,facing=north,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame",
+      "y": 180
     },
-    "col=2,facing=west,row=0,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both",
+    "col=1,facing=south,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame_mahogany"
+    },
+    "col=1,facing=south,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame"
+    },
+    "col=1,facing=south,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame"
+    },
+    "col=1,facing=west,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=0,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside",
+    "col=1,facing=west,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=0,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none",
+    "col=1,facing=west,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=0,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside",
+    "col=1,facing=west,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=1,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both",
+    "col=1,facing=west,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=1,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside",
+    "col=1,facing=west,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=1,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none",
+    "col=1,facing=west,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=1,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside",
+    "col=1,facing=west,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=2,sill=both": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both",
+    "col=1,facing=west,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=2,sill=inside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside",
+    "col=1,facing=west,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=2,sill=none": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none",
+    "col=1,facing=west,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame_mahogany",
       "y": 90
     },
-    "col=2,facing=west,row=2,sill=outside": {
-      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside",
+    "col=1,facing=west,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_both_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_none_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_b_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_both_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_none_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_c_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_both_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_none_glass/window_frame",
+      "y": 90
+    },
+    "col=1,facing=west,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_t_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=east,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame_mahogany",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=east,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame",
+      "y": 270
+    },
+    "col=2,facing=north,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame_mahogany",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=north,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame",
+      "y": 180
+    },
+    "col=2,facing=south,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame_mahogany"
+    },
+    "col=2,facing=south,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame"
+    },
+    "col=2,facing=south,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame"
+    },
+    "col=2,facing=west,finish=mahogany,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=mahogany,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame_mahogany",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=0,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_both_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=0,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=0,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_none_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=0,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_br_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=1,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_both_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=1,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=1,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_none_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=1,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_r_outside_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=2,sill=both": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_both_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=2,sill=inside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_inside_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=2,sill=none": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_none_glass/window_frame",
+      "y": 90
+    },
+    "col=2,facing=west,finish=white,row=2,sill=outside": {
+      "model": "heavyseas:block/liner/liner_window_3x3/glass/window_tr_outside_glass/window_frame",
       "y": 90
     }
   }

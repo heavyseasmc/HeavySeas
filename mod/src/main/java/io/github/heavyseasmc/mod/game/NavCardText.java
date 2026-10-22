@@ -29,9 +29,52 @@ public final class NavCardText {
     private NavCardText() {
     }
 
+    /**
+     * 这张牌的两栏今天各会算到谁（ADR-0043 A9）。点到的人不在这一栏的名单里，就当没点 ——
+     * 与引擎同一个口径：落海只认还在船上的（艇上的尸体也会被点下水，{@code Session#stillInWater}），
+     * 口渴只认活着的（{@code Condition#suffersThirst}）；这一局里没有的角色两栏都不认（规则书第九章「就当没点」）。
+     *
+     * <p>原先照牌面点名：被大海带走的人、这一局没人扮的角色照样出现在预告里，而结算时他们从来不在。
+     *
+     * @param overboard 落海那一栏认的人，按座位从船头到船尾
+     * @param thirst    口渴那一栏认的人，同上
+     */
+    public record Eligible(List<String> overboard, List<String> thirst) {
+        public Eligible {
+            overboard = List.copyOf(overboard);
+            thirst = List.copyOf(thirst);
+        }
+
+        /** 两栏认同一份（夹具与只知道座位次序的调用方）。 */
+        public static Eligible both(List<String> seatOrder) {
+            return new Eligible(seatOrder, seatOrder);
+        }
+
+        /** 从引擎状态取：落海认还在船上的，口渴认活着的。 */
+        public static Eligible of(io.github.heavyseasmc.engine.state.GameState g) {
+            List<String> onBoat = g.onBoatBySeat().stream().map(CharacterId::value).toList();
+            List<String> alive = g.onBoatBySeat().stream().filter(id -> g.conditionOf(id).suffersThirst())
+                    .map(CharacterId::value).toList();
+            return new Eligible(onBoat, alive);
+        }
+
+        /** 从客户端看得到的公开座位取（{@code TableView}，按座位排好的），口径同 {@link #of(io.github.heavyseasmc.engine.state.GameState)}。 */
+        public static Eligible ofSeats(List<io.github.heavyseasmc.mod.state.TableView.Seat> seats) {
+            List<String> onBoat = seats.stream().filter(s -> !s.removed()).map(io.github.heavyseasmc.mod.state.TableView.Seat::id).toList();
+            List<String> alive = seats.stream().filter(s -> !s.removed() && s.condition().suffersThirst())
+                    .map(io.github.heavyseasmc.mod.state.TableView.Seat::id).toList();
+            return new Eligible(onBoat, alive);
+        }
+    }
+
     /** 一行说完：「海鸥 +1 · 落海：船长 · 口渴：水手、划过船的人」。不看天候（没有天候、或天候不改航海牌时用）。 */
     public static Text describe(NavCardView card, List<String> seatOrder) {
         return describe(card, seatOrder, "");
+    }
+
+    /** 两栏都只认 {@code seatOrder} 里的人（见 {@link Eligible#both}）。 */
+    public static Text describe(NavCardView card, List<String> seatOrder, String weatherEffect) {
+        return describe(card, Eligible.both(seatOrder), weatherEffect);
     }
 
     /**
@@ -49,7 +92,7 @@ public final class NavCardText {
      *
      * @param weatherEffect 今天天候的效果 id（引擎 {@code WeatherEffect#id}）；空串 = 没有天候
      */
-    public static Text describe(NavCardView card, List<String> seatOrder, String weatherEffect) {
+    public static Text describe(NavCardView card, Eligible who, String weatherEffect) {
         String effect = weatherEffect == null ? "" : weatherEffect;
         boolean noGulls = WeatherEffect.IGNORE_GULLS.id().equals(effect);
         boolean rowersOverboard = WeatherEffect.ROWERS_OVERBOARD.id().equals(effect) && card.thirstRowers();
@@ -63,8 +106,8 @@ public final class NavCardText {
             out.append(gull).append(SECTION_SEP);
         }
         List<Text> overboard = new ArrayList<>();
-        if (card.overboard().mode() != NavCardView.Mode.NOBODY || !(rowersOverboard || fightersOverboard)) {
-            overboard.add(names(card.overboard(), seatOrder));
+        if (!namesNobody(card.overboard(), who.overboard()) || !(rowersOverboard || fightersOverboard)) {
+            overboard.add(names(card.overboard(), who.overboard()));
         }
         if (rowersOverboard) {
             overboard.add(Text.translatable("heavyseas.nav.rowers"));
@@ -75,7 +118,7 @@ public final class NavCardText {
         out.append(Text.translatable("heavyseas.nav.overboard_line", join(overboard)));
         out.append(SECTION_SEP);
         Text thirst = noThirst ? Text.translatable("heavyseas.nav.nobody")
-                : thirst(card, seatOrder, !rowersOverboard, !fightersOverboard, allThirst);
+                : thirst(card, who.thirst(), !rowersOverboard, !fightersOverboard, allThirst);
         out.append(Text.translatable("heavyseas.nav.thirst_line", thirst));
         return out;
     }
@@ -89,14 +132,25 @@ public final class NavCardText {
         };
     }
 
-    /** 一栏点名。名单按座位从船头到船尾排 —— 与座位轨同一个次序，找人不用来回扫。 */
+    /**
+     * 一栏点名。名单按座位从船头到船尾排 —— 与座位轨同一个次序，找人不用来回扫。
+     *
+     * <p>只点 {@code seatOrder} 里的人（{@link Eligible}）：点名的人一个都不在，就是「无人」；
+     * 「除了谁」里的人一个都不在，就是「所有人」。
+     */
     public static Text names(NavCardView.Names names, List<String> seatOrder) {
         return switch (names.mode()) {
             case EVERYONE -> Text.translatable("heavyseas.nav.everyone");
             case NOBODY -> Text.translatable("heavyseas.nav.nobody");
-            case ONLY -> join(characterNames(names.characters(), seatOrder));
-            case EXCEPT -> Text.translatable("heavyseas.nav.except",
-                    join(characterNames(names.characters(), seatOrder)));
+            case ONLY -> {
+                List<Text> named = characterNames(names.characters(), seatOrder);
+                yield named.isEmpty() ? Text.translatable("heavyseas.nav.nobody") : join(named);
+            }
+            case EXCEPT -> {
+                List<Text> spared = characterNames(names.characters(), seatOrder);
+                yield spared.isEmpty() ? Text.translatable("heavyseas.nav.everyone")
+                        : Text.translatable("heavyseas.nav.except", join(spared));
+            }
             case CONDITIONAL -> condition(names.condition());
         };
     }
@@ -121,7 +175,7 @@ public final class NavCardText {
         boolean showRowers = rowers && card.thirstRowers();
         boolean showFighters = fighters && card.thirstFighters();
         boolean icons = showRowers || showFighters;
-        if (card.thirst().mode() != NavCardView.Mode.NOBODY || (!icons && !everyone)) {
+        if (!namesNobody(card.thirst(), seatOrder) || (!icons && !everyone)) {
             parts.add(names(card.thirst(), seatOrder));
         }
         if (showRowers) {
@@ -140,17 +194,21 @@ public final class NavCardText {
         };
     }
 
+    /** 这一栏的点名实际一个人都不点：牌面写「无人」，或者点的人全不在 {@code seatOrder} 里。 */
+    private static boolean namesNobody(NavCardView.Names names, List<String> seatOrder) {
+        return names.mode() == NavCardView.Mode.NOBODY
+                || names.mode() == NavCardView.Mode.ONLY && names.characters().stream().noneMatch(seatOrder::contains);
+    }
+
+    /** 名单里在 {@code seatOrder} 中的那几个，按 {@code seatOrder} 的次序。 */
     private static List<Text> characterNames(List<String> ids, List<String> seatOrder) {
-        List<String> sorted = new ArrayList<>(ids);
-        sorted.sort(Comparator.comparingInt((String id) -> {
-            int seat = seatOrder.indexOf(id);
-            return seat < 0 ? Integer.MAX_VALUE : seat;
-        }).thenComparing(Comparator.naturalOrder()));
+        List<String> sorted = new ArrayList<>(ids.stream().filter(seatOrder::contains).distinct().toList());
+        sorted.sort(Comparator.comparingInt(seatOrder::indexOf));
         return sorted.stream().map(id -> GameFlow.characterName(CharacterId.of(id))).toList();
     }
 
     /** 一串名字按当前语言的分隔符连起来（{@code heavyseas.nav.name_sep}：中文「、」，英文「, 」）。播报里的名单都走这一份。 */
-    static Text join(List<Text> parts) {
+    public static Text join(List<Text> parts) {
         MutableText out = Text.empty();
         for (int i = 0; i < parts.size(); i++) {
             if (i > 0) {

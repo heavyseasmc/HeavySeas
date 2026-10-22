@@ -58,8 +58,20 @@ Simple Voice Chat（软依赖，仅编译期对其公开 API）
 
 ---- 随模组分发 ----
 
-Noto Serif SC（思源宋体）—— 界面上的全部文字
-  文件    mod/src/main/resources/assets/heavyseas/font/serif.ttf · serif_bold.ttf
+汇文明朝体（匯文明朝體 · Huiwen-mincho，Version 1.00）—— 界面上的常规体文字
+  文件    mod/src/main/resources/assets/heavyseas/font/serif.ttf
+          （取子集、精简直线段上的冗余点而成；七个中文标点 。，、；：！？ 仍是汇文自己的
+          字形，只挪了位置 —— 汇文的标点是繁体排法、落在字身正中，挪到简体的习惯位置）
+  作者    特里王
+  版权    Public Domain（字体文件 name 表 nameID 0 原文）
+  授权    作者自定义授权，原文照录随字体一起分发：
+          mod/src/main/resources/assets/heavyseas/font/huiwen_mincho_license.txt
+          （可免费用于显示与嵌入、可自由转发、可作为更大规模套装软件的一部分；
+          不可单独将字体文件作为商品转卖。条款与下面「构建前渲染贴图」那一段同一份原文）
+  出处    作者本人的文章「4、授权声明」一节 https://zhuanlan.zhihu.com/p/344103391
+
+Noto Serif SC（思源宋体）—— 界面上的粗体文字
+  文件    mod/src/main/resources/assets/heavyseas/font/serif_bold.ttf
           （由可变字体定成静态字重 600 / 800 后取子集而成，属 OFL 所说的 Modified Version；
           name 表里的版权与授权字段原样保留）
   版权    (c) 2017-2024 Adobe (http://www.adobe.com/).（字体文件 name 表 nameID 0 原文）
@@ -91,8 +103,7 @@ Noto Serif SC（思源宋体）—— 界面上的全部文字
     原文的限制是**不可单独将字体文件作为商品转卖**，而不是笼统的「免费商用」。
     字体文件内**没有** nameID 13/14（授权描述与授权网址），只有一句
     "All rights reserved" 与版本字段里的「开源且免费商用，禁止第三方以任何方式牟利」——
-    以作者原文为准。
-    首发前必须取得并存档原文，再据原文复核本段。
+    以作者原文为准。原文已存档（内部归档 evidence/授权/）。
 
 Old Standard TT —— 全部拉丁字母与数字
   授权    SIL Open Font License 1.1（字体文件 nameID 13 自述，nameID 14 指向

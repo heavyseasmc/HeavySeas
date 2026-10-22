@@ -79,6 +79,62 @@ class NavCardTextWeatherTest {
         assertTrue(all.contains("heavyseas.nav.everyone"));
     }
 
+    // ---------------------------------------------------------------- 只点结算时会算到的人（ADR-0043 A9）
+
+    private static NavCardView.Names only(String... ids) {
+        return new NavCardView.Names(NavCardView.Mode.ONLY, List.of(ids), "");
+    }
+
+    private static NavCardView.Names except(String... ids) {
+        return new NavCardView.Names(NavCardView.Mode.EXCEPT, List.of(ids), "");
+    }
+
+    /** 船长、水手还在船上；医生死在艇上（落海认他，口渴不认）；陪酒女被大海带走了（两栏都不认）。 */
+    private static final NavCardText.Eligible BOAT = new NavCardText.Eligible(
+            List.of("captain", "sailor", "doctor"), List.of("captain", "sailor"));
+
+    @Test
+    @DisplayName("落海点名被大海带走的人：那个人不出现；点的只有他，就是「无人」")
+    void removedNotNamedOverboard() {
+        Set<String> mixed = lineKeys(NavCardText.describe(new NavCardView("t", 0, only("hostess", "captain"), NOBODY, false, false), BOAT, ""),
+                "heavyseas.nav.overboard_line");
+        assertTrue(mixed.contains("heavyseas.character.captain"));
+        assertFalse(mixed.contains("heavyseas.character.hostess"), "陪酒女已被大海带走，结算时不在水里");
+        Set<String> alone = lineKeys(NavCardText.describe(new NavCardView("t", 0, only("hostess"), NOBODY, false, false), BOAT, ""),
+                "heavyseas.nav.overboard_line");
+        assertEquals(Set.of("heavyseas.nav.nobody"), alone);
+    }
+
+    @Test
+    @DisplayName("艇上的尸体：落海那一栏照点（会被点下水），口渴那一栏不点（死人不口渴）")
+    void corpseOverboardButNotThirsty() {
+        Text t = NavCardText.describe(new NavCardView("t", 0, only("doctor"), only("doctor", "sailor"), false, false), BOAT, "");
+        assertTrue(lineKeys(t, "heavyseas.nav.overboard_line").contains("heavyseas.character.doctor"));
+        Set<String> thirst = lineKeys(t, "heavyseas.nav.thirst_line");
+        assertFalse(thirst.contains("heavyseas.character.doctor"));
+        assertTrue(thirst.contains("heavyseas.character.sailor"));
+    }
+
+    @Test
+    @DisplayName("点的人全不算、这一栏还有图示：只写图示，不写「无人、划过船的人」")
+    void filteredNamesYieldToIcons() {
+        Set<String> thirst = lineKeys(NavCardText.describe(new NavCardView("t", 0, NOBODY, only("doctor"), true, false), BOAT, ""),
+                "heavyseas.nav.thirst_line");
+        assertEquals(Set.of("heavyseas.nav.rowers"), thirst);
+    }
+
+    @Test
+    @DisplayName("「除了谁」里的人都不在了：就是所有人；这一局没人扮的角色也当没点")
+    void exceptAndAbsent() {
+        Set<String> all = lineKeys(NavCardText.describe(new NavCardView("t", 0, except("hostess"), NOBODY, false, false), BOAT, ""),
+                "heavyseas.nav.overboard_line");
+        assertEquals(Set.of("heavyseas.nav.everyone"), all);
+        Set<String> absent = lineKeys(NavCardText.describe(new NavCardView("t", 0, NOBODY, only("kid", "captain"), false, false), BOAT, ""),
+                "heavyseas.nav.thirst_line");
+        assertFalse(absent.contains("heavyseas.character.kid"), "小孩这一局没人扮");
+        assertTrue(absent.contains("heavyseas.character.captain"));
+    }
+
     /** 整棵文本里出现过的翻译键。 */
     private static Set<String> keys(Text text) {
         Set<String> out = new HashSet<>();

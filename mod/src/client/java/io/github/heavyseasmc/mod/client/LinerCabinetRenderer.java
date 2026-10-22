@@ -42,6 +42,12 @@ public final class LinerCabinetRenderer extends GeoBlockRenderer<LinerCabinetEnt
     @Override
     public void createVerticesOfQuad(GeoQuad quad, Matrix4f poseState, Vector3f normal, VertexConsumer buffer, int packedLight,
                                      int packedOverlay, int colour) {
+        blockShadedQuad(quad, poseState, normal, buffer, packedLight, packedOverlay, colour);
+    }
+
+    /** 按方块模型那一套面明暗出一个面的四个顶点（柜子 · 电梯栅门与指针共用，2026-10-19 抽出来）。 */
+    static void blockShadedQuad(GeoQuad quad, Matrix4f poseState, Vector3f normal, VertexConsumer buffer, int packedLight,
+                                int packedOverlay, int colour) {
         int shaded = shade(colour, faceShade(normal.x(), normal.y(), normal.z()));
         for (GeoVertex vertex : quad.vertices()) {
             Vector3f p = vertex.position();

@@ -15,7 +15,7 @@ import net.minecraft.util.Identifier;
  * 6：电梯出发（{@code LiftRideS2C}：这一趟走多少 tick，客户端照它渐暗、轻晃）。
  */
 public final class ExperienceProtocol {
-    public static final int VERSION = 6;
+    public static final int VERSION = 7;
     public static final Identifier CHANNEL = Identifier.of("heavyseas", "experience_protocol");
     private ExperienceProtocol() { }
 

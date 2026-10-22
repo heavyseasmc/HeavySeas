@@ -109,7 +109,9 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
          */
         TRELLIS,
         /** 拱（ADR-0080 §7）：墙那一格本身，正面朝着摆它的人；一排里的哪一格 · 上下哪一排看邻居（{@link LinerConnect.Rules#archPart}）。 */
-        ARCH
+        ARCH,
+        /** 天花梁（A8）：挂在格子上半截，顺 x / 顺 z / 十字看前后左右的梁（{@link LinerConnect.Rules#beamShape}）。 */
+        BEAM
     }
 
     private static final ThreadLocal<Property<?>[]> PENDING = new ThreadLocal<>();
@@ -148,6 +150,14 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
     }
 
     /** 这个状态的样子，朝向已经算进 y 旋转里（模板一律正面朝南作画）。 */
+    /** 热室的大理石台冒蒸汽（{@link LinerBlocks#HAMMAM_SLAB}）；别的方块不画粒子。 */
+    @Override
+    public void randomDisplayTick(BlockState state, World world, BlockPos pos, net.minecraft.util.math.random.Random random) {
+        if (this == LinerBlocks.HAMMAM_SLAB) {
+            LinerAmbience.steam(world, pos, random);
+        }
+    }
+
     @Override
     public LinerLooks.Look look(BlockState state) {
         LinerLooks.Look base = look.apply(state);
@@ -249,7 +259,9 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
             case FRAME -> changed.getAxis().isVertical() || sideways;
             case WAINSCOT -> changed == Direction.UP;
             case CAPPING, CASING -> sideways;
-            case RUN, CARPET -> changed.getAxis().isHorizontal();
+            case RUN -> changed.getAxis().isHorizontal() || (state.contains(CAPITAL) && changed == Direction.DOWN);
+            case BEAM -> changed.getAxis().isHorizontal();
+            case CARPET -> changed.getAxis().isHorizontal();
             case WALL_PIECE, PILASTER_SIDE -> state.contains(BASE)
                     && (sideways || changed == Direction.DOWN || (state.contains(CAPITAL) && changed == Direction.UP));
             case TRELLIS -> changed != facing.getOpposite();
@@ -287,7 +299,21 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
                     BlockState other = world.getBlockState(pos.offset(LinerConnect.direction(d)));
                     return other.isOf(this) ? LinerConnect.index(other.get(FACING)) : null;
                 });
-                return s.with(SHAPE, LinerBlocks.CornerShape.of(shape));
+                s = s.with(SHAPE, LinerBlocks.CornerShape.of(shape));
+                if (s.contains(CAPITAL)) {
+                    // 5e：凸出檐口看正下方 —— 同朝向的白漆壁柱就长柱头（LinerConnect.Rules#corniceCapital）
+                    BlockState below = world.getBlockState(pos.down());
+                    s = s.with(CAPITAL, LinerConnect.Rules.corniceCapital("straight".equals(shape),
+                            below.isOf(LinerBlocks.PILASTER) && below.get(FACING) == s.get(FACING)));
+                }
+                return s;
+            }
+            case BEAM -> {
+                boolean hasX = isOf(world, pos.east()) || isOf(world, pos.west());
+                boolean hasZ = isOf(world, pos.north()) || isOf(world, pos.south());
+                String shape = LinerConnect.Rules.beamShape(hasX, hasZ, s.get(AXIS) == Direction.Axis.X ? "x" : "z");
+                return shape.equals("cross") ? s.with(LinerBlocks.CROSS, true)
+                        : s.with(LinerBlocks.CROSS, false).with(AXIS, shape.equals("x") ? Direction.Axis.X : Direction.Axis.Z);
             }
             case CARPET -> {
                 // 四边接不接地毯（ADR-0093 B3）：同一高度、旁边那一格也是地毯就接着；花纹第几格只看位置（两格一个周期）
@@ -306,6 +332,12 @@ public final class LinerBlock extends Block implements LinerLooks.Styled {
                         isSkirting(world.getBlockState(pos.offset(LinerConnect.viewerLeft(f))), f),
                         isSkirting(world.getBlockState(pos.offset(LinerConnect.viewerRight(f))), f));
                 s = s.with(BASE, LinerBlocks.PilasterBase.of(base));
+                if (s.contains(TRIM)) {
+                    // 5e：白漆壁柱看左右穿过的那条线（同门套的 runBeside；壁柱自己不算线，两根并排时不会互相认成线、卡在旧值上）
+                    String trim = LinerConnect.Rules.pilasterTrim(bottom, runBeside(world, pos, f, LinerConnect.viewerLeft(f)),
+                            runBeside(world, pos, f, LinerConnect.viewerRight(f)));
+                    s = s.with(TRIM, LinerBlocks.Trim.of(trim));
+                }
                 if (s.contains(CAPITAL)) {
                     // 居中整根：上面那一格不是同一根（同一种 · 同朝向 · 也居中）就长柱头（ADR-0093 B7）；左右半根不长
                     BlockState above = world.getBlockState(pos.up());

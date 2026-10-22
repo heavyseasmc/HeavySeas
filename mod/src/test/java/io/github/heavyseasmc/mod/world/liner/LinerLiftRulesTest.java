@@ -436,7 +436,7 @@ final class LinerLiftRulesTest {
     }
 
     @Test
-    @DisplayName("四种方块的每一个状态，样子里写的模板文件都在（指针盘：前四档指针在左块、后四档在右块）")
+    @DisplayName("四种方块的每一个状态，样子里写的模板文件都在（栅门开合同一块、指针盘每档同一块：动的那几块由 GeckoLib 画）")
     void everyStateHasItsTemplate() {
         int checked = 0;
         Set<String> templates = new TreeSet<>();
@@ -453,11 +453,40 @@ final class LinerLiftRulesTest {
             }
         }
         assertEquals(4, LinerLift.all().size());
-        assertTrue(checked > 300 && templates.size() == 8 + 10 + 2 + 1, "正向对照：状态 " + checked + " 个，模板 " + templates);
-        assertEquals("lift/dial_left_3", LinerLift.Rules.dialTemplate(LinerLift.Side.LEFT, 3));
-        assertEquals("lift/dial_right", LinerLift.Rules.dialTemplate(LinerLift.Side.RIGHT, 3));
-        assertEquals("lift/dial_left", LinerLift.Rules.dialTemplate(LinerLift.Side.LEFT, 4));
-        assertEquals("lift/dial_right_4", LinerLift.Rules.dialTemplate(LinerLift.Side.RIGHT, 4));
+        assertTrue(checked > 300 && templates.size() == 4 + 2 + 2 + 1, "正向对照：状态 " + checked + " 个，模板 " + templates);
+        assertEquals("lift/dial_left", LinerLift.Rules.dialTemplate(LinerLift.Side.LEFT, 3));
+        assertEquals("lift/dial_right", LinerLift.Rules.dialTemplate(LinerLift.Side.RIGHT, 4));
+        assertEquals(LinerLift.Rules.gateTemplate(LinerLift.Side.LEFT, true, DoubleBlockHalf.LOWER),
+                LinerLift.Rules.gateTemplate(LinerLift.Side.LEFT, false, DoubleBlockHalf.LOWER), "开着关着同一块");
+    }
+
+    @Test
+    @DisplayName("GeckoLib 那一半（2026-10-19）：栅门下半格 · 指针盘左块挂方块实体，别的格不挂；动画挑法 · 指针转法")
+    void rigsHangOnTheRightCells() {
+        int with = 0;
+        for (BlockState s : LinerLift.GATE.getStateManager().getStates()) {
+            boolean want = s.get(HALF) == DoubleBlockHalf.LOWER;
+            assertEquals(want, LinerLift.Rules.carriesRig(s), s.toString());
+            with += want ? 1 : 0;
+        }
+        for (BlockState s : LinerLift.DIAL.getStateManager().getStates()) {
+            boolean want = s.get(LinerLift.SIDE) == LinerLift.Side.LEFT;
+            assertEquals(want, LinerLift.Rules.carriesRig(s), s.toString());   // createBlockEntity 照它挂；单测里没登记方块实体类型，不实际建
+            with += want ? 1 : 0;
+        }
+        assertTrue(with > 20, "正向对照：挂方块实体的状态 " + with + " 个");
+        // 第一次画直接停在那一档；之后一变才播开 / 合
+        assertEquals(LinerLiftGateEntity.OPENED, LinerLiftGateEntity.pick(true, true));
+        assertEquals(LinerLiftGateEntity.CLOSED, LinerLiftGateEntity.pick(true, false));
+        assertEquals(LinerLiftGateEntity.OPEN, LinerLiftGateEntity.pick(false, true));
+        assertEquals(LinerLiftGateEntity.CLOSE, LinerLiftGateEntity.pick(false, false));
+        // 指针：没画过直接到位；之后每秒最多 SPEED 度、不越过目标；卡一下也不跳一大截
+        assertEquals(100f, LinerLiftDialEntity.advance(Float.NaN, 100f, 0f));
+        assertEquals(160f - LinerLiftDialEntity.SPEED * 0.1f, LinerLiftDialEntity.advance(160f, 100f, 0.1f), 1e-4);
+        assertEquals(100f, LinerLiftDialEntity.advance(101f, 100f, 0.5f));
+        assertEquals(20f + LinerLiftDialEntity.SPEED * 0.25f, LinerLiftDialEntity.advance(20f, 160f, 10f), 1e-4);
+        assertEquals(160f, LinerLift.Rules.dialAngle(0));
+        assertEquals(20f, LinerLift.Rules.dialAngle(LinerLift.DIAL_STOPS - 1));
     }
 
     @Test
@@ -474,6 +503,15 @@ final class LinerLiftRulesTest {
                     checked += covered(LinerLift.Rules.gateTemplate(side, open, half), boxes);
                 }
             }
+        }
+        for (LinerLift.Side side : LinerLift.Side.values()) {
+            double[][] closed = LinerLift.Rules.gateBoxes(DoubleBlockHalf.LOWER, false, false);
+            double[][] upper = LinerLift.Rules.gateBoxes(DoubleBlockHalf.UPPER, false, false);
+            if (side == LinerLift.Side.RIGHT) {
+                closed = LinerLift.Rules.mirrored(closed);
+                upper = LinerLift.Rules.mirrored(upper);
+            }
+            checked += geoCovered("lift_gate_" + side.asString(), closed, upper);
         }
         checked += covered("lift/call_on", LinerLift.Rules.CALL_BOX);
         checked += covered("lift/panel", LinerLift.Rules.PANEL_BOX);
@@ -508,6 +546,45 @@ final class LinerLiftRulesTest {
             assertTrue(inside, template + " 的元件 " + el + " 不在轮廓里");
             n++;
         }
+        return n;
+    }
+
+    /**
+     * GeckoLib 模型（合着那一档）里每一块的位置换回方块模型坐标（x = 8 − origin.x − size.x、z = origin.z + 8，见 liner_lift_rig），
+     * 斜条按转心查（同 {@link #covered}）；y 在 16 以上的归上半格那一组轮廓（挪下来 16 再查）。
+     */
+    private static int geoCovered(String name, double[][] lower, double[][] upper) throws IOException {
+        Path geo = TEMPLATES.getParent().getParent().getParent().getParent().resolve("geo/block/liner/" + name + ".geo.json");
+        JsonObject root = JsonParser.parseString(Files.readString(geo, StandardCharsets.UTF_8)).getAsJsonObject();
+        int n = 0;
+        for (JsonElement b : root.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject().getAsJsonArray("bones")) {
+            for (JsonElement c : b.getAsJsonObject().getAsJsonArray("cubes")) {
+                JsonObject cube = c.getAsJsonObject();
+                double[] o = vec(cube.getAsJsonArray("origin"));
+                double[] sz = vec(cube.getAsJsonArray("size"));
+                double[] from = {8 - o[0] - sz[0], o[1], o[2] + 8};
+                double[] to = {8 - o[0], o[1] + sz[1], o[2] + 8 + sz[2]};
+                if (cube.has("rotation")) {
+                    double[] pv = vec(cube.getAsJsonArray("pivot"));
+                    from = new double[]{8 - pv[0], pv[1], from[2]};
+                    to = new double[]{8 - pv[0], pv[1], to[2]};
+                }
+                double[][] boxes = lower;
+                if (from[1] >= 16 - 1e-9) {
+                    boxes = upper;
+                    from = new double[]{from[0], from[1] - 16, from[2]};
+                    to = new double[]{to[0], to[1] - 16, to[2]};
+                }
+                boolean inside = false;
+                for (double[] bx : boxes) {
+                    inside |= from[0] >= bx[0] - 1e-9 && from[1] >= bx[1] - 1e-9 && from[2] >= bx[2] - 1e-9
+                            && to[0] <= bx[3] + 1e-9 && to[1] <= bx[4] + 1e-9 && to[2] <= bx[5] + 1e-9;
+                }
+                assertTrue(inside, name + " 的 " + cube + " 不在合着的轮廓里");
+                n++;
+            }
+        }
+        assertTrue(n > 20, name + " 一块都没读到");
         return n;
     }
 

@@ -310,6 +310,52 @@ public final class Rulebook {
         return out;
     }
 
+    /**
+     * 书里一节（规则签，ADR-0043 §11 第六组）。
+     *
+     * @param chapter 它所在那一章的标题（签上的题头）
+     * @param blocks  从锚点那个标题起，到下一个同级或更高级的标题为止；锚点在章标题上时是整一章
+     */
+    public record Section(String chapter, List<Block> blocks) {
+        public Section {
+            blocks = List.copyOf(blocks);
+        }
+    }
+
+    /**
+     * 从解析好的书里按锚点切出一节 —— 与书里显示的同一份块（物资、人物这些 {@code @指令} 早已由 {@link #parse} 展开），
+     * 签上与书里不会是两种说法。
+     *
+     * @return 书里没有这个锚点时是空（调用方退回打开整本书，并说一声）
+     */
+    public static java.util.Optional<Section> section(List<Block> blocks, String anchor) {
+        String chapter = "";
+        int start = -1;
+        boolean wholeChapter = false;
+        for (int i = 0; i < blocks.size(); i++) {
+            Block b = blocks.get(i);
+            if (b instanceof Chapter c) {
+                if (start >= 0) {
+                    return java.util.Optional.of(new Section(chapter, blocks.subList(start, i)));
+                }
+                chapter = c.title();
+                if (c.anchor().equals(anchor)) {
+                    start = i;
+                    wholeChapter = true;
+                }
+            } else if (b instanceof Heading h) {
+                if (start >= 0 && !wholeChapter) {
+                    return java.util.Optional.of(new Section(chapter, blocks.subList(start, i)));
+                }
+                if (start < 0 && h.anchor().equals(anchor)) {
+                    start = i;
+                }
+            }
+        }
+        return start < 0 ? java.util.Optional.empty()
+                : java.util.Optional.of(new Section(chapter, blocks.subList(start, blocks.size())));
+    }
+
     /** 整本书里出现过的 {@code @指令 id}（单测核对「每张牌、每个人都写到了」用）。 */
     public static List<String> directiveIds(String source, String directive) {
         List<String> ids = new ArrayList<>();

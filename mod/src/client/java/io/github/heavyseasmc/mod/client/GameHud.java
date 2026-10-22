@@ -671,6 +671,8 @@ public final class GameHud {
             SeatClock.Mark mark = SeatClock.mark(view, id, waiting, target, now, stepped);
             SeatToken.ring(context, SeatToken.Kit.TOKEN40, t, k, mark);
             seat.ifPresent(s -> SeatMarks.marks(context, t, s, k));
+            HurtCue.draw(context, t, id, k);
+            GuessMarks.draw(context, t, id, k);
             SeatToken.chip(context, l.seatChip(i), k, mark.chip());
         }
         // 舵轮挂在座位轨上沿、舵手那一座的左上（2026-10-13 第二轮验收 03 / 50：原先挂在头像右下，印章只好挪到右上，

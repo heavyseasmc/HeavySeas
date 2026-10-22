@@ -627,6 +627,24 @@ public final class LinerProp extends Block implements LinerLooks.Styled, net.min
     }
 
     /**
+     * 整件按 facing 摆好时每一格的方块状态，键是相对默认那一块（{@link #getDefaultState} 的 part）的格偏移；一格的件只有原点。
+     * 格偏移与 {@link #onPlaced} 同一套（{@link Rules#offset}）。服务端 GameTest 摆件用（2026-10-19）。
+     */
+    public java.util.Map<BlockPos, BlockState> wholeStates(Direction facing) {
+        java.util.Map<BlockPos, BlockState> out = new java.util.LinkedHashMap<>();
+        BlockState base = getDefaultState().with(FACING, facing);
+        if (part == null) {
+            out.put(BlockPos.ORIGIN, base);
+            return out;
+        }
+        Part here = base.get(part);
+        for (Part p : Rules.piece(spec.kind(), here)) {
+            out.put(Rules.offset(BlockPos.ORIGIN, here, p, facing), base.with(part, p));
+        }
+        return out;
+    }
+
+    /**
      * 亮着时的光照：跨几格的灯只有灯身那几格发光（{@link Rules#glows}）。给方块设置的 {@code luminance} 用 ——
      * 方块状态在方块构造时就把光照算好存起来了，那时这个方块的 {@link #spec} 还没赋值，所以摆法由登记处直接传进来。
      */

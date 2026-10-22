@@ -4,6 +4,7 @@ import io.github.heavyseasmc.mod.HeavySeasMod;
 import io.github.heavyseasmc.mod.rulebook.LineBreak;
 import io.github.heavyseasmc.mod.rulebook.Rulebook;
 import io.github.heavyseasmc.mod.rulebook.RulebookData;
+import io.github.heavyseasmc.mod.rulebook.ShelfBook;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.screen.ingame.BookScreen;
@@ -60,14 +61,39 @@ public final class RulebookBook {
     }
 
     private static void show(MinecraftClient client, GameScreen parent, String anchor) {
+        if (parent instanceof RulebookScreen open) {
+            open.close();                     // 书开着时再按规则书键：合上，不在书上再叠一本
+            return;
+        }
+        // 2026-10-19：自家书页（侧栏目录 + 单页，RulebookScreen）；原来是 Minecraft 自带的书页（NavigationBook，已删）。
+        //   从某一面打开的是那一面的二级页（Esc 回到那一面、倒计时照样在最下面那一栏）
+        RulebookScreen screen = new RulebookScreen(rulebook(client), anchor);
+        if (parent != null) {
+            parent.openChild(screen);
+        } else {
+            client.setScreen(screen);
+        }
+    }
+
+    /** 规则书那一串块（按客户端语言挑一份，附录里的按键读玩家现在的绑定）。 */
+    static List<Rulebook.Block> rulebook(MinecraftClient client) {
         String language = client.getLanguageManager().getLanguage();
         Map.Entry<String, String> picked = RulebookData.pick(language);
         Language lang = Language.getInstance();
         Rulebook.Facts facts = RulebookData.facts(key -> lang.hasTranslation(key) ? lang.get(key) : null, keys());
-        Document document = document(Rulebook.parse(picked.getValue(), facts), client.textRenderer, true);
+        List<Rulebook.Block> blocks = Rulebook.parse(picked.getValue(), facts);
         // 报出用的是哪一份：退回到另一种语言与没退回，在书页上只差在字是什么语言
-        LOGGER.info("规则书：客户端语言 {} · 用的是 {} 那一份 · {} 页", language, picked.getKey(), document.pages().size());
-        client.setScreen(new NavigationBook(document, parent, anchor));
+        LOGGER.info("规则书：客户端语言 {} · 用的是 {} 那一份 · {} 块", language, picked.getKey(), blocks.size());
+        return blocks;
+    }
+
+    /** 搭建手册那一串块（方案 A14：{@code assets/heavyseas/manual/<语言>.md}，写法同书柜里的书；规则书书页里按 M 换过去）。 */
+    static List<Rulebook.Block> manual(MinecraftClient client) {
+        String language = client.getLanguageManager().getLanguage();
+        Map.Entry<String, String> picked = RulebookData.pickManual(language);
+        List<Rulebook.Block> blocks = ShelfBook.parse(picked.getValue());
+        LOGGER.info("搭建手册：客户端语言 {} · 用的是 {} 那一份 · {} 块", language, picked.getKey(), blocks.size());
+        return blocks;
     }
 
     /** 附录里的按键：读玩家现在的绑定，不是默认键。 */
@@ -185,56 +211,6 @@ public final class RulebookBook {
             contents.addAll(wrap(font, link, WIDTH));
         }
         return contents.finish();
-    }
-
-    /** The same native book as the lectern, with a live timer and an explicit route back. */
-    private static final class NavigationBook extends BookScreen implements DecisionNavigation.Child {
-        private final Document document;
-        private final GameScreen parent;
-        private final DecisionNavigation.Context origin;
-        private final String anchor;
-        private boolean opened;
-
-        NavigationBook(Document document, GameScreen parent, String anchor) {
-            super(new BookScreen.Contents(document.pages()));
-            this.document = document;
-            this.parent = parent;
-            this.origin = parent == null ? null : parent.decisionContext();
-            this.anchor = anchor;
-        }
-
-        @Override public DecisionNavigation.Context decisionContext() { return origin; }
-        @Override public boolean shouldPause() { return false; }
-        @Override protected void init() {
-            super.init();
-            if (!opened) {
-                setPage(document.anchors().getOrDefault(anchor, document.anchors().get("contents")));
-                opened = true;
-            }
-        }
-        @Override protected void addCloseButton() {
-            // 位置与大小照 BookScreen 自己那一排（196 起、两枚各 96 宽），画法换成对局各面的按钮（2026-10-13 验收：灰色按钮与纸板不搭）
-            addDrawableChild(new BookButton(width / 2 - 100, 196, 96, 20, Text.translatable("heavyseas.navigation.contents"),
-                    b -> setPage(document.anchors().get("contents"))));
-            addDrawableChild(new BookButton(width / 2 + 4, 196, 96, 20, Text.translatable("heavyseas.navigation.return"),
-                    b -> close()));
-        }
-        @Override public void close() { DecisionNavigation.back(parent, origin); }
-        @Override protected void closeScreen() { close(); }
-        @Override public boolean keyPressed(int key, int scan, int modifiers) {
-            if (HeavySeasClient.actKey().matchesKey(key, scan)) {
-                if (origin == null) {
-                    client.setScreen(null);
-                    HeavySeasClient.requestDecision(client);
-                } else DecisionNavigation.back(null, origin);
-                return true;
-            }
-            return super.keyPressed(key, scan, modifiers);
-        }
-        @Override public void render(net.minecraft.client.gui.DrawContext context, int x, int y, float delta) {
-            super.render(context, x, y, delta);
-            DecisionNavigation.drawBookPending(context, origin);
-        }
     }
 
     /**

@@ -226,6 +226,11 @@ public final class HeavySeasClient implements ClientModInitializer {
         // 柜子开合（ADR-0109 §2 第二版）：门 · 抽屉 · 箱盖由 GeckoLib 画（方块实体在每件柜子的原点那一格）
         net.minecraft.client.render.block.entity.BlockEntityRendererFactories.register(
                 io.github.heavyseasmc.mod.world.liner.LinerCabinets.TYPE, ctx -> new LinerCabinetRenderer());
+        // 电梯栅门的栅格 · 指针盘的指针（2026-10-19）：同样由 GeckoLib 画
+        net.minecraft.client.render.block.entity.BlockEntityRendererFactories.register(
+                io.github.heavyseasmc.mod.world.liner.LinerLiftRigs.GATE, ctx -> new LinerLiftGateRenderer());
+        net.minecraft.client.render.block.entity.BlockEntityRendererFactories.register(
+                io.github.heavyseasmc.mod.world.liner.LinerLiftRigs.DIAL, ctx -> new LinerLiftDialRenderer());
         // 玻璃一批（ADR-0074）：窗与穹顶玻璃是半透明的（窗 20 %、穹顶 65 %），框与肋的像素是实的 —— 同一层画
         LinerGlass.windows().forEach(w -> BlockRenderLayerMap.INSTANCE.putBlock(w, RenderLayer.getTranslucent()));
         BlockRenderLayerMap.INSTANCE.putBlock(LinerGlass.DOME_GLASS, RenderLayer.getTranslucent());
@@ -233,6 +238,7 @@ public final class HeavySeasClient implements ClientModInitializer {
         BlockRenderLayerMap.INSTANCE.putBlocks(RenderLayer.getTranslucent(), LinerHull.PORTHOLE_BLACK, LinerHull.PORTHOLE_WHITE,
                 LinerHull.PORTHOLE_INNER, LinerHull.PORTHOLE_INNER_PLAIN, LinerDoors.DOUBLE);
         BlockRenderLayerMap.INSTANCE.putBlock(LinerDoors.CABIN, RenderLayer.getCutout());
+        BlockRenderLayerMap.INSTANCE.putBlock(LinerDoors.CABIN_MAHOGANY, RenderLayer.getCutout());
         // 夜里亮着灯的舱室，从船外看舷窗与大窗是暖的（ADR-0082）：建网格时按屋里那一侧的光换上亮着的玻璃
         GlassGlow.register();
         GameScreenSidebar.register();
@@ -279,7 +285,7 @@ public final class HeavySeasClient implements ClientModInitializer {
                 "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(HeavySeasClient::pollTurn);
         rulesKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.heavyseas.rules", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "key.categories.heavyseas"));
+                "key.heavyseas.rules", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_J, "key.categories.heavyseas"));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (rulesKey.wasPressed()) {
                 if (client.currentScreen == null) RulebookBook.open(client);
@@ -326,6 +332,7 @@ public final class HeavySeasClient implements ClientModInitializer {
             CardComposite.tick(client);      // 一 tick 合成一张牌；渲染中途不动帧缓冲
             VoyageSound.tick(client);
             OverboardCue.tick(client);       // 有人落海：溅水一声 · 四边朱砂一闪（ADR-0048）
+            HurtCue.tick(client);            // 船上有人受伤：轨上那一格一闪、飘「−N」（ADR-0043 §11 第八组）
             while (logKey.wasPressed()) {
                 // Shift + L：拉伸（日志占满整条右栏，用户 2026-10-07）；L：钉住 / 放开
                 if (net.minecraft.client.gui.screen.Screen.hasShiftDown()) {

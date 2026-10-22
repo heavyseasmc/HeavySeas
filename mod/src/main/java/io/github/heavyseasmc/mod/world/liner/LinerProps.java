@@ -119,7 +119,7 @@ public final class LinerProps {
             MapColor.DARK_GREEN, BlockSoundGroup.WOOD);
     // 壁灯（ADR-0069 §2 第 ② 批里那一盏；§4 倾向 A：贴在墙前那一格、墙拆了不掉）：亮度照主次取 12（主灯 15 · 落地灯 14 · 台灯 12）
     public static final LinerProp WALL_SCONCE = prop("liner_wall_sconce",
-            new LinerProp.Spec(LinerProp.Kind.SCONCE, "wall_sconce", "wall_sconce", "wall_sconce_shade", 12),
+            new LinerProp.Spec(LinerProp.Kind.SCONCE, "wall_sconce", "wall_sconce", "wall_sconce_shade", 15),
             MapColor.GOLD, BlockSoundGroup.LANTERN);
     // A 甲板新家具（ADR 草稿 furnish；用户 2026-10-04「全按倾向」）：休息室白大理石壁炉 + 描金框镜 · 吸烟室桃花心木壁炉 + 桃花心木框油画；
     //   炉火亮度 13（落地灯 14 与壁灯 12 之间），只有正中下面那一格发光

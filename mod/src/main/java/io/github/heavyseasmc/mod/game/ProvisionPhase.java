@@ -140,7 +140,7 @@ public final class ProvisionPhase {
         if (offer.isEmpty()) {
             return;
         }
-        CharacterId holder = session.provisionHolder().orElseThrow();
+        session.provisionHolder().orElseThrow();                  // 只核「此刻有持箱人」（QA SB-04：原先赋给一个没人读的变量）
         String card = offer.get(Math.min(index, offer.size() - 1));
         session.provisionKeep(card);
         // ❗牌一进手里就推一次投影。漏推的表现是「留了牌，手牌界面里没有」——

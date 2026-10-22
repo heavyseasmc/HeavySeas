@@ -1,78 +1,153 @@
 {
   "variants": {
-    "facing=east,shape=inner_left": {
+    "capital=false,facing=east,shape=inner_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left",
       "y": 270
     },
-    "facing=east,shape=inner_right": {
+    "capital=false,facing=east,shape=inner_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right",
       "y": 270
     },
-    "facing=east,shape=outer_left": {
+    "capital=false,facing=east,shape=outer_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left",
       "y": 270
     },
-    "facing=east,shape=outer_right": {
+    "capital=false,facing=east,shape=outer_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right",
       "y": 270
     },
-    "facing=east,shape=straight": {
+    "capital=false,facing=east,shape=straight": {
       "model": "heavyseas:block/liner/liner_cornice/cornice",
       "y": 270
     },
-    "facing=north,shape=inner_left": {
+    "capital=false,facing=north,shape=inner_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left",
       "y": 180
     },
-    "facing=north,shape=inner_right": {
+    "capital=false,facing=north,shape=inner_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right",
       "y": 180
     },
-    "facing=north,shape=outer_left": {
+    "capital=false,facing=north,shape=outer_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left",
       "y": 180
     },
-    "facing=north,shape=outer_right": {
+    "capital=false,facing=north,shape=outer_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right",
       "y": 180
     },
-    "facing=north,shape=straight": {
+    "capital=false,facing=north,shape=straight": {
       "model": "heavyseas:block/liner/liner_cornice/cornice",
       "y": 180
     },
-    "facing=south,shape=inner_left": {
+    "capital=false,facing=south,shape=inner_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left"
     },
-    "facing=south,shape=inner_right": {
+    "capital=false,facing=south,shape=inner_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right"
     },
-    "facing=south,shape=outer_left": {
+    "capital=false,facing=south,shape=outer_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left"
     },
-    "facing=south,shape=outer_right": {
+    "capital=false,facing=south,shape=outer_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right"
     },
-    "facing=south,shape=straight": {
+    "capital=false,facing=south,shape=straight": {
       "model": "heavyseas:block/liner/liner_cornice/cornice"
     },
-    "facing=west,shape=inner_left": {
+    "capital=false,facing=west,shape=inner_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left",
       "y": 90
     },
-    "facing=west,shape=inner_right": {
+    "capital=false,facing=west,shape=inner_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right",
       "y": 90
     },
-    "facing=west,shape=outer_left": {
+    "capital=false,facing=west,shape=outer_left": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left",
       "y": 90
     },
-    "facing=west,shape=outer_right": {
+    "capital=false,facing=west,shape=outer_right": {
       "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right",
       "y": 90
     },
-    "facing=west,shape=straight": {
+    "capital=false,facing=west,shape=straight": {
       "model": "heavyseas:block/liner/liner_cornice/cornice",
+      "y": 90
+    },
+    "capital=true,facing=east,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left",
+      "y": 270
+    },
+    "capital=true,facing=east,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right",
+      "y": 270
+    },
+    "capital=true,facing=east,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left",
+      "y": 270
+    },
+    "capital=true,facing=east,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right",
+      "y": 270
+    },
+    "capital=true,facing=east,shape=straight": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_capital",
+      "y": 270
+    },
+    "capital=true,facing=north,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left",
+      "y": 180
+    },
+    "capital=true,facing=north,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right",
+      "y": 180
+    },
+    "capital=true,facing=north,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left",
+      "y": 180
+    },
+    "capital=true,facing=north,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right",
+      "y": 180
+    },
+    "capital=true,facing=north,shape=straight": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_capital",
+      "y": 180
+    },
+    "capital=true,facing=south,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left"
+    },
+    "capital=true,facing=south,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right"
+    },
+    "capital=true,facing=south,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left"
+    },
+    "capital=true,facing=south,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right"
+    },
+    "capital=true,facing=south,shape=straight": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_capital"
+    },
+    "capital=true,facing=west,shape=inner_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_left",
+      "y": 90
+    },
+    "capital=true,facing=west,shape=inner_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_inner_right",
+      "y": 90
+    },
+    "capital=true,facing=west,shape=outer_left": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_left",
+      "y": 90
+    },
+    "capital=true,facing=west,shape=outer_right": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_outer_right",
+      "y": 90
+    },
+    "capital=true,facing=west,shape=straight": {
+      "model": "heavyseas:block/liner/liner_cornice/cornice_capital",
       "y": 90
     }
   }

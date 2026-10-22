@@ -200,6 +200,7 @@ public final class LinerLift {
             Registry.register(Registries.ITEM, id, block instanceof LiftGate
                     ? new TallBlockItem(block, new Item.Settings()) : new BlockItem(block, new Item.Settings()));
         });
+        LinerLiftRigs.register();          // 栅格与指针由 GeckoLib 画（2026-10-19）：方块实体类型要在方块登记之后
     }
 
     /** 全部电梯方块（每一块都是 {@link LinerLooks.Styled}）。 */
@@ -213,7 +214,7 @@ public final class LinerLift {
      * 栅门：上下两块像门那样一起放一起拆；左右两扇。合着是一整片栅格（挡人），开着时栅格叠到外侧只剩一叠（碰撞箱也只剩那一叠）。
      * 右键 = 按这一层的召唤按钮。
      */
-    public static final class LiftGate extends Block implements LinerLooks.Styled {
+    public static final class LiftGate extends Block implements LinerLooks.Styled, net.minecraft.block.BlockEntityProvider {
 
         LiftGate(AbstractBlock.Settings settings) {
             super(settings);
@@ -237,6 +238,12 @@ public final class LinerLift {
         @Override
         public LinerLooks.Look itemLook() {
             return LinerLooks.look("lift/gate_item", tex("g", "lift/gate"));
+        }
+
+        /** 栅格与立梃（GeckoLib，2026-10-19）挂在下半格。 */
+        @Override
+        public net.minecraft.block.entity.BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+            return Rules.carriesRig(state) ? new LinerLiftGateEntity(pos, state) : null;
         }
 
         /** 放下：像双开门一次放左右两扇各两格 —— 点的那一格是左扇，右扇往观者右手；四格都得空着。正面朝放门的人。 */
@@ -334,7 +341,7 @@ public final class LinerLift {
      * {@link #FLOOR} 决定指针角度（{@code template/lift/dial_*}：0 层指向观者左手偏下，7 层指向右手偏下，均匀分在 160° → 20°）；
      * 指针整根落在它指向的那一块里，转轴骑在两块交界上（由左块画）。服务端轿厢走动时改它。
      */
-    public static final class LiftDial extends Block implements LinerLooks.Styled {
+    public static final class LiftDial extends Block implements LinerLooks.Styled, net.minecraft.block.BlockEntityProvider {
 
         LiftDial(AbstractBlock.Settings settings) {
             super(settings);
@@ -356,6 +363,12 @@ public final class LinerLift {
         @Override
         public LinerLooks.Look itemLook() {
             return LinerLooks.look("lift/dial_item", tex("p", "lift/dial_l", "q", "lift/dial_r", "d", "lift/dial"));
+        }
+
+        /** 指针（GeckoLib，2026-10-19）挂在左块：转轴在两块交界上，由左块画。 */
+        @Override
+        public net.minecraft.block.entity.BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+            return Rules.carriesRig(state) ? new LinerLiftDialEntity(pos, state) : null;
         }
 
         /** 放下：一次放左右两块（点的那一格是左块，右块往观者右手，那一格得空着）；正面朝放的人。 */
@@ -565,6 +578,10 @@ public final class LinerLift {
     /** 召唤按钮被按了：找它叫的那一部（{@link Rules#callGate}），当作按了那一层。 */
     static void press(ServerPlayerEntity player, ServerWorld world, BlockPos button, BlockState state) {
         BlockPos gate = Rules.callGate(button, state.get(FACING), world::getBlockState);
+        // 用户 2026-10-22「只按按钮不右键门，电梯不会下来」—— GameTest 复现不出来；留一行，下次在真服上按的时候看得到认没认出门、车在哪
+        Car seen = gate == null ? null : CARS.get(new LiftKey(world.getRegistryKey(), Rules.shaftOf(gate, world.getBlockState(gate).get(FACING))));
+        LOGGER.debug("Lift call button {} by {}: gate {} car {}", button, player.getName().getString(), gate,
+                seen == null ? "not yet seen" : seen.phase + " at y " + seen.atY + " calls " + seen.calls);
         if (gate == null) {
             if (!player.isSpectator() && pressAllowed(player, world)) {
                 player.sendMessage(Text.translatable("heavyseas.lift.no_lift"), true);
@@ -1112,13 +1129,25 @@ public final class LinerLift {
             return Math.max(0, Math.min(DIAL_STOPS - 1, index));
         }
 
-        /** 指针盘的样子：指针在它指向的那一块里（160° → 20°，前四档在左块、后四档在右块；与模板的生成脚本同一条）。 */
+        /**
+         * 指针盘的样子：模板只有盘面与转轴帽，任何一层都是同一块 —— 指针由 GeckoLib 画（{@link LinerLiftDialEntity}，2026-10-19）。
+         * 此前指针画在模板里、每一档一块（指针由一串小方块拼成，模型只能转 22.5° 的倍数），换层时一下跳过去。
+         */
         public static String dialTemplate(Side side, int floor) {
-            boolean needleLeft = floor < DIAL_STOPS / 2;
-            if (side == Side.LEFT) {
-                return needleLeft ? "lift/dial_left_" + floor : "lift/dial_left";
+            return side == Side.LEFT ? "lift/dial_left" : "lift/dial_right";
+        }
+
+        /** 第几档指针的角度（度，0 = 指向观者右手、逆时针为正）：160° → 20°，每档 20°（与 liner_lift_gate.ANGLES 同一条）。 */
+        public static float dialAngle(int floor) {
+            return 160f - 20f * floor;
+        }
+
+        /** 挂不挂方块实体：栅门的下半格（一扇一个，画上下两格的栅格）· 指针盘的左块。 */
+        public static boolean carriesRig(BlockState state) {
+            if (state.getBlock() instanceof LiftGate) {
+                return state.get(HALF) == DoubleBlockHalf.LOWER;
             }
-            return needleLeft ? "lift/dial_right" : "lift/dial_right_" + floor;
+            return state.getBlock() instanceof LiftDial && state.get(SIDE) == Side.LEFT;
         }
 
         /** 门开着的这一层：上一次有人（或刚开）是 {@code since}，此刻 {@code now}；别的层有人叫车（{@code wanted}）时等得短些。 */
@@ -1249,8 +1278,8 @@ public final class LinerLift {
 
         /** 栅门的模板名：{@code lift/gate_<left|right>_<closed|open>_<lower|upper>}。 */
         public static String gateTemplate(Side side, boolean open, DoubleBlockHalf half) {
-            return "lift/gate_" + side.asString() + "_" + (open ? "open" : "closed") + "_"
-                    + (half == DoubleBlockHalf.LOWER ? "lower" : "upper");
+            // 2026-10-19：模板只剩不动的门框 · 门楣 · 轨，开着关着同一块；栅格与立梃由 GeckoLib 画（LinerLiftGateEntity）
+            return "lift/gate_" + side.asString() + "_" + (half == DoubleBlockHalf.LOWER ? "lower" : "upper");
         }
 
         /**

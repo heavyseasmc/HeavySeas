@@ -69,12 +69,20 @@ public final class TableScreen extends GameScreen {
         Bands b = drawChrome(context, view);
         giveBox = null;
         playBox = null;
+        guessBox = null;
         if (seat == null) {
             return;
         }
         Text state = seat.offline() ? Text.translatable("heavyseas.table.offline") : conditionName(seat.condition());
         drawLine(context, Text.translatable("heavyseas.target.entry_down", nameOf(character),
                 seat.health(), seat.size(), state), paneW() / 2, b.stageTop(), GuiLanguage.ink());
+        // 我的猜测（ADR-0043 A17）：看别人时右上一颗小钮，点一下轮换；只在这一台、不发包（GuessMarks）
+        if (guessable()) {
+            Text g = GuessMarks.of(character).label();
+            int gw = buttonWidth(g);
+            guessBox = new Box(paneW() - SIDE - gw, b.stageTop() - 2, gw, buttonHeight());
+            drawButton(context, guessBox, g, false, GuiLanguage.secondary(), 0);
+        }
         int n = seat.front().size();
         int bottom = b.stageBottom() - buttonHeight() - BTN_GAP - BORDER_ROOM;
         // 牌的大小只由竖向空间定（不再按张数缩小）；横着放不下就叠（ADR-0049）。
@@ -157,8 +165,18 @@ public final class TableScreen extends GameScreen {
         if (canPlay()) {
             right.add(keys("play", "Enter"));
         }
+        if (guessable()) {
+            right.add(keys("guess", "M"));
+        }
         right.add(keys("close", "Esc"));
         drawFootBand(context, b, List.of(keys("select", "←", "→")), right, System.currentTimeMillis(), null);
+    }
+
+    private Box guessBox;
+
+    /** 看的是别人（自己那一座不记猜测），而且这一局里有他。 */
+    private boolean guessable() {
+        return seat != null && projection().seated() && !character.equals(projection().character());
     }
 
     /** 自己面前、选中的那一张此刻打得出吗（{@link CardPlay}）。别人的座位一律不行。 */
@@ -226,6 +244,10 @@ public final class TableScreen extends GameScreen {
 
     @Override
     protected boolean leftClick(double x, double y) {
+        if (guessBox != null && guessBox.contains((int) x, (int) y)) {
+            GuessMarks.cycle(character);
+            return true;
+        }
         if (giveBox != null && giveBox.contains((int) x, (int) y)) {
             give();
             return true;
@@ -292,6 +314,10 @@ public final class TableScreen extends GameScreen {
         if (seat != null && (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT)) {
             selected = Math.max(0, Math.min(seat.front().size() - 1, selected + (key == GLFW.GLFW_KEY_RIGHT ? 1 : -1)));
             clicks.reset();
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_M && guessable()) {
+            GuessMarks.cycle(character);       // 我的猜测：M 轮换（只在这一台）
             return true;
         }
         if (key == GLFW.GLFW_KEY_T) {          // 赠送是 T（用户 2026-10-07），G 只表示「行动」

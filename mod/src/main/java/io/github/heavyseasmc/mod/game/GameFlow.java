@@ -74,7 +74,7 @@ public final class GameFlow {
     }
 
     /**
-     * 开一局。座位顺序由角色决定（夫人永远在船头），与谁来占无关；座位摆在哪由布局定（ADR-0034 §5.5）。
+     * 开一局。座位顺序由角色卡上的座位号决定（{@code RosterData#select} 按它排：基础阵容里 1 号夫人坐船头，房主把她剔掉时座位号最小的那位坐船头），与谁来占无关；座位摆在哪由布局定（ADR-0034 §5.5）。
      *
      * @param viaCommand 是 {@code /seas start} 开的（不是演习艇敲钟开航）。指令开的、名单里有替身的局是<b>演示局</b>
      *                   （{@link GameComponent#isDemo}）；演习艇开航即使补了替身也是正式局（审查 2026-10-07 R5）
@@ -178,6 +178,7 @@ public final class GameFlow {
                     session.state().stateOf(id).seat(), characterName(id),
                     who.isDummy() ? Text.translatable("heavyseas.game.dummy") : Text.literal(who.label())));
         }
+        wakeLines(world, component, session);
         // 开局时生效的调试设定，记成这一局的改动（ADR-0060 D3）：全船右栏一行、计分面板的章里算一处。
         seedSetting.ifPresent(s -> DebugTrace.atStart(world, component, s.who(), s.command(),
                 Text.translatable("heavyseas.debug.did.seed", s.value())));
@@ -378,9 +379,9 @@ public final class GameFlow {
         session.beginNavigation(card);
 
         // 结算后只公开被执行的那一张（决策 ⑭）。播的是它印着什么，不是它的 id —— id 不是给人读的。
-        List<String> seats = session.state().bySeat().stream().map(CharacterId::value).toList();
+        // 两栏只点结算时会算到的人（ADR-0043 A9）：被大海带走的、已经死了的（口渴）不再出现在播报里
         broadcast(world, Text.translatable("heavyseas.game.card_played",
-                NavCardText.describe(NavCardView.of(card), seats,
+                NavCardText.describe(NavCardView.of(card), NavCardText.Eligible.of(session.state()),
                         session.currentWeather().map(w -> w.effect().id()).orElse(""))).formatted(Formatting.AQUA));
         OverboardPhase.begin(world, component);
     }
@@ -726,6 +727,29 @@ public final class GameFlow {
     }
 
     /** 播给全场。包内可见：{@link ActionPhase} 与 {@link NavigationPhase} 要播同样的话。 */
+    /** 有醒来那一句的角色（lang 里 {@code heavyseas.wake.<id>.1 / .2}；扩充角色没写的不发）。 */
+    static final java.util.Set<String> WAKE_LINES = java.util.Set.of(
+            "jeweler", "collector", "captain", "mate", "hostess", "sailor", "doctor", "kid");
+
+    /**
+     * 醒来那一句（ADR-0054 §9.9 第 7 条，用户 2026-10-22 定接入）：开局揭晓角色那一刻，每个真人私下收到一句旁白口吻的话，
+     * 告诉他「你是谁」—— 第三人称、只给一个动作或物件，不讲规则。每个角色两句，随便挑一句。
+     * 进航海日志、只给他一个人（{@link GameComponent#privateEvent}），紧跟在开场旁白与座位那几行后面 —— 第一版发在聊天里，
+     * 实测开场那几行都在日志里、只有这一句落在聊天，对局界面一开就被盖住（2026-10-22）。
+     * 不从这一局的随机流里取（取一次就改了天意，同一个种子会打出另一局）；角色本来就是公开的（上面座位那几行），这句不带隐藏信息。
+     */
+    private static void wakeLines(ServerWorld world, GameComponent component, Session session) {
+        for (CharacterId id : session.state().bySeat()) {
+            if (!WAKE_LINES.contains(id.value())) {
+                continue;
+            }
+            int n = 1 + java.util.concurrent.ThreadLocalRandom.current().nextInt(2);
+            component.privateEvent(id, "notice", ExperienceView.Source.RULE,
+                    Text.translatable("heavyseas.wake." + id.value() + "." + n));     // 替身那一座 privateEvent 自己跳过
+        }
+        sync(world);
+    }
+
     static void broadcast(ServerWorld world, Text message) {
         broadcast(world, message, ExperienceView.Source.RULE, "");
     }

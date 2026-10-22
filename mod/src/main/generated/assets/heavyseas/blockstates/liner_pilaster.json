@@ -1,47 +1,182 @@
 {
   "variants": {
-    "base=none,facing=east": {
+    "base=none,facing=east,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_chair_rail",
+      "y": 270
+    },
+    "base=none,facing=east,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_cornice",
+      "y": 270
+    },
+    "base=none,facing=east,trim=none": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster",
       "y": 270
     },
-    "base=none,facing=north": {
+    "base=none,facing=east,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster",
+      "y": 270
+    },
+    "base=none,facing=north,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_chair_rail",
+      "y": 180
+    },
+    "base=none,facing=north,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_cornice",
+      "y": 180
+    },
+    "base=none,facing=north,trim=none": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster",
       "y": 180
     },
-    "base=none,facing=south": {
+    "base=none,facing=north,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster",
+      "y": 180
+    },
+    "base=none,facing=south,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_chair_rail"
+    },
+    "base=none,facing=south,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_cornice"
+    },
+    "base=none,facing=south,trim=none": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster"
     },
-    "base=none,facing=west": {
+    "base=none,facing=south,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster"
+    },
+    "base=none,facing=west,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_chair_rail",
+      "y": 90
+    },
+    "base=none,facing=west,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_cornice",
+      "y": 90
+    },
+    "base=none,facing=west,trim=none": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster",
       "y": 90
     },
-    "base=plinth,facing=east": {
+    "base=none,facing=west,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster",
+      "y": 90
+    },
+    "base=plinth,facing=east,trim=chair_rail": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
       "y": 270
     },
-    "base=plinth,facing=north": {
+    "base=plinth,facing=east,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 270
+    },
+    "base=plinth,facing=east,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 270
+    },
+    "base=plinth,facing=east,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 270
+    },
+    "base=plinth,facing=north,trim=chair_rail": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
       "y": 180
     },
-    "base=plinth,facing=south": {
+    "base=plinth,facing=north,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 180
+    },
+    "base=plinth,facing=north,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 180
+    },
+    "base=plinth,facing=north,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 180
+    },
+    "base=plinth,facing=south,trim=chair_rail": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth"
     },
-    "base=plinth,facing=west": {
+    "base=plinth,facing=south,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth"
+    },
+    "base=plinth,facing=south,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth"
+    },
+    "base=plinth,facing=south,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth"
+    },
+    "base=plinth,facing=west,trim=chair_rail": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
       "y": 90
     },
-    "base=skirting,facing=east": {
+    "base=plinth,facing=west,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 90
+    },
+    "base=plinth,facing=west,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 90
+    },
+    "base=plinth,facing=west,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth",
+      "y": 90
+    },
+    "base=skirting,facing=east,trim=chair_rail": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
       "y": 270
     },
-    "base=skirting,facing=north": {
+    "base=skirting,facing=east,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 270
+    },
+    "base=skirting,facing=east,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 270
+    },
+    "base=skirting,facing=east,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 270
+    },
+    "base=skirting,facing=north,trim=chair_rail": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
       "y": 180
     },
-    "base=skirting,facing=south": {
+    "base=skirting,facing=north,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 180
+    },
+    "base=skirting,facing=north,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 180
+    },
+    "base=skirting,facing=north,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 180
+    },
+    "base=skirting,facing=south,trim=chair_rail": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting"
     },
-    "base=skirting,facing=west": {
+    "base=skirting,facing=south,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting"
+    },
+    "base=skirting,facing=south,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting"
+    },
+    "base=skirting,facing=south,trim=skirting": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting"
+    },
+    "base=skirting,facing=west,trim=chair_rail": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 90
+    },
+    "base=skirting,facing=west,trim=cornice": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 90
+    },
+    "base=skirting,facing=west,trim=none": {
+      "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
+      "y": 90
+    },
+    "base=skirting,facing=west,trim=skirting": {
       "model": "heavyseas:block/liner/liner_pilaster/pilaster_plinth_skirting",
       "y": 90
     }

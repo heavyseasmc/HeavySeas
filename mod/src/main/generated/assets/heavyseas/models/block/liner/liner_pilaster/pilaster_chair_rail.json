@@ -1,0 +1,8 @@
+{
+  "parent": "heavyseas:block/liner/template/pilaster_chair_rail",
+  "textures": {
+    "p": "heavyseas:block/liner/pilaster",
+    "particle": "heavyseas:block/liner/pilaster",
+    "r": "heavyseas:block/liner/chair_rail"
+  }
+}

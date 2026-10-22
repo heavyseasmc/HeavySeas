@@ -64,7 +64,8 @@ final class ProtocolFingerprintTest {
             3, "449fe702ab892620",    // 投影公开那一半多了座位轨标记（HudView.Rail：在等哪几座 · 各自的钟 · 补给箱在谁手上）
             4, "440efae3dafe09d8",    // 「上一局」快照带上被移出游戏的人（ExperienceView.Result#removed）
             5, "0a67c78db2da4668",    // 北辰号的电梯（LiftFloorsS2C 楼层表 · LiftTravelC2S 去第几层）
-            6, "9ce6ea3878bc9129");   // 电梯出发（LiftRideS2C：这一趟走多少 tick，客户端渐暗轻晃）
+            6, "9ce6ea3878bc9129",    // 电梯出发（LiftRideS2C：这一趟走多少 tick，客户端渐暗轻晃）
+            7, "17d4cffda7ce15e7");   // 座位公开状态多了力气 · 生存分 · 今天做过的事 · 抢东西不能被拒；落海每种出法带「谁会淹死」（ADR-0043 §11）
 
     private static final CharacterId MATE = CharacterId.of("mate");
     private static final CharacterId KID = CharacterId.of("kid");

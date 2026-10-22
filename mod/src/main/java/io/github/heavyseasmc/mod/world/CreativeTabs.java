@@ -37,11 +37,12 @@ public final class CreativeTabs {
             new Page("p1_materials", List.of(
                     // 楼梯 / 台阶（ADR-0093 5d）紧跟各自的整块：整块 → 楼梯 → 台阶（游戏自带物品栏的次序）
                     "liner_wall_white", "liner_wall_white_stairs", "liner_wall_white_slab",
-                    "liner_wall", "liner_ceiling", "liner_ceiling_slab", "liner_wainscot", "liner_frame_white", "liner_arch",
+                    "liner_wall", "liner_ceiling", "liner_ceiling_slab", "liner_ceiling_cream", "liner_ceiling_beam", "liner_wainscot", "liner_frame_white", "liner_arch",
                     "liner_frame_gilt", "liner_frame_gilt_wide",
                     "liner_mahogany_wall", "liner_mahogany_slab", "liner_wainscot_mahogany", "liner_frame_mahogany", "liner_frame_mahogany_gilt",
-                    "liner_teak_deck", "liner_teak_stairs", "liner_teak_slab", "liner_tile_wall", "liner_tile_floor",
-                    "liner_carpet",
+                    "liner_frame_damask_gilt", "liner_frame_flame_gilt", "liner_frame_parquet_gilt", "liner_ceiling_mahogany",
+                    "liner_teak_deck", "liner_teak_stairs", "liner_teak_slab", "liner_tile_wall", "liner_tile_floor", "liner_hammam_slab",
+                    "liner_carpet", "liner_carpet_navy", "liner_carpet_green",
                     "liner_hull_white", "liner_hull_white_stairs", "liner_hull_white_slab",
                     "liner_hull_black", "liner_hull_black_stairs", "liner_hull_black_slab",
                     "liner_hull_red", "liner_hull_red_stairs", "liner_hull_red_slab",
@@ -50,11 +51,11 @@ public final class CreativeTabs {
                     "liner_funnel_buff", "liner_funnel_black",
                     "decor_hammer")),                     // 装修锤（ADR-0093 B15）：放下以后再改，排在结构材料末尾、不当页签图标
             new Page("p2_trim", List.of(
-                    "liner_cornice", "liner_cornice_thin", "liner_chair_rail", "liner_pilaster", "liner_door_casing",
+                    "liner_cornice", "liner_cornice_gilt", "liner_cornice_thin", "liner_chair_rail", "liner_chair_rail_gilt", "liner_pilaster", "liner_door_casing", "liner_door_casing_mahogany",
                     "liner_door_casing_tall", "liner_trellis",
                     "liner_skirting", "liner_pilaster_mahogany", "liner_capping_mahogany")),
             new Page("p3_openings", List.of(
-                    "liner_door_cabin", "liner_door_double",
+                    "liner_door_cabin", "liner_door_cabin_mahogany", "liner_door_double",
                     "liner_lift_gate", "liner_lift_dial", "liner_lift_call", "liner_lift_panel",
                     "liner_window_1x1", "liner_window_1x2", "liner_window_1x3", "liner_window_2x1", "liner_window_2x2",
                     "liner_window_2x3", "liner_window_3x1", "liner_window_3x2", "liner_window_3x3",

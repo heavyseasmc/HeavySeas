@@ -89,13 +89,27 @@ public final class ConsentScreen extends GameScreen {
                     case RATION -> "heavyseas.consent.ration";
                 }, nameOf(attacker)),
                 paneW() / 2, askY, GuiLanguage.ink());
+        // 两边此刻的力气（ADR-0043 §11 第四组）：这时还没人站队、没人押武器，只是起点 —— 那一句照实说。
+        // 数取两人座位上的「打架力气」（体型 + 今天的酒，Session#fightingSize，与结算同一个函数）。
+        // ❗不取 ContestView 的两边和：表态那一刻阵营还没建，那两个数是 0（2026-10-20 实拍「医生是 0，你是 0」）
+        int powerY = askY + lineStep();
+        drawLine(context, Text.translatable("heavyseas.consent.power", nameOf(attacker),
+                strengthOf(attacker), strengthOf(view.character())), paneW() / 2, powerY, GuiLanguage.secondary());
         int s = guiScale();
         var l = sheet();
-        double top0 = Math.max(l.railBottom() + CardRow.RAIL_CLEAR * l.k(), (askY + lineStep() + HINT_GAP) * (double) s);
-        cards.render(context, b, mouseX, mouseY, now, dt, top0, 0, askY + lineStep());
+        double top0 = Math.max(l.railBottom() + CardRow.RAIL_CLEAR * l.k(), (powerY + lineStep() + HINT_GAP) * (double) s);
+        cards.render(context, b, mouseX, mouseY, now, dt, top0, 0, powerY + lineStep());
 
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,
                 new Countdown(view.contest().deadlineMs(), view.contest().windowMs(), 0));
+    }
+
+    private int strengthOf(String id) {
+        if (client == null || client.world == null) {
+            return 0;
+        }
+        return io.github.heavyseasmc.mod.state.GameComponents.of(client.world).tableView().seats().stream()
+                .filter(s -> s.id().equals(id)).findFirst().map(io.github.heavyseasmc.mod.state.TableView.Seat::strength).orElse(0);
     }
 
     /**
@@ -155,6 +169,12 @@ public final class ConsentScreen extends GameScreen {
     @Override
     protected String rulesAnchor() {
         return "consent";
+    }
+
+    /** 规则签再带上「谁赢」：这几面做的决定就看两边力气怎么比（ADR-0043 §11 第六组）。 */
+    @Override
+    protected List<String> rulesAnchors() {
+        return List.of(rulesAnchor(), "section-39");
     }
 
     @Override

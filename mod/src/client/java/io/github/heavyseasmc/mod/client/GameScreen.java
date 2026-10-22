@@ -351,6 +351,10 @@ public abstract class GameScreen extends Screen {
 
     /** 界面开着时按键不经按键绑定的轮询，所以换主题在这里接一次；各面的 onKey 最后都会落到 super。 */
     protected boolean onKey(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && rulesSign != null) {
+            rulesSign = null;                 // 规则签开着：Esc 只收签（ADR-0043 §11 第六组）
+            return true;
+        }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && detail != null) {
             detail = null;
             return true;
@@ -455,6 +459,7 @@ public abstract class GameScreen extends Screen {
     }
 
     final void renderDetails(DrawContext context, int mouseX, int mouseY) {
+        drawRulesSign(context);
         Text shown = detail;
         int x = detailX;
         int y = detailY;
@@ -526,6 +531,10 @@ public abstract class GameScreen extends Screen {
      */
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (rulesSign != null && rulesSignBox != null && rulesSignBox.contains((int) mouseX, (int) mouseY) && verticalAmount != 0) {
+            rulesSignFirst = Math.max(0, Math.min(rulesSignLast, rulesSignFirst + (verticalAmount > 0 ? -1 : 1)));
+            return true;
+        }
         if (inspecting() && plateBox != null && plateBox.contains((int) mouseX, (int) mouseY) && verticalAmount != 0) {
             plateFirstLine = Math.max(0, Math.min(plateLastLine, plateFirstLine + (verticalAmount > 0 ? -1 : 1)));
             return true;
@@ -808,7 +817,7 @@ public abstract class GameScreen extends Screen {
                 view.active(), view.seated(), decisionFace(), handOrAction,
                 origin != null && origin.owner() != this);
         switch (NavigationKeys.route(press)) {
-            case RULES -> RulebookBook.open(client, this, rulesAnchor());
+            case RULES -> toggleRulesSign();
             case BACK_TO_DECISION -> DecisionNavigation.back(null, origin);
             case REQUEST_DECISION -> {
                 client.setScreen(null);
@@ -915,6 +924,160 @@ public abstract class GameScreen extends Screen {
         return true;
     }
 
+    /**
+     * 航海牌预告两栏各认谁（ADR-0043 A9）：取自公开座位（{@code TableView}），与引擎结算同一个口径 ——
+     * 被大海带走的不再被点名，死了的不再写进口渴。
+     */
+    protected io.github.heavyseasmc.mod.game.NavCardText.Eligible navEligible() {
+        if (client == null || client.world == null) {
+            return io.github.heavyseasmc.mod.game.NavCardText.Eligible.both(java.util.List.of());
+        }
+        return io.github.heavyseasmc.mod.game.NavCardText.Eligible.ofSeats(
+                io.github.heavyseasmc.mod.state.GameComponents.of(client.world).tableView().seats());
+    }
+
+    /**
+     * 规则签上放哪几节（锚点，按先后）。默认只有 {@link #rulesAnchor} 那一节；要打架的几面再带上「谁赢」。
+     */
+    protected List<String> rulesAnchors() {
+        return List.of(rulesAnchor());
+    }
+
+    /** 规则签上的一行：小标题（粗）或正文。 */
+    private record RuleLine(String text, boolean heading) {
+    }
+
+    /** 规则签开着时的内容；{@code null} = 没开。 */
+    private List<RuleLine> rulesSign;
+    private String rulesSignCaption = "";
+    private int rulesSignFirst;
+    private int rulesSignLast;
+    private Box rulesSignBox;
+
+    /**
+     * 规则键（默认 J）与左上「规则」按钮（ADR-0043 §11 第六组；用户 2026-10-20 按倾向定）：
+     * 第一下在这一面上盖一块签，只放这一面对应的那一两节，倒计时照走；签开着再按一下，才打开整本书。
+     * 书里找不到锚点时直接开书，并报一行 —— 不静默地什么也不出。
+     */
+    protected void toggleRulesSign() {
+        if (client == null) {
+            return;
+        }
+        if (rulesSign != null) {
+            rulesSign = null;
+            RulebookBook.open(client, this, rulesAnchor());
+            return;
+        }
+        List<io.github.heavyseasmc.mod.rulebook.Rulebook.Block> book = RulebookBook.rulebook(client);
+        List<RuleLine> lines = new java.util.ArrayList<>();
+        String caption = null;
+        for (String anchor : rulesAnchors()) {
+            var section = io.github.heavyseasmc.mod.rulebook.Rulebook.section(book, anchor);
+            if (section.isEmpty()) {
+                LOGGER.warn("Rules sign: anchor {} not in the rulebook", anchor);
+                continue;
+            }
+            if (caption == null) {
+                caption = section.get().chapter();
+            }
+            for (var block : section.get().blocks()) {
+                if (block instanceof io.github.heavyseasmc.mod.rulebook.Rulebook.Heading h) {
+                    lines.add(new RuleLine(h.text(), true));
+                } else if (block instanceof io.github.heavyseasmc.mod.rulebook.Rulebook.Para para) {
+                    lines.add(new RuleLine(spansText(para.spans()), false));
+                } else if (block instanceof io.github.heavyseasmc.mod.rulebook.Rulebook.Item item) {
+                    lines.add(new RuleLine((item.depth() > 0 ? "　" : "") + item.marker() + " " + spansText(item.spans()), false));
+                }
+            }
+        }
+        if (lines.isEmpty()) {
+            RulebookBook.open(client, this, rulesAnchor());
+            return;
+        }
+        rulesSign = List.copyOf(lines);
+        rulesSignCaption = caption;
+        rulesSignFirst = 0;
+        LOGGER.info("规则签：{} · {} 行", rulesAnchors(), lines.size());
+    }
+
+    private static String spansText(List<io.github.heavyseasmc.mod.rulebook.Rulebook.Span> spans) {
+        StringBuilder out = new StringBuilder();
+        for (var span : spans) {
+            out.append(span.text());
+        }
+        return out.toString();
+    }
+
+    /** 盖在舞台正中的那块签：题头（章名）· 各行 · 底下一行键位提示；放不下就滚，最后留一行「滚轮查看全文」。 */
+    private void drawRulesSign(DrawContext context) {
+        rulesSignBox = null;
+        if (rulesSign == null) {
+            return;
+        }
+        Bands b = bands();
+        int pad = 8;
+        int w = Math.max(120, Math.min(300, paneW() - 2 * SIDE));
+        int tw = w - 2 * pad;
+        int x = (paneW() - w) / 2;
+        int top = b.stageTop();
+        int maxH = Math.max(60, b.stageBottom() - top);
+        int capH = GuiText.lineHeight(GuiText.CAPTION, false) + 3;
+        String hint = Text.translatable("heavyseas.rules_sign.hint",
+                HeavySeasClient.rulesKey().getBoundKeyLocalizedText()).getString();
+        int hintH = GuiText.lineHeight(GuiText.CAPTION, false) + 4;
+        int[] hs = new int[rulesSign.size()];
+        for (int i = 0; i < hs.length; i++) {
+            RuleLine line = rulesSign.get(i);
+            hs[i] = GuiText.height(line.text(), tw, line.heading() ? GuiText.NAME : GuiText.BODY, line.heading(), 20)
+                    + (line.heading() && i > 0 ? 4 : 2);
+        }
+        int room = maxH - 2 * pad - capH - hintH;
+        // 从 rulesSignFirst 起放得下几行；最后一行放不下就把「滚轮查看全文」也算进来
+        int last = rulesSign.size() - 1;
+        int fit = 0;
+        for (int i = 0, used = 0; i < hs.length; i++) {
+            used += hs[i];
+            if (used > room) {
+                break;
+            }
+            fit++;
+        }
+        rulesSignLast = Math.max(0, rulesSign.size() - Math.max(1, fit));
+        rulesSignFirst = Math.min(rulesSignFirst, rulesSignLast);
+        int bodyH = 0;
+        int end = rulesSignFirst;
+        for (int i = rulesSignFirst; i <= last; i++) {
+            if (bodyH + hs[i] > room) {
+                break;
+            }
+            bodyH += hs[i];
+            end = i + 1;
+        }
+        boolean more = end <= last || rulesSignFirst > 0;
+        int h = 2 * pad + capH + bodyH + hintH;
+        context.getMatrices().push();
+        context.getMatrices().translate(0, 0, 350);
+        GuiMaterial.plate(context, x, top, w, h, -1);
+        int ty = top + pad;
+        GuiText.line(context, Text.translatable("heavyseas.rules_sign.caption", rulesSignCaption), x + pad, ty, tw,
+                GuiText.CAPTION, false, GuiLanguage.onTag(GuiLanguage.muted()), GuiText.Align.LEFT);
+        ty += capH;
+        for (int i = rulesSignFirst; i < end; i++) {
+            RuleLine line = rulesSign.get(i);
+            if (line.heading() && i > rulesSignFirst) {
+                ty += 2;
+            }
+            GuiText.draw(context, line.text(), x + pad, ty, tw, line.heading() ? GuiText.NAME : GuiText.BODY, line.heading(),
+                    GuiLanguage.onTag(GuiLanguage.ink()), GuiText.Align.LEFT, 20);
+            ty += hs[i] - (line.heading() && i > rulesSignFirst ? 2 : 0);
+        }
+        GuiText.line(context, Text.literal(more ? hint + "　" + Text.translatable("heavyseas.navigation.scroll_detail").getString() : hint),
+                x + pad, top + h - pad - hintH + 4, tw, GuiText.CAPTION, false, GuiLanguage.onTag(GuiLanguage.muted()),
+                GuiText.Align.LEFT);
+        context.getMatrices().pop();
+        rulesSignBox = new Box(x, top, w, h);
+    }
+
     /** 「规则」按钮与规则键翻到规则书哪一节（规则书里的锚点）。 */
     protected String rulesAnchor() {
         return "actions";
@@ -939,7 +1102,7 @@ public abstract class GameScreen extends Screen {
         // 板外沿上方那一条：按钮高 = 一行字 + 上下各一圈内边距，贴着板顶往上排，窗口再矮也不出屏幕
         int y = Math.max(1, l.sheet().y() - navigationButtonH(l) - l.len(NAV_GAP));
         x = navigationButton(context, x, y, Text.translatable("heavyseas.navigation.rules"),
-                () -> RulebookBook.open(client, this, rulesAnchor()));
+                this::toggleRulesSign);
         if (playing) {
             int next = navigationButton(context, x, y, Text.translatable("heavyseas.navigation.chat"),
                     () -> client.setScreen(new DecisionChatScreen(this, false)));
@@ -1429,10 +1592,19 @@ public abstract class GameScreen extends Screen {
         SeatToken.ring(context, SeatToken.Kit.TOKEN46, t, l.k(), mark);
         // D1 (a)：体力印章 · 昏迷 · 移出 · 死亡（ADR-0048）。各面的轨上没有舵轮，印章一律在右下
         seat.ifPresent(s -> SeatMarks.marks(context, t, s, l.k()));
+        HurtCue.draw(context, t, characterId, l.k());
+        GuessMarks.draw(context, t, characterId, l.k());
         Rect nm = l.seatName(i, n);
         GuiText.drawPx(context, nameOf(characterId).getString(), nm.x(), nm.y(), nm.w(), l.len(SheetLayout.NAME_PX),
                 false, lit ? GuiLanguage.ink() : GuiLanguage.secondary(), GuiText.Align.CENTER, 0);
         SeatToken.chip(context, l.seatChip(i, n), l.k(), mark.chip());
+        // 舵手：与主画面的舵轮同一个口径（行动与航海两段、不在终局；舵手是谁取投影 sea().helmsman()，服务端 helmSeat 算的）
+        HudView hv = projection();
+        if (!hv.endgame().active() && (hv.phase() == io.github.heavyseasmc.engine.state.Phase.ACTION
+                || hv.phase() == io.github.heavyseasmc.engine.state.Phase.NAVIGATION)
+                && characterId.equals(hv.sea().helmsman())) {
+            SeatToken.helm(context, l.seatHelm(i, n), l.k());
+        }
         pxEnd(context);
     }
 
@@ -1768,17 +1940,60 @@ public abstract class GameScreen extends Screen {
         }
         for (var seat : io.github.heavyseasmc.mod.state.GameComponents.of(client.world).tableView().seats()) {
             if (seat.id().equals(characterId)) {
-                Text state = seat.offline() ? Text.translatable("heavyseas.table.offline") : conditionName(seat.condition());
-                // 「右键看面前的牌」每一面都写：右键座位现在哪一面都开得了那个人的座位面板（二级页面，见 mouseClicked）
-                Text line = Text.translatable("heavyseas.seat.detail",
-                        nameOf(characterId), Math.max(0, seat.health()), seat.size(), state);
-                // 下面接规则书里这个人的本事（用户 2026-10-07：「鼠标移动到角色头像上是浮窗气泡显示角色介绍」）
-                List<String> notes = CharacterNotes.of(characterId);
-                return java.util.Optional.of(notes.isEmpty() ? line
-                        : Text.literal(line.getString() + "\n" + String.join("\n", notes)));
+                return java.util.Optional.of(Text.literal(String.join("\n", seatSignLines(seat, projection(), CharacterNotes.of(seat.id())))));
             }
         }
         return java.util.Optional.empty();
+    }
+
+    /**
+     * 座位签一行一行写什么（ADR-0043 §11 第一组；文案 2026-10-20 按用户「中文语境很难理解，过度简化和 AI 风味」重写成口语）。
+     * 全是公开的，只有「你爱 / 恨这个人」那一行取收件人自己的爱恨（只在他那一包里）。不写「他 / 她」：八个人男女都有。
+     */
+    static List<String> seatSignLines(io.github.heavyseasmc.mod.state.TableView.Seat seat, HudView view, List<String> notes) {
+        List<String> lines = new java.util.ArrayList<>();
+        String state = seat.offline() ? "heavyseas.seat.state.offline" : switch (seat.condition()) {
+            case CONSCIOUS -> "heavyseas.seat.state.conscious";
+            case UNCONSCIOUS -> "heavyseas.seat.state.unconscious";
+            case DEAD -> "heavyseas.seat.state.dead";
+        };
+        lines.add(Text.translatable("heavyseas.seat.sign.head", nameOf(seat.id()), Math.max(0, seat.health()), seat.size(),
+                Text.translatable(state)).getString());
+        boolean onBoatAlive = !seat.removed() && seat.condition() != Condition.DEAD;
+        // 力气与体力不一样时才写：喝了酒（力气比体型大），或受了伤（体力比体型少，打架却照满体型算）
+        if (onBoatAlive && seat.strength() > seat.size()) {
+            lines.add(Text.translatable("heavyseas.seat.sign.strength_rum", seat.strength()).getString());
+        } else if (onBoatAlive && seat.health() < seat.size()) {
+            lines.add(Text.translatable("heavyseas.seat.sign.strength", seat.strength()).getString());
+        }
+        if (!seat.front().isEmpty()) {
+            lines.add(Text.translatable("heavyseas.seat.sign.front", io.github.heavyseasmc.mod.game.NavCardText.join(
+                    seat.front().stream().distinct().map(GameScreen::provisionName).toList())).getString());
+        }
+        List<Text> today = new java.util.ArrayList<>();
+        if (seat.today().contains(io.github.heavyseasmc.mod.state.TableView.Today.ROWED)) {
+            today.add(Text.translatable("heavyseas.seat.sign.rowed"));
+        }
+        if (seat.today().contains(io.github.heavyseasmc.mod.state.TableView.Today.FOUGHT)) {
+            today.add(Text.translatable("heavyseas.seat.sign.fought"));
+        }
+        if (onBoatAlive && !today.isEmpty()) {
+            lines.add(Text.translatable("heavyseas.seat.sign.today", io.github.heavyseasmc.mod.game.NavCardText.join(today)).getString());
+        }
+        // 和你的关系：盼他活着的人拿他的生存分，盼他死的人拿他的体型（规则书第三章）。自己那一座不写
+        if (view.seated() && !seat.id().equals(view.character())) {
+            if (seat.id().equals(view.love())) {
+                lines.add(Text.translatable("heavyseas.seat.sign.love", seat.survival()).getString());
+            }
+            if (seat.id().equals(view.hate())) {
+                lines.add(Text.translatable("heavyseas.seat.sign.hate", seat.size()).getString());
+            }
+        }
+        // 下面接规则书里这个人的本事（用户 2026-10-07：「鼠标移动到角色头像上是浮窗气泡显示角色介绍」）
+        lines.addAll(notes);
+        // 右键座位哪一面都开得了那个人的座位面板（二级页面，见 mouseClicked）
+        lines.add(Text.translatable("heavyseas.seat.sign.inspect").getString());
+        return lines;
     }
 
     /**

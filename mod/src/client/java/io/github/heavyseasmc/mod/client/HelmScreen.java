@@ -175,7 +175,7 @@ public final class HelmScreen extends GameScreen {
         // 签子上写牌面上印的那个名字（与划船一面同一条，2026-10-13 验收 E02）
         if (gathered > 0f && highlight >= 0 && highlight < offer.size()) {
             drawCardPlate(context, ins.plateX(), ins.plateY(), ins.plateW(), -1,
-                    null, navTitle(offer.get(highlight)), NavCardText.describe(offer.get(highlight), view.seats(), Catalog.weatherEffect(view.weather()))
+                    null, navTitle(offer.get(highlight)), NavCardText.describe(offer.get(highlight), navEligible(), Catalog.weatherEffect(view.weather()))
                             .copy().append("\n").append(Text.translatable("heavyseas.navigation.helm_destination")));
         }
         drawFootBand(context, b, List.of(keys("select", "←", "→")), inspectHints("confirm"), now,

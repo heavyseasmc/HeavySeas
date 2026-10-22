@@ -132,9 +132,9 @@ final class CardNameFit {
             }
             Map<String, Map<String, Double>> units = measure(lang);
             UNITS.put(lang, units);
-            for (String kind : units.keySet()) {
-                double[] t = layout.thresholds(kind, units.get(kind));
-                LOGGER.debug("Card name thresholds: language={} kind={} L0>={}px L1>={}px", lang, kind, Math.round(t[0]), Math.round(t[1]));
+            for (Map.Entry<String, Map<String, Double>> u : units.entrySet()) {
+                double[] t = layout.thresholds(u.getKey(), u.getValue());
+                LOGGER.debug("Card name thresholds: language={} kind={} L0>={}px L1>={}px", lang, u.getKey(), Math.round(t[0]), Math.round(t[1]));
             }
             for (Map.Entry<String, Named> e : all.entrySet()) {
                 overflow += report(layout, lang, e.getKey(), e.getValue(),

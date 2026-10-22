@@ -342,9 +342,11 @@ public final class SeatQuestions {
 
     /** 一张航海牌今天会怎样（界面那一份，按今天的天候改写过），写成纯文字。 */
     static String navCard(SeatView v, NavigationCard card, Names n) {
-        List<String> order = v.seats().stream().map(s -> s.id().value()).toList();
+        // 与界面、播报同一个口径（ADR-0043 A9）：落海认还在船上的，口渴认活着的
+        List<String> onBoat = v.seats().stream().filter(s -> !s.removed()).map(s -> s.id().value()).toList();
+        List<String> alive = v.seats().stream().filter(s -> !s.removed() && s.alive()).map(s -> s.id().value()).toList();
         String weather = v.weather().map(w -> w.effect().id()).orElse("");
-        return n.render(NavCardText.describe(NavCardView.of(card), order, weather));
+        return n.render(NavCardText.describe(NavCardView.of(card), new NavCardText.Eligible(onBoat, alive), weather));
     }
 
     // ---------------------------------------------------------------- 局面

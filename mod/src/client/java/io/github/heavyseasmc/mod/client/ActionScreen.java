@@ -68,17 +68,60 @@ public final class ActionScreen extends GameScreen {
         return view.myTurnToAct() && (c != ActionCard.ROW || view.canRow());
     }
 
-    /** 说明板上那一句：按不动的划船说为什么按不动，其余照牌上的说明。 */
+    /**
+     * U 查看时说明板上写什么（ADR-0043 §11 第三组）：做什么 · 图什么 · 要付出什么，数字取此刻的。
+     * 用户 2026-10-07：「划船有什么用，用物资代表什么，看过也会忘」；2026-10-20：文案要像人说话，不要「·」串短语。
+     * 按不动的划船只说为什么按不动。
+     */
     private Text effect(ActionCard c) {
         if (c == ActionCard.ROW && !view.canRow()) return Text.translatable("heavyseas.action.row_becalmed_hint");
-        Text detail = switch (c) {
-            case ROW -> Text.translatable("heavyseas.action.detail.row");
-            case SWAP, STEAL -> Text.translatable("heavyseas.action.detail.contest");
-            case USE -> Text.translatable("heavyseas.action.detail.use");
-            case PASS -> Text.translatable("heavyseas.action.detail.pass");
-            default -> Text.empty();
+        var me = mySeat();
+        int strength = me.map(io.github.heavyseasmc.mod.state.TableView.Seat::strength).orElse(0);
+        List<Text> lines = switch (c) {
+            case ROW -> List.of(Text.translatable("heavyseas.action.sign.row.what"),
+                    Text.translatable("heavyseas.action.sign.row.why", view.sea().rowStack()),
+                    Text.translatable("heavyseas.action.sign.row.cost"));
+            case SWAP -> List.of(Text.translatable("heavyseas.action.sign.swap.what"),
+                    Text.translatable("heavyseas.action.sign.swap.why"),
+                    Text.translatable("heavyseas.action.sign.fight_cost", strength));
+            // 小孩抢东西只拿手牌、对方不能拒（本事数据，服务端算好放进座位公开状态，这里不认是哪个角色）
+            case STEAL -> me.map(io.github.heavyseasmc.mod.state.TableView.Seat::stealsUncontested).orElse(false)
+                    ? List.of(Text.translatable("heavyseas.action.sign.steal.what"),
+                            Text.translatable("heavyseas.action.sign.steal.uncontested"))
+                    : List.of(Text.translatable("heavyseas.action.sign.steal.what"),
+                            Text.translatable("heavyseas.action.sign.steal.why"),
+                            Text.translatable("heavyseas.action.sign.fight_cost", strength));
+            case USE -> {
+                List<Text> usable = view.experience().playability().stream()
+                        .filter(p -> p.action() == io.github.heavyseasmc.mod.state.ExperienceView.Action.PLAY && p.enabled())
+                        .map(io.github.heavyseasmc.mod.state.ExperienceView.Playability::card).distinct()
+                        .map(GameScreen::provisionName).toList();
+                yield List.of(Text.translatable("heavyseas.action.sign.use.what"),
+                        usable.isEmpty() ? Text.translatable("heavyseas.action.sign.use.none")
+                                : Text.translatable("heavyseas.action.sign.use.now", io.github.heavyseasmc.mod.game.NavCardText.join(usable)),
+                        Text.translatable("heavyseas.action.sign.use.later"));
+            }
+            case PASS -> List.of(Text.translatable("heavyseas.action.sign.pass"));
+            default -> List.of(Text.translatable(c.effectKey()));
         };
-        return Text.translatable(c.effectKey()).append("\n").append(detail);
+        net.minecraft.text.MutableText out = Text.empty();
+        for (int i = 0; i < lines.size(); i++) {
+            if (i > 0) {
+                out.append("\n");
+            }
+            out.append(lines.get(i));
+        }
+        return out;
+    }
+
+    /** 自己那一座的公开状态（力气 · 本事标记）；不在局里时是空。 */
+    private java.util.Optional<io.github.heavyseasmc.mod.state.TableView.Seat> mySeat() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.world == null || !view.seated()) {
+            return java.util.Optional.empty();
+        }
+        return GameComponents.of(mc.world).tableView().seats().stream()
+                .filter(s -> s.id().equals(view.character())).findFirst();
     }
 
     private static ActionChoiceC2S.Kind kindOf(ActionCard c) {

@@ -3,8 +3,8 @@
   "textures": {
     "back": "heavyseas:block/liner/wall_white",
     "end": "heavyseas:block/liner/wall_white",
-    "front": "heavyseas:block/liner/mahogany",
-    "particle": "heavyseas:block/liner/mahogany",
+    "front": "heavyseas:block/liner/mahogany_wall",
+    "particle": "heavyseas:block/liner/mahogany_wall",
     "side": "heavyseas:block/liner/wall_white"
   }
 }
